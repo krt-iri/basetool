@@ -21,85 +21,122 @@
     </nav>
 </header>
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{profile.title}">User Profile</h1>
-    </div>
+    <div class="profile-page">
+        <h1 class="pf-title" th:text="#{profile.title}">Mein Profil</h1>
+        <p class="pf-sub" th:text="#{profile.subtitle}">Your master data and personal preferences.</p>
 
-    <div class="hud-box mt-2">
-        <dl class="kv-list kv-ruled">
-            <dt th:text="#{profile.username}">Username</dt>
-            <dd th:text="${username}">username</dd>
-
-            <dt th:text="#{profile.email}">Email</dt>
-            <dd th:text="${email}">email@example.com</dd>
-
-            <th:block th:if="${rank}">
-                <dt th:text="#{profile.rank}">Rank</dt>
-                <dd th:text="${rank}">10</dd>
-            </th:block>
-            <th:block th:if="${joinDate}">
-                <dt th:text="#{member.join_date}">Beitrittsdatum</dt>
-                <dd th:text="${#temporals.format(joinDate, 'dd.MM.yyyy')}">01.01.2020</dd>
-            </th:block>
-            <th:block th:if="${monthsInSquadron != null}">
-                <dt th:text="#{member.months_in_squadron}">Monate bei der Staffel</dt>
-                <dd th:text="${monthsInSquadron}">0</dd>
-            </th:block>
-
-            <dt class="kv-row-self-start" th:text="#{profile.custom_data}">Custom Data</dt>
-            <dd>
-                <form id="profile-description-form" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
-                    <input type="hidden" name="version" th:field="*{version}">
-                    <div class="form-group">
-                        <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
-                        <input type="text" id="displayName" name="displayName" th:field="*{displayName}" class="w-full"
-                               th:classappend="${#fields.hasErrors('displayName')} ? 'input-error'" />
-                        <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
+        <!-- ===== Identity (read-only): initials tile + name/handle + rank/squadron chips ===== -->
+        <div class="card card--accent">
+            <div class="id-band">
+                <div class="id-tile" th:text="${initials}" aria-hidden="true">VA</div>
+                <div class="id-main">
+                    <p class="id-name" th:text="${#strings.isEmpty(displayName) ? username : displayName}">Valk</p>
+                    <p class="id-handle" th:text="'@' + ${username}">@valk</p>
+                    <div class="id-chips">
+                        <span th:if="${rank}" class="chip chip--primary" th:text="${rank}">Commander</span>
+                        <span th:if="${activeOrgUnit != null}" class="squadron-badge"
+                              th:text="${activeOrgUnit.orgUnitShorthand() != null
+                                        ? activeOrgUnit.orgUnitName() + ' · ' + activeOrgUnit.orgUnitShorthand()
+                                        : activeOrgUnit.orgUnitName()}">IRIDIUM · IRI</span>
                     </div>
-                    <div class="form-group">
-                        <label for="description" class="form-label" th:text="#{profile.description}">Description</label>
-                        <textarea id="description" name="description" rows="5" th:text="*{description}" class="w-full"
-                                  th:classappend="${#fields.hasErrors('description')} ? 'input-error'"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Read-only fact grid (absent fields are not rendered) ===== -->
+        <div class="facts">
+            <div class="f">
+                <p class="fk" th:text="#{profile.email}">Email</p>
+                <div class="fv email" th:text="${email}">email@example.com</div>
+            </div>
+            <div class="f" th:if="${joinDate}">
+                <p class="fk" th:text="#{member.join_date}">Join date</p>
+                <div class="fv" th:text="${#temporals.format(joinDate, 'dd.MM.yyyy')}">01.01.2020</div>
+            </div>
+            <div class="f" th:if="${monthsInSquadron != null}">
+                <p class="fk" th:text="#{member.months_in_squadron}">Months in squadron</p>
+                <div class="fv" th:text="${monthsInSquadron}">0</div>
+            </div>
+        </div>
+
+        <!-- ===== Settings: one card per editable section, each with exactly one CTA ===== -->
+        <div class="stack">
+
+            <!-- Personal data -->
+            <form id="profile-description-form" class="card" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
+                <input type="hidden" name="version" th:field="*{version}">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.custom_data}">Custom Data</h2>
+                </div>
+                <div class="form-group">
+                    <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
+                    <input type="text" th:field="*{displayName}" class="w-full"
+                           th:classappend="${#fields.hasErrors('displayName')} ? 'input-error'" />
+                    <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="description" class="form-label" th:text="#{profile.description}">Description</label>
+                    <textarea th:field="*{description}" rows="5" class="w-full"
+                              th:classappend="${#fields.hasErrors('description')} ? 'input-error'"></textarea>
+                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                </div>
+                <div class="card-foot">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.save_custom_data}">Save</span></button>
-                </form>
-            </dd>
+                </div>
+            </form>
 
-            <dt class="kv-row-self-start" th:text="#{profile.payout.preference}">Default Payout Preference</dt>
-            <dd>
-                <form id="profile-payout-form" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}">
-                    <input type="hidden" name="version" th:field="*{version}">
-                    <div class="form-group">
-                        <select th:field="*{defaultPayoutPreference}" th:aria-label="#{profile.payout.preference}" class="w-full">
-                            <option th:value="PAYOUT" th:text="#{mission.payout.preference.payout}">Payout</option>
-                            <option th:value="DONATE" th:text="#{mission.payout.preference.donate}">Donate</option>
-                        </select>
-                        <p th:text="#{profile.payout.preference.hint}" class="form-hint">Pre-selected at every mission sign-up. You can still change it per mission.</p>
-                    </div>
+            <!-- Default payout -->
+            <form id="profile-payout-form" class="card" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}">
+                <input type="hidden" name="version" th:field="*{version}">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.payout.preference}">Default Payout Preference</h2>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="defaultPayoutPreference" class="form-label" th:text="#{profile.payout.preference}">Default Payout Preference</label>
+                    <select th:field="*{defaultPayoutPreference}" class="payout-select">
+                        <option th:value="PAYOUT" th:text="#{mission.payout.preference.payout}">Payout</option>
+                        <option th:value="DONATE" th:text="#{mission.payout.preference.donate}">Donate</option>
+                    </select>
+                    <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.payout.preference.hint}">Pre-selected at every mission sign-up. You can still change it per mission.</span></p>
+                </div>
+                <div class="card-foot">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.payout.save}">Save Payout Preference</span></button>
-                </form>
-            </dd>
+                </div>
+            </form>
 
-            <dt class="kv-row-self-start" th:text="#{profile.blueprintSharing.label}">Blueprint Sharing</dt>
-            <dd>
-                <form id="profile-blueprint-sharing-form" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}">
-                    <input type="hidden" name="version" th:field="*{version}">
-                    <div class="form-group">
-                        <label class="flex-gap-2xs">
-                            <input type="checkbox" th:field="*{shareBlueprintsGlobally}" />
-                            <span th:text="#{profile.blueprintSharing.toggle}">Make my blueprints available to everyone</span>
-                        </label>
-                        <p th:text="#{profile.blueprintSharing.hint}" class="form-hint">When enabled, your owned blueprints are counted in the availability views for every org unit, not only your own.</p>
+            <!-- Blueprint sharing -->
+            <form id="profile-blueprint-sharing-form" class="card" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}">
+                <input type="hidden" name="version" th:field="*{version}">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.blueprintSharing.label}">Blueprint Sharing</h2>
+                </div>
+                <div class="check-row">
+                    <input type="checkbox" th:field="*{shareBlueprintsGlobally}" />
+                    <div>
+                        <label for="shareBlueprintsGlobally" th:text="#{profile.blueprintSharing.toggle}">Make my blueprints available to everyone</label>
+                        <p class="form-hint" th:text="#{profile.blueprintSharing.hint}">When enabled, your owned blueprints are counted in the availability views for every org unit, not only your own.</p>
                     </div>
+                </div>
+                <div class="card-foot">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.blueprintSharing.save}">Save</span></button>
-                </form>
-            </dd>
-        </dl>
+                </div>
+            </form>
 
-        <div class="mt-2-flex-gap">
-            <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" th:text="#{profile.edit_link}">Edit in Keycloak</a>
-            <a th:href="@{/}" class="btn btn-ghost" th:text="#{profile.back}">Back</a>
+            <!-- Access & security -->
+            <div class="card card--inset">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>
+                </div>
+                <p class="acct-note">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                    <span th:text="#{profile.security.hint}">Password, email address and two-factor authentication are managed centrally in Keycloak.</span>
+                </p>
+                <div class="acct-actions">
+                    <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" rel="noopener"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{profile.edit_link}">Edit in Keycloak</span></a>
+                    <a th:href="@{/}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg> <span th:text="#{profile.back}">Back</span></a>
+                </div>
+            </div>
+
         </div>
     </div>
 </main>

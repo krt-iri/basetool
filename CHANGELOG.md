@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Profilseite im einheitlichen Design-System.** „Mein Profil" trennt die schreibgeschützten Identitätsdaten (Initialen-Kachel, Anzeigename, Rang, aktive Staffel sowie E-Mail/Beitrittsdatum/Monate als Faktenraster) jetzt klar von den Einstellungen: Eigene Daten, Standard-Auszahlung, Blaupausen-Freigabe und „Zugang & Sicherheit" sind je eine eigene Karte mit genau einer Aktion. Funktion, In-Place-Speichern und Übersetzungen bleiben unverändert.
+
 - **Keycloak auf 26.6.4 angehoben (Sicherheitspatch).** Der Anmeldedienst (Keycloak) wird vom Patch 26.6.3 auf 26.6.4 aktualisiert — ein reines Patch-Release mit mehreren Sicherheitskorrekturen (u. a. Authentifizierungs-Bypass und Rechte-Eskalation) und einem Quarkus-Update; keine Funktions- oder Konfigurationsänderung. Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.6`-Digest) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Beim nächsten Deploy lädt Compose das neue Image-Digest; der Keycloak-Container muss dafür neu gestartet werden.
 
 - **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
