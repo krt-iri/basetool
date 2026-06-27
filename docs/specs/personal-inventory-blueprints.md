@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -223,9 +223,17 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   `user == me`, i.e. the `/inventory/my` set — both personal and shared rows the user owns), pooled
   **per material across all storage locations**. This is NOT the free-text personal-inventory
   feature; matching is by the real `Material` FK, so it is exact.
-- **Ingredient scope.** Only **RESOURCE** (commodity) ingredients are evaluated. A recipe that also
-  needs **ITEM** ingredients still shows, with the ITEM requirement marked "not evaluated"; an
-  ITEM-only / unresolved recipe is reported as not assessable.
+- **Ingredient scope.** **RESOURCE** (commodity) ingredients are evaluated, and so are the **ITEM**
+  ingredients the wiki counts in pieces but that resolve to a shared `material` by name — a hand-mined
+  gem such as Hadanite or Beradom the wiki models as a non-craftable game item. Such an ITEM is
+  **bridged** to its PIECE material (the same bridge the job-order path applies in
+  `JobOrderItemService.bridgedMaterial`, so a craftability figure and the order requirement consume
+  the identical `material` row) and evaluated as that requirement. A **craftable** ITEM (the output of
+  another blueprint — a genuine sub-assembly) and an unresolved ITEM carry no material and are marked
+  "not evaluated"; a recipe with no evaluable material requirement at all is reported as not
+  assessable ([ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)). The
+  bridge is resolved once for the caller's whole owned set (one craftable-output query, one game-item
+  load, one material-by-name query) so the cost stays bounded.
 - **Qualifying stock.** Only stock at or above a per-material **quality floor** counts toward
   availability **and** the effective quality. The floor is the stricter of (a) the ingredient's
   `min_quality` and (b) the **no-degradation floor**: the lowest quality at which none of the slot's
@@ -238,7 +246,8 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   amount per craft; `N = floor( min over materials of ( qualifying available / required ) )`. The
   binding ("limiting") material is named.
 - **Quantity unit (SCU vs Stück).** A RESOURCE ingredient may resolve to a material whose
-  `QuantityType` is `PIECE` rather than `SCU`. The computation is done in the material's **own unit**
+  `QuantityType` is `PIECE` rather than `SCU`, and a bridged ITEM ingredient is always a PIECE
+  material counted in whole units. The computation is done in the material's **own unit**
   on both sides — `InventoryItem.amount` and the folded-in refinery yield are already piece counts
   for a PIECE material, and the per-craft requirement is **rounded to a whole piece** (the same
   rounding the job-order path applies, `JobOrderItemService.roundForQuantityType`), so a recipe never
@@ -280,8 +289,11 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 - [ ] Given the refinery toggle is on, then the caller's `OPEN` + `IN_PROGRESS` refinery yield is
   added (quantity and quality), counts are recomputed, and a blueprint craftable only via refinery
   is marked `⟢`.
-- [ ] Given a recipe with ITEM ingredients, then it still displays and the ITEM requirement is
-  marked "not evaluated"; an ITEM-only recipe reports as not assessable.
+- [ ] Given a recipe with a non-craftable PIECE-material ITEM ingredient (a hand-mined gem such as
+  Hadanite or Beradom), then it is bridged to that material and evaluated like a RESOURCE PIECE
+  requirement (required / available / missing in whole "Stück", and it can be the limiting material);
+  a craftable sub-assembly or an unresolved ITEM is marked "not evaluated", and a recipe with no
+  evaluable requirement reports as not assessable.
 - [ ] Everything is owner-scoped by JWT `sub`; no other user's blueprints, stock, or refinery
   orders are visible.
 

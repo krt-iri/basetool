@@ -34,19 +34,23 @@ import java.util.UUID;
  * in — so the refinery toggle switches client-side without a refetch. A row whose {@code
  * craftableWithRefinery} exceeds {@code craftable} is craftable only thanks to the refinery.
  *
- * <p>Only RESOURCE ingredients are evaluated; {@code hasItemIngredients} flags a recipe that also
- * needs discrete game items (marked "not evaluated" in the UI), and {@code hasResourceIngredients}
- * is {@code false} for an ITEM-only recipe that cannot be assessed at all. {@code recipeResolved}
- * is {@code false} when no active SC Wiki recipe backs the owned product.
+ * <p>Evaluated requirements are the recipe's RESOURCE ingredients plus the ITEM ingredients bridged
+ * to a PIECE material (a hand-mined gem the wiki models as a non-craftable game item, ADR-0046).
+ * {@code hasItemIngredients} flags a recipe that still needs an ITEM left "not evaluated" — a
+ * craftable sub-assembly or an unresolved item — and {@code hasResourceIngredients} is {@code
+ * false} for a recipe with no evaluable material requirement at all. {@code recipeResolved} is
+ * {@code false} when no active SC Wiki recipe backs the owned product.
  *
  * @param blueprintId the owned blueprint's id
  * @param recipeResolved whether an active recipe was found for the owned product
- * @param hasItemIngredients whether the recipe also needs ITEM (discrete game-item) ingredients
- * @param hasResourceIngredients whether the recipe has any RESOURCE ingredient to evaluate
+ * @param hasItemIngredients whether the recipe still needs an ITEM ingredient that is not evaluated
+ *     (a craftable sub-assembly or an unresolved item), marked "not evaluated" in the UI
+ * @param hasResourceIngredients whether the recipe has any evaluable material requirement (a
+ *     RESOURCE commodity or a PIECE-material-bridged ITEM)
  * @param craftable how many crafts the inventory stock alone allows
  * @param craftableWithRefinery how many crafts the inventory plus open refinery yield allows
- * @param limitingMaterialName the RESOURCE commodity capping the inventory-only count, or {@code
- *     null} when nothing limits it or no recipe resolved
+ * @param limitingMaterialName the material capping the inventory-only count, or {@code null} when
+ *     nothing limits it or no recipe resolved
  * @param limitingMaterialNameWithRefinery the commodity capping the refinery-included count, or
  *     {@code null}
  * @param groups per-requirement-group overlay, in recipe order (drives the slot quality sliders)

@@ -231,7 +231,9 @@ public class PersonalBlueprintController {
    * Returns, for every blueprint the caller owns, whether and how many times it can be crafted from
    * the caller's own "My Inventory" stock — the craftability annotation of the Personal Inventory
    * blueprint view (#781, REQ-INV-019). Strictly owner-scoped: owned blueprints, stock and refinery
-   * yield all come from the caller. Read-only; only RESOURCE ingredients are evaluated.
+   * yield all come from the caller. Read-only; RESOURCE ingredients and the PIECE-material-bridged
+   * ITEM ingredients (hand-mined gems, ADR-0046) are evaluated, craftable sub-assemblies and
+   * unresolved items are not.
    *
    * @param includeRefinery whether to fold the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
    *     yield into the {@code *WithRefinery} figures (default {@code false})
@@ -241,7 +243,8 @@ public class PersonalBlueprintController {
   @GetMapping("/craftability")
   @Operation(
       summary =
-          "Craftability of the caller's owned blueprints from their own stock (RESOURCE only).")
+          "Craftability of the caller's owned blueprints from their own stock (RESOURCE + bridged"
+              + " PIECE items).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Per-blueprint craftability for the caller."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")

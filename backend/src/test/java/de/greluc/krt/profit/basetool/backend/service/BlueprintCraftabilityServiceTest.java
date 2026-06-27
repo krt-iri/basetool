@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
@@ -39,6 +40,9 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -63,11 +67,15 @@ class BlueprintCraftabilityServiceTest {
   private static final UUID BP_ID = UUID.randomUUID();
   private static final UUID MAT_A = UUID.randomUUID();
   private static final UUID MAT_B = UUID.randomUUID();
+  private static final UUID GI_A = UUID.randomUUID();
 
   @Mock private PersonalBlueprintService personalBlueprintService;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private InventoryItemService inventoryItemService;
   @Mock private RefineryOrderService refineryOrderService;
+  @Mock private BlueprintRepository blueprintRepository;
+  @Mock private GameItemRepository gameItemRepository;
+  @Mock private MaterialRepository materialRepository;
   @InjectMocks private BlueprintCraftabilityService service;
 
   @Test
@@ -187,6 +195,78 @@ class BlueprintCraftabilityServiceTest {
     assertEquals(7.0, hadanite.availableScu(), 1e-9);
     assertEquals(0.0, hadanite.missingScu(), 1e-9);
     assertEquals(2, hadanite.craftable());
+  }
+
+  @Test
+  void computeForOwner_pieceBridgedItemIngredientIsEvaluated() {
+    stubOwned(owned("widget", "Widget"));
+    // A recipe whose only material-bearing line is an ITEM the wiki counts in pieces (a hand-mined
+    // gem such as Beradom) which is NOT craftable but exists as a PIECE material by name: it must
+    // be
+    // bridged and evaluated, not skipped (#840 follow-up, ADR-0046).
+    Blueprint bp = new Blueprint();
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(0);
+    slot.setName("Frequency Controller");
+    bp.addRequirementGroup(slot);
+    GameItem beradom = gameItem(GI_A, "Beradom");
+    bp.addIngredient(item(0, beradom, 2, null, slot));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", bp));
+    when(blueprintRepository.findCraftableOutputItemIds(any())).thenReturn(List.of());
+    when(gameItemRepository.findAllById(any())).thenReturn(List.of(beradom));
+    when(materialRepository.findByNameInIgnoreCase(any()))
+        .thenReturn(List.of(material(MAT_A, "Beradom", QuantityType.PIECE)));
+    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+        .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+
+    assertTrue(dto.recipeResolved());
+    assertTrue(dto.hasResourceIngredients()); // the bridged ITEM counts as an evaluable requirement
+    assertFalse(
+        dto.hasItemIngredients()); // the only ITEM was bridged, so nothing stays unevaluated
+    assertEquals(3, dto.craftable()); // floor(7 / 2)
+    assertEquals("Beradom", dto.limitingMaterialName());
+
+    CraftabilityMaterialDto beradomMat = material(dto, MAT_A);
+    assertEquals(QuantityType.PIECE, beradomMat.quantityType());
+    assertEquals(2.0, beradomMat.requiredScu(), 1e-9); // the per-craft whole-unit count
+    assertEquals(7.0, beradomMat.availableScu(), 1e-9);
+    assertEquals(0.0, beradomMat.missingScu(), 1e-9);
+    assertEquals(3, beradomMat.craftable());
+
+    // The slot overlay resolves its driving material from the bridged ITEM, so its slider defaults
+    // to the stock's effective quality rather than the band maximum.
+    assertEquals(1, dto.groups().size());
+    assertEquals(MAT_A, dto.groups().get(0).materialId());
+    assertEquals(400.0, dto.groups().get(0).effectiveQuality(), 1e-9);
+  }
+
+  @Test
+  void computeForOwner_craftableItemIngredientStaysNotEvaluated() {
+    stubOwned(owned("widget", "Widget"));
+    // An ITEM ingredient whose game item is itself the output of a blueprint is a genuine
+    // sub-assembly: it is NOT bridged to a material and stays "not evaluated", even if a material
+    // of
+    // the same name existed.
+    Blueprint bp = new Blueprint();
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(0);
+    bp.addRequirementGroup(slot);
+    bp.addIngredient(item(0, gameItem(GI_A, "Sub Widget"), 1, null, slot));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", bp));
+    when(blueprintRepository.findCraftableOutputItemIds(any())).thenReturn(List.of(GI_A));
+    when(inventoryItemService.getOwnedStockSlices(USER_ID)).thenReturn(List.of());
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+
+    assertTrue(dto.recipeResolved());
+    assertTrue(dto.hasItemIngredients());
+    assertFalse(dto.hasResourceIngredients());
+    assertEquals(0, dto.craftable());
+    assertTrue(dto.materials().isEmpty());
   }
 
   @Test
@@ -331,6 +411,30 @@ class BlueprintCraftabilityServiceTest {
     ingredient.setRequirementGroup(group);
     ingredient.setWikiNameSnapshot(mat.getName());
     return ingredient;
+  }
+
+  private static BlueprintIngredient item(
+      int order,
+      GameItem gameItem,
+      int units,
+      Integer minQuality,
+      BlueprintRequirementGroup group) {
+    BlueprintIngredient ingredient = new BlueprintIngredient();
+    ingredient.setOrderIndex(order);
+    ingredient.setKind(BlueprintIngredientKind.ITEM);
+    ingredient.setGameItem(gameItem);
+    ingredient.setQuantityUnits(units);
+    ingredient.setMinQuality(minQuality);
+    ingredient.setRequirementGroup(group);
+    ingredient.setWikiNameSnapshot(gameItem.getName());
+    return ingredient;
+  }
+
+  private static GameItem gameItem(UUID id, String name) {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(id);
+    gameItem.setName(name);
+    return gameItem;
   }
 
   private static BlueprintCraftabilityDto only(List<BlueprintCraftabilityDto> list) {

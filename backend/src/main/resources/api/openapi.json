@@ -34986,7 +34986,7 @@
     "/api/v1/personal-blueprints/craftability" : {
       "get" : {
         "tags" : [ "Personal Blueprints" ],
-        "summary" : "Craftability of the caller's owned blueprints from their own stock (RESOURCE only).",
+        "summary" : "Craftability of the caller's owned blueprints from their own stock (RESOURCE + bridged PIECE items).",
         "operationId" : "craftability",
         "parameters" : [ {
           "name" : "includeRefinery",
