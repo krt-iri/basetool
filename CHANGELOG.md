@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.17](https://github.com/krt-profit/basetool/releases/tag/v0.7.17) - 2026-06-27
+
 ### Added
 
 - **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
