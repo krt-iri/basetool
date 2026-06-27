@@ -16,6 +16,8 @@
 
 ### Fixed
 
+- **Auftragsdetails: kompakter Kommentar und Abstand vor „Bestellte Items".** Der Kommentar-Kasten umschließt jetzt seinen Inhalt, statt als hoher, halbleerer Block mit weit eingerücktem Titel zu erscheinen (Ursache war ein versehentlich gerendertes Einrückungs-Whitespace); Beschriftung und Text stehen platzsparend in einer Zeile, Zeilenumbrüche im Kommentar bleiben erhalten. Zwischen Kopfbereich und „Bestellte Items" bzw. „Benötigte Materialien" gibt es wieder den üblichen Abstand.
+
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
 
 - **Meine Blueprints: Die Liste ist nicht mehr auf 200 Blueprints begrenzt.** Es werden jetzt alle eigenen Blueprints geladen — die Anzahl im Tab stimmt und die Suche durchsucht den vollständigen Bestand. Rezept- und Craftbarkeits-Berechnung laufen weiterhin bedarfsweise bzw. asynchron, sodass auch große Sammlungen flüssig laden.
