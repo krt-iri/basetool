@@ -85,6 +85,28 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByNameIgnoreCase(String name);
 
   /**
+   * Batched case-insensitive name lookup: returns every material whose lower-cased name is in
+   * {@code lowerNames} (the caller lower-cases each name first). The bulk counterpart of {@link
+   * #findByNameIgnoreCase(String)}, used by the blueprint craftability calculation (#781) to bridge
+   * a recipe's PIECE-counted ITEM ingredients to their {@code material} rows across the caller's
+   * whole owned set in one query rather than one lookup per ingredient. {@code material.name} is
+   * unique, so at most one row matches each distinct lower-cased name.
+   *
+   * <p>Unlike the derived {@link #findByNameIgnoreCase(String)} — which folds <em>both</em>
+   * operands with the database {@code LOWER()} — this folds the candidate names caller-side (JVM)
+   * and the column DB-side. The two folds are byte-identical for ASCII, which is all the SC
+   * commodity / gem names this bridge ever matches; a hypothetical non-ASCII material name (e.g.
+   * one with {@code ß} or a Turkish dotted/dotless {@code I}) could fold differently and miss.
+   * Callers must pass {@code Locale.ROOT}-lower-cased names so the JVM fold is deterministic.
+   *
+   * @param lowerNames the already-{@code Locale.ROOT}-lower-cased material names to match
+   * @return the materials whose lower-cased name is in the set; empty when none match or {@code
+   *     lowerNames} is empty
+   */
+  @Query("SELECT m FROM Material m WHERE LOWER(m.name) IN :lowerNames")
+  List<Material> findByNameInIgnoreCase(@Param("lowerNames") Collection<String> lowerNames);
+
+  /**
    * Resolution-chain step 1 for the R3 Wiki commodity sync (§8.1.1): match a Wiki commodity to a
    * local material via the SC Wiki UUID written on a previous sync.
    *

@@ -23,12 +23,13 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import java.util.UUID;
 
 /**
- * Per-material craftability breakdown for one RESOURCE commodity a blueprint consumes (#781). The
- * recipe's RESOURCE ingredient lines are aggregated per {@code materialId}: {@code requiredScu} is
- * the total one craft needs of this material, and every availability / quality figure is given
- * twice — once over the caller's "My Inventory" stock alone, and once with the caller's {@code
- * OPEN}/{@code IN_PROGRESS} refinery yield folded in — so the frontend refinery toggle can switch
- * instantly without a refetch.
+ * Per-material craftability breakdown for one material a blueprint consumes (#781). The recipe's
+ * material-bearing ingredient lines — RESOURCE commodities and the PIECE-material-bridged ITEM
+ * lines (ADR-0046) — are aggregated per {@code materialId}: {@code requiredScu} is the total one
+ * craft needs of this material, and every availability / quality figure is given twice — once over
+ * the caller's "My Inventory" stock alone, and once with the caller's {@code OPEN}/{@code
+ * IN_PROGRESS} refinery yield folded in — so the frontend refinery toggle can switch instantly
+ * without a refetch.
  *
  * <p><strong>Unit:</strong> all quantity figures ({@code requiredScu}, {@code availableScu(*)},
  * {@code missingScu(*)}) are expressed in the material's own {@link QuantityType} — fractional SCU

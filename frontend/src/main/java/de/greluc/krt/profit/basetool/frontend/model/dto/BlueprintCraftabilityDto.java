@@ -30,8 +30,10 @@ import java.util.UUID;
  *
  * @param blueprintId the owned blueprint's id
  * @param recipeResolved whether an active recipe backs the owned product
- * @param hasItemIngredients whether the recipe also needs ITEM ingredients ("not evaluated")
- * @param hasResourceIngredients whether the recipe has any RESOURCE ingredient to evaluate
+ * @param hasItemIngredients whether the recipe still needs an ITEM ingredient that is not evaluated
+ *     (a craftable sub-assembly or an unresolved item), marked "not evaluated" in the UI
+ * @param hasResourceIngredients whether the recipe has any evaluable material requirement (a
+ *     RESOURCE commodity or a PIECE-material-bridged ITEM)
  * @param craftable how many crafts the inventory stock alone allows
  * @param craftableWithRefinery how many crafts inventory plus open refinery yield allows
  * @param limitingMaterialName the commodity capping the inventory-only count, or {@code null}
