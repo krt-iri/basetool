@@ -4499,21 +4499,33 @@ textarea:focus-visible,
 }
 
 /* Annotation block — a labelled note/comment with an orange left rule. For
-   free-text that shouldn't compete with structured kv data. */
+   free-text that shouldn't compete with structured kv data. The label and text
+   share one baseline-aligned row so a short comment stays a single tight line;
+   a long/multi-line comment wraps in the text column while the label keeps its
+   place. The box hugs its content instead of reserving a tall full-width panel. */
 .annotation {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     border-left: 3px solid var(--color-primary);
     background: var(--color-surface-input);
-    padding: 9px 13px;
+    padding: 7px 13px;
     font-weight: 300;
-    white-space: pre-wrap;
 }
 .annotation .annotation-label {
+    flex: none;
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: var(--fw-bold);
     color: var(--color-gray-2);
-    margin-bottom: 3px;
+}
+/* pre-wrap lives on the text only: it preserves the user's own line breaks
+   without rendering the template's inter-element indentation whitespace (which
+   on the container would surface as blank lines and inflate the box). */
+.annotation .annotation-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------- ORDER-DETAIL HEADER --- */

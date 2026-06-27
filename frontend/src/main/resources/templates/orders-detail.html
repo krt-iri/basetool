@@ -149,10 +149,12 @@
             </div>
         </div>
 
-        <!-- Comment as a labelled annotation (orange left rule), only when present. -->
+        <!-- Comment as a labelled annotation (orange left rule), only when present.
+             Label + text sit on one baseline-aligned row (see .annotation) so the box
+             stays compact; pre-wrap lives on .annotation-text only. -->
         <div th:if="${order.comment != null and !order.comment.isEmpty()}" class="annotation mt-2">
-            <div class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</div>
-            <span th:text="${order.comment}">Kommentar</span>
+            <span class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</span>
+            <span class="annotation-text" th:text="${order.comment}">Kommentar</span>
         </div>
 
         <!-- Status editor — logisticians only; everyone else reads the status pill above. -->
@@ -180,7 +182,9 @@
              persists (only its innerHTML is replaced); the claim/inventory triggers inside are
              document-delegated (window.krtEvents), so they survive the swap. The swap is mandatory
              because the per-bucket "Offen" open-amount is a backend aggregate not returned per claim. -->
-        <div id="order-materials-results"><th:block th:fragment="materialsSection">
+        <!-- mt-2: the wrapper makes the section-title a :first-child, zeroing its 2rem top
+             margin — restore the gap so the section keeps distance from the header card. -->
+        <div id="order-materials-results" class="mt-2"><th:block th:fragment="materialsSection">
         <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
@@ -276,7 +280,9 @@
         <th:block th:if="${order.type == 'ITEM'}">
         <!-- In-place AJAX swap container (#575): an item handover re-renders the ordered-items
              table (delivered/outstanding per row) via GET /orders/{id}?fragment=items. -->
-        <div id="order-items-results"><th:block th:fragment="itemsSection">
+        <!-- mt-2: the wrapper makes the section-title a :first-child, zeroing its 2rem top
+             margin — restore the gap so the section keeps distance from the header card. -->
+        <div id="order-items-results" class="mt-2"><th:block th:fragment="itemsSection">
         <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
