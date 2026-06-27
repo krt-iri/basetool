@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
+
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -1299,17 +1301,6 @@ public class OrgUnitBankAccessService {
       }
     }
     return null;
-  }
-
-  /**
-   * Renders a whole-aUEC amount for an audit detail without trailing zeros or scientific notation.
-   *
-   * @param amount the amount
-   * @return the plain whole-number string
-   */
-  @NotNull
-  private static String plain(@NotNull BigDecimal amount) {
-    return amount.stripTrailingZeros().toPlainString();
   }
 
   // ---------------------------------------------------------------------------------------------

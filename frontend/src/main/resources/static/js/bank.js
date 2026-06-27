@@ -742,6 +742,29 @@
     document.querySelectorAll('select[data-role="bank-account-type"]').forEach(syncAccountTypeRows);
 
     /**
+     * Toggles a transfer-only row and its inner <select>: shown/enabled/required only for a
+     * TRANSFER, otherwise hidden, disabled (so it is omitted from the submitted body) and cleared.
+     * No-op when the row is absent. Shared by the request modal and the confirm modal.
+     *
+     * @param {HTMLElement|null} row the transfer-only row wrapper
+     * @param {boolean} isTransfer whether the current request type is TRANSFER
+     */
+    function toggleTransferOnlyControl(row, isTransfer) {
+        if (!row) {
+            return;
+        }
+        row.hidden = !isTransfer;
+        const control = row.querySelector('select');
+        if (control) {
+            control.disabled = !isTransfer;
+            control.required = isTransfer;
+            if (!isTransfer) {
+                control.value = '';
+            }
+        }
+    }
+
+    /**
      * Org-unit request modal (REQ-BANK-040): the transfer destination row is shown only for a
      * TRANSFER. Its select is disabled while hidden so it is omitted from the body (and cleared) for
      * a deposit/withdrawal.
@@ -755,18 +778,7 @@
         }
         const isTransfer = select.value === 'TRANSFER';
         const row = form.querySelector('[data-request-transfer-only]');
-        if (!row) {
-            return;
-        }
-        row.hidden = !isTransfer;
-        const control = row.querySelector('select');
-        if (control) {
-            control.disabled = !isTransfer;
-            control.required = isTransfer;
-            if (!isTransfer) {
-                control.value = '';
-            }
-        }
+        toggleTransferOnlyControl(row, isTransfer);
     }
 
     document.addEventListener('change', function (event) {
@@ -814,17 +826,7 @@
         }
 
         const destRow = form.querySelector('[data-confirm-destination-holder]');
-        if (destRow) {
-            destRow.hidden = !isTransfer;
-            const control = destRow.querySelector('select');
-            if (control) {
-                control.disabled = !isTransfer;
-                control.required = isTransfer;
-                if (!isTransfer) {
-                    control.value = '';
-                }
-            }
-        }
+        toggleTransferOnlyControl(destRow, isTransfer);
         const holderLabel = form.querySelector('[data-confirm-holder-label]');
         if (holderLabel) {
             const text = isTransfer

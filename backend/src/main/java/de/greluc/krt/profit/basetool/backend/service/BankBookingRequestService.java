@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
+
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
@@ -675,16 +677,6 @@ public class BankBookingRequestService {
         request.isOwnerApprovalGranted(),
         request.getOwnerApprovalGrantedByHandle(),
         request.getVersion());
-  }
-
-  /**
-   * Renders a whole-aUEC amount for an audit detail without trailing zeros or scientific notation.
-   *
-   * @param amount the amount
-   * @return the plain whole-number string
-   */
-  private static String plain(@NotNull BigDecimal amount) {
-    return amount.stripTrailingZeros().toPlainString();
   }
 
   /**
