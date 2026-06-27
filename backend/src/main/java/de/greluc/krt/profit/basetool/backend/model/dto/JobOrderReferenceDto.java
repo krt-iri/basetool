@@ -31,17 +31,22 @@ import java.util.UUID;
  * @param displayId human-readable sequential id
  * @param handle contact handle
  * @param status lifecycle status
+ * @param requestingOrgUnit the customer org unit the order is placed for (slim reference); {@code
+ *     null} only on pre-rework rows not yet backfilled. Lets the refinery-order store picker label
+ *     each option with its requesting org unit so a same-material order can be distinguished from a
+ *     foreign SK-public one.
  * @param materials the MATERIAL-order material lines; empty for an ITEM order (which has no {@code
  *     job_order_material} rows). Kept for callers that display the material lines.
  * @param requiredMaterialIds the distinct material ids the order requires across <em>both</em>
  *     order kinds (ITEM-derived materials included). Unlike {@code materials} this is never empty
- *     for an ITEM order, so the Lager picker can correctly hide an order whose requirements do not
- *     include a given inventory row's material (REQ-ORDERS-018).
+ *     for an ITEM order, so the Lager picker and the refinery-order store picker can correctly hide
+ *     an order whose requirements do not include a given row's material (REQ-ORDERS-018).
  */
 public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,
     String handle,
     JobOrderStatus status,
+    SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds) {}

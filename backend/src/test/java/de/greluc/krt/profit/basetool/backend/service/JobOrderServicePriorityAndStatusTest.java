@@ -80,6 +80,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderMapper jobOrderMapper;
+  @Mock private de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialClaimService materialClaimService;
 

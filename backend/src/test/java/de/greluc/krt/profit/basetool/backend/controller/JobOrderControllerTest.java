@@ -260,7 +260,7 @@ class JobOrderControllerTest {
   void lookupJobOrders_delegatesToServiceReferenceQuery() {
     JobOrderReferenceDto ref =
         new JobOrderReferenceDto(
-            UUID.randomUUID(), 42, "alice", JobOrderStatus.OPEN, List.of(), List.of());
+            UUID.randomUUID(), 42, "alice", JobOrderStatus.OPEN, null, List.of(), List.of());
     when(jobOrderService.findAllActiveReference()).thenReturn(List.of(ref));
 
     List<JobOrderReferenceDto> result = controller.lookupJobOrders();

@@ -80,6 +80,8 @@ class JobOrderServiceTest {
 
   @Mock private JobOrderMapper jobOrderMapper;
 
+  @Mock private de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
+
   @Mock
   private de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
 
