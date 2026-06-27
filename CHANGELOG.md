@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.15](https://github.com/krt-profit/basetool/releases/tag/v0.7.15) - 2026-06-27
+
 ### Added
 
 - **Operation-Detailseite im neuen Tab-Layout mit Markdown-Editor.** Die Operationsseite nutzt jetzt dieselbe Tab-Optik wie die Einsatz-Seite — Übersicht (Operation auf einen Blick, Ergebnis je Einsatz, Einsätze, ausklappbare Beschreibung), Einsätze (mit „Einsatz hinzufügen", das die Erstellseite mit vorausgewählter Operation öffnet), Auszahlung, Finanzen und Verwaltung. Die Beschreibung lässt sich mit einem Formatierungs-Werkzeug (Fett/Kursiv/Überschrift/Liste/Link) und einer Live-Vorschau bearbeiten.
