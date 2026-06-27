@@ -976,6 +976,10 @@
 /* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
 .krt-bp-head {
     display: flex;
+    /* Title left, add-bar (search + add + import) right. Without an explicit row the shared
+       .krt-personal-inventory-header (flex-direction: column) would stack the add-bar below
+       the title; the wrap below keeps the stacked fallback on narrow screens. */
+    flex-direction: row;
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
@@ -997,12 +1001,46 @@
 
 .krt-bp-addbar .krt-bp-search input {
     min-height: 44px;
+    /* Leave room for the leading magnifier glyph (DS search-input affordance). */
+    padding-left: 38px;
+}
+
+/* Leading magnifier inside the typeahead, matching the DS search-input specimen:
+   absolutely positioned over the input's left inset, non-interactive, neutral grey. */
+.krt-bp-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    color: var(--color-gray-2, #646464);
+    pointer-events: none;
+}
+
+.krt-bp-search-icon .krt-icon {
+    width: 16px;
+    height: 16px;
 }
 
 /* Staging chips collapse to a compact strip under the bar; hidden when empty
    (the CTA stays disabled until something is staged). */
 .krt-bp-staging-bar {
     margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* "Auswahl" heading sits inline before the staged chips (consistent with the admin
+   blueprint twins). The compact bar omits the empty-text, so the heading stays hidden
+   until at least one chip is staged to keep the empty bar quiet. */
+.krt-bp-staging-bar .krt-bp-staging-label {
+    margin-bottom: 0;
+}
+
+.krt-bp-staging-bar:not(:has(.chip)) .krt-bp-staging-label {
+    display: none;
 }
 
 .krt-bp-staging-bar .krt-bp-chip-list {
@@ -1151,7 +1189,17 @@
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-    margin: 0.75rem 0 0;
+    /* First row inside the collection box: a hairline separates it from the master-detail. */
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: var(--border-hairline);
+}
+
+/* Hidden while the collection is empty (the empty-state shows instead). recipe.js mirrors this
+   from the rendered master rows after an in-place swap, since the toolbar lives outside the
+   swapped #krt-bp-list fragment and is therefore not re-rendered by the swap itself. */
+.krt-bp-craft-toolbar.is-empty {
+    display: none;
 }
 
 .krt-bp-refinery-toggle {

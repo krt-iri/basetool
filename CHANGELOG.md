@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Meine Blueprints: Feinschliff an der Design-System-Vorlage.** Der Kopfbereich stellt das Feld zum Suchen und Hinzufügen jetzt rechts neben den Titel (statt darunter), das Suchfeld trägt links ein Lupen-Symbol, und über den vorgemerkten Chips erscheint die Beschriftung „Auswahl", sobald mindestens ein Blueprint ausgewählt ist. Der Schalter „Raffinerie-Ertrag einrechnen" sitzt jetzt oben in der Sammlungs-Box (mit Trennlinie) und behält seinen Zustand, wenn die Liste nach Hinzufügen, Import oder Entfernen aktualisiert wird. Reine Optik — keine Funktionsänderung.
+
 ## [v0.7.15](https://github.com/krt-profit/basetool/releases/tag/v0.7.15) - 2026-06-27
 
 ### Added
