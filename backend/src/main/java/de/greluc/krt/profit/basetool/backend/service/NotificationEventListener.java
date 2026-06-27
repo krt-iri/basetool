@@ -17,10 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
-import de.greluc.krt.profit.basetool.backend.service.NotificationCreationService;
+import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -36,6 +36,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * AsyncConfig#NOTIFICATION_EXECUTOR} thread pool (so creation never adds latency to the request).
  * Any failure is swallowed and logged: the business transaction has already committed, so a
  * notification hiccup must not surface to the user or be retried inline.
+ *
+ * <p>Lives in the {@code service} package rather than {@code event}: it is the orchestration seam
+ * that consumes a {@link NotificationCreationService}, so keeping it here leaves {@code event} a
+ * pure payload leaf (the {@link NotificationEvent} records depend only on {@code model}) and avoids
+ * an {@code event} &rarr; {@code service} package cycle.
  */
 @Component
 @RequiredArgsConstructor

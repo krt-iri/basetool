@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.Collections;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,9 +62,9 @@ class UserServiceSortTest {
   void findAll_shouldRequestSortedUsers() {
     // Given: admin in "all squadrons" mode — squadron scope is empty so the repository receives
     // a null filter alongside the case-insensitive sort.
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
     when(userRepository.findAllScopedList(
-            org.mockito.ArgumentMatchers.<java.util.UUID>any(),
+            org.mockito.ArgumentMatchers.<java.util.Collection<java.util.UUID>>any(),
             org.mockito.ArgumentMatchers.<Sort>any()))
         .thenReturn(Collections.emptyList());
 

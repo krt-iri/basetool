@@ -425,7 +425,7 @@ class UserServiceAttributesTest {
 
     @Test
     void searchByUsername_unpaged_delegatesToRepository() {
-      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.searchScopedList("ali", null)).thenReturn(List.of(newUser(USER_ID)));
 
       assertEquals(1, userService.searchByUsername("ali").size());
@@ -435,7 +435,7 @@ class UserServiceAttributesTest {
     void searchByUsername_paged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.searchScoped("ali", null, pr)).thenReturn(page);
 
       assertEquals(1, userService.searchByUsername("ali", pr).getTotalElements());
@@ -444,7 +444,7 @@ class UserServiceAttributesTest {
     @Test
     void findAllReference_delegatesToRepository() {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());
@@ -454,7 +454,7 @@ class UserServiceAttributesTest {
     void findAllPaged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllScoped(null, pr)).thenReturn(page);
 
       assertSame(page, userService.findAll(pr));
@@ -463,9 +463,10 @@ class UserServiceAttributesTest {
     @Test
     void findAllReference_inFocusedMode_passesScopeToRepository() {
       UUID scope = UUID.randomUUID();
+      java.util.Set<UUID> scopeSet = java.util.Set.of(scope);
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scope));
-      when(userRepository.findAllReferenceScoped(scope)).thenReturn(List.of(dto));
+      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
+      when(userRepository.findAllReferenceScoped(scopeSet)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
@@ -554,84 +555,6 @@ class UserServiceAttributesTest {
   // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
-
-  // ---------------------------------------------------------------
-  // updateUserSquadron — admin-only squadron assignment
-  // ---------------------------------------------------------------
-
-  /**
-   * Pins the contract for {@link UserService#updateUserSquadron}: admin-only at the controller
-   * boundary, optimistic-locking via the {@code version} arg, repository lookup for the squadron
-   * id, {@code null} clears the assignment. The four cases collectively exercise every branch in
-   * the service method.
-   */
-  @Nested
-  class UpdateUserSquadronTests {
-
-    @Test
-    void assignsSquadron_whenVersionMatches() {
-      UUID squadronId = UUID.randomUUID();
-      User user = newUser(USER_ID);
-      user.setVersion(3L);
-      de.greluc.krt.profit.basetool.backend.model.Squadron squadron =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
-      squadron.setId(squadronId);
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
-
-      User result = userService.updateUserSquadron(USER_ID, squadronId, 3L);
-
-      // Post-R9 D3 (V101): the squadron assignment now lives in org_unit_membership — verify
-      // the membership-service was called with the resolved squadron, not that the User entity
-      // carries it.
-      assertSame(user, result, "the returned user should be the in-memory entity");
-      verify(orgUnitMembershipService).syncStaffelMembership(user, squadron);
-    }
-
-    @Test
-    void clearsAssignment_whenSquadronIdIsNull() {
-      User user = newUser(USER_ID);
-      user.setVersion(1L);
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      User result = userService.updateUserSquadron(USER_ID, null, 1L);
-
-      // Post-R9 D3 (V101): passing null clears the membership row.
-      assertSame(user, result);
-      verify(squadronRepository, never()).findById(any());
-      verify(orgUnitMembershipService).syncStaffelMembership(user, null);
-    }
-
-    @Test
-    void throwsOptimisticLockingFailure_whenVersionMismatch() {
-      User user = newUser(USER_ID);
-      user.setVersion(5L);
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      assertThrows(
-          ObjectOptimisticLockingFailureException.class,
-          () -> userService.updateUserSquadron(USER_ID, UUID.randomUUID(), 2L));
-      // Post-R9 D3 (V101): the User entity is no longer touched on the squadron path — only
-      // the membership service is.
-      verify(orgUnitMembershipService, never()).syncStaffelMembership(any(), any());
-    }
-
-    @Test
-    void throwsNoSuchElement_whenSquadronUnknown() {
-      User user = newUser(USER_ID);
-      user.setVersion(1L);
-      UUID squadronId = UUID.randomUUID();
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(squadronRepository.findById(squadronId)).thenReturn(Optional.empty());
-
-      assertThrows(
-          java.util.NoSuchElementException.class,
-          () -> userService.updateUserSquadron(USER_ID, squadronId, 1L));
-      verify(orgUnitMembershipService, never()).syncStaffelMembership(any(), any());
-    }
-  }
 
   private static User newUser(UUID id) {
     User u = new User();

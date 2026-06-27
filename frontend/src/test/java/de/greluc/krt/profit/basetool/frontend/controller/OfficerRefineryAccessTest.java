@@ -90,6 +90,7 @@ class OfficerRefineryAccessTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -112,6 +113,7 @@ class OfficerRefineryAccessTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -173,6 +175,7 @@ class OfficerRefineryAccessTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);

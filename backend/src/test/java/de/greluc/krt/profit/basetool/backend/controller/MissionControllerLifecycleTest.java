@@ -144,6 +144,7 @@ class MissionControllerLifecycleTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             java.time.LocalDate.of(2024, 1, 1),
             false);

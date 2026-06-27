@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +91,7 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private OperationRepository operationRepository;
   @Mock private ShipRepository shipRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
   // R2.c: the real flag-resolution logic moved from OwnerScopeService to OwnerScopeService;
   // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
@@ -109,6 +111,18 @@ class PromotionFeatureFlagServiceGateTest {
   @BeforeEach
   void stubMembershipLookup() {
     lenient().when(authHelper.isAdmin()).thenReturn(false);
+    // readPersistentSquadronFromUser delegates the name-sorted-primary fallback to
+    // StaffelMembershipResolver; back the mock with a real instance so the single-Staffel
+    // resolution
+    // these tests rely on runs through the real resolver.
+    StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
+    lenient()
+        .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
+        .thenAnswer(
+            invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+    // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
+    // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
+    lenient().when(squadronRepository.existsById(any())).thenReturn(true);
   }
 
   @Test

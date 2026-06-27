@@ -41,7 +41,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * Computes the cascading-scope expansion of the org hierarchy (epic #692, REQ-ORG-015) in one
  * place, so the two consumers that need it — the request-scope resolver ({@link OwnerScopeService})
  * and the JWT authority converter ({@link
- * de.greluc.krt.profit.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter}) — share a
+ * de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter}) — share a
  * single, independently-tested definition of "who reaches which org units".
  *
  * <p><b>The cascade rule.</b> A leadership membership confers officer-equivalent reach over the

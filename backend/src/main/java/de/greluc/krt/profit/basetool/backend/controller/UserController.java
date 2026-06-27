@@ -191,29 +191,33 @@ public class UserController {
   }
 
   /**
-   * Returns {@code true} when the caller is a non-admin and the target user belongs to a foreign
-   * squadron (or to a squadron the caller cannot see via {@code OwnerScopeService}). Used to
-   * tighten {@link #getUserById} to "same squadron or admin" for full-PII access. Users without a
-   * squadron (admins, unassigned) are treated as cross-squadron for non-admin callers — full PII on
-   * an unassigned account remains admin-only.
+   * Returns {@code true} when the caller is a non-admin and the target user belongs to NO squadron
+   * the caller can see via {@code OwnerScopeService}. Used to tighten {@link #getUserById} to "same
+   * squadron or admin" for full-PII access. Users without a squadron (admins, unassigned) are
+   * treated as cross-squadron for non-admin callers — full PII on an unassigned account remains
+   * admin-only.
+   *
+   * <p>REQ-ORG-017: the target may now hold up to two Staffeln, so the gate ORs across ALL of the
+   * target's Staffeln — the caller keeps full PII as soon as it can see ANY one of them, mirroring
+   * the caller-side membership union. A same-Staffel peer is therefore never over-redacted just
+   * because the shared Staffel happens not to be the target's name-sorted primary.
    *
    * @param user target user resolved by id; never {@code null}
-   * @return {@code true} if the caller is a non-admin and the user is not in the caller's squadron
-   *     scope
+   * @return {@code true} if the caller is a non-admin and shares none of the user's squadrons
    */
   private boolean isCrossSquadronNonAdmin(
       @NotNull de.greluc.krt.profit.basetool.backend.model.User user) {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    // Post-R9 D3 (V101): the user's home Staffel is sourced from org_unit_membership — the legacy
-    // User.squadron column was dropped.
-    UUID userSquadronId =
-        orgUnitMembershipService.findStaffelMembershipOrgUnitId(user.getId()).orElse(null);
-    if (userSquadronId == null) {
+    // Post-R9 D3 (V101): the user's home Staffel(n) are sourced from org_unit_membership — the
+    // legacy User.squadron column was dropped.
+    java.util.List<UUID> targetSquadronIds =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitIds(user.getId());
+    if (targetSquadronIds.isEmpty()) {
       return true;
     }
-    return !authHelperService.canSeeSquadron(userSquadronId);
+    return targetSquadronIds.stream().noneMatch(authHelperService::canSeeSquadron);
   }
 
   /**
@@ -403,55 +407,6 @@ public class UserController {
   }
 
   /**
-   * Flips the {@code is_logistician} flag. The JWT-to-authorities converter promotes the flag to
-   * {@code ROLE_LOGISTICIAN} on the next authentication.
-   */
-  @PatchMapping("/{id}/logistician")
-  @PreAuthorize("hasRole('ADMIN')")
-  public UserDto updateLogisticianStatus(
-      @PathVariable @NotNull UUID id, @RequestParam boolean isLogistician) {
-    return userMapper.toDto(userService.updateLogisticianStatus(id, isLogistician));
-  }
-
-  /** Flips the {@code is_mission_manager} flag (mirrors {@link #updateLogisticianStatus}). */
-  @PatchMapping("/{id}/mission-manager")
-  @PreAuthorize("hasRole('ADMIN')")
-  public UserDto updateMissionManagerStatus(
-      @PathVariable @NotNull UUID id, @RequestParam boolean isMissionManager) {
-    return userMapper.toDto(userService.updateMissionManagerStatus(id, isMissionManager));
-  }
-
-  /**
-   * Assigns the user to a squadron, or clears the assignment when {@code request.squadronId} is
-   * {@code null}. Admin-only. Optimistic-locking via the {@code version} field of the body — two
-   * admins editing the same user row simultaneously surface as 409 instead of one silently winning.
-   *
-   * @param id user primary key
-   * @param request typed body carrying the target squadron id (nullable to clear) and the expected
-   *     {@code @Version}
-   * @return the persisted DTO
-   */
-  @PatchMapping("/{id}/squadron")
-  @PreAuthorize("hasRole('ADMIN')")
-  public UserDto updateUserSquadron(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid UpdateUserSquadronRequest request) {
-    return userMapper.toDto(
-        userService.updateUserSquadron(id, request.squadronId(), request.version()));
-  }
-
-  /**
-   * Body for {@link #updateUserSquadron}: the squadron the user should belong to (or {@code null}
-   * to clear), plus the optimistic-lock version echoed back from the last read.
-   *
-   * @param squadronId target squadron id, or {@code null} to unassign
-   * @param version the {@code @Version} of the user row the admin last fetched
-   */
-  public record UpdateUserSquadronRequest(
-      @org.jetbrains.annotations.Nullable UUID squadronId,
-      @jakarta.validation.constraints.NotNull Long version) {}
-
-  /**
    * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta endpoint. Lets the admin member-edit
    * page persist every Staffel-assignment + flag-toggle + SK add / remove / patch as one atomic
    * transaction. Per-row optimistic-lock survives because every change record carries its own
@@ -470,6 +425,27 @@ public class UserController {
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
     return new MembershipDeltaResponse(
         userService.applyMembershipDelta(id, request).stream()
+            .map(orgUnitMembershipMapper::toDto)
+            .toList());
+  }
+
+  /**
+   * Reads the user's complete membership set as full DTOs — each carrying its per-membership
+   * Logistician / Mission-Manager flags (REQ-SEC-005) and optimistic-lock {@code version} (ADMIN
+   * only). Backs the member-edit page, which seeds its editable Staffel slots (REQ-ORG-017 — up to
+   * two Staffeln, each with its own flags) from this view. Distinct from {@code GET
+   * /{id}/memberships}: that endpoint returns the lean picker-option projection consumed by the
+   * owner picker and carries neither flags nor version, so it cannot back an editable form.
+   *
+   * @param id user primary key.
+   * @return the user's memberships (Staffel + every SK) as full {@link OrgUnitMembershipDto}s,
+   *     wrapped in the same response shape the membership-delta PATCH returns.
+   */
+  @GetMapping("/{id}/memberships/detail")
+  @PreAuthorize("hasRole('ADMIN')")
+  public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
+    return new MembershipDeltaResponse(
+        orgUnitMembershipService.findAllMembershipsForUser(id).stream()
             .map(orgUnitMembershipMapper::toDto)
             .toList());
   }
@@ -617,6 +593,7 @@ public class UserController {
         false, // isMissionManager
         dto.inKeycloak(),
         dto.squadron(),
+        dto.squadrons(),
         dto.version(),
         null, // joinDate
         null // discordLinked – Discord-link status is not exposed to peers (admin-only column)
@@ -651,6 +628,7 @@ public class UserController {
         dto.isMissionManager(),
         dto.inKeycloak(),
         dto.squadron(),
+        dto.squadrons(),
         dto.version(),
         dto.joinDate(),
         dto.discordLinked());

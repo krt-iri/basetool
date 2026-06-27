@@ -1475,6 +1475,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -1599,6 +1600,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -1773,6 +1775,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -1792,6 +1795,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -1931,6 +1935,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -1950,6 +1955,7 @@ class MissionPageControllerMvcTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);

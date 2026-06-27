@@ -86,6 +86,7 @@ class MemberEditPageRenderTest {
                 false,
                 true,
                 null,
+                java.util.List.of(),
                 1L,
                 null,
                 false));

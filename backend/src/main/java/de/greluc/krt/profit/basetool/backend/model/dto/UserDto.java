@@ -20,12 +20,20 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Data transfer record carrying User payload.
+ *
+ * <p>{@code squadron} is the user's <em>primary</em> Staffel (the first by name) and is retained
+ * for API stability; {@code squadrons} carries the user's <em>complete</em> Staffel membership set
+ * — REQ-ORG-017 allows up to two — so callers that must render every membership (the admin member
+ * list badge, the member-edit form) read {@code squadrons}, while legacy single-Staffel consumers
+ * keep reading {@code squadron}. Both are {@code null} / empty for a user with no Staffel
+ * membership.
  *
  * <p>{@code discordLinked} is a privacy-safe, read-only indicator derived from {@code
  * app_user.discord_user_id} (see {@code UserMapper#toDto}): {@code true} when the user has a
@@ -49,6 +57,7 @@ public record UserDto(
     Boolean isMissionManager,
     Boolean inKeycloak,
     @Nullable SquadronReferenceDto squadron,
+    @Nullable List<SquadronReferenceDto> squadrons,
     Long version,
     @Nullable LocalDate joinDate,
     Boolean discordLinked) {}

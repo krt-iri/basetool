@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.integration.scwiki;
+package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintQualityRa
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementChildDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintSummaryPropertyDto;
+import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.SyncEventType;

@@ -33,6 +33,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
@@ -272,7 +275,8 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "old desc", "alice", 1L, null, null, null, null, null, null, null, null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -294,7 +298,19 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, "existing-source", null, null, null, null);
+          new MemberEditForm(
+              5,
+              "old desc",
+              "alice",
+              1L,
+              "existing-source",
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -319,6 +335,71 @@ class MemberManagementControllerTest {
       assertEquals(
           "error.member.details.load", redirectAttributes.getFlashAttributes().get("errorToast"));
     }
+
+    @Test
+    void detailFetchFails_marksFormStaffelDetailNotLoaded_withBlankSlots() {
+      // REQ-ORG-017 wipe-guard: a transient failure of GET /memberships/detail (resilience timeout
+      // /
+      // open circuit breaker) — while the main user GET succeeds — must NOT render seeded slots.
+      // The form is flagged staffelDetailLoaded=false so the save skips the Staffel reconcile.
+      UUID id = UUID.randomUUID();
+      UserDto user = newUser("alice");
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      doThrow(new RuntimeException("detail unavailable"))
+          .when(backendApiClient)
+          .get(
+              eq("/api/v1/users/" + id + "/memberships/detail"), eq(MembershipDeltaResponse.class));
+
+      String view = controller.editMember(id, null, model, redirectAttributes);
+
+      assertEquals("member-edit", view);
+      MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
+      assertNotNull(form);
+      assertEquals(
+          Boolean.FALSE,
+          form.staffelDetailLoaded(),
+          "a failed Staffel-detail load must flag the form so the save skips the reconcile");
+      assertNull(
+          form.staffel1Id(), "slots stay blank when the authoritative detail is unavailable");
+      assertNull(form.staffel2Id());
+    }
+
+    @Test
+    void detailFetchSucceeds_marksFormLoaded_andSeedsSlotsWithFlags() {
+      UUID id = UUID.randomUUID();
+      UUID squadronId = UUID.randomUUID();
+      UserDto user = newUser("alice");
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      MembershipDeltaResponse detail =
+          new MembershipDeltaResponse(
+              List.of(
+                  new OrgUnitMembershipDto(
+                      id,
+                      "alice",
+                      squadronId,
+                      OrgUnitKind.SQUADRON,
+                      true,
+                      false,
+                      false,
+                      null,
+                      1L)));
+      when(backendApiClient.get(
+              eq("/api/v1/users/" + id + "/memberships/detail"), eq(MembershipDeltaResponse.class)))
+          .thenReturn(detail);
+
+      controller.editMember(id, null, model, redirectAttributes);
+
+      MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
+      assertNotNull(form);
+      assertEquals(
+          Boolean.TRUE,
+          form.staffelDetailLoaded(),
+          "a successful Staffel-detail load lets the save reconcile the slots as the desired set");
+      assertEquals(squadronId, form.staffel1Id());
+      assertEquals(Boolean.TRUE, form.staffel1Logistician());
+    }
   }
 
   // ---------------------------------------------------------------
@@ -336,7 +417,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null, null, null, null);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
       BindingResult br = mock(BindingResult.class);
@@ -356,7 +438,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -381,7 +464,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, "profile", null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -398,7 +482,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("backend down"))
@@ -417,7 +502,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, "profile", null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("nope")).when(backendApiClient).put(anyString(), any(), any());
@@ -429,6 +515,43 @@ class MemberManagementControllerTest {
           view,
           "the source param must be preserved on the failure redirect so the user "
               + "lands back on the same view");
+    }
+
+    @Test
+    void detailLoadFailed_skipsMembershipReconcilePatch() {
+      // REQ-ORG-017 wipe-guard (save half): when the form carries staffelDetailLoaded=false the
+      // membership PATCH is skipped entirely, so the blank slots cannot strip the member's
+      // Staffeln.
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      MemberEditForm form =
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null, false);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+
+      controller.updateMember(id, form, br, model, redirectAttributes);
+
+      verify(backendApiClient)
+          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+      verify(backendApiClient, never()).patch(anyString(), any(), any());
+    }
+
+    @Test
+    void detailLoaded_sendsMembershipReconcilePatch() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      MemberEditForm form =
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null, true);
+      BindingResult br = mock(BindingResult.class);
+      when(br.hasErrors()).thenReturn(false);
+
+      controller.updateMember(id, form, br, model, redirectAttributes);
+
+      verify(backendApiClient)
+          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+      verify(backendApiClient).patch(eq("/api/v1/users/" + id + "/memberships"), any(), any());
     }
   }
 
@@ -442,7 +565,8 @@ class MemberManagementControllerTest {
     @Test
     void updateMemberAjax_validationError_returns422WithFieldMessages() {
       UUID id = UUID.randomUUID();
-      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
       org.springframework.validation.FieldError fe =
@@ -464,7 +588,8 @@ class MemberManagementControllerTest {
     void updateMemberAjax_happyPath_returns200WithRefreshedVersion() {
       UUID id = UUID.randomUUID();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       // The refreshed re-fetch (no squadron/flag change) AND the post-save version read both hit
@@ -486,7 +611,8 @@ class MemberManagementControllerTest {
     void updateMemberAjax_backendConflict_relaysStatusAndCodeAndDetail() {
       UUID id = UUID.randomUUID();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(
@@ -534,54 +660,6 @@ class MemberManagementControllerTest {
   }
 
   // ---------------------------------------------------------------
-  // toggleLogistician / toggleMissionManager
-  // ---------------------------------------------------------------
-
-  @Nested
-  class ToggleTests {
-
-    @Test
-    void toggleLogistician_true_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      UserDto result = controller.toggleLogistician(id, true);
-
-      assertSame(expected, result);
-      verify(backendApiClient)
-          .patch("/api/v1/users/" + id + "/logistician?isLogistician=true", null, UserDto.class);
-    }
-
-    @Test
-    void toggleLogistician_false_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      controller.toggleLogistician(id, false);
-
-      verify(backendApiClient)
-          .patch("/api/v1/users/" + id + "/logistician?isLogistician=false", null, UserDto.class);
-    }
-
-    @Test
-    void toggleMissionManager_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      controller.toggleMissionManager(id, true);
-
-      verify(backendApiClient)
-          .patch(
-              "/api/v1/users/" + id + "/mission-manager?isMissionManager=true",
-              null,
-              UserDto.class);
-    }
-  }
-
-  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 
@@ -601,6 +679,7 @@ class MemberManagementControllerTest {
         false,
         true,
         null,
+        java.util.List.of(),
         1L,
         null,
         false);

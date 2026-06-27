@@ -17,15 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.integration.scwiki;
+package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.integration.scwiki.BlueprintOutputNameOverrides.Correction;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.service.scwiki.BlueprintOutputNameOverrides.Correction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -49,7 +49,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -75,9 +74,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *   <li>{@link UserService#syncUser(KeycloakUserDto)} — the scheduled Keycloak Admin API sync (the
  *       previously completely-uncovered {@code inKeycloak} flip + change-detection branches).
  *   <li>{@link UserService#extractRolesFromJwt} — null and missing-key {@code realm_access} paths.
- *   <li>{@link UserService#updateLogisticianStatus} / {@link
- *       UserService#updateMissionManagerStatus} — admin-toggle operations called out in CLAUDE.md
- *       as the alternative to Keycloak-role assignment.
  *   <li>{@link UserService#updateUserDescription} — the version-check {@code
  *       ObjectOptimisticLockingFailureException} path.
  *   <li>{@link UserService#getCurrentUser} — null/anonymous/non-JWT principal short-circuits.
@@ -651,62 +647,6 @@ class UserServiceSyncTest {
       userService.updateUserDefaultPayoutPreference(USER_ID, PayoutPreference.PAYOUT, null);
 
       assertEquals(PayoutPreference.PAYOUT, user.getDefaultPayoutPreference());
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // updateLogisticianStatus / updateMissionManagerStatus
-  // ---------------------------------------------------------------
-
-  @Nested
-  class AdminRoleToggleTests {
-
-    @Test
-    void updateLogisticianStatus_throws_whenUserMissing() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(
-          NoSuchElementException.class, () -> userService.updateLogisticianStatus(USER_ID, true));
-    }
-
-    @Test
-    void updateLogisticianStatus_setsTrue() {
-      User user = newUser(USER_ID, "alice");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      userService.updateLogisticianStatus(USER_ID, true);
-
-      // Post-R9 D3 (V101): the flag write lands on the membership row, not the User entity.
-      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, true, null);
-    }
-
-    @Test
-    void updateLogisticianStatus_setsFalse() {
-      User user = newUser(USER_ID, "alice");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      userService.updateLogisticianStatus(USER_ID, false);
-
-      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, false, null);
-    }
-
-    @Test
-    void updateMissionManagerStatus_throws_whenUserMissing() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(
-          NoSuchElementException.class,
-          () -> userService.updateMissionManagerStatus(USER_ID, true));
-    }
-
-    @Test
-    void updateMissionManagerStatus_setsTrue() {
-      User user = newUser(USER_ID, "alice");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-      userService.updateMissionManagerStatus(USER_ID, true);
-
-      verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(USER_ID, null, true);
     }
   }
 

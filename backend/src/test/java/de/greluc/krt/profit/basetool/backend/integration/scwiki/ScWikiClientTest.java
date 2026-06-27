@@ -199,7 +199,7 @@ class ScWikiClientTest {
     ScWikiClient counter =
         new ScWikiClient(WebClient.builder(), properties) {
           @Override
-          protected void paceForRateLimit() {
+          public void paceForRateLimit() {
             paceCalls.incrementAndGet();
           }
         };

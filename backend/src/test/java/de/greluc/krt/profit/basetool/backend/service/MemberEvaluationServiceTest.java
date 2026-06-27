@@ -272,8 +272,8 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(UUID.fromString(foreignMemberId)))
-        .thenReturn(Optional.of(foreignStaffelId));
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(UUID.fromString(foreignMemberId)))
+        .thenReturn(java.util.List.of(foreignStaffelId));
     when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
 
     // When / Then
@@ -313,8 +313,8 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(UUID.fromString(memberId)))
-        .thenReturn(Optional.of(ownStaffelId));
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(UUID.fromString(memberId)))
+        .thenReturn(java.util.List.of(ownStaffelId));
     when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
     when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);

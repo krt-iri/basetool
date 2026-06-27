@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-import de.greluc.krt.profit.basetool.backend.config.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;

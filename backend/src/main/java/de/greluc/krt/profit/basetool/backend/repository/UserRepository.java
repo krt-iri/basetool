@@ -41,7 +41,12 @@ import org.springframework.stereotype.Repository;
  * scope filter consults {@code org_unit_membership} instead. The squadron-scoped queries below use
  * a {@code NOT EXISTS} sub-select to detect "user has no Staffel membership" (the equivalent of the
  * pre-V101 {@code u.squadron IS NULL} branch) and an {@code EXISTS} sub-select with the {@code
- * (kind = SQUADRON AND org_unit_id = :scopeSquadronId)} predicate for the in-scope branch.
+ * (kind = SQUADRON AND org_unit_id IN :scopeSquadronIds)} predicate for the in-scope branch. The
+ * scope parameter is a <em>collection</em> of squadron ids (REQ-ORG-017: a member may belong to up
+ * to two Staffeln, so a non-admin's unpinned scope is the union of their Staffeln); {@code null}
+ * still signals admin "all squadrons" mode. The collection is never empty (a caller with no Staffel
+ * collapses to {@code null} in {@code OwnerScopeService#currentUserListScopeSquadronIds()}), so the
+ * {@code IN} clause never degenerates to {@code IN ()}.
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
@@ -61,29 +66,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * name with username fallback, rank) ordered by display name. Used to populate user pickers
    * without pulling the full User aggregate.
    *
-   * <p>Multi-tenant: {@code scopeSquadronId} restricts the result to members of that squadron
-   * (MULTI_SQUADRON_PLAN.md section 4.4: list/search for normal users sees own squadron only).
-   * {@code null} signals admin "all squadrons" mode and falls back to the cross-staffel list. Users
-   * that have no squadron assigned (admins, guests) are always included so an admin in focused mode
+   * <p>Multi-tenant: {@code scopeSquadronIds} restricts the result to members of those squadrons
+   * (REQ-ORG-017: a non-admin's unpinned scope is the union of their up-to-two Staffeln). {@code
+   * null} signals admin "all squadrons" mode and falls back to the cross-staffel list. Users that
+   * have no squadron assigned (admins, guests) are always included so an admin in focused mode
    * still sees the unassigned bucket alongside the squadron members.
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,"
           + " u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>"
           + " '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE"
-          + " :scopeSquadronId IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE"
+          + " :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE"
           + " ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
           + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " = :scopeSquadronId) ORDER BY u.displayName")
+          + " IN :scopeSquadronIds) ORDER BY u.displayName")
   List<UserReferenceDto> findAllReferenceScoped(
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds);
 
   /**
    * Unscoped variant used internally by JWT sync flows where access is always implicit. Kept for
    * backwards compatibility — every caller-facing path should go through {@link
-   * #findAllReferenceScoped(UUID)} instead.
+   * #findAllReferenceScoped(java.util.Collection)} instead.
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,"
@@ -134,37 +140,40 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
 
   /**
-   * Squadron-scoped paged listing. Filters by the user's single SQUADRON-kind membership in {@code
-   * org_unit_membership} — users without a Staffel membership (admins, guests) are always visible
-   * so the focused admin can manage them.
+   * Squadron-scoped paged listing. Filters by the user's SQUADRON-kind membership(s) in {@code
+   * org_unit_membership} against the caller's scope set (REQ-ORG-017: up to two Staffeln) — users
+   * without a Staffel membership (admins, guests) are always visible so the focused admin can
+   * manage them.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR NOT EXISTS (SELECT 1 FROM"
+      "SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM"
           + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
           + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " = :scopeSquadronId)")
+          + " IN :scopeSquadronIds)")
   Page<User> findAllScoped(
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
-   * Unpaged squadron-scoped listing. Same predicate as {@link #findAllScoped(UUID, Pageable)}
-   * without pagination — used by the legacy {@code findAll()} call sites that still expect a plain
-   * {@link List}.
+   * Unpaged squadron-scoped listing. Same predicate as {@link #findAllScoped(java.util.Collection,
+   * Pageable)} without pagination — used by the legacy {@code findAll()} call sites that still
+   * expect a plain {@link List}.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronId IS NULL OR NOT EXISTS (SELECT 1 FROM"
+      "SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM"
           + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
           + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " = :scopeSquadronId)")
+          + " IN :scopeSquadronIds)")
   List<User> findAllScopedList(
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
       org.springframework.data.domain.Sort sort);
 
   /**
@@ -178,12 +187,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * exclusion also guards against a manually mis-assigned admin or officer row that still carries a
    * squadron membership.
    *
-   * <p>When {@code scopeSquadronId} is {@code null} (admin "all squadrons" mode) the result spans
-   * every squadron's members. A non-null id restricts to that squadron. Users without a squadron
-   * membership are excluded — they are not part of any squadron's evaluation list, which keeps the
-   * promotion system scoped to squadrons and never to other org-unit kinds.
+   * <p>When {@code scopeSquadronIds} is {@code null} (admin "all squadrons" mode) the result spans
+   * every squadron's members. A non-null set restricts to those squadrons (REQ-ORG-017: an officer
+   * of two Staffeln evaluates both). Users without a squadron membership are excluded — they are
+   * not part of any squadron's evaluation list, which keeps the promotion system scoped to
+   * squadrons and never to other org-unit kinds.
    *
-   * @param scopeSquadronId squadron filter; {@code null} = all squadrons.
+   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
    * @return paged ordinary squadron members that an Officer / Admin may evaluate.
    */
@@ -191,10 +201,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id ="
           + " u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON"
-          + " AND (:scopeSquadronId IS NULL OR ms.id.orgUnitId = :scopeSquadronId)) AND NOT"
+          + " AND (:scopeSquadronIds IS NULL OR ms.id.orgUnitId IN :scopeSquadronIds)) AND NOT"
           + " EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))")
   Page<User> findEvaluatableMembers(
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
@@ -205,33 +216,35 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @EntityGraph(attributePaths = {"roles"})
   @Query(
       "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
-          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
+          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS"
           + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
           + " ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
           + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " = :scopeSquadronId))")
+          + " IN :scopeSquadronIds))")
   Page<User> searchScoped(
       @org.springframework.data.repository.query.Param("query") String query,
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
    * Squadron-scoped substring search returning a plain list. Same predicate as {@link
-   * #searchScoped(String, UUID, Pageable)} without pagination.
+   * #searchScoped(String, java.util.Collection, Pageable)} without pagination.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
       "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
-          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronId IS"
+          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS"
           + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
           + " ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
           + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
           + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " = :scopeSquadronId))")
+          + " IN :scopeSquadronIds))")
   List<User> searchScopedList(
       @org.springframework.data.repository.query.Param("query") String query,
-      @org.springframework.data.repository.query.Param("scopeSquadronId") UUID scopeSquadronId);
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the

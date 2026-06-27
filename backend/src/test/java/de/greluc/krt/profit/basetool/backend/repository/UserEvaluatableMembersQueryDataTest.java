@@ -84,7 +84,7 @@ class UserEvaluatableMembersQueryDataTest {
 
     List<UUID> evaluatableIds =
         userRepository
-            .findEvaluatableMembers(Squadron.IRIDIUM_ID, PageRequest.of(0, 5000))
+            .findEvaluatableMembers(java.util.Set.of(Squadron.IRIDIUM_ID), PageRequest.of(0, 5000))
             .map(User::getId)
             .getContent();
 

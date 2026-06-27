@@ -50,8 +50,6 @@
                     <th th:text="#{members.field.squadron}">Staffel</th>
                     <th th:text="#{members.list.specialcommands}">SK</th>
                     <th th:text="#{profile.rank}">Rang</th>
-                    <th th:text="#{members.is_logistician}">Logistiker</th>
-                    <th th:text="#{members.is_mission_manager}">Missions-Manager</th>
                     <th th:text="#{members.discord}">Discord</th>
                     <th th:text="#{members.status}">Status</th>
                     <th th:text="#{general.action}">Aktion</th>
@@ -60,11 +58,18 @@
             <tbody>
                 <tr th:each="user : ${users}">
                     <td th:text="${user.effectiveName}">Username</td>
+                    <!-- REQ-ORG-017 — a member may hold up to two Staffeln; render every badge
+                         (mirrors the SK column's separated-badge style). -->
                     <td>
-                        <span th:if="${user.squadron != null}" class="squadron-badge"
-                              th:title="${user.squadron.name()}"
-                              th:text="${user.squadron.shorthand()}">IRI</span>
-                        <span th:if="${user.squadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
+                            <th:block th:each="sq, st : ${user.squadrons}">
+                                <span class="squadron-badge"
+                                      th:title="${sq.name()}"
+                                      th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                            </th:block>
+                        </span>
+                        <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
+                              class="squadron-badge squadron-badge-muted">&mdash;</span>
                     </td>
                     <!-- SPEZIALKOMMANDO_PLAN.md §7.5 — comma-separated SK shorthand list (neutral
                          badge style so SK pins do not compete with the Staffel brand colour). -->
@@ -81,20 +86,6 @@
                               th:utext="#{members.list.specialcommands.none}">&mdash;</span>
                     </td>
                     <td th:text="${user.rank}">Rang</td>
-                    <td>
-                        <input type="checkbox"
-                               th:checked="${user.isLogistician}"
-                               th:data-user-id="${user.id}"
-                               data-trigger="members-toggle-logistician"
-                               th:disabled="${#authentication.principal.subject == user.id.toString()}">
-                    </td>
-                    <td>
-                        <input type="checkbox"
-                               th:checked="${user.isMissionManager}"
-                               th:data-user-id="${user.id}"
-                               data-trigger="members-toggle-mission-manager"
-                               th:disabled="${#authentication.principal.subject == user.id.toString()}">
-                    </td>
                     <td>
                         <span th:if="${user.discordLinked}" role="img"
                               th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
@@ -139,7 +130,7 @@
         let membersFilterTimer = null;
 
         // In-place filter + pagination (epic #571 / #573). The GET form stays the no-JS fallback;
-        // the row actions (logistician/mission-manager toggle, delete) are delegated via krtEvents
+        // the row actions (delete) are delegated via krtEvents
         // below, so they keep working after the results fragment is swapped.
         function applyMembersFilter() {
             if (!filterForm || !resultsContainer || !window.krtFetch) {
@@ -194,57 +185,12 @@
         }
     });
 
-    const MSG_STATUS_UPDATED = "[[#{members.status.updated}]]";
-    const MSG_STATUS_UPDATE_FAILED = "[[#{members.status.update.failed}]]";
-    const MSG_STATUS_UPDATE_ERROR = "[[#{members.status.update.error}]]";
     const MSG_DELETE_TITLE = "[[#{members.delete.title}]]";
     const MSG_DELETE_CONFIRM = "[[#{members.delete_confirm}]]";
     const MSG_DELETE_LABEL = "[[#{members.delete}]]";
     const MSG_CANCEL_LABEL = "[[#{general.cancel}]]";
     const MSG_DELETE_SUCCESS = "[[#{success.user.delete}]]";
     const MSG_DELETE_ERROR = "[[#{error.user.delete}]]";
-
-    // Flag-toggle writes stay in place (epic #571): on failure the toggle the user flipped did
-    // not persist, so the checkbox is reverted to its prior state instead of reloading the page.
-    async function updateLogisticianStatus(checkbox, userId, isLogistician) {
-        try {
-            const resp = await fetch(`/members/${userId}/logistician?isLogistician=${isLogistician}`, {
-                method: 'POST',
-                headers: window.krtCsrf.headers()
-            });
-            if (!resp.ok) {
-                const data = await resp.json().catch(() => ({}));
-                showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
-                checkbox.checked = !isLogistician;
-            } else {
-                showFrontendSuccessToast(MSG_STATUS_UPDATED);
-            }
-        } catch (err) {
-            console.error('Failed to update status', err);
-            showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
-            checkbox.checked = !isLogistician;
-        }
-    }
-
-    async function updateMissionManagerStatus(checkbox, userId, isMissionManager) {
-        try {
-            const resp = await fetch(`/members/${userId}/mission-manager?isMissionManager=${isMissionManager}`, {
-                method: 'POST',
-                headers: window.krtCsrf.headers()
-            });
-            if (!resp.ok) {
-                const data = await resp.json().catch(() => ({}));
-                showFrontendErrorToast(data.message || MSG_STATUS_UPDATE_ERROR);
-                checkbox.checked = !isMissionManager;
-            } else {
-                showFrontendSuccessToast(MSG_STATUS_UPDATED);
-            }
-        } catch (err) {
-            console.error('Failed to update status', err);
-            showFrontendErrorToast(MSG_STATUS_UPDATE_FAILED);
-            checkbox.checked = !isMissionManager;
-        }
-    }
 
     // Re-render the current (filtered/paginated) member list so a deleted row drops out and the
     // pagination + SK column stay coherent. The URL already carries the active filter (kept in
@@ -276,16 +222,10 @@
     }
 
     // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
-    // The matching data-trigger attributes are set on the checkboxes / delete button
-    // above; using the global event-delegation helper keeps the wiring working when
-    // Thymeleaf re-renders the member table on filter/pagination changes.
+    // The matching data-trigger attribute is set on the delete button above; using the
+    // global event-delegation helper keeps the wiring working when Thymeleaf re-renders
+    // the member table on filter/pagination changes.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'members-toggle-logistician', function (el) {
-            updateLogisticianStatus(el, el.getAttribute('data-user-id'), el.checked);
-        });
-        window.krtEvents.on('change', 'members-toggle-mission-manager', function (el) {
-            updateMissionManagerStatus(el, el.getAttribute('data-user-id'), el.checked);
-        });
         window.krtEvents.on('click', 'members-delete-user', function (el) {
             deleteUser(el.getAttribute('data-user-id'));
         });

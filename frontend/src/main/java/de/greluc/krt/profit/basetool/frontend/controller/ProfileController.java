@@ -129,6 +129,13 @@ public class ProfileController {
             // joinDate missing or malformed — leave attribute unset
           }
         }
+        // REQ-ORG-017: surface the user's FULL Staffel membership set (up to two) so the identity
+        // band shows every Staffel affiliation, not just the single active-context pin. Each
+        // element
+        // is the serialised SquadronReferenceDto ({name, shorthand}).
+        if (user.get("squadrons") instanceof java.util.List<?> squadrons) {
+          model.addAttribute("profileSquadrons", squadrons);
+        }
       }
     } catch (Exception e) {
       // Backend unavailable? Keep Token data.

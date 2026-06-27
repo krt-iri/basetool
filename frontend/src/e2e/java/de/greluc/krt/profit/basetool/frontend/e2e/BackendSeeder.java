@@ -107,23 +107,17 @@ public final class BackendSeeder {
   public void ensureIridiumMembership(String username, String password) {
     try {
       String token = passwordGrant(username, password);
-      for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
-        JsonObject me = getJson("/api/v1/users/me", token);
-        if (me.has("squadron") && !me.get("squadron").isJsonNull()) {
-          return; // already a member — nothing to seed
-        }
-        String userId = me.get("id").getAsString();
-        long version = me.get("version").getAsLong();
-        int status = patchSquadron(token, userId, version);
-        if (status >= 200 && status < 300) {
-          return;
-        }
-        if (status != 409) {
-          throw new IllegalStateException("Squadron PATCH failed: HTTP " + status);
-        }
-        // 409: the optimistic-lock version moved (syncUser bumped it) — re-read and retry.
+      JsonObject me = getJson("/api/v1/users/me", token);
+      if (me.has("squadron") && !me.get("squadron").isJsonNull()) {
+        return; // already a member — nothing to seed
       }
-      throw new IllegalStateException("Squadron seeding exhausted retries on HTTP 409");
+      String userId = me.get("id").getAsString();
+      // REQ-ORG-017: assign via the membership-delta reconcile (the legacy /squadron endpoint was
+      // removed). The reconcile carries no user-row version, so there is no 409 retry loop.
+      int status = patchSquadron(token, userId);
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException("Membership seeding PATCH failed: HTTP " + status);
+      }
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
@@ -1980,18 +1974,19 @@ public final class BackendSeeder {
   }
 
   /**
-   * Assigns {@code targetUserId} to a Staffel via {@code PATCH /api/v1/users/{id}/squadron}
-   * (admin-only, body {@code {squadronId, version}}), re-reading the user's version on a 409 like
-   * {@link #ensureIridiumMembership}. A user has at most one Staffel membership, so this also
-   * re-homes them. Optional role flags are then set via the dedicated {@code /logistician} and
-   * {@code /mission-manager} query-param toggles.
+   * Assigns {@code targetUserId} to a Staffel and sets its per-squadron role flags in one
+   * transaction via the membership-delta {@code PATCH /api/v1/users/{id}/memberships} (admin-only),
+   * sending the desired complete Staffel set {@code {staffeln:[{squadronId, isLogistician,
+   * isMissionManager}]}} (REQ-ORG-017). The reconcile adds the Staffel (re-homing the user, since
+   * the desired set is authoritative) and patches the flags; it is idempotent and needs no user-row
+   * version, so there is no 409 retry loop here.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
    * @param targetUserId the app_user id to assign (see {@link #getUserId})
    * @param squadronId the Staffel OrgUnit id
-   * @param isLogistician whether to set the {@code is_logistician} flag
-   * @param isMissionManager whether to set the {@code is_mission_manager} flag
+   * @param isLogistician whether to set the {@code is_logistician} flag on the Staffel membership
+   * @param isMissionManager whether to set the {@code is_mission_manager} flag on the membership
    */
   public void assignStaffelMembership(
       String adminUser,
@@ -2002,61 +1997,23 @@ public final class BackendSeeder {
       boolean isMissionManager) {
     try {
       String token = passwordGrant(adminUser, adminPassword);
-      for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
-        long version = getJson("/api/v1/users/" + targetUserId, token).get("version").getAsLong();
-        String body = "{\"squadronId\":\"" + squadronId + "\",\"version\":" + version + "}";
-        int status = patch(token, "/api/v1/users/" + targetUserId + "/squadron", body);
-        if (status >= 200 && status < 300) {
-          if (isLogistician) {
-            patchFlag(token, targetUserId, "logistician", "isLogistician");
-          }
-          if (isMissionManager) {
-            patchFlag(token, targetUserId, "mission-manager", "isMissionManager");
-          }
-          return;
-        }
-        if (status != 409) {
-          throw new IllegalStateException("Squadron assignment PATCH failed: HTTP " + status);
-        }
+      String body =
+          "{\"staffeln\":[{\"squadronId\":\""
+              + squadronId
+              + "\",\"isLogistician\":"
+              + isLogistician
+              + ",\"isMissionManager\":"
+              + isMissionManager
+              + "}]}";
+      int status = patch(token, "/api/v1/users/" + targetUserId + "/memberships", body);
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException(
+            "Staffel membership assignment PATCH failed: HTTP " + status);
       }
-      throw new IllegalStateException(
-          "Staffel membership assignment exhausted retries on HTTP 409");
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.assignStaffelMembership failed", e);
-    }
-  }
-
-  /**
-   * Sets a boolean user flag to {@code true} via its admin-only query-param PATCH endpoint (e.g.
-   * {@code PATCH /api/v1/users/{id}/logistician?isLogistician=true}). Throws on a non-2xx status.
-   *
-   * @param token a bearer token for an admin
-   * @param userId the target user id
-   * @param pathSegment the endpoint path segment ({@code logistician} or {@code mission-manager})
-   * @param paramName the boolean query parameter name to set to {@code true}
-   * @throws Exception on transport failure
-   */
-  private void patchFlag(String token, String userId, String pathSegment, String paramName)
-      throws Exception {
-    HttpRequest request =
-        HttpRequest.newBuilder(
-                URI.create(
-                    BACKEND_BASE_URL
-                        + "/api/v1/users/"
-                        + userId
-                        + "/"
-                        + pathSegment
-                        + "?"
-                        + paramName
-                        + "=true"))
-            .header("Authorization", "Bearer " + token)
-            .method("PATCH", HttpRequest.BodyPublishers.noBody())
-            .build();
-    int status = http.send(request, BodyHandlers.ofString()).statusCode();
-    if (status < 200 || status >= 300) {
-      throw new IllegalStateException("Flag PATCH " + pathSegment + " failed: HTTP " + status);
     }
   }
 
@@ -2178,20 +2135,20 @@ public final class BackendSeeder {
   }
 
   /**
-   * Sends the squadron-assignment PATCH and returns the HTTP status so the caller can react to a
-   * 409 optimistic-lock conflict.
+   * Assigns the IRIDIUM Staffel to the user via the membership-delta reconcile ({@code PATCH
+   * /api/v1/users/{id}/memberships}) and returns the HTTP status. The reconcile is declarative and
+   * carries no user-row version, so there is no optimistic-lock 409 to react to.
    *
    * @param token bearer token
    * @param userId the app_user id to assign
-   * @param version the optimistic-lock version last read for that user
    * @return the HTTP status code of the PATCH
    * @throws Exception on transport failure
    */
-  private int patchSquadron(String token, String userId, long version) throws Exception {
-    String body = "{\"squadronId\":\"" + IRIDIUM_SQUADRON_ID + "\",\"version\":" + version + "}";
+  private int patchSquadron(String token, String userId) throws Exception {
+    String body = "{\"staffeln\":[{\"squadronId\":\"" + IRIDIUM_SQUADRON_ID + "\"}]}";
     HttpRequest request =
         HttpRequest.newBuilder(
-                URI.create(BACKEND_BASE_URL + "/api/v1/users/" + userId + "/squadron"))
+                URI.create(BACKEND_BASE_URL + "/api/v1/users/" + userId + "/memberships"))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(body))

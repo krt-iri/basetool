@@ -20,12 +20,18 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Data transfer record carrying User payload.
+ *
+ * <p>{@code squadron} is the user's primary Staffel (kept for API stability); {@code squadrons} is
+ * the complete Staffel membership set (REQ-ORG-017 allows up to two). Surfaces that must render
+ * every membership — the admin member list badge — read {@code squadrons}; both are {@code null} /
+ * empty for a user without a Staffel.
  *
  * <p>{@code discordLinked} is a privacy-safe, read-only indicator mirrored from the backend: {@code
  * true} when a Discord account is federated to the user's Basetool account, {@code false}
@@ -48,6 +54,7 @@ public record UserDto(
     Boolean isMissionManager,
     Boolean inKeycloak,
     @Nullable SquadronReferenceDto squadron,
+    @Nullable List<SquadronReferenceDto> squadrons,
     Long version,
     @Nullable LocalDate joinDate,
     @Nullable Boolean discordLinked) {}

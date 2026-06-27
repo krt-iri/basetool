@@ -413,14 +413,17 @@ public class ScWikiClient {
   }
 
   /**
-   * Sleeps {@code 1000 / requestsPerSecond} milliseconds between page fetches. Protected (not
-   * private) so unit tests can subclass and override with a no-op to keep test latency bounded
-   * while still exercising the pagination + ETag paths.
+   * Sleeps {@code 1000 / requestsPerSecond} milliseconds between page fetches. Public so the
+   * SC-Wiki sync orchestrators in the {@code service.scwiki} package can pace their own
+   * multi-request loops between client calls (they live in a different package since the cycle
+   * cleanup that left only the HTTP client in {@code integration.scwiki}), and so unit tests can
+   * subclass and override it with a no-op to keep test latency bounded while still exercising the
+   * pagination + ETag paths.
    *
    * <p>Interruption is preserved (re-sets the thread's interrupted flag) so a shutting-down
    * scheduler thread can exit promptly instead of being parked inside a long sleep.
    */
-  protected void paceForRateLimit() {
+  public void paceForRateLimit() {
     int rps = properties.getRequestsPerSecond() == null ? 5 : properties.getRequestsPerSecond();
     long sleepMillis = Math.max(1L, 1000L / Math.max(1, rps));
     try {

@@ -6,11 +6,19 @@
 
 - **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
 
+### Changed
+
+- **Mitgliederverwaltung: bis zu zwei Staffeln je Mitglied.** In den Mitglied-Details lassen sich jetzt zwei Staffeln zuweisen statt nur einer, jede mit eigenen Logistiker-/Missions-Manager-Rollen; das Speichern gleicht die Staffelmitgliedschaften in einem Schritt ab (Hinzufügen, Entfernen, Rollen). Die Logistiker-/Missions-Manager-Schalter in der Mitgliederliste entfallen — diese Rollen werden nun je Staffel in den Mitglied-Details gepflegt; die Staffel-Spalte zeigt beide Staffeln.
+
+- **Zwei Staffeln werden projektweit unterstützt.** Profil und Mitgliederliste zeigen beide Staffeln, und Mitglieder-/Such-/Bewertungslisten eines Offiziers mit zwei Staffeln umfassen beide; die aktive Staffel (für Anzeige und automatische Zuweisung beim Erstellen) folgt dem Staffel-Umschalter in der Seitenleiste, sonst der primären (namens-sortierten) Staffel. Berechtigungen (PII-Einsicht, Bewertung) und Auftrags-Übergabe-Protokolle berücksichtigen beide Staffeln; beim Erstellen von Promotion-Themen/Rang-Anforderungen muss ein Nutzer mit zwei Staffeln zuvor die Ziel-Staffel anpinnen.
+
 ### Fixed
 
 - **Raffinerieauftrag einlagern: Auftrags-Dropdown blieb leer.** Beim Einlagern eines Raffinerieauftrags zeigte die „Auftrag"-Auswahl keine passenden Aufträge, obwohl welche das Material in der Qualität benötigten. Ursache: Der Filter prüfte nur die Material-Zeilen, die bei Item-Aufträgen leer sind — solche Aufträge fielen immer heraus. Das Dropdown bietet jetzt (wie der Lager-Picker) alle aktiven Aufträge an, die das eingelagerte Material benötigen, über beide Auftragsarten hinweg.
 
 - **Meine Blueprints: Craftbarkeit rechnet jetzt auch Hand-Minables (Stück) ein.** In der Craftbarkeits-Ansicht fehlten bisher die Zutaten mit Mengeneinheit „Stück" — handabgebaute Edelsteine wie Hadanite oder Beradom, die das Wiki als Item führt. Sie werden jetzt (wie schon im Auftrags-Pfad) an das passende Material gekoppelt und mitgezählt (benötigt/vorhanden/fehlt in ganzen Stück, ggf. als limitierendes Material); craftbare Unterbaugruppen bleiben „nicht bewertet".
+
+- **Mitglied-Details: Speichern entfernt keine Staffeln mehr, wenn die Staffel-Daten nicht geladen werden konnten.** Schlug beim Öffnen der Bearbeitung der Abruf der Staffel-Mitgliedschaften fehl (z. B. Zeitüberschreitung), zeigte das Formular leere Staffel-Felder — ein anschließendes Speichern hätte alle Staffeln des Mitglieds entfernt. Jetzt erscheint stattdessen ein Hinweis, die Staffel-Felder bleiben ausgeblendet und der Staffel-Abgleich wird übersprungen; die übrigen Felder speichern normal.
 
 ## [v0.7.16](https://github.com/krt-profit/basetool/releases/tag/v0.7.16) - 2026-06-27
 

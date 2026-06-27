@@ -41,12 +41,17 @@ class UserJoinDateMapperTest {
   @BeforeEach
   void setUp() {
     // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
-    // two mocked repositories since this test does not load a Spring context.
+    // membership repository plus the StaffelMembershipResolver collaborator since this test does
+    // not
+    // load a Spring context.
     userMapper = new UserMapperImpl();
     ReflectionTestUtils.setField(
         userMapper, "membershipRepository", Mockito.mock(OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(
-        userMapper, "squadronRepository", Mockito.mock(SquadronRepository.class));
+        userMapper,
+        "staffelMembershipResolver",
+        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+            Mockito.mock(SquadronRepository.class)));
   }
 
   @Test
