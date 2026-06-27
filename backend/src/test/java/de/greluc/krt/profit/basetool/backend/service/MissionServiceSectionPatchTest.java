@@ -103,7 +103,15 @@ class MissionServiceSectionPatchTest {
     // When
     Mission result =
         missionService.updateCoreSection(
-            missionId, "New name", "New desc", "https://example.org/cal", "PLANNED", null, 4L);
+            missionId,
+            "New name",
+            "New desc",
+            "https://example.org/cal",
+            "PLANNED",
+            null,
+            null,
+            null,
+            4L);
 
     // Then
     assertEquals("New name", result.getName());
@@ -127,7 +135,9 @@ class MissionServiceSectionPatchTest {
     // Mission.version (7) and the other section counters (schedule=5, flags=6) are untouched.
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> missionService.updateCoreSection(missionId, "X", null, null, null, null, 3L));
+        () ->
+            missionService.updateCoreSection(
+                missionId, "X", null, null, null, null, null, null, 3L));
   }
 
   @Test
@@ -141,7 +151,7 @@ class MissionServiceSectionPatchTest {
     // When: caller switches status to ACTIVE via the core patch
     Mission result =
         missionService.updateCoreSection(
-            missionId, "Old name", "Old desc", null, "ACTIVE", null, 4L);
+            missionId, "Old name", "Old desc", null, "ACTIVE", null, null, null, 4L);
 
     Instant after = Instant.now();
 
@@ -239,7 +249,8 @@ class MissionServiceSectionPatchTest {
 
     // When (1): a core-section caller saves
     Mission afterCore =
-        missionService.updateCoreSection(missionId, "New name", null, null, "PLANNED", null, 4L);
+        missionService.updateCoreSection(
+            missionId, "New name", null, null, "PLANNED", null, null, null, 4L);
 
     // Then (1): coreVersion advances to 5, flagsVersion is still 6
     assertEquals(5L, afterCore.getCoreVersion());

@@ -63,4 +63,6 @@ public record MissionForm(
     Long coreVersion,
     Long scheduleVersion,
     Long flagsVersion,
-    UUID owningOrgUnitId) {}
+    UUID owningOrgUnitId,
+    @Size(max = 250) String objective,
+    @Size(max = 200) String meetingPoint) {}

@@ -263,6 +263,21 @@ public enum AuditEventType {
   /** A mission finance entry was deleted. */
   MISSION_FINANCE_ENTRY_DELETED(AuditDomain.MISSION),
 
+  /** An Ablauf (procedure) step was added to a mission. */
+  MISSION_STEP_ADDED(AuditDomain.MISSION),
+
+  /** An Ablauf step's title or time/place hint was edited. */
+  MISSION_STEP_UPDATED(AuditDomain.MISSION),
+
+  /** An Ablauf step was removed from a mission. */
+  MISSION_STEP_REMOVED(AuditDomain.MISSION),
+
+  /** A mission's Ablauf steps were reordered (one event per reorder action). */
+  MISSION_STEP_REORDERED(AuditDomain.MISSION),
+
+  /** An Ablauf step's shared done flag was toggled on or off. */
+  MISSION_STEP_DONE_CHANGED(AuditDomain.MISSION),
+
   /** The mission audit log was exported as a PDF or JSON for a period. */
   MISSION_AUDIT_EXPORTED(AuditDomain.MISSION),
 

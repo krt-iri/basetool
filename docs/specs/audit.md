@@ -50,8 +50,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Missionen** — mission create (incl. sub-mission) / edit (core, schedule, flags) / delete;
   participant add / remove / edit / check-in / check-out; unit add / edit / remove; crew add / edit /
   remove; frequency change / remove; owner change; party-lead change; manager add / remove; finance
-  entry create / edit / delete. Free-text (mission/guest names beyond the snapshot label, notes) is
-  never written to the details payload — only ids and the non-personal mission name snapshot.
+  entry create / edit / delete; Ablauf step add / edit / remove / reorder / done-toggle. Free-text
+  (mission/guest names beyond the snapshot label, notes, **step titles and time/place hints**) is
+  never written to the details payload — only ids, counts and the non-personal mission name snapshot.
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
   deleted); per-participant payout toggle.
 - **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit

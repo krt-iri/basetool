@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-11.
-> **Owner area:** MISSION/UI · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md)
 
 # Mission detail page — tab layout (Variante B)
 
@@ -23,16 +23,22 @@ The detail page renders a sticky head (title, owning-squadron badge, status pill
 a `.facts-bar` (server join = planned start, TS meeting time, participants, checked-in count,
 finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
 
-1. **Übersicht** — read-only landing tab: briefing/description (member+ gate unchanged; the
-   description is **Markdown** and renders server-side via the `@markdown` bean — raw HTML in the
-   source is escaped, unsafe link protocols are stripped, so `th:utext` never emits
-   user-controlled markup; the same renderer feeds the home-page next-mission banner), schedule /
-   radio / leadership as a `.kv-list` (operation labelled singular; actual start and end as
-   separate rows; the leadership-position rows precede the party lead), the caller's personal
-   participation status, and a single Wirtschaft jump card (no Teilnehmer/Finanzen cards — those
-   targets are one tab click away; owner decision 2026-06-11). The page content is capped at
-   1800px — 1.5× the app's regular `--content-max` (1200px), because the board and finance grids
-   carry side-by-side columns (owner decision 2026-06-11).
+1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
+   2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout). Two columns of
+   stacked panels: **left** = "Mission auf einen Blick" (the short objective `Ziel` + planned/actual
+   times, meeting time, `Treffpunkt`, operation, internal chip, party lead as a `.kv-list`, plus the
+   caller's personal participation chip), "Weitere Leads" (the leadership-position rows) and "Funk"
+   (the dynamic frequencies); **right** = a "Teilnehmer" attendance meter (registered count + a
+   checked-in progress bar derived from `checkedInParticipants/registeredParticipants`), the
+   read-only **Ablauf** checklist (REQ-MISSION-009) and a "Kalender" open card. The long **Markdown**
+   description moves into a collapsible `<details>` below the grid (member+ gate unchanged; rendered
+   server-side via the `@markdown` bean — raw HTML escaped, unsafe link protocols stripped, so
+   `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
+   banner). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
+   `freq-value-display` markers are preserved so the schedule / party-lead / frequency live-update
+   patches keep working. The Wirtschaft jump card is dropped (the Finanzen tab is one click away). The
+   page content is capped at 1800px — 1.5× the app's regular `--content-max` (1200px), because the
+   board and finance grids carry side-by-side columns (owner decision 2026-06-11).
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).
 3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
    table (public; participation % authenticated-only), and the Wirtschaft `<details>` sections
@@ -105,3 +111,64 @@ canEdit/own/guest; check-in/out time-state conditions; Wirtschaft authenticated 
 by edit permission). Backend endpoints, DTOs and the optimistic-locking flow (`version` echo,
 `data-version` DOM sync, 409 handling via `MissionSubresource`) are unchanged. Mission data shown
 read-only to non-editors in the old Details panel remains visible via the Übersicht tab.
+
+### REQ-MISSION-009 — Ablauf (procedure timeline) steps
+
+A mission carries an ordered, reorderable list of **Ablauf** steps — a procedure timeline. Each step
+is a persisted `MissionStep` child of the mission (`title` required ≤200 chars, optional free-text
+`meta` "Zeit / Ort" hint ≤200 chars, a shared `done` flag, an explicit `orderIndex`). The Ablauf is
+authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-step-list`: per-row
+title + meta inputs, up/down + drag reorder, delete, "Schritt hinzufügen", a live "N Schritte"
+counter) and shown **read-only** in the Übersicht as an `<ol class="ablauf">` checklist whose single
+**current phase** (`step--now`) is *derived* as the first not-done step (never stored). Edit-authorised
+users (`mission.canEdit` / `@missionSecurityService.canManageMission`) toggle a step's shared `done`
+check directly on the overview checklist; the state is visible to every viewer. Outsiders/guests see
+the Ablauf read-only (it is non-PII planning data, forwarded like units/frequencies; ADR-0044).
+
+All five mutations (add / edit / remove / reorder / done-toggle) go through dedicated slim endpoints
+`…/missions/{id}/steps[/{stepId}][/reorder|/done]/slim` (`@PreAuthorize canManageMission`), each
+echoing the mission's dedicated **`stepsVersion`** section counter — a manual `@OptimisticLock(excluded
+= true) Long` in the `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion` family — so an
+Ablauf edit never 409s a concurrent core/schedule/flags edit, and a stale `stepsVersion` surfaces as
+HTTP 409. Reorder reassigns `orderIndex` over the managed children by dirty-checking (no per-child
+save, no clearing bulk query mid-loop) and records **one** event. Mutations re-render the editor +
+overview-checklist fragments in place via `krtFetch`/`krtRefreshMissionSection(['steps','overview'])`
+(no reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an
+audited area: each mutation records a `MISSION_STEP_*` event (`ADDED` / `UPDATED` / `REMOVED` /
+`REORDERED` / `DONE_CHANGED`) carrying only ids/counts/the done flag — **never** the step title or
+meta (free text), per REQ-AUDIT-001. Migration: V191 (`mission_step` table + `mission.steps_version`).
+
+### REQ-MISSION-010 — Short objective (Ziel) and rally point (Treffpunkt)
+
+A mission carries two short free-text core-section fields: **`objective`** (Ziel, ≤250 chars — the
+headline goal shown first in "Mission auf einen Blick", distinct from the long Markdown description)
+and **`meetingPoint`** (Treffpunkt, ≤200 chars — the rally point). Both are edited in the Verwaltung
+details form and belong to the **core** section (guarded by `coreVersion`, persisted via the existing
+`/core` patch; no new lock). Both are non-PII planning data, forwarded to outsiders/guests like the
+units and frequencies (the long Markdown description remains the one free-text field hidden from
+outsiders). Migration: V191 (`mission.objective`, `mission.meeting_point`).
+
+### REQ-MISSION-011 — Operation detail page adopts the Variante B tab shell
+
+The operation detail page (`/operations/{id}`) — the umbrella over missions, also an "Einsatz-Seite"
+under #818 — is restructured from the legacy collapsible-column layout to the **same tab shell**
+(sticky head + `.facts-bar` + `.tab-nav`) with five tabs: **Übersicht** (read-only landing: "Operation
+auf einen Blick" status/mission-count/result/donations, an "Ergebnis je Einsatz" proportional result
+bar per linked mission from the operation finance breakdown, an Einsätze preview list, and a
+collapsible Markdown description), **Einsätze** (the paginated linked-missions table — REQ-FE-002 AJAX
+pager unchanged — with an "Einsatz hinzufügen" shortcut that opens `/missions/new?operationId={id}`
+with the operation preselected, editor-only), **Auszahlung** (the operation payout table + paid-out
+toggle, unchanged), **Finanzen** (a summary strip + the per-mission finance breakdown as native
+`<details>`), and **Verwaltung** (the details form — name / status / description — with the delete +
+single Speichern CTA). This is a **frontend-only** restructure: operations have **no** owner or
+per-operation managers (the mockup's owner/manager panels were clones of the mission design and are
+deliberately omitted — edit access stays the role-based `canEdit`), and the read-only details form
+remains visible (disabled) to non-editors as before.
+
+The description field gains a **Markdown editor** (editor-only): a B / I / heading / list / link
+formatting toolbar that wraps the textarea selection client-side, and a "Bearbeiten / Vorschau"
+toggle whose preview is rendered **server-side** via `POST /operations/markdown-preview` through the
+same `@markdown` (`MarkdownRenderer`) bean the page uses on save — so the preview is byte-identical to
+the persisted render (raw HTML escaped, unsafe link protocols stripped). No backend, DTO, migration or
+permission change; every existing operation contract (save / delete AJAX twins, payout paid-out
+asymmetric authorization, missions pager) is preserved.

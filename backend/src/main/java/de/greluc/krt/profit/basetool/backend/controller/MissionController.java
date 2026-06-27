@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
@@ -375,7 +376,14 @@ public class MissionController {
         // — no email or real name — so it is forwarded to guests unchanged.
         dto.partyLeadUser(),
         dto.partyLeadGuestName(),
-        dto.partyLeadVersion());
+        dto.partyLeadVersion(),
+        // Ablauf steps, objective (Ziel) and meeting point (Treffpunkt) are non-PII mission
+        // planning data — forwarded like the assigned units and frequencies (the long Markdown
+        // description stays the one free-text field hidden from outsiders, handled below).
+        dto.steps(),
+        dto.stepsVersion(),
+        dto.objective(),
+        dto.meetingPoint());
   }
 
   /**
@@ -453,7 +461,11 @@ public class MissionController {
         peer.owningSquadron(), // organisation kept
         peer.partyLeadUser(),
         peer.partyLeadGuestName(),
-        peer.partyLeadVersion());
+        peer.partyLeadVersion(),
+        peer.steps(), // Ablauf kept (planning data, like units/frequencies)
+        peer.stepsVersion(),
+        peer.objective(), // short objective kept; long description is the hidden free-text field
+        peer.meetingPoint());
   }
 
   /**
@@ -638,6 +650,8 @@ public class MissionController {
             request.calendarLink(),
             request.status(),
             request.operationId(),
+            request.objective(),
+            request.meetingPoint(),
             request.version()));
   }
 
@@ -1717,6 +1731,135 @@ public class MissionController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     missionService.removeMissionUnit(id, unitId);
     return ResponseEntity.noContent().build();
+  }
+
+  // --- Ablauf steps (procedure timeline) ---
+
+  /**
+   * Appends an Ablauf step and returns the mission's full step list in order (slim). Guarded by the
+   * mission's {@code stepsVersion} section counter, so editing the Ablauf never collides with a
+   * concurrent core / schedule / flags edit.
+   *
+   * @param id mission id
+   * @param request the step payload (title, optional meta, expected stepsVersion)
+   * @return the mission's ordered Ablauf steps after the add
+   */
+  @PostMapping("/{id}/steps/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Add an Ablauf step to a mission (slim response)",
+      description =
+          "Adds a procedure-timeline step and returns the mission's ordered step list as slim"
+              + " DTOs.")
+  public List<MissionStepDto> addStepSlim(
+      @PathVariable @NotNull UUID id,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionStepRequest request) {
+    var mission =
+        missionService.addStep(id, request.title(), request.meta(), request.stepsVersion());
+    return toStepDtos(mission);
+  }
+
+  /**
+   * Edits an Ablauf step's title / time-place hint and returns the mission's ordered step list.
+   *
+   * @param id mission id
+   * @param stepId step id
+   * @param request the step payload (title, optional meta, expected stepsVersion)
+   * @return the mission's ordered Ablauf steps after the edit
+   */
+  @PutMapping("/{id}/steps/{stepId}/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Update an Ablauf step (slim response)",
+      description = "Edits a step's title / time-place hint and returns the ordered step list.")
+  public List<MissionStepDto> updateStepSlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionStepRequest
+              request) {
+    var mission =
+        missionService.updateStep(
+            id, stepId, request.title(), request.meta(), request.stepsVersion());
+    return toStepDtos(mission);
+  }
+
+  /**
+   * Removes an Ablauf step and returns the mission's remaining ordered step list.
+   *
+   * @param id mission id
+   * @param stepId step id
+   * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
+   * @return the mission's ordered Ablauf steps after the removal
+   */
+  @DeleteMapping("/{id}/steps/{stepId}/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Delete an Ablauf step (slim response)",
+      description = "Removes a step, re-packs the order, and returns the ordered step list.")
+  public List<MissionStepDto> deleteStepSlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @RequestParam @NotNull Long stepsVersion) {
+    var mission = missionService.deleteStep(id, stepId, stepsVersion);
+    return toStepDtos(mission);
+  }
+
+  /**
+   * Reorders the mission's Ablauf steps and returns the new ordered step list.
+   *
+   * @param id mission id
+   * @param request the desired step-id order + expected stepsVersion
+   * @return the mission's ordered Ablauf steps after the reorder
+   */
+  @PutMapping("/{id}/steps/reorder/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Reorder a mission's Ablauf steps (slim response)",
+      description = "Reorders the procedure timeline and returns the ordered step list.")
+  public List<MissionStepDto> reorderStepsSlim(
+      @PathVariable @NotNull UUID id,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionStepsRequest
+              request) {
+    var mission = missionService.reorderSteps(id, request.stepIds(), request.stepsVersion());
+    return toStepDtos(mission);
+  }
+
+  /**
+   * Toggles an Ablauf step's shared done flag and returns the mission's ordered step list.
+   *
+   * @param id mission id
+   * @param stepId step id
+   * @param request the new done state + expected stepsVersion
+   * @return the mission's ordered Ablauf steps after the toggle
+   */
+  @PatchMapping("/{id}/steps/{stepId}/done/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Toggle an Ablauf step's done flag (slim response)",
+      description = "Sets a step's shared done flag and returns the ordered step list.")
+  public List<MissionStepDto> toggleStepDoneSlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.ToggleMissionStepRequest
+              request) {
+    var mission = missionService.toggleStepDone(id, stepId, request.done(), request.stepsVersion());
+    return toStepDtos(mission);
+  }
+
+  /**
+   * Projects a mission's Ablauf steps into an ordered list of slim DTOs (by {@code orderIndex}).
+   */
+  private List<MissionStepDto> toStepDtos(de.greluc.krt.profit.basetool.backend.model.Mission m) {
+    return m.getSteps().stream()
+        .sorted(
+            java.util.Comparator.comparingInt(
+                de.greluc.krt.profit.basetool.backend.model.MissionStep::getOrderIndex))
+        .map(missionMapper::toDto)
+        .toList();
   }
 
   /**

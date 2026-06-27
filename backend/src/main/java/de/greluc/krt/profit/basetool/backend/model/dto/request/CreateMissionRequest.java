@@ -71,4 +71,6 @@ public record CreateMissionRequest(
     @Nullable Instant plannedEndTime,
     @Nullable Boolean isInternal,
     @Nullable UUID operationId,
-    @Nullable UUID owningOrgUnitId) {}
+    @Nullable UUID owningOrgUnitId,
+    @Nullable @Size(max = 250) String objective,
+    @Nullable @Size(max = 200) String meetingPoint) {}

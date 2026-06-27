@@ -50,7 +50,7 @@ import org.hibernate.annotations.OptimisticLock;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries"})
+@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries", "steps"})
 public class Mission extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -62,6 +62,22 @@ public class Mission extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   private String description;
+
+  /**
+   * Short free-text objective ("Ziel") shown prominently in the overview's "Mission auf einen
+   * Blick" panel. Distinct from the long Markdown {@link #description}: capped at 250 characters
+   * and rendered as plain text. Nullable. Part of the {@code core} section (guarded by {@link
+   * #coreVersion}).
+   */
+  @Column(length = 250)
+  private String objective;
+
+  /**
+   * Free-text rally point ("Treffpunkt", e.g. "Lobby Mining → ARC-L1") shown in the overview.
+   * Nullable. Part of the {@code core} section (guarded by {@link #coreVersion}).
+   */
+  @Column(name = "meeting_point", length = 200)
+  private String meetingPoint;
 
   @Column(length = 2048)
   private String calendarLink;
@@ -115,6 +131,16 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Long partyLeadVersion = 0L;
 
+  /**
+   * Section-scoped optimistic-lock counter for the Ablauf editor and the per-step done-toggle
+   * ({@link #steps}). Independent of the global {@link AbstractEntity#getVersion()} and marked
+   * {@code @OptimisticLock(excluded = true)} so editing the procedure timeline never invalidates
+   * another user's open core / schedule / flags form on the same mission.
+   */
+  @Column(name = "steps_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long stepsVersion = 0L;
+
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionParticipant> participants = new HashSet<>();
@@ -131,6 +157,17 @@ public class Mission extends AbstractEntity<UUID> {
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
+
+  /**
+   * Ordered, reorderable "Ablauf" (procedure timeline) steps. Loaded by ascending {@link
+   * MissionStep#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
+   * list) preserves the checklist order. Excluded from the global optimistic-lock; the dedicated
+   * {@link #stepsVersion} guards concurrent edits instead.
+   */
+  @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("orderIndex ASC")
+  @OptimisticLock(excluded = true)
+  private Set<MissionStep> steps = new LinkedHashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_mission_id")

@@ -43,4 +43,6 @@ public record CreateMissionRequest(
     Instant plannedEndTime,
     Boolean isInternal,
     UUID operationId,
-    UUID owningOrgUnitId) {}
+    UUID owningOrgUnitId,
+    String objective,
+    String meetingPoint) {}

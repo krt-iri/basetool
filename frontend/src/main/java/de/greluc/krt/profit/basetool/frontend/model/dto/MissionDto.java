@@ -73,4 +73,8 @@ public record MissionDto(
     SquadronReferenceDto owningSquadron,
     UserReferenceDto partyLeadUser,
     String partyLeadGuestName,
-    Long partyLeadVersion) {}
+    Long partyLeadVersion,
+    List<MissionStepDto> steps,
+    Long stepsVersion,
+    String objective,
+    String meetingPoint) {}

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Operation-Detailseite im neuen Tab-Layout mit Markdown-Editor.** Die Operationsseite nutzt jetzt dieselbe Tab-Optik wie die Einsatz-Seite — Übersicht (Operation auf einen Blick, Ergebnis je Einsatz, Einsätze, ausklappbare Beschreibung), Einsätze (mit „Einsatz hinzufügen", das die Erstellseite mit vorausgewählter Operation öffnet), Auszahlung, Finanzen und Verwaltung. Die Beschreibung lässt sich mit einem Formatierungs-Werkzeug (Fett/Kursiv/Überschrift/Liste/Link) und einer Live-Vorschau bearbeiten.
+
+- **Einsatz-Seite: Ablauf-Checkliste, neu aufgeteilte Übersicht und die Felder „Ziel"/„Treffpunkt".** Ein Einsatz hat jetzt einen sortierbaren Ablauf (Schritte mit Titel und optionaler Zeit/Ort), den Bearbeiter im Verwaltungs-Tab pflegen; in der Übersicht erscheint er als Checkliste, deren aktuelle Phase der erste offene Schritt ist und deren Häkchen Bearbeiter live für alle setzen. Die Übersicht ist in kompakte Karten neu aufgeteilt (Mission auf einen Blick mit Ziel, Weitere Leads, Funk, Teilnehmer-Fortschritt, Ablauf, Kalender) samt ausklappbarer Beschreibung; alle Ablauf-Aktionen stehen im Aktivitätsprotokoll (Missionen).
+
 ### Fixed
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.

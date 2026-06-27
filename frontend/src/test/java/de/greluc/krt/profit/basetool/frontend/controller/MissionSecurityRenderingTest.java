@@ -145,7 +145,11 @@ class MissionSecurityRenderingTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -248,7 +252,11 @@ class MissionSecurityRenderingTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -344,7 +352,11 @@ class MissionSecurityRenderingTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
@@ -450,7 +462,11 @@ class MissionSecurityRenderingTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
