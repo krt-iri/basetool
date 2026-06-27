@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGranteeKind;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
@@ -675,6 +676,98 @@ class OrgUnitBankAccessServiceTest {
             eq(destId),
             eq(false),
             eq(null));
+  }
+
+  @Test
+  void createBookingRequest_aboveAllMembersLimit_appliesToNonMemberViewGrantHolder() {
+    // REQ-BANK-041 (review F2): the all-members ceiling is the catch-all for every eligible
+    // requester, not only org-unit members. An outsider holding only a USER *view* grant (canView
+    // via the grant, but not a member and matching no USER/role limit) must still be capped by the
+    // all-members limit — otherwise the exact audience the cap targets escapes it (was: unlimited).
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID outsider = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    BankAccountViewGrant viewGrant = new BankAccountViewGrant();
+    viewGrant.setGranteeKind(BankAccountViewGranteeKind.USER);
+    viewGrant.setGranteeUserId(outsider);
+    BankAccountApprovalLimit allMembers = new BankAccountApprovalLimit();
+    allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    allMembers.setLimitAmount(new BigDecimal("100"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of(viewGrant));
+    when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(outsider));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100"))))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100")));
+  }
+
+  @Test
+  void grantOwnerApproval_byNonResponsibleHolder_throwsAccessDenied() {
+    // Security review (S1): only the account's responsible holder (or an admin) may grant the
+    // in-app owner approval; a non-responsible, non-admin caller is rejected before any delegation.
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(account);
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+
+    assertThrows(AccessDeniedException.class, () -> service.grantOwnerApproval(requestId));
+    verifyNoInteractions(bankBookingRequestService);
+  }
+
+  @Test
+  void grantOwnerApproval_byResponsibleHolder_delegates() {
+    // Security review (S1): the responsible holder (Staffelleiter of the owning unit) passes the
+    // guard and the seam delegates the blind mutation to the booking-request service.
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(account);
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(true);
+    when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    BankBookingRequestDto dto = service.grantOwnerApproval(requestId);
+
+    assertThat(dto).isNotNull();
+    verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
   }
 
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {

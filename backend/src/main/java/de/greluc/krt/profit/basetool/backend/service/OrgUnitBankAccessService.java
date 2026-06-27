@@ -894,7 +894,10 @@ public class OrgUnitBankAccessService {
   private Set<UUID> responsibleAccountIds() {
     boolean admin = authHelperService.isAdmin();
     Set<UUID> ids = new LinkedHashSet<>();
-    for (BankAccount account : bankAccountRepository.findAll()) {
+    // findAllByOrderByAccountNoAsc carries @EntityGraph(orgUnit); the bare findAll() does not, so
+    // isResponsibleHolder's account.getOrgUnit() dereference would fire one SELECT org_unit per row
+    // (N+1, REQ-DATA-003). The order is irrelevant here — only ids are collected.
+    for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
       if (admin || isResponsibleHolder(account)) {
         ids.add(account.getId());
       }
@@ -1240,8 +1243,11 @@ public class OrgUnitBankAccessService {
   /**
    * Resolves the current caller's applicable approval limit from the given limit rows: an
    * individual-user limit wins; otherwise the most permissive (maximum) of the limits for the role
-   * tiers the caller holds; otherwise the all-members limit when the caller is a member; otherwise
-   * {@code null} = unlimited. The {@code null} default preserves the pre-feature behaviour.
+   * tiers the caller holds; otherwise the all-members limit (the catch-all ceiling, applied to
+   * every eligible viewer who matches no more specific tier — every caller has already passed the
+   * {@code canView} gate upstream, so org-unit membership is <em>not</em> additionally required);
+   * otherwise {@code null} = unlimited. The {@code null} default preserves the pre-feature
+   * behaviour (REQ-BANK-041).
    *
    * @param account the account
    * @param limits the account's approval-limit rows (possibly empty)
@@ -1282,15 +1288,14 @@ public class OrgUnitBankAccessService {
     if (best != null) {
       return best;
     }
+    // The all-members tier is the catch-all ceiling for everyone who may raise a request but
+    // matches no more specific tier. Every caller has already cleared canView / isRequestCapable
+    // upstream, so it must apply to an outsider holding only a USER view-grant and to a plain KRT
+    // member viewing a CARTEL account too — gating it on org-unit membership would silently exempt
+    // exactly the audience the cap is meant to constrain (REQ-BANK-041).
     for (BankAccountApprovalLimit limit : limits) {
       if (limit.getGranteeKind() == BankAccountViewGranteeKind.ALL_MEMBERS) {
-        boolean member =
-            owner != null
-                ? ownerScopeService.currentUserIsMemberOfOrgUnit(owner)
-                : authHelperService.isMemberOrAbove();
-        if (member) {
-          return limit.getLimitAmount();
-        }
+        return limit.getLimitAmount();
       }
     }
     return null;

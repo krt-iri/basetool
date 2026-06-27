@@ -360,7 +360,13 @@ public class BankBookingRequestService {
               throw new NotFoundException(
                   "A transfer confirmation requires the destination account and holder");
             }
-            boolean destinationVisible = bankSecurityService.canSee(target.getId(), authentication);
+            // REQ-BANK-040: confirming a transfer *request* is not a direct employee-initiated
+            // transfer. The requester (an authorized source-account viewer) already chose the
+            // destination from any active account, and requireConfirmCapability above already
+            // checked the employee's can_transfer on the SOURCE. The direct-transfer
+            // destination-visibility gate (REQ-BANK-011) therefore does not apply here, so a
+            // scoped employee without a grant on the destination can still execute the request
+            // (passing destinationVisible = true) instead of hitting a permanent dead-end.
             yield bankLedgerService.bookTransfer(
                 new BankTransferRequest(
                     accountId,
@@ -369,7 +375,7 @@ public class BankBookingRequestService {
                     destinationHolderId,
                     request.getAmount(),
                     request.getNote()),
-                destinationVisible);
+                true);
           }
         };
 

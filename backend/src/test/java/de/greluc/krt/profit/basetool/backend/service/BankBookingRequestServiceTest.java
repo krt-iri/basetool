@@ -438,7 +438,11 @@ class BankBookingRequestServiceTest {
   }
 
   @Test
-  void confirm_transfer_booksTransferWithDestinationVisibility() {
+  void confirm_transfer_bypassesDestinationVisibilityGate() {
+    // REQ-BANK-040 (review F1): confirming a transfer *request* must not require the employee to
+    // hold a grant on the destination — the requester already chose it from any active account.
+    // The confirm path therefore never consults canSee(destination) and always books with
+    // destinationVisible = true, so a scoped employee cannot hit a permanent dead-end.
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID destId = UUID.randomUUID();
@@ -451,7 +455,6 @@ class BankBookingRequestServiceTest {
     request.setTargetAccount(account(destId));
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     when(bankSecurityService.canTransfer(eq(accountId), any())).thenReturn(true);
-    when(bankSecurityService.canSee(eq(destId), any())).thenReturn(true);
     when(bankLedgerService.bookTransfer(any(BankTransferRequest.class), anyBoolean()))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.TRANSFER, null, Instant.now()));
@@ -470,6 +473,7 @@ class BankBookingRequestServiceTest {
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     ArgumentCaptor<BankTransferRequest> booked = ArgumentCaptor.forClass(BankTransferRequest.class);
     verify(bankLedgerService).bookTransfer(booked.capture(), eq(true));
+    verify(bankSecurityService, never()).canSee(any(), any());
     assertThat(booked.getValue().sourceAccountId()).isEqualTo(accountId);
     assertThat(booked.getValue().destinationAccountId()).isEqualTo(destId);
     assertThat(booked.getValue().sourceHolderId()).isEqualTo(sourceHolder);

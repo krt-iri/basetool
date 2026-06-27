@@ -54,6 +54,14 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code CARTEL} (REQ-BANK-039/-040); their role buckets mirror the account's configurable
  * visibility buckets (squadron sub-ranks / Bereich ranks), plus the all-members tier and individual
  * users.
+ *
+ * <p>The grantee-kind dimension (table {@code bank_account_approval_limit}) is the same four-kind
+ * enum as the visibility-grant model on purpose, so the two tables stay structurally identical. One
+ * kind, {@code GLOBAL_ROLE}, is therefore present in the schema and the switches but is never
+ * produced for limits by design: it is the SPECIAL-account role bucket, and SPECIAL accounts (being
+ * non-request-capable) carry no limits. The tier is kept rather than dropped to preserve the 1:1
+ * mirror with the visibility model and to make a future "wire SPECIAL accounts into limits" a purely
+ * additive change (REQ-BANK-041).
  */
 @Service
 @RequiredArgsConstructor

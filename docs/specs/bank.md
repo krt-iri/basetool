@@ -1145,17 +1145,25 @@ view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsult
 ### REQ-BANK-040 — User-initiated transfer requests
 
 A requester may raise a `TRANSFER` booking request from a (source) account they may view to **any
-active account** as destination (`bank_booking_request.target_account_id`, V193). The request is
-off-ledger and audited like a deposit/withdrawal request (REQ-BANK-022/-024); on confirmation the
-bank employee records the **source and destination holders** and books a real `TRANSFER` through the
-existing `BankLedgerService.bookTransfer` path (REQ-BANK-011) — the destination-visibility rule
-(`canSee(destination)`), the in-game transfer fee (REQ-BANK-033) and account/holder legs apply
-unchanged. Confirming a transfer additionally requires the bank `can_transfer` capability on the
-source (REQ-BANK-009).
+active account** as destination (`bank_booking_request.target_account_id`, V193). The destination is
+deliberately *any active account* — including a Sonderkonto or the bank-operating account that the
+request mechanism forbids as a **source** (`isRequestCapable` is checked on the source only); this
+source/destination asymmetry is intentional (the requester routes money *into* an account, and the
+move is still gated by the two confirming parties below). The request is off-ledger and audited like
+a deposit/withdrawal request (REQ-BANK-022/-024); on confirmation the bank employee records the
+**source and destination holders** and books a real `TRANSFER` through the existing
+`BankLedgerService.bookTransfer` path (REQ-BANK-011) — the in-game transfer fee (REQ-BANK-033) and
+account/holder legs apply unchanged. Confirming a transfer requires the bank `can_transfer`
+capability on the **source** (REQ-BANK-009); it does **not** require the employee to hold a grant on
+the destination. The direct-transfer destination-visibility gate (`canSee(destination)`,
+REQ-BANK-011) is bypassed for request confirmations — the requester (an authorized source viewer)
+already chose the destination, so requiring the *employee's* own destination grant would make a
+transfer request to an account they cannot see permanently unconfirmable rather than redacted.
 
-**Enforced by:** `BankBookingRequestServiceTest` (transfer confirm books via `bookTransfer` with
-`destinationVisible`; capability gate), `OrgUnitBankAccessServiceTest` (transfer carries its
-destination) · **Code:** `model/BankBookingRequestType#TRANSFER`,
+**Enforced by:** `BankBookingRequestServiceTest` (transfer confirm books via `bookTransfer`;
+confirmable even when the employee cannot see the destination; capability gate on the source),
+`OrgUnitBankAccessServiceTest` (transfer carries its destination) · **Code:**
+`model/BankBookingRequestType#TRANSFER`,
 `model/BankBookingRequest#targetAccount`, `service/BankBookingRequestService` (`create` / `confirm`),
 `db/migration/V193`, frontend `templates/org-unit-bank.html` + `bank-requests.html` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
@@ -1169,8 +1177,15 @@ Bereich sub-ranks, all-members, individual users). A **missing** limit for a req
 unlimited — preserving the pre-feature behaviour (no regression). The limit a requester is subject to
 is resolved **at request creation** in the seam: an individual-user limit wins; otherwise the maximum
 of the limits for the role tiers they hold; otherwise the all-members limit; otherwise unlimited. The
-result is **snapshotted** onto the request (`requires_owner_approval`, `applicable_limit`) so the
-org-unit-blind confirm path only reads the boolean.
+**all-members tier is the catch-all ceiling for every eligible requester** who matches no more
+specific tier — *not only* org-unit members: because request eligibility = view eligibility
+(REQ-BANK-039), it applies equally to an outsider holding only a per-user view grant and to any KRT
+member raising a request against the cartel account. (Resolution mirrors the visibility model's
+four-kind grantee set; the `GLOBAL_ROLE` tier is reserved for parity and never produced for limits,
+since it is the Sonderkonto role bucket and Sonderkonten are non-request-capable — see
+`BankApprovalLimitService`.) The result is **snapshotted** onto the request
+(`requires_owner_approval`, `applicable_limit`) so the org-unit-blind confirm path only reads the
+boolean.
 
 **Who configures limits:** the account's responsible holder (REQ-BANK-034), **bank management** and
 **admin** — never a plain bank employee. Limits are shown read-only in both account-detail surfaces
@@ -1187,10 +1202,19 @@ sees an explicit warning in the confirmation dialog and must tick a mandatory
 request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
 flagged request cannot be confirmed without the checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409).
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (limit resolution; `canConfigureApprovalLimits`
-matrix — holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner
-approval), `BankBookingRequestServiceTest` (snapshot at create; confirm gate 409 + audit; pre-fill is
-UI-only), `OrgUnitBankControllerTest` · **Code:** `model/BankAccountApprovalLimit`,
+The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
+different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
+is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open
+bank-staff queue still carrying the pre-grant version 409s with `OPTIMISTIC_LOCK` on the next
+confirm and recovers on reload — this cross-user 409→reload is the **accepted** behaviour per the
+project concurrency rules, not a defect.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (limit resolution incl. the all-members ceiling
+applying to a non-member per-user view-grant holder; `canConfigureApprovalLimits` matrix —
+holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner approval, incl.
+a non-responsible-holder being rejected), `BankBookingRequestServiceTest` (snapshot at create;
+confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · **Code:**
+`model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
 `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` ·
