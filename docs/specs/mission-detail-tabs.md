@@ -28,7 +28,10 @@ finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
    stacked panels: **left** = "Mission auf einen Blick" (the short objective `Ziel` + planned/actual
    times, meeting time, `Treffpunkt`, operation, internal chip, party lead as a `.kv-list`, plus the
    caller's personal participation chip), "Weitere Leads" (the leadership-position rows) and "Funk"
-   (the dynamic frequencies); **right** = a "Teilnehmer" attendance meter (registered count + a
+   (the dynamic frequencies — the central, unit-less frequencies that carry a value, followed by the
+   per-unit frequencies of the units that have one, each unit row tagged with a muted "Einheit"
+   qualifier; central types without a value and units without a frequency are omitted and the whole
+   panel collapses when nothing is set, #816); **right** = a "Teilnehmer" attendance meter (registered count + a
    checked-in progress bar derived from `checkedInParticipants/registeredParticipants`), the
    read-only **Ablauf** checklist (REQ-MISSION-009) and a "Kalender" open card. The long **Markdown**
    description moves into a collapsible `<details>` below the grid (member+ gate unchanged; rendered
@@ -36,7 +39,11 @@ finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
    `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
    banner). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
    `freq-value-display` markers are preserved so the schedule / party-lead / frequency live-update
-   patches keep working. The Wirtschaft jump card is dropped (the Finanzen tab is one click away). The
+   patches keep working; because the Funk panel now also omits empty entries (#816), setting a
+   central frequency additionally re-renders the overview section in place
+   (`krtRefreshMissionSection('overview')`, not just a peer notify) so a first-ever value surfaces a
+   fresh row, and every unit add/edit/delete refreshes `['crew','overview']` so the per-unit Funk
+   mirror tracks the board (REQ-FE-010). The Wirtschaft jump card is dropped (the Finanzen tab is one click away). The
    page content is capped at 1800px — 1.5× the app's regular `--content-max` (1200px), because the
    board and finance grids carry side-by-side columns (owner decision 2026-06-11).
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).

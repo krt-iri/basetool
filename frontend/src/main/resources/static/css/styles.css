@@ -2099,6 +2099,17 @@ input[type='radio']:focus {
     overflow-wrap: anywhere;
 }
 
+/* Subordinate qualifier inside a .kv-list term (e.g. the "Einheit" tag that marks a
+   per-unit frequency row in the mission overview Funk panel). Reads as secondary to the
+   term it follows: lighter weight, no uppercase/tracking, smaller and dimmed. */
+.kv-list dt .kv-sub {
+    font-weight: var(--fw-regular);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: var(--fs-xs);
+    opacity: 0.7;
+}
+
 /* Full-width row (e.g. a description spanning both columns). */
 .kv-list .kv-row-wide {
     grid-column: 1 / -1;
@@ -5055,4 +5066,222 @@ input[type='range'] {
     gap: 6px;
     align-items: center;
     flex-wrap: wrap;
+}
+
+/* ============================================================ PROFILE PAGE ==
+   /profile (Variante A redesign). A capped reading column with a read-only
+   identity band + fact grid on top, then one settings card per editable section
+   below — each carrying exactly one filled CTA. Built on the existing
+   .card / .chip / .squadron-badge / .btn--* primitives; the rules below are the
+   page-specific layout glue (identity tile, fact grid, card foot, security note).
+   ---------------------------------------------------------------------------- */
+.profile-page {
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+.profile-page .pf-title {
+    margin: 0 0 var(--space-1);
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-h1);
+    line-height: 1.1;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+}
+
+.profile-page .pf-sub {
+    margin: 0 0 var(--space-6);
+    color: var(--color-gray-2);
+    font-size: var(--fs-sm);
+}
+
+/* Identity band — square initials tile beside name / handle / chips. */
+.profile-page .id-band {
+    display: flex;
+    gap: var(--space-4);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.profile-page .id-tile {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 74px;
+    height: 74px;
+    background-color: var(--color-surface-input);
+    border: var(--border-hairline);
+    font-family: var(--font-headline);
+    font-weight: var(--fw-black);
+    font-size: 1.8rem;
+    letter-spacing: 0.02em;
+    color: var(--color-primary);
+    text-transform: uppercase;
+}
+
+.profile-page .id-main {
+    min-width: 0;
+}
+
+.profile-page .id-name {
+    margin: 0;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1.35rem;
+    line-height: 1.1;
+    color: var(--color-white);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+}
+
+.profile-page .id-handle {
+    margin: var(--space-1) 0 0;
+    color: var(--color-gray-2);
+    font-size: var(--fs-xs);
+}
+
+.profile-page .id-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+}
+
+/* Read-only fact grid — hairline-separated cells, neutral labels, bright values. */
+.profile-page .facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    margin-top: var(--space-4);
+    background-color: var(--color-gray-3);
+    border: var(--border-hairline);
+}
+
+.profile-page .facts .f {
+    min-width: 0;
+    padding: var(--space-3);
+    background-color: var(--color-bg-dark-gray);
+}
+
+.profile-page .facts .fk {
+    margin: 0 0 var(--space-1);
+    color: var(--color-gray-2);
+    font-size: 0.625rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.profile-page .facts .fv {
+    color: var(--data-fg);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.profile-page .facts .fv.email {
+    font-size: var(--fs-xs);
+}
+
+/* Settings card stack. */
+.profile-page .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+}
+
+.profile-page textarea {
+    width: 100%;
+    min-height: 100px;
+    line-height: 1.55;
+    resize: vertical;
+}
+
+.profile-page .payout-select {
+    width: 100%;
+    max-width: 340px;
+}
+
+.profile-page .form-hint .krt-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 0.25rem;
+    color: var(--color-primary);
+    vertical-align: -0.18em;
+}
+
+.profile-page .form-hint b {
+    color: var(--color-gray-1);
+    font-weight: var(--fw-bold);
+}
+
+/* One filled CTA per card, separated from the fields by a hairline. */
+.profile-page .card-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: var(--border-hairline);
+}
+
+/* Blueprint-sharing checkbox row. */
+.profile-page .check-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+}
+
+.profile-page .check-row input[type='checkbox'] {
+    flex: none;
+    margin-top: 0.15rem;
+}
+
+.profile-page .check-row label {
+    margin: 0;
+    color: var(--color-gray-1);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+
+/* Access & security note. */
+.profile-page .acct-note {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    margin: 0;
+    color: var(--color-gray-1);
+    font-size: var(--fs-xs);
+    line-height: 1.55;
+}
+
+.profile-page .acct-note .krt-icon {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    margin-top: 1px;
+    color: var(--color-primary);
+}
+
+.profile-page .acct-note b {
+    color: var(--color-white);
+}
+
+.profile-page .acct-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-4);
+}
+
+@media (width <= 560px) {
+    .profile-page .facts {
+        grid-template-columns: 1fr 1fr;
+    }
 }

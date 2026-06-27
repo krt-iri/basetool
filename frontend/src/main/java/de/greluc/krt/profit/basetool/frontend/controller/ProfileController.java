@@ -28,6 +28,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -178,6 +179,14 @@ public class ProfileController {
     model.addAttribute("shareBlueprintsGlobally", shareBlueprintsGlobally);
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
+
+    // Identity-tile initials for the read-only identity block (Variante A profile redesign).
+    // Derived from the already-resolved display name (token, then DB overlay) with a username
+    // fallback — no new avatar/upload feature, just the squared monogram the design calls for.
+    model.addAttribute(
+        "initials",
+        computeInitials(
+            (String) model.getAttribute("displayName"), (String) model.getAttribute("username")));
 
     if (!model.containsAttribute("profileDescriptionForm")) {
       String currentDesc = (String) model.getAttribute("description");
@@ -609,6 +618,34 @@ public class ProfileController {
         .filter(message -> message != null && !message.isBlank())
         .findFirst()
         .orElseGet(() -> msg("error.profile.update.failed"));
+  }
+
+  /**
+   * Derives the 1–2 letter identity-tile monogram shown in the profile's identity block. The source
+   * is the user's display name, falling back to the username when no display name is set. A name
+   * with two or more whitespace-separated tokens yields the first letter of its first two tokens
+   * ({@code "John Doe" -> "JD"}); a single token yields its first two characters ({@code "Valk" ->
+   * "VA"}). The result is upper-cased via {@link Locale#ROOT}; an absent or blank source yields the
+   * empty string so the tile renders empty rather than throwing.
+   *
+   * @param displayName the user's chosen display name; may be {@code null} or blank
+   * @param username the Keycloak username used as the fallback source; may be {@code null}
+   * @return the upper-cased initials (0–2 characters); never {@code null}
+   */
+  private static String computeInitials(String displayName, String username) {
+    String base =
+        displayName != null && !displayName.isBlank()
+            ? displayName.trim()
+            : (username != null ? username.trim() : "");
+    if (base.isEmpty()) {
+      return "";
+    }
+    String[] tokens = base.split("\\s+");
+    String initials =
+        tokens.length >= 2
+            ? String.valueOf(tokens[0].charAt(0)) + tokens[1].charAt(0)
+            : base.substring(0, Math.min(2, base.length()));
+    return initials.toUpperCase(Locale.ROOT);
   }
 
   private static Long parseLong(Object o) {
