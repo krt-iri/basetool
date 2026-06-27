@@ -136,7 +136,7 @@ overview-checklist fragments in place via `krtFetch`/`krtRefreshMissionSection([
 (no reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an
 audited area: each mutation records a `MISSION_STEP_*` event (`ADDED` / `UPDATED` / `REMOVED` /
 `REORDERED` / `DONE_CHANGED`) carrying only ids/counts/the done flag — **never** the step title or
-meta (free text), per REQ-AUDIT-001. Migration: V191 (`mission_step` table + `mission.steps_version`).
+meta (free text), per REQ-AUDIT-001. Migration: V192 (`mission_step` table + `mission.steps_version`).
 
 ### REQ-MISSION-010 — Short objective (Ziel) and rally point (Treffpunkt)
 
@@ -146,7 +146,7 @@ and **`meetingPoint`** (Treffpunkt, ≤200 chars — the rally point). Both are 
 details form and belong to the **core** section (guarded by `coreVersion`, persisted via the existing
 `/core` patch; no new lock). Both are non-PII planning data, forwarded to outsiders/guests like the
 units and frequencies (the long Markdown description remains the one free-text field hidden from
-outsiders). Migration: V191 (`mission.objective`, `mission.meeting_point`).
+outsiders). Migration: V192 (`mission.objective`, `mission.meeting_point`).
 
 ### REQ-MISSION-011 — Operation detail page adopts the Variante B tab shell
 

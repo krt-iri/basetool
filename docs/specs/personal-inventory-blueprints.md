@@ -338,3 +338,51 @@ eslint/prettier and the server-side apply contract — blank/unresolvable picks 
 (`renderRow`, `apply`),
 [`BlueprintImportService#applyImport`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintImportService.java)
 · **Issues:** [#824](https://github.com/krt-profit/basetool/issues/824)
+
+### REQ-INV-022 — Admin twin shares the member page's design-system surface
+
+The ADMIN-gated twin `/admin/personal-blueprints` (`AdminPersonalBlueprintsPageController`) — which
+lets an administrator pick a member and manage that member's owned blueprints — MUST render on the
+same DAS KARTELL design-system components as the member page (REQ-INV-008…010), not the legacy
+table/dialog markup it had drifted to. Specifically:
+
+- the owned-blueprint list renders on the DS `.data-table` (shared canonical table treatment), with
+  the empty result as a centred `.krt-pi-empty` cell;
+- the note-edit, remove-confirm and JSON-import dialogs use the `.krt-modal*` frame (head / body /
+  foot, icon close with `aria-label`, exactly one filled CTA + ghost cancel, Esc) — never native
+  `.modal` / `.modal-content` / `.close (×)`; the remove confirm is `.krt-modal--danger` with a
+  `.btn-danger` CTA naming the product (no `.krt-danger !important`);
+- the multi-select staging tokens render as DS `.chip.chip--primary` (the shared `renderStaging`
+  emits one chip path for both pages); and
+- the ADMIN-mode banner is a flat primary tint — no gradient, which the DS reserves for the greeting
+  banner.
+
+The admin-only member `<select>` is the one extra element and intentionally stays a full reload
+(switching the member changes the per-user endpoints embedded in the inline script, which a fragment
+swap cannot refresh); the owned-list `?q=` filter is an in-place fragment swap of `#bp-results`
+(REQ-FE-002), and the edit / remove / import flows reuse the member page's wiring verbatim
+(`data-trigger`, IDs, optimistic-lock `version`, CSRF hidden inputs, CSP nonces).
+
+*Why:* the twin was the largest remaining design-system gap between the two pages (legacy
+`.krt-table`, `.modal`+`.close (×)` dialogs, `.btn krt-danger !important`, the bespoke `.krt-bp-chip`
+and a gradient banner). Putting it on the shared components removes that gap and keeps a single chip
+implementation rather than a second bespoke one.
+
+**Acceptance**
+
+- [ ] The owned-blueprint list renders as a `.data-table`; no `.krt-table` / `.krt-pi-table` remains
+  on the page.
+- [ ] All three dialogs use `.krt-modal-overlay` / `.krt-modal`; the remove confirm is
+  `.krt-modal--danger` with a `.btn-danger` CTA, and no `.modal` / `.close (×)` / `.krt-danger`
+  remains.
+- [ ] Staged selections render as `.chip.chip--primary`; the admin banner has no gradient.
+- [ ] The member `<select>`, the `#bp-results` filter swap (REQ-FE-002), and the edit / remove /
+  import flows keep working unchanged.
+
+**Enforced by:** [`AdminPersonalBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/AdminPersonalBlueprintsPageControllerMvcTest.java)
+(admin gate + `fragment=results` swap target), the frontend lint gates
+(`htmlhint` / `stylelint` / `eslint` / `prettier`) and `MessageBundleConsistencyTest` (DE/EN/default
+i18n) · **Code:**
+[`admin/personal-blueprints.html`](../../frontend/src/main/resources/templates/admin/personal-blueprints.html),
+[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
+(`renderStaging`), [`personal-inventory.css`](../../frontend/src/main/resources/static/css/personal-inventory.css)

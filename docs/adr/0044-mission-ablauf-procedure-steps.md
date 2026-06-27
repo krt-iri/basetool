@@ -31,7 +31,7 @@ live-sync stack, so the Ablauf should reuse them rather than invent new machiner
 
 ## Decision
 
-1. **Persisted ordered child `MissionStep` (REQ-MISSION-009).** A new `mission_step` table (V191),
+1. **Persisted ordered child `MissionStep` (REQ-MISSION-009).** A new `mission_step` table (V192),
    `@OneToMany(cascade=ALL, orphanRemoval=true) @OrderBy("orderIndex ASC") @OptimisticLock(excluded =
    true) Set<MissionStep>` on `Mission`, mirroring `MissionFrequency`/`MissionUnit`. `title` is required
    (≤200), `meta` optional (≤200), `done` a boolean, `orderIndex` an explicit stored position (the

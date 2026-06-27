@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwne
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
@@ -442,6 +443,7 @@ public class JobOrderController {
         dto.priority(),
         dto.status(),
         dto.type(),
+        dto.countBlueprintsWithVariants(),
         dto.materials(),
         dto.items(),
         dto.aggregatedMaterials(),
@@ -702,6 +704,48 @@ public class JobOrderController {
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
+  }
+
+  /**
+   * Toggles whether an item order's blueprint-coverage view counts cosmetic variants of the ordered
+   * items toward availability (REQ-ORDERS-021, issue #822). {@code true} keeps family-key matching
+   * (owners of any cosmetic variant count); {@code false} switches to exact-name matching, so an
+   * order for one specific variant counts only owners of that exact blueprint. Applies to item
+   * orders only and carries the order version for optimistic locking.
+   *
+   * @param id item-order id
+   * @param dto the requested counting mode + expected version
+   * @return the persisted DTO (carries the bumped version when the mode actually changed)
+   */
+  @PatchMapping("/{id}/blueprint-variant-counting")
+  @Operation(
+      summary = "Toggle item-order blueprint variant counting",
+      description =
+          "Sets whether the item order's blueprint-coverage view counts cosmetic variants of the"
+              + " ordered items (family matching) or matches blueprints exactly. Item orders only."
+              + " Requires the current version for optimistic locking.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Counting mode updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Not an item order"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Forbidden – insufficient role"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Job order not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "Conflict – optimistic locking failure (version mismatch)")
+  })
+  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  public JobOrderDto updateBlueprintVariantCounting(
+      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
+    return jobOrderService.updateBlueprintVariantCounting(
+        id, dto.countBlueprintsWithVariants(), dto.version());
   }
 
   /**

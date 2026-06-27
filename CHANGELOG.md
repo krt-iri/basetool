@@ -8,7 +8,19 @@
 
 - **Einsatz-Seite: Ablauf-Checkliste, neu aufgeteilte Übersicht und die Felder „Ziel"/„Treffpunkt".** Ein Einsatz hat jetzt einen sortierbaren Ablauf (Schritte mit Titel und optionaler Zeit/Ort), den Bearbeiter im Verwaltungs-Tab pflegen; in der Übersicht erscheint er als Checkliste, deren aktuelle Phase der erste offene Schritt ist und deren Häkchen Bearbeiter live für alle setzen. Die Übersicht ist in kompakte Karten neu aufgeteilt (Mission auf einen Blick mit Ziel, Weitere Leads, Funk, Teilnehmer-Fortschritt, Ablauf, Kalender) samt ausklappbarer Beschreibung; alle Ablauf-Aktionen stehen im Aktivitätsprotokoll (Missionen).
 
+- **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
+
+### Changed
+
+- **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
+
+- **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
+
+- **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
+
 ### Fixed
+
+- **Auftragsdetails: kompakter Kommentar und Abstand vor „Bestellte Items".** Der Kommentar-Kasten umschließt jetzt seinen Inhalt, statt als hoher, halbleerer Block mit weit eingerücktem Titel zu erscheinen (Ursache war ein versehentlich gerendertes Einrückungs-Whitespace); Beschriftung und Text stehen platzsparend in einer Zeile, Zeilenumbrüche im Kommentar bleiben erhalten. Zwischen Kopfbereich und „Bestellte Items" bzw. „Benötigte Materialien" gibt es wieder den üblichen Abstand.
 
 - **Beförderungssystem: Offiziere erscheinen nicht mehr in der Bewertungsmatrix.** Die Member-Liste der Bewertungsverwaltung führt jetzt nur noch die einfachen Mitglieder einer Staffel — Träger der Rollen `OFFICER` und `ADMIN` werden herausgefiltert, da sie die Bewertung durchführen, statt selbst bewertet zu werden (bisher wurden nur Admins ausgeschlossen). Das Beförderungssystem betrachtet damit ausschließlich einfache Staffel-Mitglieder.
 

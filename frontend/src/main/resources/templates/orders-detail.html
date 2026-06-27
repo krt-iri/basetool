@@ -149,10 +149,12 @@
             </div>
         </div>
 
-        <!-- Comment as a labelled annotation (orange left rule), only when present. -->
+        <!-- Comment as a labelled annotation (orange left rule), only when present.
+             Label + text sit on one baseline-aligned row (see .annotation) so the box
+             stays compact; pre-wrap lives on .annotation-text only. -->
         <div th:if="${order.comment != null and !order.comment.isEmpty()}" class="annotation mt-2">
-            <div class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</div>
-            <span th:text="${order.comment}">Kommentar</span>
+            <span class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</span>
+            <span class="annotation-text" th:text="${order.comment}">Kommentar</span>
         </div>
 
         <!-- Status editor — logisticians only; everyone else reads the status pill above. -->
@@ -180,7 +182,9 @@
              persists (only its innerHTML is replaced); the claim/inventory triggers inside are
              document-delegated (window.krtEvents), so they survive the swap. The swap is mandatory
              because the per-bucket "Offen" open-amount is a backend aggregate not returned per claim. -->
-        <div id="order-materials-results"><th:block th:fragment="materialsSection">
+        <!-- mt-2: the wrapper makes the section-title a :first-child, zeroing its 2rem top
+             margin — restore the gap so the section keeps distance from the header card. -->
+        <div id="order-materials-results" class="mt-2"><th:block th:fragment="materialsSection">
         <h3 class="section-title" th:text="#{orders.detail.materials.title}">Benötigte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders, detected by the backend
@@ -276,7 +280,9 @@
         <th:block th:if="${order.type == 'ITEM'}">
         <!-- In-place AJAX swap container (#575): an item handover re-renders the ordered-items
              table (delivered/outstanding per row) via GET /orders/{id}?fragment=items. -->
-        <div id="order-items-results"><th:block th:fragment="itemsSection">
+        <!-- mt-2: the wrapper makes the section-title a :first-child, zeroing its 2rem top
+             margin — restore the gap so the section keeps distance from the header card. -->
+        <div id="order-items-results" class="mt-2"><th:block th:fragment="itemsSection">
         <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
         <table class="data-table">
@@ -545,7 +551,7 @@
           class="bp-coverage"
           aria-labelledby="blueprint-owners-heading"
           data-testid="blueprint-owners-section"
-        >
+        ><th:block th:fragment="blueprintOwnersSection">
           <details class="bp-coverage__details" open data-testid="blueprint-owners-details">
             <summary class="bp-coverage__summary">
               <h3 id="blueprint-owners-heading" th:text="#{orders.detail.blueprintOwners.title}">Blaupausen-Verfügbarkeit</h3>
@@ -553,6 +559,27 @@
             <p class="bp-coverage__subtitle" th:text="#{orders.detail.blueprintOwners.subtitle}">
               Mitglieder der bearbeitenden Staffel/SK mit Blaupausen für die geforderten Items.
             </p>
+
+            <!-- Variant-counting toggle (#822, REQ-ORDERS-021): logisticians flip whether the
+                 coverage below counts cosmetic variants of the ordered items (family matching) or
+                 matches blueprints exactly. The choice persists on the order; on change the order is
+                 PATCHed and this whole panel re-renders in place (no reload). Read-only members do not
+                 see the control (backend enforces canEditJobOrder). -->
+            <div class="bp-coverage__mode" th:if="${isLogistician}">
+              <label class="bp-coverage__toggle">
+                <input
+                  type="checkbox"
+                  data-trigger="od-toggle-bp-counting"
+                  th:data-order-id="${order.id}"
+                  th:data-version="${order.version}"
+                  th:checked="${order.countBlueprintsWithVariants}"
+                />
+                <span th:text="#{orders.detail.blueprintOwners.countVariants.label}">Varianten mitz&auml;hlen</span>
+              </label>
+              <span class="bp-coverage__mode-hint" th:text="#{orders.detail.blueprintOwners.countVariants.hint}"
+                >Ein: inkl. Varianten der Familie &middot; Aus: nur die exakt bestellte Variante.</span
+              >
+            </div>
 
             <ul class="bp-owner-list">
               <li class="bp-owner" th:each="owner : ${itemBlueprintOwners.owners}">
@@ -604,7 +631,7 @@
               </div>
             </div>
           </details>
-        </section>
+        </th:block></section>
 
         <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
              phase; for now the material-specific handover protocol is hidden for item orders. -->
@@ -1852,6 +1879,44 @@
         });
     }
 
+    // Blueprint-coverage variant-counting toggle (#822). Persist the chosen mode on the order, then
+    // re-render the whole coverage panel in place (no reload) so the counts + per-item hints reflect
+    // the new mode. The order @Version is bumped server-side, so patch it onto the two version
+    // carriers that live OUTSIDE this panel (status select + edit-modal hidden input) — otherwise the
+    // user's next status/edit write would 409. On failure the optimistic checkbox is reverted.
+    const MSG_BP_COUNTING_SUCCESS = '[(#{orders.detail.blueprintOwners.countVariants.success})]';
+    const MSG_BP_COUNTING_ERROR = '[(#{orders.detail.blueprintOwners.countVariants.error})]';
+    function _toggleBlueprintCounting(checkbox) {
+        const orderId = checkbox.getAttribute('data-order-id');
+        const desired = checkbox.checked;
+        const version = parseInt(checkbox.getAttribute('data-version'), 10);
+        if (!orderId || !window.krtFetch) { return; }
+        // Disable for the round-trip so a quick double-toggle can't fire a second, stale-version
+        // write (a change-event control isn't covered by krtFetch's submit-button double-submit
+        // guard). On success the panel swap replaces this checkbox; on failure we re-enable + revert.
+        checkbox.disabled = true;
+        krtOrderWrite({
+            method: 'POST',
+            url: '/orders/' + orderId + '/blueprint-variant-counting',
+            payload: { countBlueprintsWithVariants: desired, version: version },
+            toast: false,
+            errorMessage: MSG_BP_COUNTING_ERROR,
+            onSuccess: function (data) {
+                if (data && data.version != null) {
+                    const sel = document.getElementById('status-select');
+                    if (sel) sel.dataset.version = data.version;
+                    const editVer = document.querySelector('#edit-modal input[name="version"]');
+                    if (editVer) editVer.value = data.version;
+                }
+                showFrontendSuccessToast(MSG_BP_COUNTING_SUCCESS);
+                _swapOrderSection(orderId, 'blueprint-owners-section', 'blueprint-owners');
+            }
+        }).then(function (res) {
+            checkbox.disabled = false;
+            if (!res || !res.ok) { checkbox.checked = !desired; }
+        });
+    }
+
     const MSG_HANDOVER_REPORT_ERROR = '[(#{orders.handover.report.error})]';
     const MSG_HANDOVER_REPORT_VALIDATION_DATE = '[(#{orders.handover.report.validation.date})]';
     const MSG_HANDOVER_REPORT_VALIDATION_TIME = '[(#{orders.handover.report.validation.time})]';
@@ -2218,6 +2283,7 @@
     // in this script and the inline script higher up.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'od-update-status', function (el) { updateStatus(el); });
+        window.krtEvents.on('change', 'od-toggle-bp-counting', function (el) { _toggleBlueprintCounting(el); });
         window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
             // Skip the row inventory-toggle when the click originated on a claim control or the
             // in-drill-down unlink button (both live inside the clickable material row); krtEvents

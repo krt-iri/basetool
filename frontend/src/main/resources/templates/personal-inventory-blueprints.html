@@ -42,7 +42,7 @@
                     <span th:text="#{general.add}">Hinzuf&uuml;gen</span>
                 </button>
                 <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
-                <button type="button" id="krt-bp-import-open" class="btn btn-outline"
+                <button type="button" id="krt-bp-import-open" class="btn btn-ghost"
                         data-trigger="bp-import-pick">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
                     <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
@@ -116,8 +116,12 @@
                                      data-removable=${bp.removable},
                                      data-acquired-at=${bp.acquiredAt}">
                         <span th:text="${bp.productName}">Produkt</span>
-                        <span class="master-row-note" th:if="${bp.note != null and !bp.note.isBlank()}"
-                              th:title="#{personalInventory.blueprints.field.note}" aria-hidden="true">&#x270E;</span>
+                        <!-- Trailing status cluster: note pencil + (JS-painted) craft badge. The
+                             wrapper is always present so recipe.js has a stable append target. -->
+                        <span class="krt-bp-row-aside">
+                            <span class="master-row-note" th:if="${bp.note != null and !bp.note.isBlank()}"
+                                  th:title="#{personalInventory.blueprints.field.note}" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-edit"/></svg></span>
+                        </span>
                     </button>
                 </div>
             </div>
@@ -268,7 +272,9 @@
         conflictDismiss:  /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?',
         factsCount:    /*[[#{personalInventory.blueprints.facts.count}]]*/    'Blueprints',
-        factsWithNote: /*[[#{personalInventory.blueprints.facts.withNote}]]*/ 'mit Notiz'
+        factsWithNote: /*[[#{personalInventory.blueprints.facts.withNote}]]*/ 'mit Notiz',
+        noteTitle:     /*[[#{personalInventory.blueprints.field.note}]]*/     'Notiz',
+        chipRemove:    /*[[#{personalInventory.blueprints.action.remove}]]*/  'Entfernen'
     };
     window.krtBlueprintsImportI18n = {
         groupMatched:    /*[[#{personalInventory.blueprints.import.group.matched}]]*/    'Automatisch zugeordnet',

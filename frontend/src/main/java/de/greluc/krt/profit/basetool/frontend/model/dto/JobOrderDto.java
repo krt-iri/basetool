@@ -39,6 +39,7 @@ public record JobOrderDto(
     Integer priority,
     String status,
     String type,
+    boolean countBlueprintsWithVariants,
     List<JobOrderMaterialDto> materials,
     List<JobOrderItemDto> items,
     List<AggregatedMaterialDto> aggregatedMaterials,

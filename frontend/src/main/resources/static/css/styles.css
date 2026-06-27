@@ -3126,6 +3126,42 @@ input[type='radio']:focus {
     font-size: var(--fs-sm);
 }
 
+/* Variant-counting toggle (#822): a logistician-only switch above the coverage lists that flips
+   whether cosmetic variants are counted. Deliberately a divider-separated control row, NOT a filled
+   card, so it never reads as one of the .bp-owner data cards below it. */
+.bp-coverage__mode {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    margin: 0 0 var(--space-4);
+    padding: 0 0 var(--space-3);
+    border-bottom: var(--border-hairline);
+}
+
+.bp-coverage__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2.75rem; /* 44px comfortable tap target on touch device classes */
+    cursor: pointer;
+    font-weight: var(--fw-bold);
+}
+
+.bp-coverage__toggle input {
+    width: 1.1rem;
+    height: 1.1rem;
+    cursor: pointer;
+    accent-color: var(--color-accent-light); /* brand gold on the checked state */
+}
+
+.bp-coverage__mode-hint {
+    /* gray-1 (not the muted/disabled gray-2): on the page surface the muted gray fails WCAG AA at
+       this size — readability comes from the smaller font size, not a low-contrast colour. */
+    color: var(--color-gray-1);
+    font-size: var(--fs-sm);
+}
+
 .bp-owner-list {
     display: flex;
     flex-direction: column;
@@ -4463,21 +4499,33 @@ textarea:focus-visible,
 }
 
 /* Annotation block — a labelled note/comment with an orange left rule. For
-   free-text that shouldn't compete with structured kv data. */
+   free-text that shouldn't compete with structured kv data. The label and text
+   share one baseline-aligned row so a short comment stays a single tight line;
+   a long/multi-line comment wraps in the text column while the label keeps its
+   place. The box hugs its content instead of reserving a tall full-width panel. */
 .annotation {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     border-left: 3px solid var(--color-primary);
     background: var(--color-surface-input);
-    padding: 9px 13px;
+    padding: 7px 13px;
     font-weight: 300;
-    white-space: pre-wrap;
 }
 .annotation .annotation-label {
+    flex: none;
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: var(--fw-bold);
     color: var(--color-gray-2);
-    margin-bottom: 3px;
+}
+/* pre-wrap lives on the text only: it preserves the user's own line breaks
+   without rendering the template's inter-element indentation whitespace (which
+   on the container would surface as blank lines and inflate the box). */
+.annotation .annotation-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------- ORDER-DETAIL HEADER --- */

@@ -95,6 +95,11 @@ public enum AuditEventType {
   /** A job order was moved to a new priority slot. */
   JOB_ORDER_PRIORITY_CHANGED(AuditDomain.JOB_ORDER),
 
+  /**
+   * An item order's blueprint-coverage variant-counting mode was toggled (with/without variants).
+   */
+  JOB_ORDER_BLUEPRINT_COUNTING_CHANGED(AuditDomain.JOB_ORDER),
+
   /** A job order was hard-deleted (label snapshotted into details before deletion). */
   JOB_ORDER_DELETED(AuditDomain.JOB_ORDER),
 

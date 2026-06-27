@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-26.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Item-order blueprint coverage
@@ -47,6 +47,12 @@ matches only an identical magazine). Distinct required items are de-duplicated b
 `MATERIAL` order yields an empty view. A member's blueprints that are **not** in a required family
 are never exposed, and owners are identified by display name only (never the Keycloak `sub` or
 e-mail).
+
+Family-key matching is the **default**, but it is governed by the per-order **variant-counting toggle**
+(`REQ-ORDERS-021`): when an order is switched to *exact* counting, the match key becomes the exact
+normalized name instead of the family key, so only owners of the exact ordered blueprint count and the
+family's other variants are excluded. The two matching modes are otherwise identical (same scope, same
+gate, same display).
 
 Display: each coverage row shows the **ordered** item name (the variant the line requested, if any)
 and, for every non-magazine row, a "counts variants" hint; each owner row shows the **actual** owned
@@ -100,6 +106,50 @@ this gate — it changes only which owners are counted *inside* the view, never 
 **Enforced by:** `OwnerScopeServiceTest` (canSeeJobOrderBlueprintOwners),
 `JobOrderControllerTest` (getItemBlueprintOwners auth) · **Code:**
 `OwnerScopeService.canSeeJobOrderBlueprintOwners` · **Issues:** —
+
+### REQ-ORDERS-021 — Per-order toggle: count blueprint coverage with or without variants
+
+An `ITEM` order MUST carry a per-order **variant-counting** flag (`countBlueprintsWithVariants`,
+default **true**) that governs how its blueprint-coverage view (`REQ-ORDERS-015`) matches blueprints:
+
+- **On (default)** — coverage counts cosmetic **variants** of each ordered item via the variant
+  family key, the historic behaviour (a member owning any variant of an ordered item is counted).
+- **Off** — coverage matches blueprints **exactly** by normalized name, so when a specific variant is
+  ordered only owners of that exact blueprint count and the family's other variants are excluded; the
+  per-row "counts variants" hint is suppressed.
+
+The flag is **persisted on the order** and applies for **every** viewer (it is a property of the
+order, not a per-viewer view preference), so a lead who needs the strict count for a one-specific-
+variant order sets it once. The flag is toggled **live** from the coverage panel: a control visible
+only to editors (`hasRole('LOGISTICIAN')` + the order's edit scope, `@ownerScopeService.canEditJobOrder`)
+PATCHes the order and re-renders the coverage panel **in place** (no full-page reload, per
+`REQ-FE-001`); the order's optimistic-lock `version` guards the write (a stale version yields HTTP 409),
+and the bumped version is propagated to the order's other version-carrying controls so a subsequent edit
+does not 409. Read-only members who may see the panel (`REQ-ORDERS-016`) do not see the control. The
+toggle is a state-mutating activity in an audited area and records a `JOB_ORDER_BLUEPRINT_COUNTING_CHANGED`
+audit event (`REQ-AUDIT-001`). The flag is ignored for `MATERIAL` orders (which have no coverage view),
+and the PATCH endpoint rejects a non-`ITEM` order with HTTP 400.
+
+**Acceptance**
+
+- [ ] A new item order defaults to counting **with** variants, preserving the historic coverage.
+- [ ] Switching an order to **without** variants makes a required variant count only owners of that
+  exact blueprint; owners of sibling variants and the base are no longer counted, and the per-row
+  "counts variants" hint disappears.
+- [ ] Switching back to **with** variants restores the family-key coverage.
+- [ ] The toggle persists on the order and is reflected for every viewer of the coverage panel.
+- [ ] Toggling re-renders the coverage panel in place without a full-page reload, and a concurrent
+  edit of the same order surfaces as a 409 rather than a lost update.
+- [ ] The toggle control is shown only to editors; a read-only member sees the panel without it.
+- [ ] Toggling records a `JOB_ORDER_BLUEPRINT_COUNTING_CHANGED` audit event; the PATCH on a material
+  order is rejected with HTTP 400.
+
+**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest` (with/without-variants matching),
+`JobOrderServiceTest` (toggle update: persistence, 409, audit, non-item 400),
+`JobOrderControllerTest` (PATCH auth) · **Code:**
+`JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver.matchKey`,
+`JobOrderService.updateBlueprintVariantCounting`,
+`JobOrderController.updateBlueprintVariantCounting` · **Issues:** #822
 
 ## Out of scope
 

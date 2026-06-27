@@ -180,6 +180,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "OPEN",
             "ITEM",
+            true,
             List.of(),
             List.of(topItem, subItem),
             List.of(
@@ -289,6 +290,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "OPEN",
             "ITEM",
+            true,
             List.of(),
             List.of(line),
             List.of(new AggregatedMaterialDto(agricium, "NONE", 12.0, 4.0, List.of(claim), 6.0)),
@@ -361,6 +363,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "COMPLETED",
             "ITEM",
+            true,
             List.of(),
             List.of(line),
             List.of(
@@ -442,6 +445,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "IN_PROGRESS",
             "ITEM",
+            true,
             List.of(),
             List.of(line),
             List.of(
@@ -518,6 +522,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "OPEN",
             "MATERIAL",
+            true,
             List.of(mat),
             List.of(),
             List.of(),
@@ -566,6 +571,7 @@ class JobOrderItemDetailRenderTest {
             1,
             "OPEN",
             "MATERIAL",
+            true,
             List.of(mat),
             List.of(),
             List.of(),
@@ -615,6 +621,7 @@ class JobOrderItemDetailRenderTest {
         1,
         "OPEN",
         "ITEM",
+        true,
         List.of(),
         List.of(line),
         List.of(),
@@ -681,6 +688,54 @@ class JobOrderItemDetailRenderTest {
         .as("coverage panel is rendered inside a collapsible details, expanded by default")
         .contains("data-testid=\"blueprint-owners-details\"")
         .contains("bp-coverage__summary");
+    // REQ-ORDERS-021 / #822: the variant-counting toggle is shown to an editor (logistician), wired
+    // to the AJAX trigger, and reflects the order's countBlueprintsWithVariants flag
+    // (oneLineItemOrder
+    // defaults it on, so the checkbox is checked).
+    assertThat(html)
+        .as("variant-counting toggle rendered for the editor")
+        .contains("data-trigger=\"od-toggle-bp-counting\"")
+        .contains("bp-coverage__mode");
+  }
+
+  // REQ-ORDERS-021 / #822: the live toggle re-renders ONLY the coverage panel via a fragment swap
+  // (GET /orders/{id}?fragment=blueprint-owners -> "orders-detail :: blueprintOwnersSection"). The
+  // response must be the panel fragment alone (toggle + lists), never the full page chrome.
+  @Test
+  void itemOrder_blueprintOwnersFragment_rendersOnlyThePanel() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    JobOrderItemBlueprintOwnersDto coverage =
+        new JobOrderItemBlueprintOwnersDto(
+            List.of(
+                new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1, true)),
+            List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true)));
+    when(backendApiClient.get(
+            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class)))
+        .thenReturn(coverage);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "blueprint-owners")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the swapped fragment carries the panel + the variant-counting toggle")
+        .contains("data-testid=\"blueprint-owners-details\"")
+        .contains("data-trigger=\"od-toggle-bp-counting\"");
+    assertThat(html)
+        .as("a fragment swap returns the panel alone, not the whole page")
+        .doesNotContain("<html");
   }
 
   @Test

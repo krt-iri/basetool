@@ -25,10 +25,25 @@ main.oc-page {
     max-width: none;
 }
 
-main.oc-page .greeting,
-main.oc-page .oc-toolbar {
+main.oc-page .greeting {
     max-width: var(--content-max);
     margin-inline: auto;
+}
+
+/* The title box carries the inline-editor toggle on its trailing edge: the heading + subtitle are
+   the leading text column, the "Bearbeiten" button is pushed to the right (margin-inline-start:auto)
+   and vertically centred. flex-wrap lets the button drop below the text on a narrow viewport instead
+   of crushing the heading; it stays right-aligned on its own line. */
+main.oc-page .oc-greeting {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+main.oc-page .oc-greeting .oc-edit-toggle {
+    flex: 0 0 auto;
+    margin-inline-start: auto;
 }
 
 .oc-chart {
@@ -576,12 +591,6 @@ main.oc-page .oc-toolbar {
 .oc-add:hover {
     color: var(--color-primary);
     border-color: var(--color-primary);
-}
-
-.oc-toolbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 1rem;
 }
 
 /* Edit-mode legend: a quiet info line shown only while the inline editor is on
