@@ -94,6 +94,7 @@ class MissionSecurityRenderingTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -201,6 +202,7 @@ class MissionSecurityRenderingTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -301,6 +303,7 @@ class MissionSecurityRenderingTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);
@@ -411,6 +414,7 @@ class MissionSecurityRenderingTest {
             false,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);

@@ -23,13 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
@@ -57,13 +55,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Tests for {@link UserService#applyMembershipDelta} — the SPEZIALKOMMANDO_PLAN.md §7.4 single-POST
- * membership-delta orchestrator. Verifies:
+ * membership-delta orchestrator (multi-Staffel variant, REQ-ORG-017). Verifies:
  *
  * <ul>
- *   <li>Staffel reassignment routes through {@code updateUserSquadron} (which keeps the membership
- *       row in lockstep), then applies any explicit flag patch on top.
- *   <li>Staffel flag-only delta (squadronId unchanged) bypasses {@code updateUserSquadron} and hits
- *       {@code applyStaffelMembershipFlagDelta} directly.
+ *   <li>A non-null {@code staffeln} list is forwarded verbatim to {@link
+ *       OrgUnitMembershipService#reconcileStaffelMemberships} (which adds / removes / flag-patches
+ *       the user's Staffel memberships against that desired set); a {@code null} list leaves the
+ *       Staffel side untouched.
+ *   <li>An empty {@code staffeln} list still reconciles (it removes every Staffel membership).
  *   <li>SK ADD calls {@link OrgUnitMembershipService#addMember} and adopts initial flags inline via
  *       dirty-checking on the returned row (no second explicit save).
  *   <li>SK REMOVE calls {@link OrgUnitMembershipService#removeMember}.
@@ -98,10 +97,10 @@ class UserServiceMembershipDeltaTest {
     assertThrows(
         NoSuchElementException.class,
         () -> userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null)));
+    verify(orgUnitMembershipService, never()).reconcileStaffelMemberships(any(), any());
     verify(orgUnitMembershipService, never()).addMember(any(), any());
     verify(orgUnitMembershipService, never()).removeMember(any(), any());
     verify(orgUnitMembershipService, never()).patchFlags(any(), any(), any());
-    verify(orgUnitMembershipService, never()).applyStaffelMembershipFlagDelta(any(), any(), any());
   }
 
   @Test
@@ -115,75 +114,39 @@ class UserServiceMembershipDeltaTest {
         userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null));
 
     assertEquals(0, result.size());
+    verify(orgUnitMembershipService, never()).reconcileStaffelMemberships(any(), any());
     verify(orgUnitMembershipService, never()).addMember(any(), any());
     verify(orgUnitMembershipService, never()).removeMember(any(), any());
     verify(orgUnitMembershipService, never()).patchFlags(any(), any(), any());
-    verify(orgUnitMembershipService, never()).applyStaffelMembershipFlagDelta(any(), any(), any());
   }
 
   @Test
-  void staffelReassignment_routesThroughUpdateUserSquadron_thenFlagDelta() {
+  void staffelnDelta_forwardsDesiredSetToReconcile() {
     UUID userId = UUID.randomUUID();
-    UUID oldSquadronId = UUID.randomUUID();
-    UUID newSquadronId = UUID.randomUUID();
-    Squadron newSquadron = new Squadron();
-    newSquadron.setId(newSquadronId);
+    UUID squadronA = UUID.randomUUID();
+    UUID squadronB = UUID.randomUUID();
     User user = newUser(userId);
-    user.setVersion(7L);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(squadronRepository.findById(newSquadronId)).thenReturn(Optional.of(newSquadron));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-    // Post-R9 D3 (V101): the current Staffel is read from org_unit_membership.
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(Optional.of(oldSquadronId));
 
-    MembershipDeltaRequest delta =
-        new MembershipDeltaRequest(new StaffelChange(newSquadronId, true, false, 7L), null);
-    userService.applyMembershipDelta(userId, delta);
+    List<StaffelChange> staffeln =
+        List.of(
+            new StaffelChange(squadronA, true, false), new StaffelChange(squadronB, false, true));
+    userService.applyMembershipDelta(userId, new MembershipDeltaRequest(staffeln, null));
 
-    // updateUserSquadron is called inside applyMembershipDelta — which in turn calls
-    // OrgUnitMembershipService.syncStaffelMembership. After that, the explicit flag patch fires.
-    verify(orgUnitMembershipService).syncStaffelMembership(any(User.class), eq(newSquadron));
-    verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(userId, true, false);
+    verify(orgUnitMembershipService).reconcileStaffelMemberships(eq(user), eq(staffeln));
   }
 
   @Test
-  void staffelFlagOnlyDelta_bypassesUpdateUserSquadron() {
+  void emptyStaffelnList_stillReconciles_removingAllStaffeln() {
     UUID userId = UUID.randomUUID();
-    UUID squadronId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(Optional.of(squadronId));
 
-    MembershipDeltaRequest delta =
-        new MembershipDeltaRequest(
-            new StaffelChange(squadronId, /* isLogistician */ true, null, /* version */ null),
-            null);
-    userService.applyMembershipDelta(userId, delta);
+    userService.applyMembershipDelta(userId, new MembershipDeltaRequest(List.of(), null));
 
-    verify(orgUnitMembershipService, never()).syncStaffelMembership(any(), any());
-    verify(orgUnitMembershipService).applyStaffelMembershipFlagDelta(userId, true, null);
-  }
-
-  @Test
-  void staffelClear_routesThroughUpdateUserSquadronWithNull() {
-    UUID userId = UUID.randomUUID();
-    UUID oldSquadronId = UUID.randomUUID();
-    User user = newUser(userId);
-    user.setVersion(3L);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(Optional.of(oldSquadronId));
-
-    MembershipDeltaRequest delta =
-        new MembershipDeltaRequest(new StaffelChange(null, null, null, 3L), null);
-    userService.applyMembershipDelta(userId, delta);
-
-    verify(orgUnitMembershipService).syncStaffelMembership(any(User.class), isNull());
-    verify(orgUnitMembershipService, never()).applyStaffelMembershipFlagDelta(any(), any(), any());
+    verify(orgUnitMembershipService).reconcileStaffelMemberships(eq(user), eq(List.of()));
   }
 
   @Test

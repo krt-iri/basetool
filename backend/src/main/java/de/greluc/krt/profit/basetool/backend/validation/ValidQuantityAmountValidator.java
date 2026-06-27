@@ -19,34 +19,36 @@
 
 package de.greluc.krt.profit.basetool.backend.validation;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * Constraint validator for {@link ValidQuantityAmount}.
  *
- * <p>Resolves the material by id (one DB hit per validated DTO) and applies the
- * quantity-type-specific rules listed on {@link ValidQuantityAmount}: {@code amount > 0} for both
- * types and whole-number amounts for {@code PIECE}. {@code SCU} fractional precision is
- * <em>not</em> rejected here — an amount with more than three decimals is commercially rounded
+ * <p>Applies the quantity-type-specific rules listed on {@link ValidQuantityAmount}: {@code amount
+ * > 0} for both types and whole-number amounts for {@code PIECE}. {@code SCU} fractional precision
+ * is <em>not</em> rejected here — an amount with more than three decimals is commercially rounded
  * (HALF_UP) to three places at the persistence boundary (the {@code @PrePersist}/{@code @PreUpdate}
  * hooks on the amount entities), mirroring the frontend, so the server accepts and normalises it
  * rather than refusing it. If the material does not exist, validation silently passes — the
  * surrounding {@code @NotNull}/foreign-key checks (or the service layer) report that case so the
  * user gets the right error key, not a confusing "invalid quantity" message.
+ *
+ * <p>The PIECE-vs-SCU fact is resolved through the {@link MaterialPieceTypeLookup} seam rather than
+ * a direct {@code MaterialRepository} call, so this {@code validation} class depends on neither
+ * {@code repository} nor {@code model} and the package stays a dependency leaf (avoiding a {@code
+ * model} &harr; {@code validation} cycle, since {@code model.dto} carries the constraint
+ * annotation). A missing material yields {@code false} from the lookup, which is handled exactly
+ * like a non-PIECE material: the whole-number check is skipped and validation passes.
  */
 @Component
 @RequiredArgsConstructor
 public class ValidQuantityAmountValidator
     implements ConstraintValidator<ValidQuantityAmount, QuantityAware> {
 
-  private final MaterialRepository materialRepository;
+  private final MaterialPieceTypeLookup materialPieceTypeLookup;
 
   @Override
   public boolean isValid(QuantityAware dto, ConstraintValidatorContext context) {
@@ -63,15 +65,10 @@ public class ValidQuantityAmountValidator
       return false;
     }
 
-    Optional<Material> materialOpt = materialRepository.findById(dto.materialId());
-    if (materialOpt.isEmpty()) {
-      return true; // Let other validations handle missing material
-    }
-
-    // The isEmpty()/early-return guard above already excludes the empty case;
-    // orElseThrow makes that contract explicit (and silences SpotBugs).
-    Material material = materialOpt.orElseThrow();
-    if (material.getQuantityType() == QuantityType.PIECE && dto.amount() % 1 != 0) {
+    // A missing material resolves to false here, identical to a non-PIECE (SCU) material: the
+    // whole-number rule is skipped and the missing-material case is reported by @NotNull /
+    // foreign-key checks instead.
+    if (materialPieceTypeLookup.isPieceQuantity(dto.materialId()) && dto.amount() % 1 != 0) {
       context.disableDefaultConstraintViolation();
       context
           .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}")

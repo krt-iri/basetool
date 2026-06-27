@@ -134,6 +134,15 @@ public class PromotionTopicService {
   @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
+    // REQ-ORG-017 "pin, else choose": an officer who belongs to two Staffeln must pin the target
+    // Staffel via the switcher before creating, rather than have the topic silently stamped to
+    // their
+    // name-sorted primary.
+    if (ownerScopeService.hasAmbiguousStaffelContext()) {
+      throw new BadRequestException(
+          "You belong to two Staffeln — pin the Staffel this promotion topic belongs to via the"
+              + " sidebar switcher before creating it.");
+    }
     Squadron squadron =
         ownerScopeService
             .currentSquadron()

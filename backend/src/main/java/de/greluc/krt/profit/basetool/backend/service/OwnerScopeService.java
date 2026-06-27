@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -161,6 +162,7 @@ public class OwnerScopeService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
+  private final StaffelMembershipResolver staffelMembershipResolver;
   private final HttpServletRequest request;
 
   /**
@@ -289,6 +291,87 @@ public class OwnerScopeService {
       return new ScopePredicate(true, null, java.util.Set.of());
     }
     return base;
+  }
+
+  /**
+   * Resolves the SQUADRON-scope <em>set</em> for the admin user-list / search / typeahead /
+   * promotion-Bewertungsmatrix queries. REQ-ORG-017 relaxed a member to up to two Staffeln, so the
+   * unpinned non-admin scope is the <b>union</b> of the caller's own Staffeln rather than a single
+   * one. A faithful generalisation of {@link #currentSquadronId()} (the pre-REQ-ORG-017 single
+   * value) that only widens the two-Staffel case and otherwise preserves the legacy behaviour
+   * exactly:
+   *
+   * <ul>
+   *   <li>admin without a pin → {@code null} (no filter — the cross-staffel list);
+   *   <li>admin/non-admin with an active pin → the singleton pinned id;
+   *   <li>non-admin without a pin and at least one Staffel → the set of the caller's own Staffel
+   *       ids (one element for a single-Staffel member — byte-identical to before; two for a
+   *       dual-Staffel member);
+   *   <li>non-admin without a pin and no Staffel → {@code null}, preserving the legacy "unfiltered"
+   *       behaviour (so Bereich/OL leadership and guests keep seeing the full picker list).
+   * </ul>
+   *
+   * <p>The returned set is never empty (a caller with no Staffel collapses to {@code null}), so the
+   * repository {@code IN :scopeSquadronIds} clause never degenerates to an {@code IN ()}.
+   *
+   * @return the squadron id set the user-list queries filter on, or {@code null} for the unfiltered
+   *     admin/leadership all-scope.
+   */
+  @org.jetbrains.annotations.Nullable
+  public Set<UUID> currentUserListScopeSquadronIds() {
+    if (authHelper.isAdmin()) {
+      Optional<UUID> pin = readActiveSquadronFromHeader();
+      return pin.<Set<UUID>>map(Set::of).orElse(null);
+    }
+    Optional<UUID> callerId = authHelper.currentUserId();
+    if (callerId.isEmpty()) {
+      return null;
+    }
+    List<OrgUnitMembership> rows =
+        orgUnitMembershipRepository.findAllByIdUserIdAndKind(callerId.get(), OrgUnitKind.SQUADRON);
+    if (rows.isEmpty()) {
+      return null;
+    }
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    if (pinned.isPresent()
+        && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
+      return Set.of(pinned.get());
+    }
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (OrgUnitMembership m : rows) {
+      ids.add(m.getId().getOrgUnitId());
+    }
+    return ids;
+  }
+
+  /**
+   * {@code true} iff the current non-admin caller holds more than one Staffel (REQ-ORG-017) and has
+   * NOT pinned one of them via the active-context switcher — i.e. a single-Staffel auto-stamp would
+   * have to pick arbitrarily. Create flows that auto-stamp exactly one owning Staffel (e.g. the
+   * promotion topic / rank-requirement create) consult this to honour the owner's "pin, else
+   * choose" decision: when it returns {@code true} they reject the create with a clean 400 telling
+   * the user to pin the target Staffel first, rather than silently defaulting to the name-sorted
+   * primary. Admins are never ambiguous here (they always stamp via an explicit switcher focus or
+   * are rejected in "all squadrons" mode), and a caller with zero or one Staffel is unambiguous.
+   *
+   * @return {@code true} iff a single-Staffel auto-stamp would be ambiguous for the current caller.
+   */
+  public boolean hasAmbiguousStaffelContext() {
+    if (authHelper.isAdmin()) {
+      return false;
+    }
+    Optional<UUID> callerId = authHelper.currentUserId();
+    if (callerId.isEmpty()) {
+      return false;
+    }
+    List<OrgUnitMembership> rows =
+        orgUnitMembershipRepository.findAllByIdUserIdAndKind(callerId.get(), OrgUnitKind.SQUADRON);
+    if (rows.size() <= 1) {
+      return false;
+    }
+    Optional<UUID> pinned = readActiveSquadronFromHeader();
+    return pinned.isEmpty()
+        || rows.stream().noneMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()));
   }
 
   /**
@@ -483,10 +566,16 @@ public class OwnerScopeService {
       return currentScopePredicate();
     }
     Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
-    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
-      readPersistentSquadronFromUser().ifPresent(oversightOrgUnitIds::add);
-    }
     List<OrgUnitMembership> memberships = currentCallerMemberships();
+    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
+      // REQ-ORG-017: an officer oversees ALL of their own Staffeln (up to two), not just the
+      // name-sorted primary — add every SQUADRON membership rather than the single active one.
+      for (OrgUnitMembership m : memberships) {
+        if (m.getKind() == OrgUnitKind.SQUADRON) {
+          oversightOrgUnitIds.add(m.getId().getOrgUnitId());
+        }
+      }
+    }
     for (OrgUnitMembership m : memberships) {
       // SK leads oversee their own SK; from epic #800 (REQ-ROLE-002) the four squadron ranks
       // oversee their own squadron the same way (officer-equivalent, own-unit only, no cascade).
@@ -538,10 +627,18 @@ public class OwnerScopeService {
       return currentScopePredicate();
     }
     Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
+    List<OrgUnitMembership> memberships = currentCallerMemberships();
     if (authHelper.hasReachableRole("ROLE_OFFICER")) {
-      readPersistentSquadronFromUser().ifPresent(ownLevelOrgUnitIds::add);
+      // REQ-ORG-017: an officer's own-level scope is ALL of their Staffeln (up to two), not just
+      // the
+      // name-sorted primary.
+      for (OrgUnitMembership m : memberships) {
+        if (m.getKind() == OrgUnitKind.SQUADRON) {
+          ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
+        }
+      }
     }
-    for (OrgUnitMembership m : currentCallerMemberships()) {
+    for (OrgUnitMembership m : memberships) {
       if (isOversightSeat(m)) {
         ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
       }
@@ -786,8 +883,16 @@ public class OwnerScopeService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        throw new BadRequestException(
-            "User belongs to multiple org units; owningOrgUnitId is required");
+        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the target's own
+        // org units (self-service create) so a pinned member need not re-pick; otherwise force a
+        // choice.
+        Optional<UUID> pinned = readActiveSquadronFromHeader();
+        if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
+          stampedOrgUnitId = pinned.get();
+        } else {
+          throw new BadRequestException(
+              "User belongs to multiple org units; owningOrgUnitId is required");
+        }
       }
     } else {
       if (!memberOrgUnitIds.contains(owningOrgUnitId)) {
@@ -940,8 +1045,20 @@ public class OwnerScopeService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        throw new BadRequestException(
-            "User belongs to multiple org units; owningOrgUnitId is required");
+        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the TARGET
+        // user's
+        // own org units (the self-service create path where caller == target) so a member who has
+        // already pinned a Staffel via the switcher need not re-pick it on the create form;
+        // otherwise force an explicit choice. The pin is only honoured when it is one of the
+        // target's
+        // memberships, so an admin's foreign pin on an on-behalf create still falls through to 400.
+        Optional<UUID> pinned = readActiveSquadronFromHeader();
+        if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
+          stampedOrgUnitId = pinned.get();
+        } else {
+          throw new BadRequestException(
+              "User belongs to multiple org units; owningOrgUnitId is required");
+        }
       }
     } else {
       // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the TARGET
@@ -1069,7 +1186,7 @@ public class OwnerScopeService {
   /**
    * SPEZIALKOMMANDO_PLAN.md §6.1 contextual-authority check. Returns {@code true} iff the current
    * authenticated principal carries an {@link
-   * de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority} matching {@code
+   * de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority} matching {@code
    * (roleName, orgUnitId)}. Admins always pass — they have implicit elevated access in every
    * OrgUnit (mirrors the {@link #canEditSquadron} short-circuit).
    *
@@ -1104,12 +1221,12 @@ public class OwnerScopeService {
         || authentication.get().getAuthorities() == null) {
       return false;
     }
-    de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority target =
-        new de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority(
+    de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority target =
+        new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
             roleName, orgUnitId);
     for (org.springframework.security.core.GrantedAuthority a :
         authentication.get().getAuthorities()) {
-      if (a instanceof de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority ctx
+      if (a instanceof de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority ctx
           && ctx.equals(target)) {
         return true;
       }
@@ -1785,10 +1902,16 @@ public class OwnerScopeService {
     if (cached.isPresent()) {
       return cached.get();
     }
-    // Post-D3: the user's home Staffel lives in org_unit_membership (kind=SQUADRON). The V95
-    // partial unique index guarantees at most one row, so a List read with an in-loop pick is the
-    // right shape — Spring Data's findOneByIdUserIdAndKind would throw on the data-corruption case
-    // we tolerate elsewhere.
+    // REQ-ORG-017: the user's Staffel lives in org_unit_membership (kind=SQUADRON), and a user may
+    // now hold up to TWO Staffeln (the V98 uq_org_unit_membership_one_squadron index was relaxed to
+    // <=2 in V164). This single-valued accessor resolves the caller's ACTIVE Staffel: honour an
+    // X-Active-Org-Unit-Id pin that points at one of the caller's own Staffel memberships
+    // (mirroring
+    // the non-admin pin handling in currentScopePredicate()); otherwise fall back to a
+    // DETERMINISTIC
+    // name-sorted primary (matching UserMapper.resolveSquadron / UserDto.squadron) rather than an
+    // arbitrary first row, so the auto-stamp and single-value surfaces agree with the displayed
+    // primary Staffel.
     Optional<UUID> resolved =
         authHelper
             .currentUserId()
@@ -1797,9 +1920,21 @@ public class OwnerScopeService {
                   List<OrgUnitMembership> rows =
                       orgUnitMembershipRepository.findAllByIdUserIdAndKind(
                           userId, OrgUnitKind.SQUADRON);
-                  return rows.isEmpty()
-                      ? Optional.empty()
-                      : Optional.of(rows.get(0).getId().getOrgUnitId());
+                  if (rows.isEmpty()) {
+                    return Optional.empty();
+                  }
+                  Optional<UUID> pinned = readActiveSquadronFromHeader();
+                  if (pinned.isPresent()
+                      && rows.stream()
+                          .anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
+                    return pinned;
+                  }
+                  // No matching pin: the deterministic name-sorted primary. The name-sort (and the
+                  // single-Staffel fast path that skips the squadron load) is owned by
+                  // StaffelMembershipResolver so this fallback agrees with UserDto.squadron /
+                  // OrgUnitMembershipService.findStaffelMembershipOrgUnitIds by construction.
+                  return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
+                      .findFirst();
                 });
     request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);
     return resolved;

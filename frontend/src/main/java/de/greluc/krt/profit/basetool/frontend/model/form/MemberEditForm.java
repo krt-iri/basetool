@@ -28,11 +28,14 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * Form-binding object for the admin member-edit page.
  *
- * <p>SPEZIALKOMMANDO_PLAN.md §7.4: {@link #isLogistician} / {@link #isMissionManager} carry the
- * per-Staffel-membership role flags that the page-controller diffs against the loaded state and
- * forwards to the new single-POST {@code PATCH /api/v1/users/{id}/memberships} delta endpoint —
- * concentrating the previously-fragmented {@code /users/{id}/logistician} + {@code
- * /users/{id}/mission-manager} round-trips into one transactional save.
+ * <p>A member may belong to up to two Staffeln (REQ-ORG-017), each carrying its own per-squadron
+ * Logistician / Mission-Manager flags (REQ-SEC-005). The form models the two Staffel slots as two
+ * fixed groups of fields ({@code staffel1*} / {@code staffel2*}) rather than a growable list, since
+ * the cardinality is hard-capped at two. The page-controller folds the non-empty slots into the
+ * {@code staffeln} list of the single-POST {@code PATCH /api/v1/users/{id}/memberships} delta,
+ * which the backend reconciles against the user's current Staffel memberships (add / remove /
+ * flag-patch in one transaction). An empty slot means "no membership in that slot"; clearing both
+ * removes every Staffel membership.
  *
  * @param rank pay-grade rank (1-20).
  * @param description profile description.
@@ -41,11 +44,23 @@ import org.springframework.format.annotation.DateTimeFormat;
  * @param source origin marker — {@code "profile"} keeps the round-trip on the profile page,
  *     anything else lands back on the member list.
  * @param joinDate squadron-join date.
- * @param squadronId Staffel assignment target, or {@code null} to clear.
- * @param isLogistician desired post-save value of the Staffel-membership Logistician flag, or
- *     {@code null} when the section was not rendered (no Staffel) so the flag delta is skipped.
- * @param isMissionManager desired post-save value of the Staffel-membership Mission Manager flag,
- *     or {@code null} when the section was not rendered.
+ * @param staffel1Id first Staffel slot's target Squadron id, or {@code null} when the slot is
+ *     empty.
+ * @param staffel1Logistician first slot's desired Logistician flag (defaults {@code false}).
+ * @param staffel1MissionManager first slot's desired Mission Manager flag (defaults {@code false}).
+ * @param staffel2Id second Staffel slot's target Squadron id, or {@code null} when the slot is
+ *     empty; a value equal to {@code staffel1Id} is dropped as a duplicate by the controller.
+ * @param staffel2Logistician second slot's desired Logistician flag (defaults {@code false}).
+ * @param staffel2MissionManager second slot's desired Mission Manager flag (defaults {@code
+ *     false}).
+ * @param staffelDetailLoaded whether the authoritative Staffel-membership detail (each Staffel's
+ *     own flags) was successfully loaded when the edit form was rendered. {@code false} when that
+ *     fetch failed (resilience timeout / open circuit breaker), in which case the two slots render
+ *     blank and the controller must NOT reconcile the Staffel set on save — otherwise the blank
+ *     slots would be misread as "remove every Staffel" and silently strip the member's memberships.
+ *     The hidden field round-trips the flag from the GET render to the POST. Defaults to {@code
+ *     true} via the convenience constructor for callers that build the form without the membership
+ *     detail.
  */
 public record MemberEditForm(
     Integer rank,
@@ -54,6 +69,59 @@ public record MemberEditForm(
     Long version,
     String source,
     @Nullable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate joinDate,
-    @Nullable UUID squadronId,
-    @Nullable Boolean isLogistician,
-    @Nullable Boolean isMissionManager) {}
+    @Nullable UUID staffel1Id,
+    @Nullable Boolean staffel1Logistician,
+    @Nullable Boolean staffel1MissionManager,
+    @Nullable UUID staffel2Id,
+    @Nullable Boolean staffel2Logistician,
+    @Nullable Boolean staffel2MissionManager,
+    @Nullable Boolean staffelDetailLoaded) {
+
+  /**
+   * Convenience constructor that defaults {@link #staffelDetailLoaded()} to {@code true} — the
+   * normal "detail loaded" path. Lets callers (and tests) that do not track the Staffel-detail load
+   * outcome build the form without the trailing flag; the page controller uses the full canonical
+   * constructor to thread the real load outcome.
+   *
+   * @param rank pay-grade rank (1-20).
+   * @param description profile description.
+   * @param displayName visible display name.
+   * @param version {@code app_user} row {@code @Version} for the optimistic-lock check.
+   * @param source origin marker — {@code "profile"} keeps the round-trip on the profile page.
+   * @param joinDate squadron-join date.
+   * @param staffel1Id first Staffel slot's target Squadron id, or {@code null}.
+   * @param staffel1Logistician first slot's desired Logistician flag.
+   * @param staffel1MissionManager first slot's desired Mission Manager flag.
+   * @param staffel2Id second Staffel slot's target Squadron id, or {@code null}.
+   * @param staffel2Logistician second slot's desired Logistician flag.
+   * @param staffel2MissionManager second slot's desired Mission Manager flag.
+   */
+  public MemberEditForm(
+      Integer rank,
+      String description,
+      String displayName,
+      Long version,
+      String source,
+      @Nullable LocalDate joinDate,
+      @Nullable UUID staffel1Id,
+      @Nullable Boolean staffel1Logistician,
+      @Nullable Boolean staffel1MissionManager,
+      @Nullable UUID staffel2Id,
+      @Nullable Boolean staffel2Logistician,
+      @Nullable Boolean staffel2MissionManager) {
+    this(
+        rank,
+        description,
+        displayName,
+        version,
+        source,
+        joinDate,
+        staffel1Id,
+        staffel1Logistician,
+        staffel1MissionManager,
+        staffel2Id,
+        staffel2Logistician,
+        staffel2MissionManager,
+        Boolean.TRUE);
+  }
+}

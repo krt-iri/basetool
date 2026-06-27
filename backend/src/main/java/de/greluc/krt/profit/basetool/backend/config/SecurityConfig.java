@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -33,6 +35,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -55,7 +58,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * authorization matrix.
  *
  * <p>The backend is a pure resource server — incoming JWTs are validated against the Keycloak
- * issuer, the {@link CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
+ * issuer, the {@code CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
  * project-specific {@code is_logistician} / {@code is_mission_manager} flags on {@code app_user}
  * into Spring authorities. The role hierarchy mirrors the CLAUDE.md matrix (admin/officer imply
  * logistician/mission-manager).
@@ -159,16 +162,20 @@ public class SecurityConfig {
   }
 
   /**
-   * Wires the project's {@link CustomJwtGrantedAuthoritiesConverter} into Spring Security's
+   * Wires the project's {@code CustomJwtGrantedAuthoritiesConverter} into Spring Security's
    * standard {@link JwtAuthenticationConverter}, so every authenticated request sees the merged
-   * authority set (Keycloak realm roles + DB-flag-derived roles).
+   * authority set (Keycloak realm roles + DB-flag-derived roles). The parameter is typed as the
+   * Spring {@link Converter} interface rather than the concrete {@code service}-package bean, so
+   * this {@code config} class does not depend on the {@code service} layer (which would close a
+   * {@code config} &harr; {@code service} package cycle); Spring still injects the single matching
+   * bean by type.
    *
-   * @param customConverter project-specific authorities converter
+   * @param customConverter the project-specific authorities converter bean
    * @return wired {@code JwtAuthenticationConverter}
    */
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter(
-      CustomJwtGrantedAuthoritiesConverter customConverter) {
+      Converter<Jwt, Collection<GrantedAuthority>> customConverter) {
     JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
     converter.setJwtGrantedAuthoritiesConverter(customConverter);
     return converter;

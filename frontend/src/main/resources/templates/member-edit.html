@@ -64,6 +64,10 @@
               th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
             <input type="hidden" name="source" th:field="*{source}">
+            <!-- REQ-ORG-017: round-trips whether the authoritative Staffel-membership detail loaded
+                 on the GET. When false (detail fetch failed) the controller skips the Staffel
+                 reconcile on save, so blank slots never strip the member's Staffeln. -->
+            <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
             <div class="form-group">
                 <label th:text="#{profile.rank}">Rang</label>
                 <select name="rank">
@@ -100,41 +104,88 @@
                        style="min-height:44px;" />
             </div>
 
-            <!-- Squadron assignment (admin-only, since /members/{id}/edit is admin-only).
-                 SquadronContextAdvice injects `availableSquadrons` on every request. -->
-            <div class="form-group" sec:authorize="hasRole('ADMIN')">
-                <label for="member-edit-squadron" th:text="#{members.field.squadron}">Staffel</label>
-                <select id="member-edit-squadron" name="squadronId" style="min-height:44px;">
-                    <option value=""
-                            th:selected="${memberEditForm.squadronId == null}"
-                            th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
-                    <option th:each="sq : ${availableSquadrons}"
-                            th:value="${sq.id()}"
-                            th:selected="${memberEditForm.squadronId != null and memberEditForm.squadronId == sq.id()}"
-                            th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
-                </select>
-            </div>
+            <!-- Staffel memberships (admin-only, since /members/{id}/edit is admin-only). REQ-ORG-017:
+                 up to two Staffeln, each with its own Logistician / Mission-Manager flags
+                 (REQ-SEC-005). SquadronContextAdvice injects `availableSquadrons`. The two fixed slots
+                 bind to staffel1*/staffel2* fields; the Save button folds the non-empty slots into one
+                 PATCH /api/v1/users/{id}/memberships reconcile. -->
+            <div class="form-group" sec:authorize="hasRole('ADMIN')" id="staffel-section">
+                <label th:text="#{members.staffel.title}">Staffeln</label>
 
-            <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — per-Staffel-membership role flags inline on the
-                 member-edit form. The Save button bundles the squadron assignment + flag delta
-                 into one PATCH /api/v1/users/{id}/memberships round-trip; per-row optimistic-lock
-                 stays intact because the backend forwards each side through its own service. -->
-            <div class="form-group" sec:authorize="hasRole('ADMIN')">
-                <label th:text="#{members.staffel.flags}">Staffel-Rollen</label>
-                <div style="display:flex; flex-direction:column; gap:0.5rem;">
-                    <label style="display:flex; align-items:center; gap:0.5rem;">
-                        <input type="hidden" name="_isLogistician" value="on" />
-                        <input type="checkbox" name="isLogistician"
-                               th:checked="${memberEditForm.isLogistician}" />
-                        <span th:text="#{members.is_logistician}">Logistiker</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:0.5rem;">
-                        <input type="hidden" name="_isMissionManager" value="on" />
-                        <input type="checkbox" name="isMissionManager"
-                               th:checked="${memberEditForm.isMissionManager}" />
-                        <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
-                    </label>
+                <!-- REQ-ORG-017: the authoritative Staffel-membership detail (each Staffel's own
+                     flags) failed to load. The editable slots are hidden so the admin cannot make a
+                     change that the save would silently drop, and a non-null reconcile that would
+                     strip every Staffel is avoided (the controller skips the PATCH when
+                     staffelDetailLoaded is false). The other fields above still save normally. -->
+                <p class="field-error" th:unless="${memberEditForm.staffelDetailLoaded}"
+                   th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</p>
+
+                <th:block th:if="${memberEditForm.staffelDetailLoaded}">
+                <!-- Slot 1 -->
+                <div class="staffel-slot hud-box" style="padding:1rem; margin-bottom:0.75rem;">
+                    <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
+                    <select id="staffel1-select" class="staffel-select" name="staffel1Id" style="min-height:44px;">
+                        <option value=""
+                                th:selected="${memberEditForm.staffel1Id == null}"
+                                th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                        <option th:each="sq : ${availableSquadrons}"
+                                th:value="${sq.id()}"
+                                th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
+                                th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                    </select>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.5rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="hidden" name="_staffel1Logistician" value="on" />
+                            <input type="checkbox" name="staffel1Logistician"
+                                   th:checked="${memberEditForm.staffel1Logistician}" />
+                            <span th:text="#{members.is_logistician}">Logistiker</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="hidden" name="_staffel1MissionManager" value="on" />
+                            <input type="checkbox" name="staffel1MissionManager"
+                                   th:checked="${memberEditForm.staffel1MissionManager}" />
+                            <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
+                        </label>
+                    </div>
                 </div>
+
+                <!-- Slot 2 (optional, REQ-ORG-017 second Staffel) -->
+                <div id="staffel-slot-2" class="staffel-slot hud-box"
+                     th:style="${memberEditForm.staffel2Id == null}
+                               ? 'display:none; padding:1rem; margin-bottom:0.75rem;'
+                               : 'padding:1rem; margin-bottom:0.75rem;'">
+                    <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
+                    <select id="staffel2-select" class="staffel-select" name="staffel2Id" style="min-height:44px;">
+                        <option value=""
+                                th:selected="${memberEditForm.staffel2Id == null}"
+                                th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                        <option th:each="sq : ${availableSquadrons}"
+                                th:value="${sq.id()}"
+                                th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
+                                th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                    </select>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.5rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="hidden" name="_staffel2Logistician" value="on" />
+                            <input type="checkbox" name="staffel2Logistician"
+                                   th:checked="${memberEditForm.staffel2Logistician}" />
+                            <span th:text="#{members.is_logistician}">Logistiker</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="hidden" name="_staffel2MissionManager" value="on" />
+                            <input type="checkbox" name="staffel2MissionManager"
+                                   th:checked="${memberEditForm.staffel2MissionManager}" />
+                            <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-ghost" id="staffel-remove-2"
+                            style="margin-top:0.75rem;" th:text="#{members.staffel.remove}">Entfernen</button>
+                </div>
+
+                <button type="button" class="btn btn-ghost" id="staffel-add-2"
+                        th:style="${memberEditForm.staffel2Id == null} ? '' : 'display:none;'"
+                        th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</button>
+                </th:block>
             </div>
 
             <div class="form-actions">
@@ -305,6 +356,58 @@
                 done();
             });
         });
+    })();
+</script>
+<!--
+  Two-Staffel slot management (REQ-ORG-017). Slot 1 is always visible; slot 2 is revealed by the
+  "add" button and cleared+hidden by its "remove" button. Even while hidden, slot 2's inputs stay in
+  the DOM and submit empty (the controller drops an empty/duplicate slot), so no DOM removal is
+  needed. Each select disables the squadron currently chosen in the other, preventing the same
+  Staffel twice client-side (the backend also rejects a duplicate defensively).
+-->
+<script th:attr="nonce=${cspNonce}">
+    (function () {
+        'use strict';
+        var sel1 = document.getElementById('staffel1-select');
+        var sel2 = document.getElementById('staffel2-select');
+        var slot2 = document.getElementById('staffel-slot-2');
+        var addBtn = document.getElementById('staffel-add-2');
+        var removeBtn = document.getElementById('staffel-remove-2');
+        if (!sel1 || !sel2 || !slot2 || !addBtn || !removeBtn) {
+            return;
+        }
+        function showSlot2(show) {
+            slot2.style.display = show ? '' : 'none';
+            addBtn.style.display = show ? 'none' : '';
+        }
+        function clearSlot2() {
+            sel2.value = '';
+            slot2.querySelectorAll('input[type=checkbox]').forEach(function (c) {
+                c.checked = false;
+            });
+        }
+        function syncDuplicateOptions() {
+            var v1 = sel1.value;
+            var v2 = sel2.value;
+            Array.prototype.forEach.call(sel2.options, function (o) {
+                o.disabled = (o.value !== '' && o.value === v1);
+            });
+            Array.prototype.forEach.call(sel1.options, function (o) {
+                o.disabled = (o.value !== '' && o.value === v2);
+            });
+        }
+        addBtn.addEventListener('click', function () {
+            showSlot2(true);
+            syncDuplicateOptions();
+        });
+        removeBtn.addEventListener('click', function () {
+            clearSlot2();
+            showSlot2(false);
+            syncDuplicateOptions();
+        });
+        sel1.addEventListener('change', syncDuplicateOptions);
+        sel2.addEventListener('change', syncDuplicateOptions);
+        syncDuplicateOptions();
     })();
 </script>
 </body>

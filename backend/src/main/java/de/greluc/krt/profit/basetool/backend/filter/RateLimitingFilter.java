@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.greluc.krt.profit.basetool.backend.config.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;

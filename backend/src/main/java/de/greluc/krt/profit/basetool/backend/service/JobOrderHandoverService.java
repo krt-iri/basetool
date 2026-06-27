@@ -146,18 +146,22 @@ public class JobOrderHandoverService {
     handover.setRecipientSquadron(dto.recipientSquadron());
 
     // Audit trail: capture the executing user + their squadron snapshot at handover time.
-    // Cross-staffel workspace (MULTI_SQUADRON_PLAN.md section 4.4) means the executing user may
-    // belong to a different squadron than the order's owning one — without this stamp the audit
-    // trail does not record who actually performed the write on a foreign squadron's items.
-    // Post-R9 D3 (V101): the user's home Staffel is read from org_unit_membership directly — the
-    // legacy User.squadron column was dropped.
+    // Cross-staffel workspace means the executing user may belong to a different squadron than the
+    // order's responsible one — without this stamp the audit trail does not record who actually
+    // performed the write on a foreign squadron's items. REQ-ORG-017: the executor may now hold up
+    // to two Staffeln, so the snapshot is order-aligned — the executor's Staffel that matches the
+    // order's responsible org unit, else their deterministic primary (read from
+    // org_unit_membership;
+    // the legacy User.squadron column was dropped in V101).
+    UUID responsibleOrgUnitId =
+        jobOrder.getResponsibleOrgUnit() != null ? jobOrder.getResponsibleOrgUnit().getId() : null;
     userService
         .getCurrentUser()
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
               orgUnitMembershipService
-                  .findStaffelMembershipOrgUnitId(current.getId())
+                  .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
                   .flatMap(squadronRepository::findById)
                   .ifPresent(handover::setExecutingSquadron);
             });

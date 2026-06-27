@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -73,31 +72,18 @@ public interface OrgUnitMembershipRepository
   long countByIdUserId(UUID userId);
 
   /**
-   * Returns every membership row of the given user filtered by kind. Handy for "what Staffel does
-   * this user belong to" (returns at most one row because of the V95 partial unique index) and for
-   * "what Spezialkommandos has this user joined" — without forcing the caller to filter the full
-   * result client-side.
+   * Returns every membership row of the given user filtered by kind. Handy for "what Staffeln does
+   * this user belong to" (REQ-ORG-017: up to two SQUADRON rows since the V98 {@code
+   * uq_org_unit_membership_one_squadron} index was relaxed to {@code <=2} in V164) and for "what
+   * Spezialkommandos has this user joined" — without forcing the caller to filter the full result
+   * client-side. Always use this for {@code kind=SQUADRON}; a single-row accessor would throw for a
+   * legitimate two-Staffel user.
    *
    * @param userId the user whose memberships to list; never {@code null}.
    * @param kind the discriminator value to match; never {@code null}.
    * @return memberships of the requested kind; never {@code null}, possibly empty.
    */
   List<OrgUnitMembership> findAllByIdUserIdAndKind(UUID userId, OrgUnitKind kind);
-
-  /**
-   * Returns the single Squadron membership of the given user, if any. Convenience wrapper around
-   * {@link #findAllByIdUserIdAndKind} that takes advantage of the V95 partial unique index "{@code
-   * uq_org_unit_membership_one_squadron}" — a user has at most one Staffel membership, so the
-   * result is always at most one row. The implementation calls {@code findOneByIdUserIdAndKind}
-   * (Spring Data derives the query); if data corruption ever produces a second Staffel membership
-   * for the same user, Spring Data will surface it as an {@code
-   * IncorrectResultSizeDataAccessException} which the service layer translates into a 500-level
-   * problem detail.
-   *
-   * @param userId the user whose Staffel membership to fetch; never {@code null}.
-   * @return the user's single Staffel membership if present, empty otherwise.
-   */
-  Optional<OrgUnitMembership> findOneByIdUserIdAndKind(UUID userId, OrgUnitKind kind);
 
   /**
    * Returns every membership belonging to the given org unit. Used by the admin roster page for an

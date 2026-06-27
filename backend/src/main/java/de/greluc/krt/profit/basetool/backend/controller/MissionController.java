@@ -549,6 +549,7 @@ public class MissionController {
         false, // isMissionManager
         dto.inKeycloak(),
         null, // squadron – not exposed to guests
+        null, // squadrons – not exposed to guests
         dto.version(),
         null, // joinDate – not exposed to guests
         null // discordLinked – not exposed to guests

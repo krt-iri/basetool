@@ -24,11 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import jakarta.validation.ConstraintValidatorContext;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +36,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ValidQuantityAmountValidatorTest {
 
-  @Mock private MaterialRepository materialRepository;
+  @Mock private MaterialPieceTypeLookup materialPieceTypeLookup;
 
   @Mock private ConstraintValidatorContext context;
 
@@ -55,7 +51,7 @@ class ValidQuantityAmountValidatorTest {
 
   @BeforeEach
   void setUp() {
-    validator = new ValidQuantityAmountValidator(materialRepository);
+    validator = new ValidQuantityAmountValidator(materialPieceTypeLookup);
     materialId = UUID.randomUUID();
   }
 
@@ -89,9 +85,7 @@ class ValidQuantityAmountValidatorTest {
 
   @Test
   void shouldBeValidWhenPieceIsInteger() {
-    Material material = new Material();
-    material.setQuantityType(QuantityType.PIECE);
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(materialPieceTypeLookup.isPieceQuantity(materialId)).thenReturn(true);
 
     QuantityAware dto = new TestDto(materialId, 5.0);
     assertTrue(validator.isValid(dto, context));
@@ -99,9 +93,7 @@ class ValidQuantityAmountValidatorTest {
 
   @Test
   void shouldBeInvalidWhenPieceIsDecimal() {
-    Material material = new Material();
-    material.setQuantityType(QuantityType.PIECE);
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(materialPieceTypeLookup.isPieceQuantity(materialId)).thenReturn(true);
 
     when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
     when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
@@ -116,9 +108,7 @@ class ValidQuantityAmountValidatorTest {
 
   @Test
   void shouldBeValidWhenScuHasUpToThreeDecimals() {
-    Material material = new Material();
-    material.setQuantityType(QuantityType.SCU);
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(materialPieceTypeLookup.isPieceQuantity(materialId)).thenReturn(false);
 
     assertTrue(validator.isValid(new TestDto(materialId, 10.0), context));
     assertTrue(validator.isValid(new TestDto(materialId, 10.12), context));
@@ -130,9 +120,7 @@ class ValidQuantityAmountValidatorTest {
     // SCU precision is no longer rejected: an amount with more than three decimals is rounded
     // HALF_UP to three places at the persistence boundary (the entity @PrePersist/@PreUpdate
     // hooks), mirroring the frontend, so the validator must accept it rather than refuse it.
-    Material material = new Material();
-    material.setQuantityType(QuantityType.SCU);
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(materialPieceTypeLookup.isPieceQuantity(materialId)).thenReturn(false);
 
     assertTrue(validator.isValid(new TestDto(materialId, 10.1234), context));
   }

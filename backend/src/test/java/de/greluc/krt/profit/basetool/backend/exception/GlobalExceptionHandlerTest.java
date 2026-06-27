@@ -30,7 +30,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import de.greluc.krt.profit.basetool.backend.config.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;

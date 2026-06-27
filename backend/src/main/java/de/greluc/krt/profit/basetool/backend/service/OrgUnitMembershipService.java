@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
@@ -42,10 +43,14 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -64,11 +69,12 @@ import org.springframework.transaction.annotation.Transactional;
  * endpoints therefore lands as a clean 404 before any membership row is touched, never as a
  * corrupted Staffel membership.
  *
- * <p>Staffel membership flag flips ({@code is_logistician} / {@code is_mission_manager} on the
- * Staffel membership row) flow through {@link #applyStaffelMembershipFlagDelta(UUID, Boolean,
- * Boolean)} and {@link #patchSquadronMemberFlags(UUID, UUID, MembershipFlagsPatchRequest)}. The
- * legacy {@code app_user.is_logistician} / {@code app_user.is_mission_manager} columns were dropped
- * in V101 (R9 Step 5) — the membership row is the single source of truth.
+ * <p>Staffel membership add / remove / flag changes flow through {@link
+ * #reconcileStaffelMemberships(User, java.util.List)} (the member-edit membership-delta path, up to
+ * two Staffeln per REQ-ORG-017) and the version-aware {@link #patchSquadronMemberFlags(UUID, UUID,
+ * MembershipFlagsPatchRequest)}. The legacy {@code app_user.is_logistician} / {@code
+ * app_user.is_mission_manager} columns were dropped in V101 (R9 Step 5) — the membership row is the
+ * single source of truth.
  *
  * <p>Concurrency: every write method checks the inbound {@code version} against the membership
  * row's {@code @Version} field, throwing {@link ObjectOptimisticLockingFailureException} → 409 on
@@ -90,6 +96,7 @@ public class OrgUnitMembershipService {
   private final InventoryOrgUnitReconciler inventoryReconciler;
   private final AuditService auditService;
   private final OrgChartService orgChartService;
+  private final StaffelMembershipResolver staffelMembershipResolver;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -648,152 +655,146 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * R6.e helper — applies the supplied flag delta to the user's existing Staffel membership row
-   * without optimistic-lock checking. Used by the legacy {@code UserController}-shaped flag-toggle
-   * endpoints that still accept a bare {@code ?isLogistician=...} query parameter (no version
-   * round-trip) so a flag toggle from the existing admin UI propagates to the membership row.
-   * Idempotent — passing the same flag value the row already has is a no-op write that bumps the
-   * {@code @Version} via Hibernate dirty checking.
+   * Reconciles the user's Staffel memberships to the supplied desired set (epic multi-Staffel,
+   * REQ-ORG-017 — a user may belong to up to two Staffeln, each carrying its own per-squadron
+   * Logistician / Mission-Manager flags per REQ-SEC-005). Backs the member-edit membership-delta
+   * endpoint: the admin form posts the complete desired Staffel set, and this method adds the
+   * squadrons that are not yet a membership, removes the current Staffel memberships absent from
+   * the set, and patches the flags of the ones that stay — all in the caller's transaction.
    *
-   * <p>Post-R9 D3 (V101): the user's home Staffel is read from {@code org_unit_membership} directly
-   * — the legacy {@code app_user.squadron_id} column was dropped. If the user has no Staffel
-   * membership row at all (admin / guest), the call is a no-op: there is no membership to flip the
-   * flag on.
+   * <p>Reconcile order matters: removals are deleted and flushed <em>before</em> any insert so the
+   * V164 {@code enforce_max_two_squadron_memberships} counting trigger never miscounts an
+   * about-to-be-removed row as a third Staffel during a re-point (e.g. {@code [A,B] → [A,C]}).
+   * Additions and flag patches then run; a flag patch only writes (and only audits) when a value
+   * actually changes, so re-posting an unchanged set is a clean no-op.
    *
-   * @param userId the user whose Staffel membership to update; never {@code null}.
-   * @param isLogistician new flag value, or {@code null} to leave the existing value untouched.
-   * @param isMissionManager new flag value, or {@code null} to leave the existing value untouched.
-   * @throws NotFoundException if the user does not exist.
-   */
-  @Transactional
-  public void applyStaffelMembershipFlagDelta(
-      @NotNull UUID userId,
-      @org.jetbrains.annotations.Nullable Boolean isLogistician,
-      @org.jetbrains.annotations.Nullable Boolean isMissionManager) {
-    userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    List<OrgUnitMembership> staffelRows =
-        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
-    if (staffelRows.isEmpty()) {
-      // No Staffel membership to flip the flag on (admin / guest user without a Staffel link).
-      // Post-R9 D3 there is no legacy User-level column to fall back to either — the toggle is a
-      // clean no-op.
-      return;
-    }
-    OrgUnitMembership m = staffelRows.get(0);
-    if (isLogistician != null) {
-      m.setLogistician(isLogistician);
-    }
-    if (isMissionManager != null) {
-      m.setMissionManager(isMissionManager);
-    }
-    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    recordCapabilityFlagsChanged(saved.getId().getOrgUnitId(), userId, saved);
-  }
-
-  /**
-   * Synchronises the user's single Staffel membership row to the target Squadron. Called by {@link
-   * UserService#updateUserSquadron(UUID, UUID, Long)} so the {@code org_unit_membership} row
-   * reflects the admin's squadron-assignment write.
-   *
-   * <p>Logic:
+   * <p>Guards (defence in depth ahead of the DB triggers, surfacing clean 400s):
    *
    * <ul>
-   *   <li>{@code newSquadron == null} → every existing Staffel membership of the user is removed.
-   *       The user falls back into "no Staffel" territory; their SK memberships (if any) stay.
-   *   <li>{@code newSquadron} matches the user's existing Staffel membership → no-op.
-   *   <li>{@code newSquadron} differs from the existing Staffel membership → the old row is deleted
-   *       and a new one is created at the new Squadron. Per-membership flags reset to {@code false}
-   *       on the new row — the legacy {@code User.isLogistician} / {@code User.isMissionManager}
-   *       columns were dropped in V101 (R9 Step 5), so there is no carry-over source.
-   *   <li>No existing Staffel membership → a fresh row is created at {@code newSquadron} with flags
-   *       defaulting to {@code false}.
+   *   <li>duplicate squadron in the desired set → 400;
+   *   <li>more than two desired squadrons → 400;
+   *   <li>the user holds a silo-leader role (SK-Lead / Bereichsleitung / OL) while at least one
+   *       Staffel is desired → 400 (a leader belongs to no Staffel, REQ-ORG-017).
    * </ul>
    *
-   * <p>The V95 partial unique index {@code uq_user_one_squadron_membership} guarantees at most one
-   * Staffel membership per user, which this method preserves by deleting the old row before
-   * inserting the new one.
+   * <p>Inventory lifecycle: if this reconcile grants the user their first-ever org-unit membership
+   * the ownerless-personal inventory adopts the name-sorted <em>primary</em> of the newly added
+   * Staffeln (the same deterministic primary {@code UserDto.squadron} / the create-time auto-stamp
+   * use, rather than whichever Staffel the client happened to list first); if it removes the user's
+   * last remaining membership the inventory demotes back to ownerless-personal.
    *
-   * @param user the user whose Staffel membership to sync; never {@code null}.
-   * @param newSquadron the target Staffel, or {@code null} to remove the Staffel membership.
+   * @param user the user whose Staffel memberships to reconcile; never {@code null}.
+   * @param desired the complete desired Staffel membership set (0–2 entries); never {@code null},
+   *     possibly empty (which removes every Staffel membership).
+   * @throws NotFoundException if a desired squadron id does not resolve to a Squadron.
+   * @throws BadRequestException on a duplicate squadron, more than two squadrons, or a leadership
+   *     conflict.
    */
   @Transactional
-  public void syncStaffelMembership(
-      @NotNull User user, @org.jetbrains.annotations.Nullable Squadron newSquadron) {
-    final long membershipsBefore = membershipRepository.countByIdUserId(user.getId());
-    List<OrgUnitMembership> existing =
-        membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
-
-    if (newSquadron == null) {
-      if (!existing.isEmpty()) {
-        membershipRepository.deleteAll(existing);
-        for (OrgUnitMembership removed : existing) {
-          recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-          // A squadron rank held on the removed row leaves a stale chart seat — clear it
-          // (REQ-ROLE-006).
-          orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
-        }
-        // Removing the Staffel may have been the user's last org-unit membership (no SK left) →
-        // demote their org-stamped inventory to ownerless-personal.
-        if (membershipRepository.countByIdUserId(user.getId()) == 0) {
-          inventoryReconciler.onUserLostLastOrgUnit(user.getId());
-        }
-      }
-      return;
+  public void reconcileStaffelMemberships(
+      @NotNull User user, @NotNull List<MembershipDeltaRequest.StaffelChange> desired) {
+    List<UUID> desiredIds =
+        desired.stream().map(MembershipDeltaRequest.StaffelChange::squadronId).toList();
+    Set<UUID> distinctIds = new LinkedHashSet<>(desiredIds);
+    if (distinctIds.size() != desiredIds.size()) {
+      throw new BadRequestException("A user cannot be assigned the same Staffel twice");
     }
-
-    // REQ-ORG-017: a leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject
-    // assigning a Staffel to such a user with a clean 400 before the V165 DB trigger turns it into
-    // a 500. (A user being moved between Staffeln is unaffected — they hold no leadership flag.)
-    if (userHoldsLeadershipRole(user.getId())) {
+    if (distinctIds.size() > 2) {
+      throw new BadRequestException("A user may belong to at most two Staffeln (REQ-ORG-017)");
+    }
+    // REQ-ORG-017: a silo leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject a
+    // Staffel assignment with a clean 400 before the V165 DB trigger turns it into a 500.
+    if (!desired.isEmpty() && userHoldsLeadershipRole(user.getId())) {
       throw new BadRequestException(
           "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
               + " Staffel — remove the leadership role first (REQ-ORG-017)");
     }
 
-    boolean alreadyMember =
-        existing.stream().anyMatch(m -> newSquadron.getId().equals(m.getId().getOrgUnitId()));
-    if (alreadyMember && existing.size() == 1) {
-      return;
+    // Resolve every desired squadron up front so an unknown id fails before any row is mutated.
+    Map<UUID, Squadron> targetSquadrons = new LinkedHashMap<>();
+    for (UUID id : distinctIds) {
+      Squadron sq =
+          squadronRepository
+              .findById(id)
+              .orElseThrow(() -> new NotFoundException("Squadron not found with id: " + id));
+      targetSquadrons.put(id, sq);
     }
 
-    // Delete any stale Staffel memberships at other Squadrons (V95 partial unique index allows
-    // at most one Staffel membership per user; switching squadrons removes the old one).
-    List<OrgUnitMembership> stale =
-        existing.stream()
-            .filter(m -> !newSquadron.getId().equals(m.getId().getOrgUnitId()))
+    final long membershipsBefore = membershipRepository.countByIdUserId(user.getId());
+    List<OrgUnitMembership> currentStaffel =
+        membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
+    Map<UUID, OrgUnitMembership> currentById = new LinkedHashMap<>();
+    for (OrgUnitMembership m : currentStaffel) {
+      currentById.put(m.getId().getOrgUnitId(), m);
+    }
+
+    // 1. Removals: current Staffel memberships not in the desired set. Delete + flush BEFORE any
+    // insert so the V164 counting trigger sees the post-removal state.
+    List<OrgUnitMembership> toRemove =
+        currentStaffel.stream()
+            .filter(m -> !distinctIds.contains(m.getId().getOrgUnitId()))
             .toList();
-    if (!stale.isEmpty()) {
-      membershipRepository.deleteAll(stale);
+    if (!toRemove.isEmpty()) {
+      membershipRepository.deleteAll(toRemove);
       membershipRepository.flush();
-      for (OrgUnitMembership removed : stale) {
+      for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        // Clear any stale chart seat the moved-away squadron rank left behind (REQ-ROLE-006).
+        // A squadron rank held on the removed row leaves a stale chart seat — clear it
+        // (REQ-ROLE-006).
         orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
       }
     }
 
-    if (!alreadyMember) {
-      OrgUnitMembership fresh = new OrgUnitMembership();
-      fresh.setId(new OrgUnitMembershipId(user.getId(), newSquadron.getId()));
-      fresh.setUser(user);
-      fresh.setJoinedAt(java.time.Instant.now());
-      // Post-R9 D3: flags default to false on a freshly-created row — the legacy
-      // app_user.is_logistician / app_user.is_mission_manager columns are gone. Admins re-grant
-      // the flags via the membership-PATCH endpoint after the Staffel switch.
-      membershipRepository.save(fresh);
-      auditService.record(
-          AuditEventType.MEMBERSHIP_GRANTED,
-          newSquadron.getId(),
-          orgUnitLabel(newSquadron),
-          user.getId(),
-          "kind=SQUADRON");
-
-      // If this Staffel was the user's first-ever org-unit membership, their ownerless-personal
-      // inventory adopts it (the auto-promote lifecycle policy). A Staffel switch or a second
-      // membership (membershipsBefore > 0) does not move existing stock.
-      if (membershipsBefore == 0) {
-        inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), newSquadron);
+    // 2. Additions + in-place flag patches.
+    List<Squadron> addedSquadrons = new ArrayList<>();
+    for (MembershipDeltaRequest.StaffelChange change : desired) {
+      UUID squadronId = change.squadronId();
+      boolean wantLogistician = Boolean.TRUE.equals(change.isLogistician());
+      boolean wantMissionManager = Boolean.TRUE.equals(change.isMissionManager());
+      OrgUnitMembership existing = currentById.get(squadronId);
+      if (existing != null) {
+        boolean changed =
+            existing.isLogistician() != wantLogistician
+                || existing.isMissionManager() != wantMissionManager;
+        if (changed) {
+          existing.setLogistician(wantLogistician);
+          existing.setMissionManager(wantMissionManager);
+          OrgUnitMembership saved = membershipRepository.saveAndFlush(existing);
+          recordCapabilityFlagsChanged(squadronId, user.getId(), saved);
+        }
+      } else {
+        OrgUnitMembership fresh = new OrgUnitMembership();
+        fresh.setId(new OrgUnitMembershipId(user.getId(), squadronId));
+        fresh.setUser(user);
+        fresh.setJoinedAt(Instant.now());
+        fresh.setLogistician(wantLogistician);
+        fresh.setMissionManager(wantMissionManager);
+        membershipRepository.save(fresh);
+        Squadron sq = targetSquadrons.get(squadronId);
+        auditService.record(
+            AuditEventType.MEMBERSHIP_GRANTED,
+            squadronId,
+            orgUnitLabel(sq),
+            user.getId(),
+            "kind=SQUADRON");
+        addedSquadrons.add(sq);
       }
+    }
+
+    // 3. Inventory lifecycle: a first-ever membership adopts the name-sorted PRIMARY of the newly
+    // added Staffeln (REQ-ORG-017) — not the request-order-first — so the inventory's owning
+    // Staffel
+    // matches the deterministic primary every other surface (UserDto.squadron, the create-time
+    // auto-stamp, officer oversight) derives from the same name sort. The last membership removed
+    // demotes the org-stamped inventory back to ownerless-personal.
+    if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
+      Squadron primaryAdded =
+          addedSquadrons.stream()
+              .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
+              .orElseThrow();
+      inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), primaryAdded);
+    } else if (membershipsBefore > 0 && membershipRepository.countByIdUserId(user.getId()) == 0) {
+      inventoryReconciler.onUserLostLastOrgUnit(user.getId());
     }
   }
 
@@ -1038,22 +1039,61 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Returns the OrgUnit id of the user's single Staffel membership row, if any. Convenience
-   * accessor used by callers that previously read {@code User.getSquadron().getId()} — now that the
-   * legacy column is gone, the equivalent lookup is "find the single SQUADRON-kind membership for
-   * this user".
+   * Returns every Staffel OrgUnit id the user belongs to (REQ-ORG-017 — up to two), sorted
+   * case-insensitively by squadron name so the first element is the deterministic <em>primary</em>
+   * Staffel — the same primary definition {@code UserMapper.resolveSquadron} / {@code
+   * UserDto.squadron} use. Backs the authorization gates that must consider ALL of a target's
+   * Staffeln (grant on any overlap), and the single-valued callers that want a stable primary. The
+   * name-sort (and the single-Staffel fast path that skips the squadron load) lives in {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffelIds(List)}, the single owner of the primary
+   * definition; a dangling membership (a row whose squadron no longer resolves) is skipped there,
+   * so the accessor never throws.
    *
-   * @param userId the user whose Staffel membership to resolve; never {@code null}.
-   * @return the Staffel's id when the user belongs to one, empty otherwise.
+   * @param userId the user whose Staffel memberships to resolve; never {@code null}.
+   * @return the user's Staffel ids, name-sorted (primary first); never {@code null}, possibly
+   *     empty.
+   */
+  @NotNull
+  public List<UUID> findStaffelMembershipOrgUnitIds(@NotNull UUID userId) {
+    return staffelMembershipResolver.resolveNameSortedStaffelIds(
+        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON));
+  }
+
+  /**
+   * Returns the user's deterministic <em>primary</em> Staffel OrgUnit id — the name-sorted first of
+   * {@link #findStaffelMembershipOrgUnitIds(UUID)} (REQ-ORG-017: a user may now hold up to two
+   * Staffeln). Stable across requests and consistent with {@code UserDto.squadron}. Callers that
+   * must consider BOTH Staffeln (e.g. authorization gates) use {@link
+   * #findStaffelMembershipOrgUnitIds(UUID)} instead of this single-valued accessor.
+   *
+   * @param userId the user whose primary Staffel to resolve; never {@code null}.
+   * @return the primary Staffel's id when the user belongs to one, empty otherwise.
    */
   @NotNull
   public Optional<UUID> findStaffelMembershipOrgUnitId(@NotNull UUID userId) {
-    List<OrgUnitMembership> rows =
-        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
-    if (rows.isEmpty()) {
-      return Optional.empty();
+    return findStaffelMembershipOrgUnitIds(userId).stream().findFirst();
+  }
+
+  /**
+   * Resolves the executing user's Staffel to snapshot on a cross-staffel audit trail (Job-Order
+   * handover), <em>order-aligned</em> per REQ-ORG-017: when the user holds two Staffeln and one of
+   * them is the order's own (responsible) org unit, that Staffel is recorded — it is the unit the
+   * user was actually acting under; otherwise the user's deterministic name-sorted primary Staffel.
+   * Returns empty only when the user holds no Staffel at all.
+   *
+   * @param userId the executing user; never {@code null}.
+   * @param orderOrgUnitId the order's responsible org-unit id, or {@code null} when the order names
+   *     none.
+   * @return the order-aligned executing Staffel id, or empty when the user holds no Staffel.
+   */
+  @NotNull
+  public Optional<UUID> findExecutingStaffelForOrder(
+      @NotNull UUID userId, @org.jetbrains.annotations.Nullable UUID orderOrgUnitId) {
+    List<UUID> staffelIds = findStaffelMembershipOrgUnitIds(userId);
+    if (orderOrgUnitId != null && staffelIds.contains(orderOrgUnitId)) {
+      return Optional.of(orderOrgUnitId);
     }
-    return Optional.of(rows.get(0).getId().getOrgUnitId());
+    return staffelIds.stream().findFirst();
   }
 
   /**
@@ -1144,8 +1184,8 @@ public class OrgUnitMembershipService {
 
   /**
    * Records a {@link AuditEventType#MEMBERSHIP_REVOKED} event for a removed Staffel membership
-   * (epic #800, REQ-AUDIT-001). Extracted so the {@link #syncStaffelMembership} delete branches
-   * stay readable; the details payload carries only the org-unit kind (no PII).
+   * (epic #800, REQ-AUDIT-001). Extracted so the {@link #reconcileStaffelMemberships} delete
+   * branches stay readable; the details payload carries only the org-unit kind (no PII).
    *
    * @param squadronOrgUnitId the Staffel the removed membership pointed at; never {@code null}.
    * @param userId the user whose Staffel membership was removed; never {@code null}.

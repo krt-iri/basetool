@@ -134,6 +134,7 @@ class MembersPageDiscordColumnRenderTest {
         false,
         true,
         null,
+        java.util.List.of(),
         1L,
         null,
         discordLinked);

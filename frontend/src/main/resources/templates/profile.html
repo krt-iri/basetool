@@ -34,10 +34,11 @@
                     <p class="id-handle" th:text="'@' + ${username}">@valk</p>
                     <div class="id-chips">
                         <span th:if="${rank}" class="chip chip--primary" th:text="${rank}">Commander</span>
-                        <span th:if="${activeOrgUnit != null}" class="squadron-badge"
-                              th:text="${activeOrgUnit.orgUnitShorthand() != null
-                                        ? activeOrgUnit.orgUnitName() + ' · ' + activeOrgUnit.orgUnitShorthand()
-                                        : activeOrgUnit.orgUnitName()}">IRIDIUM · IRI</span>
+                        <!-- REQ-ORG-017: show every Staffel the user belongs to (up to two), not just
+                             the single active-context pin. -->
+                        <span th:if="${profileSquadrons != null and !profileSquadrons.isEmpty()}"
+                              th:each="sq : ${profileSquadrons}" class="squadron-badge"
+                              th:text="${sq.shorthand != null ? sq.name + ' · ' + sq.shorthand : sq.name}">IRIDIUM · IRI</span>
                     </div>
                 </div>
             </div>

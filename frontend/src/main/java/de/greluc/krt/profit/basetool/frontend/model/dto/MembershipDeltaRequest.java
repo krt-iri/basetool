@@ -25,36 +25,36 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta wire
- * shape. Lives in {@code PATCH /api/v1/users/{id}/memberships}. Two-part payload: a single {@link
- * StaffelChange} record (a user has at most one Staffel membership) plus a list of {@link
- * SpecialCommandChange} records.
+ * shape. Lives in {@code PATCH /api/v1/users/{id}/memberships}. Two-part payload: the {@link
+ * #staffeln} list (the caller's desired complete Staffel membership set, REQ-ORG-017 allows up to
+ * two) plus a list of {@link SpecialCommandChange} records.
  *
  * <p>Wire contract is identical to the backend record field-for-field — per the {@code
  * feedback_backend_frontend_dto_mirror} rule. Any change here MUST land on the backend record in
  * the same commit (or vice versa).
  *
- * @param staffel Staffel-side delta, or {@code null} to leave the user's Staffel untouched.
+ * @param staffeln desired complete Staffel membership set (0–2 entries), or {@code null} to leave
+ *     the Staffel side untouched. A non-null list is reconciled by the backend against the current
+ *     state (an empty list removes every Staffel membership).
  * @param specialCommands list of SK-side changes; may be {@code null} or empty.
  */
 public record MembershipDeltaRequest(
-    @Nullable StaffelChange staffel, @Nullable List<SpecialCommandChange> specialCommands) {
+    @Nullable List<StaffelChange> staffeln, @Nullable List<SpecialCommandChange> specialCommands) {
 
   /**
-   * Staffel-side delta record. {@link #squadronId} {@code null} means "remove the Staffel
-   * membership"; differing from the current Staffel means "reassign"; matching means "flag-only
-   * patch".
+   * One desired Staffel membership. Declarative: each entry names a target Squadron plus the flag
+   * values that membership should carry. Add vs in-place flag patch is decided by the backend
+   * reconcile; removal is expressed by omitting a currently-held squadron from {@link #staffeln}.
    *
-   * @param squadronId target Squadron id, or {@code null} to clear.
-   * @param isLogistician new Logistician flag, or {@code null} to leave unchanged.
-   * @param isMissionManager new Mission Manager flag, or {@code null} to leave unchanged.
-   * @param userVersion the {@code app_user} row {@code @Version} for the optimistic-lock check on
-   *     the assignment change; required when reassigning, optional for flag-only.
+   * @param squadronId target Squadron id; never {@code null} ("no Staffel" is an empty {@link
+   *     #staffeln} list).
+   * @param isLogistician desired Logistician flag for this squadron; {@code null} means {@code
+   *     false}.
+   * @param isMissionManager desired Mission Manager flag for this squadron; {@code null} means
+   *     {@code false}.
    */
   public record StaffelChange(
-      @Nullable UUID squadronId,
-      @Nullable Boolean isLogistician,
-      @Nullable Boolean isMissionManager,
-      @Nullable Long userVersion) {}
+      UUID squadronId, @Nullable Boolean isLogistician, @Nullable Boolean isMissionManager) {}
 
   /**
    * SK-side change record. {@link #action} picks between ADD (new membership), REMOVE (delete

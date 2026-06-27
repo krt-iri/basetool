@@ -215,9 +215,10 @@ class UserControllerTest {
 
     User entity = new User();
     entity.setId(userId);
-    // Post-R9 D3 (V101): the home Staffel comes from the membership service, not User.squadron.
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(java.util.Optional.of(foreignSquadronId));
+    // REQ-ORG-017: the home Staffel(n) come from the membership service (the PII gate ORs across
+    // all of the target's Staffeln).
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+        .thenReturn(java.util.List.of(foreignSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -239,9 +240,9 @@ class UserControllerTest {
     UUID userId = UUID.randomUUID();
     User entity = new User();
     entity.setId(userId);
-    // Post-R9 D3 (V101): "no Staffel" surfaces as Optional.empty() from the membership lookup.
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(java.util.Optional.empty());
+    // REQ-ORG-017: "no Staffel" surfaces as an empty list from the membership lookup.
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+        .thenReturn(java.util.List.of());
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -262,9 +263,9 @@ class UserControllerTest {
 
     User entity = new User();
     entity.setId(userId);
-    // Post-R9 D3 (V101): same-squadron lookup goes through the membership service.
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId))
-        .thenReturn(java.util.Optional.of(sharedSquadronId));
+    // REQ-ORG-017: same-squadron lookup goes through the membership service (ORs across Staffeln).
+    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+        .thenReturn(java.util.List.of(sharedSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -290,6 +291,7 @@ class UserControllerTest {
         false,
         true,
         null,
+        java.util.List.of(),
         1L,
         null,
         false);
@@ -495,43 +497,6 @@ class UserControllerTest {
     verify(userService).updateUserAttributes(id, 3, null, null, 1L, null);
   }
 
-  // ── PATCH /{id}/logistician ─────────────────────────────────────────────
-
-  @Test
-  void updateLogisticianStatus_truePathForwardsTrue() {
-    UUID id = UUID.randomUUID();
-    when(userService.updateLogisticianStatus(id, true)).thenReturn(new User());
-    when(userMapper.toDto(any())).thenReturn(mockDto(id));
-
-    controller.updateLogisticianStatus(id, true);
-
-    verify(userService).updateLogisticianStatus(id, true);
-  }
-
-  @Test
-  void updateLogisticianStatus_falsePathForwardsFalse() {
-    UUID id = UUID.randomUUID();
-    when(userService.updateLogisticianStatus(id, false)).thenReturn(new User());
-    when(userMapper.toDto(any())).thenReturn(mockDto(id));
-
-    controller.updateLogisticianStatus(id, false);
-
-    verify(userService).updateLogisticianStatus(id, false);
-  }
-
-  // ── PATCH /{id}/mission-manager ─────────────────────────────────────────
-
-  @Test
-  void updateMissionManagerStatus_passesBooleanFlagVerbatim() {
-    UUID id = UUID.randomUUID();
-    when(userService.updateMissionManagerStatus(id, true)).thenReturn(new User());
-    when(userMapper.toDto(any())).thenReturn(mockDto(id));
-
-    controller.updateMissionManagerStatus(id, true);
-
-    verify(userService).updateMissionManagerStatus(id, true);
-  }
-
   // ── DELETE /{id} ────────────────────────────────────────────────────────
 
   @Test
@@ -589,6 +554,7 @@ class UserControllerTest {
         false,
         true,
         null,
+        java.util.List.of(),
         1L,
         null,
         false);

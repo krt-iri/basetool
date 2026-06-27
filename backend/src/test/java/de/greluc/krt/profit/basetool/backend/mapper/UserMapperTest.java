@@ -20,17 +20,22 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -52,13 +57,32 @@ class UserMapperTest {
   @BeforeEach
   void setUp() {
     // Post-R9 D3 (V101): the mapper derives squadron + flag fields from the membership table. Wire
-    // the two repositories the abstract MapStruct mapper needs since we are not running inside a
-    // Spring context.
+    // the membership repository plus a real StaffelMembershipResolver (backed by the squadron-repo
+    // mock) so the name-sort path is exercised end-to-end; we are not running inside a Spring
+    // context.
     mapper = Mappers.getMapper(UserMapper.class);
     membershipRepository = mock(OrgUnitMembershipRepository.class);
     squadronRepository = mock(SquadronRepository.class);
     ReflectionTestUtils.setField(mapper, "membershipRepository", membershipRepository);
-    ReflectionTestUtils.setField(mapper, "squadronRepository", squadronRepository);
+    ReflectionTestUtils.setField(
+        mapper, "staffelMembershipResolver", new StaffelMembershipResolver(squadronRepository));
+  }
+
+  /** Builds a {@code SQUADRON}-kind membership row pointing the user at the given squadron. */
+  private static OrgUnitMembership staffelRow(UUID userId, UUID squadronId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    return m;
+  }
+
+  /** Builds a squadron fixture with the given id, name and shorthand. */
+  private static Squadron squadron(UUID id, String name, String shorthand) {
+    Squadron s = new Squadron();
+    s.setId(id);
+    s.setName(name);
+    s.setShorthand(shorthand);
+    return s;
   }
 
   @Test
@@ -156,6 +180,32 @@ class UserMapperTest {
   }
 
   @Test
+  void toDto_twoStaffeln_mapsNameSortedSquadronsAndPrimary() {
+    // REQ-ORG-017: a member may hold up to two Staffeln. The mapper projects them name-sorted via
+    // the shared StaffelMembershipResolver, with squadron == the name-sorted primary (first).
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("dual");
+
+    UUID alphaId = UUID.randomUUID();
+    UUID bravoId = UUID.randomUUID();
+    // Rows + squadron entities returned in non-alphabetical order to prove the sort — not the
+    // repository/input order — decides the primary.
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelRow(user.getId(), bravoId), staffelRow(user.getId(), alphaId)));
+    when(squadronRepository.findAllById(any()))
+        .thenReturn(List.of(squadron(bravoId, "Bravo", "BRV"), squadron(alphaId, "Alpha", "ALP")));
+
+    UserDto dto = mapper.toDto(user);
+
+    assertEquals(2, dto.squadrons().size());
+    assertEquals("Alpha", dto.squadrons().get(0).name());
+    assertEquals("Bravo", dto.squadrons().get(1).name());
+    assertEquals(alphaId, dto.squadron().id());
+    assertEquals("Alpha", dto.squadron().name());
+  }
+
+  @Test
   void toDto_withinRequest_loadsStaffelMembershipOncePerUser() {
     // The three derived-field resolvers (squadron / isLogistician / isMissionManager) each need the
     // user's Staffel membership. Within an HTTP request the lookup is memoised per user, so the
@@ -181,7 +231,8 @@ class UserMapperTest {
   @Test
   void toDto_withoutRequestScope_fallsBackToDirectQuery() {
     // Outside an HTTP request (e.g. a scheduled task) there is no request scope to memoise on, so
-    // each resolver issues its own lookup — the fallback must not throw.
+    // each of the four membership-derived resolvers (squadron, squadrons, isLogistician,
+    // isMissionManager) issues its own lookup — the fallback must not throw.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("noRequest");
@@ -191,7 +242,7 @@ class UserMapperTest {
     UserDto dto = mapper.toDto(user);
 
     assertNotNull(dto);
-    verify(membershipRepository, times(3))
+    verify(membershipRepository, times(4))
         .findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
   }
 }

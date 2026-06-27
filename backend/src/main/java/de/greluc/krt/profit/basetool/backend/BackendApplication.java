@@ -30,8 +30,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>{@code @SpringBootApplication} enables auto-configuration and component scanning rooted at
  * this package, {@code @EnableScheduling} activates the {@code @Scheduled} hooks used by the
  * Keycloak sync and other periodic tasks, and {@code @ConfigurationPropertiesScan} registers every
- * {@code @ConfigurationProperties} record under {@code config/} without requiring an explicit
- * {@code @EnableConfigurationProperties} list.
+ * {@code @ConfigurationProperties} record across the backend packages (e.g. {@code config} and the
+ * {@code support} leaf) without requiring an explicit {@code @EnableConfigurationProperties} list.
  */
 @SpringBootApplication
 @EnableScheduling

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.config;
+package de.greluc.krt.profit.basetool.backend.support;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -34,7 +34,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Configuration properties under {@code app.rate-limit.*}.
  *
- * <p>Consumed by {@link de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter}. The
+ * <p>Consumed by {@code de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter}. The
  * {@code capacity} / {@code refillTokens} / {@code refillPeriod} triple defines the GLOBAL Bucket4j
  * bucket that applies to every request matching {@code paths}; the optional {@link #getRules()
  * rules} list overlays tighter per-pattern budgets on top (e.g. tighter limits for anonymous-spam
@@ -44,6 +44,11 @@ import org.springframework.validation.annotation.Validated;
  * <p>{@code trustedProxies} controls whether the filter honors {@code X-Forwarded-For} from a
  * reverse proxy. The defaults (300 tokens, refilled 300/min) are tuned for the project's typical
  * mission-planning workload — adjust per environment, not via global wildcards.
+ *
+ * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) so the {@code
+ * filter} layer can read it without a {@code filter} &rarr; {@code config} package cycle; it
+ * depends only on Lombok / Jakarta-validation / Spring-Boot and is registered via
+ * {@code @ConfigurationPropertiesScan} regardless of package.
  */
 @Data
 @Validated
@@ -73,8 +78,7 @@ public class RateLimitProperties {
    * spam against an anonymous-reachable POST endpoint trips the per-rule budget before it touches
    * the loose global budget (audit finding L-5, 2026-05-20). A rule's {@link Rule#getPaths()}
    * should still be covered by {@link #getPaths()} — paths outside the global umbrella skip the
-   * filter entirely via {@link
-   * de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter#shouldNotFilter}.
+   * filter entirely.
    */
   @Valid private List<Rule> rules = new ArrayList<>();
 

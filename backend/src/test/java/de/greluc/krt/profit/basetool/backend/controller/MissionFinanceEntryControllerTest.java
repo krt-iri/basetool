@@ -94,6 +94,7 @@ class MissionFinanceEntryControllerTest {
             true,
             true,
             null,
+            java.util.List.of(),
             1L,
             null,
             false);

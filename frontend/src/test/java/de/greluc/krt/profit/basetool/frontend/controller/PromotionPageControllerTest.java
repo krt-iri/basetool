@@ -128,6 +128,7 @@ class PromotionPageControllerTest {
         null,
         null,
         null,
+        java.util.List.of(),
         0L,
         null,
         false);

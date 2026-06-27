@@ -27,8 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.config.CustomJwtGrantedAuthoritiesConverter;
-import de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -40,6 +38,8 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.util.Collection;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

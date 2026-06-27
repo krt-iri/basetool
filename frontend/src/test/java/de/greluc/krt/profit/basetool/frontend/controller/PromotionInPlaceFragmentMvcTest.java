@@ -160,8 +160,24 @@ class PromotionInPlaceFragmentMvcTest {
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", null, 0, null, null);
     UserDto member =
         new UserDto(
-            memberId, "alice", null, "alice", null, 20, null, Set.of(), Set.of(), null, null, null,
-            null, null, 0L, null, false);
+            memberId,
+            "alice",
+            null,
+            "alice",
+            null,
+            20,
+            null,
+            Set.of(),
+            Set.of(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(),
+            0L,
+            null,
+            false);
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
