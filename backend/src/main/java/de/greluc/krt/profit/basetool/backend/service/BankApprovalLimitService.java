@@ -60,8 +60,8 @@ import org.springframework.transaction.annotation.Transactional;
  * kind, {@code GLOBAL_ROLE}, is therefore present in the schema and the switches but is never
  * produced for limits by design: it is the SPECIAL-account role bucket, and SPECIAL accounts (being
  * non-request-capable) carry no limits. The tier is kept rather than dropped to preserve the 1:1
- * mirror with the visibility model and to make a future "wire SPECIAL accounts into limits" a purely
- * additive change (REQ-BANK-041).
+ * mirror with the visibility model and to make a future "wire SPECIAL accounts into limits" a
+ * purely additive change (REQ-BANK-041).
  */
 @Service
 @RequiredArgsConstructor
