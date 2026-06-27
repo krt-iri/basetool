@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
@@ -1349,14 +1349,25 @@ public class RefineryOrderPageController {
     return new ArrayList<>();
   }
 
-  private List<JobOrderDto> fetchActiveJobOrders() {
+  /**
+   * Loads the active (OPEN / IN_PROGRESS) job orders that back the store dialog's per-item
+   * "Auftrag" dropdown. Uses the lightweight {@code /api/v1/orders/lookup} reference projection
+   * rather than the full {@code /api/v1/orders} list because the projection's {@code
+   * requiredMaterialIds} is the authoritative, kind-agnostic required-material set: it is populated
+   * for ITEM orders too (whose {@code materials} line list is always empty), so the template can
+   * hide an order that does not require the stored output material across <em>both</em> order kinds
+   * (REQ-ORDERS-018). The old {@code materials}-based filter silently dropped every ITEM order,
+   * leaving the dropdown empty.
+   *
+   * @return the active job orders visible to the caller as reference projections; never {@code
+   *     null}
+   */
+  private List<JobOrderReferenceDto> fetchActiveJobOrders() {
     try {
-      PageResponse<JobOrderDto> p =
-          backendApiClient.get(
-              "/api/v1/orders?size=1000&status=OPEN,IN_PROGRESS",
-              new ParameterizedTypeReference<>() {});
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
+      List<JobOrderReferenceDto> content =
+          backendApiClient.get("/api/v1/orders/lookup", new ParameterizedTypeReference<>() {});
+      if (content != null) {
+        return new ArrayList<>(content);
       }
     } catch (Exception e) {
       log.error("Failed to fetch job orders", e);

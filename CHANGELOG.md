@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Raffinerieauftrag einlagern: Auftrags-Dropdown blieb leer.** Beim Einlagern eines Raffinerieauftrags zeigte die „Auftrag"-Auswahl keine passenden Aufträge, obwohl welche das Material in der Qualität benötigten. Ursache: Der Filter prüfte nur die Material-Zeilen, die bei Item-Aufträgen leer sind — solche Aufträge fielen immer heraus. Das Dropdown bietet jetzt (wie der Lager-Picker) alle aktiven Aufträge an, die das eingelagerte Material benötigen, über beide Auftragsarten hinweg.
+
 - **Meine Blueprints: Craftbarkeit rechnet jetzt auch Hand-Minables (Stück) ein.** In der Craftbarkeits-Ansicht fehlten bisher die Zutaten mit Mengeneinheit „Stück" — handabgebaute Edelsteine wie Hadanite oder Beradom, die das Wiki als Item führt. Sie werden jetzt (wie schon im Auftrags-Pfad) an das passende Material gekoppelt und mitgezählt (benötigt/vorhanden/fehlt in ganzen Stück, ggf. als limitierendes Material); craftbare Unterbaugruppen bleiben „nicht bewertet".
 
 ## [v0.7.16](https://github.com/krt-profit/basetool/releases/tag/v0.7.16) - 2026-06-27

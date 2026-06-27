@@ -317,10 +317,10 @@ class InventoryPageControllerMvcTest {
     // them (the ITEM-order case the old materials-based filter could not handle).
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
-            matchingOrderId, 71, "h1", "IN_PROGRESS", List.of(), List.of(materialId));
+            matchingOrderId, 71, "h1", "IN_PROGRESS", null, List.of(), List.of(materialId));
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
-            unrelatedOrderId, 99, "h2", "IN_PROGRESS", List.of(), List.of(UUID.randomUUID()));
+            unrelatedOrderId, 99, "h2", "IN_PROGRESS", null, List.of(), List.of(UUID.randomUUID()));
 
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenAnswer(
