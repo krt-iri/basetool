@@ -28,10 +28,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -62,6 +64,7 @@ public class OrgUnitBankPageController {
       "hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER')";
 
   private final BackendApiClient backendApiClient;
+  private final ParallelPageLoader parallelPageLoader;
 
   /**
    * Renders the overview page (or its {@code orgUnitBank} fragment for an in-place swap after a
@@ -75,19 +78,21 @@ public class OrgUnitBankPageController {
   @GetMapping("/org-unit-bank")
   @PreAuthorize(MEMBER_OR_ABOVE)
   public String orgUnitBank(@RequestParam(required = false) String fragment, Model model) {
-    List<OrgUnitBankBalanceDto> balances =
-        backendApiClient.get(
-            "/api/v1/org-units/bank/balances",
-            new ParameterizedTypeReference<List<OrgUnitBankBalanceDto>>() {});
-    List<BankBookingRequestDto> ownRequests =
-        backendApiClient.get(
-            "/api/v1/org-units/bank/requests",
-            new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
-    List<OrgUnitBankBalanceDto> safeBalances =
-        balances == null ? List.<OrgUnitBankBalanceDto>of() : balances;
+    // Balances, own-requests and foreign-requests are independent reads; fetch them concurrently
+    // via ParallelPageLoader (which relays the bearer token + active-OrgUnit header to the worker
+    // threads) instead of three serial round-trips. Each helper degrades to an empty list on
+    // failure, so allOf().join() never throws and the page renders exactly as the serial version.
+    CompletableFuture<List<OrgUnitBankBalanceDto>> balancesFuture =
+        parallelPageLoader.loadAsync(this::fetchBalances);
+    CompletableFuture<List<BankBookingRequestDto>> ownRequestsFuture =
+        parallelPageLoader.loadAsync(this::fetchOwnRequests);
+    CompletableFuture<List<BankBookingRequestDto>> foreignRequestsFuture =
+        parallelPageLoader.loadAsync(this::fetchForeignRequests);
+    CompletableFuture.allOf(balancesFuture, ownRequestsFuture, foreignRequestsFuture).join();
+
+    List<OrgUnitBankBalanceDto> safeBalances = balancesFuture.join();
     model.addAttribute("balances", safeBalances);
-    model.addAttribute(
-        "ownRequests", ownRequests == null ? List.<BankBookingRequestDto>of() : ownRequests);
+    model.addAttribute("ownRequests", ownRequestsFuture.join());
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
     // Drives the single page-level "request" CTA + its modal account selector (REQ-BANK-022/-039):
     // shown iff at least one visible account is request-capable (canRequest = the caller may view a
@@ -97,13 +102,7 @@ public class OrgUnitBankPageController {
     // "Fremde Anträge" tab (REQ-BANK-041): requests on the accounts the caller is responsible for.
     // The tab is shown whenever the caller manages any account (responsible holder / OL / admin),
     // even when it currently holds no request.
-    List<BankBookingRequestDto> foreignRequests =
-        backendApiClient.get(
-            "/api/v1/org-units/bank/requests/foreign",
-            new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
-    model.addAttribute(
-        "foreignRequests",
-        foreignRequests == null ? List.<BankBookingRequestDto>of() : foreignRequests);
+    model.addAttribute("foreignRequests", foreignRequestsFuture.join());
     // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
     // ORG_UNIT/AREA/CARTEL account == its responsible holder). This matches the backend scope of
     // /requests/foreign (responsibleAccountIds), so the tab is never shown empty to an
@@ -113,21 +112,96 @@ public class OrgUnitBankPageController {
     model.addAttribute(
         "hasResponsibleAccounts",
         safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
-    // Transfer-request destination picker (REQ-BANK-040): any active account. Only fetched when the
-    // request modal is shown at all.
-    List<BankAccountRefDto> transferTargets =
-        anyCanRequest
-            ? backendApiClient.get(
-                "/api/v1/org-units/bank/transfer-targets",
-                new ParameterizedTypeReference<List<BankAccountRefDto>>() {})
-            : List.<BankAccountRefDto>of();
+    // Transfer-request destination picker (REQ-BANK-040): any active account. Depends on
+    // anyCanRequest (derived from balances), so it stays sequential — and is only fetched when at
+    // least one visible account is request-capable.
     model.addAttribute(
         "requestTransferTargets",
-        transferTargets == null ? List.<BankAccountRefDto>of() : transferTargets);
+        anyCanRequest ? fetchTransferTargets() : List.<BankAccountRefDto>of());
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
     return "org-unit-bank";
+  }
+
+  /**
+   * Fetches the caller's viewable balance cards, degrading to an empty list on backend failure.
+   *
+   * @return the balance cards, or an empty list when the backend call fails or returns nothing
+   */
+  private List<OrgUnitBankBalanceDto> fetchBalances() {
+    try {
+      List<OrgUnitBankBalanceDto> balances =
+          backendApiClient.get(
+              "/api/v1/org-units/bank/balances",
+              new ParameterizedTypeReference<List<OrgUnitBankBalanceDto>>() {});
+      if (balances != null) {
+        return balances;
+      }
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch org-unit bank balances");
+    }
+    return List.of();
+  }
+
+  /**
+   * Fetches the caller's own booking requests, degrading to an empty list on any backend failure.
+   *
+   * @return the caller's requests, or an empty list when the backend call fails or returns nothing
+   */
+  private List<BankBookingRequestDto> fetchOwnRequests() {
+    try {
+      List<BankBookingRequestDto> requests =
+          backendApiClient.get(
+              "/api/v1/org-units/bank/requests",
+              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+      if (requests != null) {
+        return requests;
+      }
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch org-unit bank own requests");
+    }
+    return List.of();
+  }
+
+  /**
+   * Fetches the requests on the accounts the caller is responsible for, empty on backend failure.
+   *
+   * @return the foreign requests, or an empty list when the backend call fails or returns nothing
+   */
+  private List<BankBookingRequestDto> fetchForeignRequests() {
+    try {
+      List<BankBookingRequestDto> requests =
+          backendApiClient.get(
+              "/api/v1/org-units/bank/requests/foreign",
+              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+      if (requests != null) {
+        return requests;
+      }
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch org-unit bank foreign requests");
+    }
+    return List.of();
+  }
+
+  /**
+   * Fetches the active accounts offered as transfer-request destinations (REQ-BANK-040).
+   *
+   * @return the transfer targets, or an empty list when the backend call fails or returns nothing
+   */
+  private List<BankAccountRefDto> fetchTransferTargets() {
+    try {
+      List<BankAccountRefDto> targets =
+          backendApiClient.get(
+              "/api/v1/org-units/bank/transfer-targets",
+              new ParameterizedTypeReference<List<BankAccountRefDto>>() {});
+      if (targets != null) {
+        return targets;
+      }
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch org-unit bank transfer targets");
+    }
+    return List.of();
   }
 
   /**

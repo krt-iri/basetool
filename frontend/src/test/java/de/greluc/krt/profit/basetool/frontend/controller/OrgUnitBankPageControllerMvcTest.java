@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -192,6 +193,56 @@ class OrgUnitBankPageControllerMvcTest {
   @WithMockUser(roles = {"GUEST"})
   void orgUnitBank_guestIsForbidden() throws Exception {
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_failingFetchDegradesToEmptyAndStillRenders() throws Exception {
+    // F5: the landing-page reads run concurrently and each swallows its own failure -> a single
+    // backend hiccup degrades to an empty list instead of 500-ing or blanking the page, and every
+    // model attribute is still populated. Here /balances throws but /requests is stubbed.
+    BankBookingRequestDto request =
+        new BankBookingRequestDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "KB-0001",
+            UUID.randomUUID(),
+            "IRIDIUM",
+            "IRI",
+            "DEPOSIT",
+            new BigDecimal("5000"),
+            "from sale",
+            "PENDING",
+            "officerX",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Instant.parse("2026-06-17T14:02:00Z"),
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
+            0L);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(request));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("org-unit-bank"))
+        .andExpect(model().attributeExists("balances", "ownRequests", "foreignRequests"))
+        .andExpect(model().attributeExists("requestTransferTargets", "anyCanRequest", "sparks"))
+        // The failed balances fetch degraded to empty -> no requestable account -> no request CTA.
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))));
   }
 
   @Test
