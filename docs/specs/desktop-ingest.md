@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
 > **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
@@ -41,13 +41,13 @@ network only.
 
 **Acceptance**
 
-- [ ] The gateway exposes only the two documented ingest endpoints plus the actuator
+- [x] The gateway exposes only the two documented ingest endpoints plus the actuator
   health endpoint; every other path is 404/401.
-- [ ] An ingest call results in exactly one forwarded call to the matching backend import
+- [x] An ingest call results in exactly one forwarded call to the matching backend import
   endpoint, carrying the caller's bearer, and no backend write.
-- [ ] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
+- [x] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
-- [ ] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
+- [x] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
   nginx-proxy-manager terminates the public TLS and **re-encrypts** to the gateway over
   `https://…:11262` (NPM upstream scheme `https`, upstream-certificate verification **off** for the
   shared self-signed cert). The shared `SERVER_SSL_KEY_STORE` env vars feed **both** the server
@@ -56,7 +56,11 @@ network only.
   scheme, the NPM upstream scheme and the healthcheck scheme must stay aligned — a mismatch makes the
   proxy return a bare 400 and keeps the container `unhealthy`.
 
-**Enforced by:** _(pending — #642)_ · **Code:** _(new `ingest` module — #642)_ · **Issues:** #642
+**Enforced by:** `ArchitectureTest` (no JPA / no relational persistence; every controller +
+`@PostMapping` is `@PreAuthorize`-annotated), `IngestControllerTest` (exactly the two endpoints,
+forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `BackendImportClientTest`
+(the caller's bearer is forwarded) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
+`IngestApplication`, `application.yml` (`server.port: 11262`, `server.ssl.enabled: true`) · **Issues:** #642
 
 ### REQ-INGEST-002 — Authentication & authorization
 
@@ -72,13 +76,17 @@ same `basetool-backend` audience the backend requires. All data is scoped to the
 
 **Acceptance**
 
-- [ ] A request without a valid signed realm token (carrying `aud=basetool-backend`) is
+- [x] A request without a valid signed realm token (carrying `aud=basetool-backend`) is
   rejected 401/403; no forward happens.
-- [ ] The device-grant client is public (no secret) and the secret is never embedded in the
+- [x] The device-grant client is public (no secret) and the secret is never embedded in the
   desktop binary or in any committed config.
-- [ ] The handoff staged by an ingest call is readable only under the same `sub`.
+- [x] The handoff staged by an ingest call is readable only under the same `sub`.
 
-**Enforced by:** _(pending — #642/#647)_ · **Code:** _(ingest module security config — #642; Keycloak client — #641)_ · **Issues:** #641, #642
+**Enforced by:** `SecurityConfigTest` (audience validator accepts a token carrying `basetool-backend`,
+rejects one without it), `IngestControllerTest` (an unauthenticated caller is 401, no forward),
+`ArchitectureTest` (every REST surface is authorization-annotated) · **Code:** `SecurityConfig`,
+`IngestController`, `HandoffStagingService` (per-`sub` Redis key); the public `basetool-sc-extractor`
+device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · **Issues:** #641, #642
 
 ### REQ-INGEST-003 — Short-lived single-use Redis handoff
 
@@ -92,14 +100,17 @@ never leave the machine).
 
 **Acceptance**
 
-- [ ] A handoff id is unguessable and bound to the creating `sub`; reading under another
+- [x] A handoff id is unguessable and bound to the creating `sub`; reading under another
   `sub` returns not-found.
-- [ ] A second read of the same id after a successful first read returns not-found
+- [x] A second read of the same id after a successful first read returns not-found
   (single-use).
-- [ ] An entry past its TTL is gone; no draft is returned and no error leaks its prior
+- [x] An entry past its TTL is gone; no draft is returned and no error leaks its prior
   existence.
 
-**Enforced by:** _(pending — #642)_ · **Code:** _(ingest Redis handoff service — #642)_ · **Issues:** #642
+**Enforced by:** `HandoffStagingServiceTest` (Testcontainers Redis: stage + consume-once, a
+foreign-`sub` read returns empty without deleting, an unknown id returns empty), frontend
+`IngestHandoffServiceTest` (single-use consume, per-`sub` scoping, kind match) · **Code:**
+`HandoffStagingService`, `StagedHandoff`, `IngestProperties#handoffTtl` · **Issues:** #642
 
 ### REQ-INGEST-004 — Browser pre-fill, review-before-commit preserved
 
@@ -116,13 +127,16 @@ REQ-UI-008); it never errors the page out.
 
 **Acceptance**
 
-- [ ] Opening `…/create?handoff=<valid id>` while logged in renders the pre-filled review
+- [x] Opening `…/create?handoff=<valid id>` while logged in renders the pre-filled review
   form; the user must still click Save to persist.
-- [ ] Opening it without a session triggers login and lands back on the pre-filled form.
-- [ ] An expired/consumed/foreign/unknown handoff renders the normal empty form with an
+- [x] Opening it without a session triggers login and lands back on the pre-filled form.
+- [x] An expired/consumed/foreign/unknown handoff renders the normal empty form with an
   inline notice — no stack trace, no persisted data.
 
-**Enforced by:** _(pending — #644/#647 e2e)_ · **Code:** _(frontend create-page controllers — #644)_ · **Issues:** #644
+**Enforced by:** `IngestHandoffServiceTest` (graceful degradation on miss / expired / foreign-`sub` /
+wrong-kind), `IngestHandoffE2eTest` (end-to-end pre-fill + login-replay landing) · **Code:**
+`RefineryOrderPageController#applyRefineryHandoff`, `PersonalBlueprintImportProxyController`,
+`IngestHandoffService`, `ingest.handoff.notFound` (DE/EN inline notice) · **Issues:** #644
 
 ### REQ-INGEST-005 — Size and rate limits
 
@@ -146,9 +160,9 @@ them.
 
 **Acceptance**
 
-- [ ] A body over the size cap is rejected by the gateway with a localized problem response
+- [x] A body over the size cap is rejected by the gateway with a localized problem response
   and is never forwarded — including a chunked body with no `Content-Length`.
-- [ ] A burst of ingest calls from one `sub` is throttled with a `Retry-After`, not passed
+- [x] A burst of ingest calls from one `sub` is throttled with a `Retry-After`, not passed
   straight through; rotating the source IP does not defeat the per-`sub` limit.
 
 **Enforced by:** `FiltersTest`, `SubjectRateLimiterTest` · **Code:** `PayloadSizeLimitFilter`,
@@ -166,12 +180,14 @@ leave the machine (ADR-0007).
 
 **Acceptance**
 
-- [ ] No extractor code path transmits the extract without an explicit user Send action.
-- [ ] The CLI path performs no network egress of extract data.
-- [ ] The extractor docs describe the egress accurately (no remaining absolute
+- [x] No extractor code path transmits the extract without an explicit user Send action.
+- [x] The CLI path performs no network egress of extract data.
+- [x] The extractor docs describe the egress accurately (no remaining absolute
   "nothing-leaves" claim).
 
-**Enforced by:** _(pending — extractor repo tests #645)_ · **Code:** _(extractor send action — #645; docs — #646)_ · **Issues:** #645, #646
+**Enforced by:** verified in the `basetool-bp-extractor` repo (the extractor internals are out of
+scope here — see *Out of scope*) · **Code:** the extractor's explicit Send action (#645) and the
+"nothing-leaves" docs reconciliation (#646), both in the extractor repo · **Issues:** #645, #646
 
 ### REQ-INGEST-007 — "Remember me" token storage & revocation
 
@@ -184,15 +200,17 @@ the user's name/email are never logged (project-wide logging rule).
 
 **Acceptance**
 
-- [ ] With "remember me" off, no refresh token is persisted; a new send re-runs the device
+- [x] With "remember me" off, no refresh token is persisted; a new send re-runs the device
   approval.
-- [ ] With it on, the refresh token is stored via DPAPI and a second send needs no
+- [x] With it on, the refresh token is stored via DPAPI and a second send needs no
   re-approval until expiry/revocation.
-- [ ] "Vom Basetool trennen" revokes at Keycloak and removes the stored credential; a
+- [x] "Vom Basetool trennen" revokes at Keycloak and removes the stored credential; a
   subsequent send requires re-approval.
-- [ ] No token or refresh token appears in any log line.
+- [x] No token or refresh token appears in any log line.
 
-**Enforced by:** _(pending — extractor repo tests #648)_ · **Code:** _(extractor token store — #648)_ · **Issues:** #648
+**Enforced by:** verified in the `basetool-bp-extractor` repo (extractor internals out of scope here)
+· **Code:** the extractor's DPAPI refresh-token store with rotation/reuse-detection and the "Vom
+Basetool trennen" revoke action (#648), in the extractor repo · **Issues:** #648
 
 ### REQ-INGEST-008 — No new role; backend stays internal; audience sequencing
 
@@ -207,11 +225,15 @@ precede turning the check on, in that order.
 
 **Acceptance**
 
-- [ ] No new role/authority appears in `ROLES_AND_PERMISSIONS.md` for ingest.
-- [ ] Enabling `app.security.jwt.expected-audiences` is gated on both clients already
+- [x] No new role/authority appears in `ROLES_AND_PERMISSIONS.md` for ingest.
+- [x] Enabling `app.security.jwt.expected-audiences` is gated on both clients already
   emitting `aud=basetool-backend` (documented runbook step, #641).
 
-**Enforced by:** _(pending — #641/#647)_ · **Code:** _(Keycloak realm config per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) — #641; backend `SecurityConfig` audience knob, already present)_ · **Issues:** #641
+**Enforced by:** `SecurityConfigTest` (the audience validator), `ArchitectureTest` (every surface is
+authorization-annotated; the gateway adds no new authority) · **Code:** ingest `SecurityConfig`, the
+backend `SecurityConfig` audience knob; Keycloak realm config per
+[`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md); `ROLES_AND_PERMISSIONS.md` unchanged ·
+**Issues:** #641
 
 ## Out of scope
 
@@ -227,8 +249,8 @@ precede turning the check on, in that order.
 
 ## Open questions
 
-- Whether the blueprint preview endpoint stays multipart or gains a JSON sibling for the
-  gateway to forward to (decided in #642). Either way the gateway forwards, it does not
-  reshape the contract.
-- Final hostname / NPM proxy entry and CI deployment shape (decided in #643).
+None outstanding — epic #639 has shipped. The two questions from the decision gate were both
+resolved during implementation: the blueprint-preview forwarding shape in #642 (the gateway
+forwards, it does not reshape the contract, ADR-0008) and the hostname / NPM proxy entry + CI
+deployment shape in #643.
 
