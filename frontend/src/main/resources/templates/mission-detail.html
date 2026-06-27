@@ -359,20 +359,45 @@
                             </dl>
                         </div>
                     </div>
-                    <div class="kpanel" th:if="${frequencyTypes != null and !frequencyTypes.isEmpty()}">
+                    <!-- Funk: the dynamic frequencies (#816). Shows only entries that actually carry a
+                         value — first the central, unit-less frequencies that have been set, then the
+                         per-unit frequencies of the units that carry one. Central types without a value
+                         and units without a frequency are omitted, and the whole panel collapses when
+                         nothing is set. The locals are bound on the wrapping th:block because th:if
+                         (precedence 300) runs before th:with (400) on the same element, so the panel's
+                         th:if can only read them from an ancestor. hasCentralTypes guards the panel on the
+                         frequency-types list actually having loaded: it is a Resilience4j-wrapped fetch
+                         whose failure is swallowed (the attribute is then null), so without this guard a
+                         mission that carries a central value while the type list failed to load — and has
+                         no unit frequency — would paint a bare "Funk" heading over an empty list. The
+                         central rows iterate frequencyTypes, so they can only render when it is present. -->
+                    <th:block th:with="unitsWithFreq=${mission.assignedUnits != null ? mission.assignedUnits.?[frequency != null] : null},
+                                       hasCentralTypes=${frequencyTypes != null and !frequencyTypes.isEmpty()},
+                                       hasCentralFreq=${frequencyByTypeId != null and !frequencyByTypeId.isEmpty()}">
+                    <div class="kpanel" th:if="${(hasCentralFreq and hasCentralTypes) or (unitsWithFreq != null and !unitsWithFreq.isEmpty())}">
                         <div class="kpanel-head" th:text="#{mission.overview.radio}">Funk</div>
                         <div class="kpanel-body">
                             <dl class="kv-list">
-                                <th:block th:each="freqType : ${frequencyTypes}" th:with="f=${frequencyByTypeId[freqType.id]}">
+                                <!-- Central, unit-less frequencies — only those with a value entered. -->
+                                <th:block th:each="freqType : ${frequencyTypes}"
+                                          th:if="${frequencyByTypeId[freqType.id] != null}"
+                                          th:with="f=${frequencyByTypeId[freqType.id]}">
                                     <dt th:text="${freqType.name}">Funk</dt>
                                     <dd>
-                                        <span th:if="${f != null}" class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
-                                        <span th:if="${f == null}" th:text="#{general.none}">&mdash;</span>
+                                        <span class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                    </dd>
+                                </th:block>
+                                <!-- Per-unit frequencies — only units that carry one. -->
+                                <th:block th:each="unit : ${unitsWithFreq}">
+                                    <dt><span th:text="${unit.name}">Einheit</span> <small class="kv-sub" th:text="#{mission.overview.radio.unit}">Einheit</small></dt>
+                                    <dd>
+                                        <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
                                     </dd>
                                 </th:block>
                             </dl>
                         </div>
                     </div>
+                    </th:block>
                 </div>
                 <!-- RIGHT: attendance, Ablauf checklist, calendar -->
                 <div class="pane-col">
@@ -2428,9 +2453,13 @@
                             }
                         }
                         window.krtModalClose(frequencyModal);
-                        // Already patched the frequency displays in place above; just signal peers to
-                        // re-render their overview (the value is mirrored there) — REQ-FE-010.
-                        if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('overview'); }
+                        // The in-place patch above keeps the Verwaltung row (value + data-version for the
+                        // next edit) current, but the Übersicht Funk panel now only renders frequencies
+                        // that carry a value (#816): a frequency set for the first time has no row to
+                        // patch there, so re-render the overview section in place. krtRefreshMissionSection
+                        // also broadcasts 'overview' to peers (REQ-FE-010), replacing the prior notify.
+                        if (window.krtRefreshMissionSection) { window.krtRefreshMissionSection('overview'); }
+                        else if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('overview'); }
                     }
                 });
             }
@@ -2593,7 +2622,9 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(addForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection('crew');
+                        // 'overview' too: the Übersicht Funk panel mirrors the units' frequencies (#816),
+                        // so a new unit with a frequency must surface there without a reload.
+                        window.krtRefreshMissionSection(['crew', 'overview']);
                     }
                 });
             }
@@ -2626,7 +2657,8 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection('crew');
+                        // 'overview' too: an edited unit frequency is mirrored in the Funk panel (#816).
+                        window.krtRefreshMissionSection(['crew', 'overview']);
                     }
                 });
             }
@@ -2649,7 +2681,8 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection('crew');
+                        // 'overview' too: a deleted unit drops out of the Funk panel mirror (#816).
+                        window.krtRefreshMissionSection(['crew', 'overview']);
                     }
                 });
             }
