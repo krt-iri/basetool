@@ -1,6 +1,6 @@
 # ADR-0025 — Org hierarchy data model: Bereich + Organisationsleitung as org_unit kinds with a parent FK
 
-- **Status:** Accepted — implementation pending (epic #692)
+- **Status:** Accepted — implemented (epic #692)
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-014 · REQ-ORG-017 · ADR-0026 · ADR-0027 · issue #692 · #694

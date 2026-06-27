@@ -1,7 +1,7 @@
 # ADR-0026 — Cascading org-unit scope without admin rights, computed in one descent helper
 
-- **Status:** Accepted — implemented in Phase 3 (#696) for the aggregate scope + authorities; the
-  `currentOversightScope()` half is deferred to Phase 6 (#699). See *Implementation note*.
+- **Status:** Accepted — implemented. Phase 3 (#696) delivered the aggregate scope + authorities;
+  the `currentOversightScope()` half landed in Phase 6 (#699). See *Implementation note*.
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-015 · REQ-SEC-015 · ADR-0025 · REQ-ORG-011 (#701) · ADR-0024 (#702) · issue #692 · #696
@@ -73,6 +73,14 @@ The decision holds; three refinements landed during implementation:
   the helper's pure-function contract is unchanged. This is the cheap first answer to the OL-union
   cost flagged under *Consequences*; the closure-table swap stays available if the `IN` list itself
   bites.
+
+## Implementation note (Phase 6, #699)
+
+The deferred half landed with the bank phase: `OwnerScopeService.currentOversightScope()` now unions
+in `cascadedOfficerReach(...)`, so a Bereichsleitung/OL's **view** cascades down to descendant
+accounts and the blueprint-availability overview, while the new **own-level** companion
+`currentOwnLevelOversightScope()` keeps deposit/withdrawal **requests** at the caller's own level
+(the Q4 read/write split, REQ-BANK-022). The whole cascade decision is therefore fully implemented.
 
 ## Consequences
 
