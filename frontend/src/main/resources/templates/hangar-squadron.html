@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="#{hangar.squadron.title} + ' - ' + ${appTitle}">Staffelübersicht - Profit Basetool</title>
+    <title th:text="#{hangar.squadron.title} + ' - ' + ${appTitle}">Org-Einheitsübersicht - Profit Basetool</title>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -22,7 +22,7 @@
 
 <main>
     <div class="greeting hud-box flex-between">
-        <h1 th:text="#{hangar.squadron.title}">Staffelübersicht</h1>
+        <h1 th:text="#{hangar.squadron.title}">Org-Einheitsübersicht</h1>
         <a th:href="@{/hangar}" class="btn btn-ghost" th:text="#{hangar.back}">Zurück zum Hangar</a>
     </div>
 
@@ -103,14 +103,15 @@
             }
         </style>
 
-        <!-- Squadron overview aggregates ship counts per ship-type across the current
-             squadron context. In admin "all squadrons" mode the bucket merges ships from
-             every staffel - tell the admin the totals span all staffeln. Members never
-             enter this mode and always see only their squadron's ships. -->
+        <!-- Org-unit overview aggregates ship counts per ship-type across every org unit the
+             caller can see (REQ-HANGAR-003): without a pin a member sees their own Staffeln/SKs,
+             a Bereichsleitung the units of their Bereich, and the OL every ship. In admin "all
+             org units" mode the bucket merges ships from every unit - tell the admin the totals
+             span all of them. An active pin narrows the view back to the pinned unit. -->
         <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted"
              style="display: block; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: var(--radius-none); white-space: normal; text-align: left;"
              th:text="#{hangar.squadron.all_squadrons_notice}">
-            Aggregation across all squadrons. Select a single squadron to filter.
+            Aggregation across all org units. Select a single org unit to filter.
         </div>
 
         <!-- Server-side filter: the form GETs back to this page (search resets to page 0 by
@@ -180,7 +181,7 @@
             </tr>
             </th:block>
             <tr th:if="${#lists.isEmpty(overview) and search == null}">
-                <td colspan="3" class="text-center" th:text="#{hangar.squadron.empty}">Keine Schiffe in der Staffel vorhanden.</td>
+                <td colspan="3" class="text-center" th:text="#{hangar.squadron.empty}">Keine Schiffe in den Org-Einheiten vorhanden.</td>
             </tr>
             <tr th:if="${#lists.isEmpty(overview) and search != null}">
                 <td colspan="3" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>

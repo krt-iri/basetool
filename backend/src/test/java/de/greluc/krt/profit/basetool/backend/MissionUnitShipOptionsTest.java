@@ -137,6 +137,24 @@ class MissionUnitShipOptionsTest {
   }
 
   @Test
+  void getSelectableUnitShips_includesParticipantShipWithoutAnyOrgUnit() {
+    // A participant who belongs to no org unit at all — their ship is an ownerless personal ship
+    // (owningOrgUnit == null) — must still have their ship offered. Selection is keyed purely on
+    // participation, never on the OrgUnit the participant signed up as (or the lack of one): the
+    // owner-requested "a player's ships are always selectable regardless of org unit" guarantee.
+    User orgUnitlessParticipant = saveUser("ship_opts_no_orgunit");
+    Ship orgUnitlessShip = saveShip("E-Ship", orgUnitlessParticipant, null);
+    missionService.addParticipant(mission.getId(), orgUnitlessParticipant.getId());
+
+    List<UUID> shipIds =
+        missionService.getSelectableUnitShips(mission.getId()).stream().map(Ship::getId).toList();
+
+    assertTrue(
+        shipIds.contains(orgUnitlessShip.getId()),
+        "ship of a participant with no OrgUnit at all must still be offered");
+  }
+
+  @Test
   void getSelectableUnitShips_keepsAlreadyAssignedShipOfDepartedOwner() {
     // A ship owned by a non-participant, persisted onto a unit directly (bypassing the service
     // guard) to model a unit whose ship owner has since left the roster.

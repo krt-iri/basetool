@@ -137,6 +137,25 @@ public class HangarService {
   }
 
   /**
+   * One page of the user's own ships, server-side ordered by the personal-hangar multi-key
+   * comparator and optionally narrowed by a search term (REQ-HANGAR-002). Backs the paginated
+   * {@code /hangar} page: the rich ordering (manufacturer, type, insurance tier/amount, location,
+   * fitted, name) and the case-insensitive ship-type/manufacturer filter are applied in the
+   * repository so they span the user's whole fleet rather than a single client-fetched page. Blank
+   * input is normalised to "no filter".
+   *
+   * @param userId owner id; only this user's ships are returned
+   * @param search optional ship-type/manufacturer name filter; {@code null}/blank means no filter
+   * @param pageable page request (pass it unsorted — the ordering lives in the repository query)
+   * @return one ordered, optionally filtered page of the user's ships
+   */
+  public Page<Ship> getMyShipsFiltered(
+      @NotNull UUID userId, String search, @NotNull Pageable pageable) {
+    String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, pageable);
+  }
+
+  /**
    * Returns the per-ship-type squadron overview. When {@code includeOwnerDetails} is {@code true}
    * the returned DTOs carry the per-ship owner/location/fitted breakdown; when {@code false} only
    * the aggregated counts are exposed. The optional {@code query} filters the ship types
@@ -150,20 +169,22 @@ public class HangarService {
    * architecture rule enforced by {@code ArchitectureTest}.
    *
    * <p>Both the aggregated counts ({@code countShipsByType}) and the owner-detail rows ({@code
-   * findByShipTypeInScoped}) are filtered through the <em>same</em> {@link ScopePredicate}, so the
-   * breakdown can never surface a ship from an OrgUnit the caller is not scoped to. An admin pinned
-   * to a squadron therefore sees only that squadron's ships in the breakdown — not, say, an SK-only
-   * member's ship that merely shares a ship type with the pinned squadron (Hangar = strict eigene
-   * Staffel, MULTI_SQUADRON_PLAN.md section 1).
+   * findByShipTypeInScoped}) are filtered through the <em>same</em> {@link ScopePredicate} — the
+   * unit-overview scope ({@link OwnerScopeService#currentUnitOverviewScope()}, REQ-HANGAR-003) — so
+   * the breakdown can never surface a ship from an org unit the caller is not scoped to. Without an
+   * active pin a member sees every org unit they belong to, a Bereichsleitung the Staffeln/SKs of
+   * their Bereich, and the OL <em>every</em> ship including ownerless personal ones (the owner-
+   * approved widening of REQ-ORG-015, ADR-0048); an active pin still narrows the overview to the
+   * pinned unit, and an admin keeps the unchanged admin-all / admin-pin reach.
    *
    * @param pageable page request (sortable by {@code shipType.name})
    * @param includeOwnerDetails whether to load the per-ship owner/location/fitted breakdown
    * @param query optional ship-type/manufacturer name filter; {@code null} or blank means no filter
-   * @return one page of per-ship-type aggregates, REQ-HANGAR-001
+   * @return one page of per-ship-type aggregates, REQ-HANGAR-001 / REQ-HANGAR-003
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    ScopePredicate scope = ownerScopeService.currentUnitOverviewScope();
     String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
     Page<Object[]> p =
         shipRepository.countShipsByType(

@@ -104,7 +104,8 @@ class HangarControllerTest {
     ShipDto d1 = shipDto("Aurora");
     ShipDto d2 = shipDto("Cutlass");
     Page<Ship> page = new PageImpl<>(List.of(s1, s2), PageRequest.of(0, 20), 2);
-    when(hangarService.getMyShips(eq(ownerId), any(Pageable.class))).thenReturn(page);
+    when(hangarService.getMyShipsFiltered(eq(ownerId), isNull(), any(Pageable.class)))
+        .thenReturn(page);
     when(shipMapper.toDto(s1)).thenReturn(d1);
     when(shipMapper.toDto(s2)).thenReturn(d2);
 
@@ -114,10 +115,27 @@ class HangarControllerTest {
     // the personal-hangar data-isolation guarantee. The captured Pageable plus the JWT-derived
     // owner id together prove the controller doesn't accept caller-supplied owners.
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
-    verify(hangarService).getMyShips(ownerCaptor.capture(), any(Pageable.class));
+    verify(hangarService).getMyShipsFiltered(ownerCaptor.capture(), isNull(), any(Pageable.class));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
     assertThat(result.content()).containsExactly(d1, d2);
     assertThat(result.totalElements()).isEqualTo(2L);
+  }
+
+  @Test
+  void getMyShips_forwardsSearchTermToService() {
+    // covers REQ-HANGAR-002 — the personal-hangar text filter travels from the HTTP boundary into
+    // the service untouched, so a filtered result is ordered + paginated across the whole fleet
+    // rather than the rows of a single client-fetched page.
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    Page<Ship> page = new PageImpl<>(List.of());
+    when(hangarService.getMyShipsFiltered(eq(ownerId), eq("Cutlass"), any(Pageable.class)))
+        .thenReturn(page);
+
+    controller.getMyShips(jwt, 0, 50, "Cutlass");
+
+    verify(hangarService).getMyShipsFiltered(eq(ownerId), eq("Cutlass"), any(Pageable.class));
   }
 
   // ── GET /ships (admin/officer wide read) ─────────────────────────────

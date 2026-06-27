@@ -96,6 +96,35 @@ class HangarServiceTest {
         () -> hangarService.updateShip(userId, shipId, request));
   }
 
+  // ---- getMyShipsFiltered (REQ-HANGAR-002) ----
+
+  @Test
+  void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearch() {
+    UUID userId = UUID.randomUUID();
+    Pageable pageable = PageRequest.of(0, 50);
+    Page<Ship> page = new PageImpl<>(List.of(new Ship()));
+    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", pageable)).thenReturn(page);
+
+    // Surrounding whitespace is trimmed before the term reaches the repository.
+    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", pageable);
+
+    assertEquals(page, result);
+    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", pageable);
+  }
+
+  @Test
+  void getMyShipsFiltered_normalisesBlankSearchToNull() {
+    UUID userId = UUID.randomUUID();
+    Pageable pageable = PageRequest.of(0, 50);
+    Page<Ship> page = new PageImpl<>(List.of());
+    when(shipRepository.findByOwnerIdFiltered(userId, null, pageable)).thenReturn(page);
+
+    // A blank/whitespace-only term means "no filter": the repository receives null, not "".
+    hangarService.getMyShipsFiltered(userId, "   ", pageable);
+
+    verify(shipRepository).findByOwnerIdFiltered(userId, null, pageable);
+  }
+
   // ---- deleteAllShipsForUser ----
 
   @Test
@@ -280,7 +309,7 @@ class HangarServiceTest {
     // activeOrgUnitId=squadronId, memberOrgUnitIds=empty).
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 20);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
 
     ShipType fighter = new ShipType();
@@ -324,7 +353,7 @@ class HangarServiceTest {
     // and surrounding whitespace from the search box never reaches the LIKE pattern.
     UUID squadronId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 10);
-    when(ownerScopeService.currentScopePredicate())
+    when(ownerScopeService.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
     Page<Object[]> empty = new PageImpl<>(List.of(), pageable, 0);
     when(shipRepository.countShipsByType(

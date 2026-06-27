@@ -125,6 +125,78 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
+   * One page of the calling user's own ships, server-side ordered by the rich multi-key comparator
+   * the personal hangar relies on and optionally narrowed by a case-insensitive search term
+   * (REQ-HANGAR-002). This replaces the former {@code size=1000} fetch-all + client-side {@code
+   * SHIP_SORT}: the ordering and the filter now span <em>all</em> the user's ships, not just the
+   * rows of the current page.
+   *
+   * <p>The {@code ORDER BY} replays the comparator verbatim: manufacturer name, ship-type name, the
+   * computed insurance tier (LTI &lt; numeric &lt; unset — a bucket, not a column), insurance
+   * amount descending within the numeric tier, location name, fitted-first, ship name, and finally
+   * the id as a stable tiebreaker so pages never interleave. The amount key casts {@code insurance}
+   * to an integer, which is safe because the {@code Ship.insurance} {@code @Pattern} constrains
+   * every persisted value to {@code 0}, {@code 1}–{@code 120} or {@code LTI}, and the {@code CASE}
+   * guards the cast against the three non-numeric cases ({@code null} / {@code LTI} / {@code 0});
+   * the matching branch is never the cast on those rows.
+   *
+   * <p>{@code search} matches the ship-type name or the manufacturer name (parity with the former
+   * client-side filter and the squadron overview); a {@code null}/blank term means "no filter". The
+   * {@code cast(:search as string)} null-guard is the proven Postgres-safe idiom (an untyped {@code
+   * IS NULL} bind would otherwise resolve to {@code bytea} and break the {@code LIKE}). The value
+   * query {@code LEFT JOIN FETCH}es the to-one relations the DTO projection needs (so the page is
+   * mapped without N+1) and reuses those fetch-join aliases in the WHERE/ORDER BY; a separate
+   * {@code countQuery} is therefore mandatory because a derived count cannot strip a {@code JOIN
+   * FETCH}. All fetches are single-valued, so the page limit is applied in SQL (no in-memory
+   * pagination).
+   *
+   * @param ownerId the owning user id; only this user's ships are returned (per-user isolation)
+   * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
+   *     returns every ship the user owns
+   * @param pageable page request — pass it <em>unsorted</em> (page+size only); the ordering lives
+   *     in the query's {@code ORDER BY}, so any caller-supplied {@code Sort} would only append
+   *     noise
+   * @return one ordered page of the user's ships
+   */
+  @Query(
+      value =
+          "SELECT s FROM Ship s"
+              + " LEFT JOIN FETCH s.shipType st"
+              + " LEFT JOIN FETCH st.manufacturer m"
+              + " LEFT JOIN FETCH s.location l"
+              + " LEFT JOIN FETCH s.owner"
+              + " LEFT JOIN FETCH s.owningOrgUnit"
+              + " WHERE s.owner.id = :ownerId"
+              + " AND (cast(:search as string) IS NULL"
+              + "  OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
+              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
+              + " ) ORDER BY"
+              + "  LOWER(COALESCE(m.name, '')) ASC,"
+              + "  LOWER(COALESCE(st.name, '')) ASC,"
+              + "  CASE WHEN s.insurance = 'LTI' THEN 1"
+              + "       WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3"
+              + "       ELSE 2 END ASC,"
+              + "  CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0"
+              + "       ELSE cast(s.insurance as integer) END DESC,"
+              + "  LOWER(COALESCE(l.name, '')) ASC,"
+              + "  CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,"
+              + "  LOWER(COALESCE(s.name, '')) ASC,"
+              + "  s.id ASC",
+      countQuery =
+          "SELECT COUNT(s) FROM Ship s"
+              + " LEFT JOIN s.shipType st"
+              + " LEFT JOIN st.manufacturer m"
+              + " WHERE s.owner.id = :ownerId"
+              + " AND (cast(:search as string) IS NULL"
+              + "  OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
+              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
+              + " )")
+  Page<Ship> findByOwnerIdFiltered(
+      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
+      @org.springframework.data.repository.query.Param("search") String search,
+      Pageable pageable);
+
+  /**
    * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
    * DTO projection. Unlike {@link #findAllScoped}, this is intentionally NOT OrgUnit-scoped: it
    * surfaces the ships of a mission's participants regardless of which OrgUnit each participant

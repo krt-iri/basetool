@@ -85,4 +85,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0045](0045-bank-user-transfers-and-per-account-approval-limits.md)       | Bank: view-based request eligibility + user-initiated transfer requests + per-account approval limits with two-step owner approval         | Accepted                                          |
 | [0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)     | Blueprint craftability bridges non-craftable PIECE-material ITEM ingredients (hand-mined gems) instead of skipping them                    | Accepted                                          |
 | [0047](0047-backend-package-acyclic-dependencies.md)                      | Backend package graph made acyclic (9 cycles removed) + `support` leaf package + leaf-SPI inversions, ArchUnit-gated                       | Accepted                                          |
+| [0048](0048-ol-sees-every-ship-in-the-unit-overview.md)                   | OL sees every ship (incl. ownerless) in the hangar unit overview — a narrow, read-only exception to the REQ-ORG-015 admin-only invariant   | Accepted                                          |
 

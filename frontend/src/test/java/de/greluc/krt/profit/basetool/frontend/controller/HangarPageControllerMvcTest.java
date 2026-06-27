@@ -83,7 +83,7 @@ class HangarPageControllerMvcTest {
         new PageResponse<>(List.of(location), 0, 10, 1, 1, List.of());
 
     when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(ships);
     when(backendApiClient.getCached(
             eq("/api/v1/ship-types?size=1000"), any(ParameterizedTypeReference.class)))
@@ -98,18 +98,19 @@ class HangarPageControllerMvcTest {
 
   @Test
   @WithMockUser
-  void viewHangar_ShouldRenderShipTypeFilterWhenHangarHasShips() throws Exception {
-    // Given
+  void viewHangar_ShouldRenderServerSideSearchFormWhenHangarHasShips() throws Exception {
+    // The personal hangar's text filter is now a server-side GET form (REQ-HANGAR-002): the search
+    // input carries name="search" so it round-trips to /hangar, and the rendered ship type appears.
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
     ShipDto ship =
         new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
-    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(ships);
 
     // When & Then
@@ -117,9 +118,10 @@ class HangarPageControllerMvcTest {
         .perform(get("/hangar"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar"))
+        .andExpect(content().string(containsString("id=\"hangar-filter-form\"")))
         .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
-        .andExpect(
-            content().string(containsString("data-ship-filter=\"aegis dynamics avenger titan\"")));
+        .andExpect(content().string(containsString("name=\"search\"")))
+        .andExpect(content().string(containsString("Avenger Titan")));
   }
 
   @Test
@@ -138,7 +140,7 @@ class HangarPageControllerMvcTest {
     LocationDto homeLoc = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
 
     when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(ships);
     when(backendApiClient.getCached(
             eq("/api/v1/locations/home-locations"), any(ParameterizedTypeReference.class)))
@@ -158,18 +160,19 @@ class HangarPageControllerMvcTest {
   @WithMockUser
   void viewHangar_FragmentResults_RendersOnlyTheShipTableFragment() throws Exception {
     // The in-place swap target: GET /hangar?fragment=results returns just the hangarResults
-    // fragment (the add button + table) and NOT the surrounding page chrome (the modals, the
-    // import section), so a write handler can re-render the table without reloading (REQ-FE-005).
+    // fragment (the add button + search form + table + pagination) and NOT the surrounding page
+    // chrome (the modals, the import section), so a write/filter/page handler can re-render the
+    // table without reloading (REQ-FE-005 / REQ-HANGAR-002).
     ManufacturerDto manufacturer =
         new ManufacturerDto(UUID.randomUUID(), "Aegis Dynamics", "AEGS", null, null, null, false);
     ShipTypeDto shipType =
         new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 0, false);
     ShipDto ship =
         new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
-    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?size=1000"), any(ParameterizedTypeReference.class)))
+            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
         .thenReturn(ships);
 
     mockMvc
@@ -177,7 +180,7 @@ class HangarPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("hangar :: hangarResults"))
         .andExpect(content().string(containsString("data-testid=\"hangar-add-ship\"")))
-        .andExpect(content().string(containsString("data-ship-filter=")))
+        .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
         // the modals + import section live outside the fragment and must not be in the swap body
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("id=\"ship-modal\""))))
         .andExpect(
