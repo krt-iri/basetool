@@ -33,6 +33,7 @@
             <div class="krt-bp-addbar">
                 <div class="krt-pi-typeahead krt-bp-search">
                     <label for="krt-bp-search-input" class="visually-hidden" th:text="#{personalInventory.blueprints.add.search}">Blueprints suchen</label>
+                    <span class="krt-bp-search-icon" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-search"/></svg></span>
                     <input id="krt-bp-search-input" type="text" autocomplete="off"
                            th:placeholder="#{personalInventory.blueprints.add.searchPlaceholder}">
                     <div id="krt-bp-search-results" class="krt-pi-typeahead-results" hidden></div>
@@ -51,7 +52,7 @@
             <!-- Multi-select staging: chips appear compactly under the bar; the CTA stays
                  disabled until at least one blueprint is staged. -->
             <div class="krt-bp-staging-bar">
-                <span class="visually-hidden" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
+                <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
                 <div id="krt-bp-staging-list" class="krt-bp-chip-list"
                      th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
                     <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgew&auml;hlt.</span>
@@ -68,10 +69,19 @@
         </a>
     </nav>
 
-    <!-- Craftability controls (#781): the refinery toggle lives OUTSIDE the swapped collection card
-         so its state survives a batch-add / import / remove re-render; recipe.js reads it and
-         recomputes the list badges + detail breakdown client-side (both figure sets are fetched). -->
-    <div class="krt-bp-craft-toolbar" th:unless="${#lists.isEmpty(blueprints)}">
+    <!-- Collection: master list left, permanent recipe/stat detail right (V3). The hud-box wraps the
+         craftability toolbar + the in-place AJAX swap target (#krt-bp-list). The toggle sits INSIDE
+         the box but OUTSIDE the swap target, so its checkbox state survives a batch-add / import /
+         remove re-render (epic #571 / REQ-FE-005); only the inner fragment is re-rendered via GET
+         /personal-inventory/blueprints?fragment=list. The hidden meta drives the header subtitle +
+         tab-count resync after a swap; recipe.js re-inits on krt:swapped and mirrors the toolbar's
+         visibility from the collection's empty state. -->
+    <div class="hud-box krt-personal-inventory mt-2">
+    <!-- Craftability controls (#781): refinery toggle + hint, hidden while the collection is empty
+         (mirrors the empty-state); recipe.js reads the toggle and recomputes the list badges +
+         detail breakdown client-side (both figure sets are fetched). -->
+    <div class="krt-bp-craft-toolbar" id="krt-bp-craft-toolbar"
+         th:classappend="${#lists.isEmpty(blueprints)} ? ' is-empty' : ''">
         <label class="krt-bp-refinery-toggle" for="krt-bp-refinery-toggle">
             <input type="checkbox" id="krt-bp-refinery-toggle">
             <span th:text="#{personalInventory.blueprints.craft.refineryToggle}">Raffinerie-Ertrag einrechnen</span>
@@ -79,12 +89,7 @@
         <span class="krt-bp-craft-toolbar-hint" th:text="#{personalInventory.blueprints.craft.refineryHint}">Offene &amp; laufende Raffinerie-Auftr&auml;ge einrechnen</span>
     </div>
 
-    <!-- Collection: master list left, permanent recipe/stat detail right (V3). The card is an
-         in-place AJAX swap target (epic #571 / REQ-FE-005): a batch add, an import-apply and a
-         blueprint removal re-render this fragment via GET /personal-inventory/blueprints?fragment=
-         list instead of reloading the page. The hidden meta drives the header subtitle + tab-count
-         resync after a swap; the master-row/filter wiring (recipe.js) re-inits on krt:swapped. -->
-    <div class="hud-box krt-personal-inventory mt-2" id="krt-bp-list">
+    <div id="krt-bp-list">
     <th:block th:fragment="blueprintList">
         <span id="krt-bp-total-meta" hidden
               th:attr="data-total=${blueprints.size()},
@@ -172,6 +177,7 @@
             </div>
         </div>
     </th:block>
+    </div>
     </div>
 </main>
 

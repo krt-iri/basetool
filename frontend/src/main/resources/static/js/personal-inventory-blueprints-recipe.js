@@ -807,6 +807,14 @@
 
     function init() {
         mdEl = document.getElementById('krt-bp-md');
+        // The craftability toolbar lives inside the collection box but OUTSIDE the swapped
+        // #krt-bp-list fragment, so its checkbox state survives a re-render. The swap does not
+        // re-render it either, so mirror its visibility here from the (possibly just-swapped)
+        // collection's empty state.
+        const craftToolbar = document.getElementById('krt-bp-craft-toolbar');
+        if (craftToolbar) {
+            craftToolbar.classList.toggle('is-empty', !mdEl);
+        }
         if (!mdEl) {
             return; // empty collection — nothing to wire
         }
