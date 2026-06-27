@@ -193,6 +193,123 @@ public class OrgUnitBankProxyController {
   }
 
   /**
+   * Forwards setting a role-bucket approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param roleCode the role bucket
+   * @param body the limit payload ({@code limit})
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setRoleApprovalLimit(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull String roleCode,
+      @RequestBody @NotNull Map<String, Object> body) {
+    return putMap(
+        "/api/v1/org-units/bank/accounts/" + id + "/approval-limit/role/" + roleCode, body);
+  }
+
+  /**
+   * Forwards clearing a role-bucket approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param roleCode the role bucket to clear
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> clearRoleApprovalLimit(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
+    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/role/" + roleCode);
+  }
+
+  /**
+   * Forwards setting the all-members approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param body the limit payload ({@code limit})
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/all-members")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setAllMembersApprovalLimit(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return putMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/all-members", body);
+  }
+
+  /**
+   * Forwards clearing the all-members approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/all-members")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> clearAllMembersApprovalLimit(@PathVariable @NotNull UUID id) {
+    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/all-members");
+  }
+
+  /**
+   * Forwards setting an individual user's approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param userId the user the limit addresses
+   * @param body the limit payload ({@code limit})
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setUserApprovalLimit(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @NotNull Map<String, Object> body) {
+    return putMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/user/" + userId, body);
+  }
+
+  /**
+   * Forwards clearing an individual user's approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param userId the user whose limit to clear
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> clearUserApprovalLimit(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/user/" + userId);
+  }
+
+  /**
+   * Forwards the responsible holder granting in-app approval for an over-limit request
+   * (REQ-BANK-041).
+   *
+   * @param id the request to approve
+   * @param body unused (path-only)
+   * @return the updated request
+   */
+  @PostMapping("/requests/{id}/owner-approval")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> grantOwnerApproval(
+      @PathVariable @NotNull UUID id,
+      @RequestBody(required = false) @Nullable Map<String, Object> body) {
+    return postMap("/api/v1/org-units/bank/requests/" + id + "/owner-approval", emptyIfNull(body));
+  }
+
+  /**
+   * Forwards the responsible holder revoking a previously granted in-app approval (REQ-BANK-041).
+   *
+   * @param id the request whose approval to revoke
+   * @return the updated request
+   */
+  @DeleteMapping("/requests/{id}/owner-approval")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> revokeOwnerApproval(@PathVariable @NotNull UUID id) {
+    return deleteMap("/api/v1/org-units/bank/requests/" + id + "/owner-approval");
+  }
+
+  /**
    * Streams the Halter-redacted Kontoauszug PDF for an account the caller may view (REQ-BANK-038).
    *
    * @param id the account id

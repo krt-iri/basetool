@@ -21,7 +21,7 @@
     'use strict';
 
     /** Form field names serialized as JSON numbers instead of strings. */
-    const NUMBER_FIELDS = ['amount', 'version', 'target'];
+    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit'];
 
     /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
     const BOOLEAN_FIELDS = ['active'];
@@ -211,6 +211,15 @@
         if (form && form.querySelector('[data-fee-preview]')) {
             updateFeePreview(form);
         }
+        // Org-unit request modal (REQ-BANK-040/-041): re-apply the transfer-type rows and the live
+        // over-limit warning for the (re)opened modal — the CTA carries no per-row data-field-*.
+        if (form && form.querySelector('[data-limit-warning]')) {
+            const typeSelect = form.querySelector('select[data-role="org-unit-request-type"]');
+            if (typeSelect) {
+                syncRequestTypeRows(typeSelect);
+            }
+            updateLimitWarning(form);
+        }
     }
 
     document.addEventListener('click', function (event) {
@@ -221,6 +230,9 @@
         const modal = document.getElementById(trigger.getAttribute('data-modal-id'));
         if (modal && modal.classList.contains('krt-modal-overlay')) {
             primeModal(trigger, modal);
+            if (modal.id === 'bank-confirm-request-modal') {
+                applyConfirmModalState(trigger, modal);
+            }
         }
     });
 
@@ -468,6 +480,42 @@
     }
 
     /**
+     * Live over-limit warning on the org-unit request modal (REQ-BANK-041): shows the warning when
+     * the entered amount exceeds the requester's approval limit for the chosen source account. The
+     * per-account limit rides on each source-account <option> as `data-limit` (absent = unlimited).
+     * Advisory only — it never blocks submission; the request is still filed and then flagged.
+     *
+     * @param {HTMLFormElement} form the org-unit request form carrying a `[data-limit-warning]` block
+     */
+    function updateLimitWarning(form) {
+        const warning = form.querySelector('[data-limit-warning]');
+        const amountEl = form.querySelector('input[name="amount"]');
+        const accountEl = form.querySelector('select[name="sourceAccountId"]');
+        if (!warning || !amountEl || !accountEl) {
+            return;
+        }
+        const amount = Number(amountEl.value);
+        const option = accountEl.options[accountEl.selectedIndex];
+        const rawLimit = option ? option.getAttribute('data-limit') : null;
+        const limit = rawLimit === null || rawLimit === '' ? null : Number(rawLimit);
+        const exceeds =
+            limit !== null && Number.isFinite(limit) && Number.isFinite(amount) && amount > limit;
+        warning.hidden = !exceeds;
+    }
+
+    /**
+     * Recomputes the over-limit warning for the form the edited field belongs to.
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function recomputeLimitWarningFrom(target) {
+        const form = target && target.closest ? target.closest('form') : null;
+        if (form && form.querySelector('[data-limit-warning]')) {
+            updateLimitWarning(form);
+        }
+    }
+
+    /**
      * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
      * entered current in-game balance and their server-rendered global custody total
      * (`data-reserved`), shows how much is the holder's own private money (`balance − reserved`).
@@ -509,6 +557,7 @@
      */
     function onBankFieldEdit(target) {
         recomputeFeePreviewFrom(target);
+        recomputeLimitWarningFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
             updateBalanceCalc(target);
         }
@@ -691,6 +740,116 @@
     });
 
     document.querySelectorAll('select[data-role="bank-account-type"]').forEach(syncAccountTypeRows);
+
+    /**
+     * Toggles a transfer-only row and its inner <select>: shown/enabled/required only for a
+     * TRANSFER, otherwise hidden, disabled (so it is omitted from the submitted body) and cleared.
+     * No-op when the row is absent. Shared by the request modal and the confirm modal.
+     *
+     * @param {HTMLElement|null} row the transfer-only row wrapper
+     * @param {boolean} isTransfer whether the current request type is TRANSFER
+     */
+    function toggleTransferOnlyControl(row, isTransfer) {
+        if (!row) {
+            return;
+        }
+        row.hidden = !isTransfer;
+        const control = row.querySelector('select');
+        if (control) {
+            control.disabled = !isTransfer;
+            control.required = isTransfer;
+            if (!isTransfer) {
+                control.value = '';
+            }
+        }
+    }
+
+    /**
+     * Org-unit request modal (REQ-BANK-040): the transfer destination row is shown only for a
+     * TRANSFER. Its select is disabled while hidden so it is omitted from the body (and cleared) for
+     * a deposit/withdrawal.
+     *
+     * @param {HTMLSelectElement} select the request-type select
+     */
+    function syncRequestTypeRows(select) {
+        const form = select.closest('form');
+        if (!form) {
+            return;
+        }
+        const isTransfer = select.value === 'TRANSFER';
+        const row = form.querySelector('[data-request-transfer-only]');
+        toggleTransferOnlyControl(row, isTransfer);
+    }
+
+    document.addEventListener('change', function (event) {
+        const select = event.target.closest('select[data-role="org-unit-request-type"]');
+        if (select) {
+            syncRequestTypeRows(select);
+        }
+    });
+
+    /**
+     * Per-row state for the bank confirmation modal (REQ-BANK-040/-041), read from the trigger's
+     * data-field-* attributes (which are NOT form controls, so they are not primed onto inputs):
+     *  - the over-limit owner-approval block + its mandatory checkbox (pre-ticked when the
+     *    responsible holder already granted in-app), gating the confirm button until it is ticked;
+     *  - the transfer destination-holder select (enabled only for a TRANSFER) and the adaptive
+     *    source-holder label.
+     * Re-applied on every open: the modal is reused across rows and {@link submitBankForm} re-enables
+     * the submit button on success.
+     *
+     * @param {HTMLElement} trigger the clicked confirm button carrying the request's data-field-*
+     * @param {HTMLElement} modal the confirm modal overlay
+     */
+    function applyConfirmModalState(trigger, modal) {
+        const form = modal.querySelector('form.bank-ajax-form');
+        if (!form) {
+            return;
+        }
+        const requiresApproval =
+            trigger.getAttribute('data-field-requiresownerapproval') === 'true';
+        const alreadyGranted = trigger.getAttribute('data-field-ownerapprovalgranted') === 'true';
+        const isTransfer = trigger.getAttribute('data-field-reqtype') === 'TRANSFER';
+        const submit = form.querySelector('button[type="submit"]');
+
+        const block = form.querySelector('[data-owner-approval-block]');
+        const checkbox = form.querySelector('[data-owner-approval-check]');
+        if (block) {
+            block.hidden = !requiresApproval;
+        }
+        if (checkbox) {
+            checkbox.disabled = !requiresApproval;
+            checkbox.checked = requiresApproval && alreadyGranted;
+        }
+        if (submit) {
+            submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
+        }
+
+        const destRow = form.querySelector('[data-confirm-destination-holder]');
+        toggleTransferOnlyControl(destRow, isTransfer);
+        const holderLabel = form.querySelector('[data-confirm-holder-label]');
+        if (holderLabel) {
+            const text = isTransfer
+                ? holderLabel.getAttribute('data-label-source')
+                : holderLabel.getAttribute('data-label-default');
+            if (text) {
+                holderLabel.textContent = text;
+            }
+        }
+    }
+
+    /* Over-limit confirmation checkbox: re-arms the confirm button as it is ticked/unticked. */
+    document.addEventListener('change', function (event) {
+        const checkbox = event.target.closest('[data-owner-approval-check]');
+        if (!checkbox) {
+            return;
+        }
+        const form = checkbox.closest('form');
+        const submit = form ? form.querySelector('button[type="submit"]') : null;
+        if (submit) {
+            submit.disabled = !checkbox.checked;
+        }
+    });
 
     /* Enhance the user pickers into searchable comboboxes when the helper is loaded. */
     if (typeof window.krtSearchableSelect === 'function') {

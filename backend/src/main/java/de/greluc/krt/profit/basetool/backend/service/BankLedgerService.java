@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
+
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -581,18 +583,6 @@ public class BankLedgerService {
         BankConflictException.CODE_BANK_OVERDRAFT,
         "The booking would overdraw the account",
         Map.of("accountNo", accountNo, "available", plain(available)));
-  }
-
-  /**
-   * Renders a ledger sum for client display: {@code NUMERIC(19,4)} sums come back as {@code
-   * 300.0000} — bank amounts are whole aUEC, so trailing zeros are stripped (plain notation, no
-   * scientific rendering).
-   *
-   * @param amount the sum to render
-   * @return the plain whole-number string
-   */
-  private static String plain(@NotNull BigDecimal amount) {
-    return amount.stripTrailingZeros().toPlainString();
   }
 
   /**

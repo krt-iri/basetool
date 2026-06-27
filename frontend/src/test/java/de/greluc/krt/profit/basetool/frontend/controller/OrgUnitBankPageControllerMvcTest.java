@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -101,7 +102,8 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("420000"),
             List.of(new BigDecimal("1430000"), new BigDecimal("1850000")),
             new BigDecimal("2000000"),
-            true);
+            true,
+            null);
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),
@@ -122,6 +124,12 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             Instant.parse("2026-06-17T14:02:00Z"),
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
             0L);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
@@ -148,10 +156,15 @@ class OrgUnitBankPageControllerMvcTest {
         // The single page-level request CTA shows (an account is requestable) and opens the modal.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
-        // The modal's account selector lists the requestable org unit as an option (replacing the
-        // former per-card data-field-orgunitid priming).
-        .andExpect(content().string(Matchers.containsString("name=\"orgUnitId\"")))
-        .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
+        // The modal's account selector lists the requestable account as an option, keyed by the
+        // account id now that eligibility is view-based (REQ-BANK-039) — and offers the TRANSFER
+        // op.
+        .andExpect(content().string(Matchers.containsString("name=\"sourceAccountId\"")))
+        .andExpect(content().string(Matchers.containsString("org-unit-request-account")))
+        .andExpect(content().string(Matchers.containsString("name=\"type\"")))
+        // REQ-BANK-040: the transfer destination select MUST be named targetAccountId to match the
+        // CreateBankBookingRequest DTO field — a mismatch silently 400s every transfer request.
+        .andExpect(content().string(Matchers.containsString("name=\"targetAccountId\"")))
         // The own-request row renders with a cancel form.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")));
   }
@@ -183,6 +196,56 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_failingFetchDegradesToEmptyAndStillRenders() throws Exception {
+    // F5: the landing-page reads run concurrently and each swallows its own failure -> a single
+    // backend hiccup degrades to an empty list instead of 500-ing or blanking the page, and every
+    // model attribute is still populated. Here /balances throws but /requests is stubbed.
+    BankBookingRequestDto request =
+        new BankBookingRequestDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "KB-0001",
+            UUID.randomUUID(),
+            "IRIDIUM",
+            "IRI",
+            "DEPOSIT",
+            new BigDecimal("5000"),
+            "from sale",
+            "PENDING",
+            "officerX",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Instant.parse("2026-06-17T14:02:00Z"),
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
+            0L);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("backend down"));
+    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(request));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("org-unit-bank"))
+        .andExpect(model().attributeExists("balances", "ownRequests", "foreignRequests"))
+        .andExpect(model().attributeExists("requestTransferTargets", "anyCanRequest", "sparks"))
+        // The failed balances fetch degraded to empty -> no requestable account -> no request CTA.
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))));
+  }
+
+  @Test
   @WithMockUser(roles = {"LOGISTICIAN"})
   void orgUnitBank_specialAccountRendersRowWithoutRequestButton() throws Exception {
     // REQ-BANK-028: a special account (Sonderkonto) carries no org-unit identity and is not
@@ -205,7 +268,8 @@ class OrgUnitBankPageControllerMvcTest {
             BigDecimal.ZERO,
             List.of(),
             null,
-            false);
+            false,
+            null);
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(special));
@@ -251,9 +315,17 @@ class OrgUnitBankPageControllerMvcTest {
             account,
             new BigDecimal("420000"),
             128L,
-            new BankCapabilitiesDto(false, false, false, false));
+            new BankCapabilitiesDto(false, false, false, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
-        new OrgUnitBankAccountDetailDto(inner, true, true, true, true);
+        new OrgUnitBankAccountDetailDto(inner, true, true, true, true, true, null);
     OrgUnitBankAccountSettingsDto settings =
         new OrgUnitBankAccountSettingsDto(
             accountId,
@@ -271,7 +343,16 @@ class OrgUnitBankPageControllerMvcTest {
             List.of("LOGISTICIAN", "MISSION_MANAGER"),
             List.of("LOGISTICIAN"),
             false,
-            List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")));
+            List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")),
+            true,
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
     BankBookingDto booking =
         new BankBookingDto(
             UUID.randomUUID(),

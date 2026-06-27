@@ -82,4 +82,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0042](0042-unified-membership-rank-with-delegated-appointment.md)        | Unified membership rank enum + delegated appointment ladder + baseline squadron-leadership grant                                           | Accepted — Phases 1-2 implemented                 |
 | [0043](0043-bank-account-responsibility-and-visibility.md)                | Bank: derived account responsibility + configurable balance visibility + read-only drill-in (Halter redacted) + balance target             | Accepted                                          |
 | [0044](0044-mission-ablauf-procedure-steps.md)                            | Mission Ablauf: persisted ordered `MissionStep` child + dedicated `stepsVersion` lock + shared per-step done state (derived current phase) | Accepted                                          |
+| [0045](0045-bank-user-transfers-and-per-account-approval-limits.md)       | Bank: view-based request eligibility + user-initiated transfer requests + per-account approval limits with two-step owner approval         | Accepted                                          |
 

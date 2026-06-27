@@ -30,19 +30,24 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for an org-unit officer/lead raising a confirm-before-post booking request
- * (REQ-BANK-022). The caller names the org unit they act for (the service verifies it is within
- * their oversight scope and resolves it to the org unit's bank account), the movement kind and a
- * whole-aUEC amount. There is deliberately <strong>no holder field</strong> — the holder is
- * recorded by the bank employee at confirmation, not by the requester.
+ * Write payload for a caller raising a confirm-before-post booking request
+ * (REQ-BANK-022/-039/-040). The caller names the (source) account they act on — any account they
+ * may <em>view</em> — the movement kind and a whole-aUEC amount. For a {@code TRANSFER} the {@code
+ * targetAccountId} names the destination (any active account); it is required for {@code TRANSFER}
+ * and must be absent for {@code DEPOSIT} / {@code WITHDRAWAL} (the service enforces this). There is
+ * deliberately <strong>no holder field</strong> — the holder(s) are recorded by the bank employee
+ * at confirmation, not by the requester.
  *
- * @param orgUnitId the org unit the requester acts for (must be in the caller's oversight scope)
- * @param type whether to request a deposit or a withdrawal
+ * @param sourceAccountId the (source) account the request acts on (the caller must be able to view
+ *     it)
+ * @param type whether to request a deposit, a withdrawal or a transfer
+ * @param targetAccountId the destination account for a {@code TRANSFER}; {@code null} otherwise
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note carried onto the booking on confirmation
  */
 public record CreateBankBookingRequest(
-    @NotNull UUID orgUnitId,
+    @NotNull UUID sourceAccountId,
     @NotNull BankBookingRequestType type,
+    @Nullable UUID targetAccountId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note) {}

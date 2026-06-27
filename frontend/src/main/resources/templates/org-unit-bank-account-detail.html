@@ -90,6 +90,11 @@
             </div>
         </div>
 
+        <!-- Approval-limit display (REQ-BANK-041) for viewers who cannot edit; a manager sees the
+             editor in the settings panel below instead (so it is never shown twice). -->
+        <th:block th:if="${settings == null}"
+                  th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
+
         <!-- Responsibility settings (REQ-BANK-035/-036): only for the holder / OL. -->
         <div class="hud-box mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
             <h2 th:text="#{bank.orgUnit.settings.title}">Verantwortung &amp; Sichtbarkeit</h2>
@@ -198,6 +203,11 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Approval limits (REQ-BANK-041): responsible holder / management / admin set per-tier
+                 ceilings up to which a tier may request without explicit approval. -->
+            <th:block
+                th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
         </div>
     </th:block>
     </div>

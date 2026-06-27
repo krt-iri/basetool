@@ -206,6 +206,20 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Approval limits (REQ-BANK-041): read-only for a plain employee (self-boxed), editable
+                 for bank management / admin (wrapped in a panel here). Lives inside accountBody so a
+                 limit write swaps it in place. -->
+            <th:block
+                th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
+            <div class="bank-panel"
+                 th:if="${detail.approvalLimits() != null and detail.approvalLimits().canEdit()}"
+                 data-testid="bank-approval-limit-panel">
+                <div class="bank-panel-body">
+                    <th:block
+                        th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${detail.approvalLimits()}, ${users}, 'accountBody')}"></th:block>
+                </div>
+            </div>
         </div>
     </div>
 

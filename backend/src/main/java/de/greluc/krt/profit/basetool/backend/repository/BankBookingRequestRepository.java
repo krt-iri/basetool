@@ -65,7 +65,14 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @param requestedBy the requesting user's id
    * @return the requester's requests, newest first
    */
-  @EntityGraph(attributePaths = {"account", "account.orgUnit", "holder", "resultingTransaction"})
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "resultingTransaction"
+      })
   List<BankBookingRequest> findByRequestedByOrderByCreatedAtDesc(UUID requestedBy);
 
   /**
@@ -76,7 +83,14 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @param pageable page, size and whitelisted sort
    * @return one page of requests in that state
    */
-  @EntityGraph(attributePaths = {"account", "account.orgUnit", "holder", "resultingTransaction"})
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "resultingTransaction"
+      })
   Page<BankBookingRequest> findByStatus(BankBookingRequestStatus status, Pageable pageable);
 
   /**
@@ -89,9 +103,34 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @param pageable page, size and whitelisted sort
    * @return one page of requests in that state on those accounts
    */
-  @EntityGraph(attributePaths = {"account", "account.orgUnit", "holder", "resultingTransaction"})
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "resultingTransaction"
+      })
   Page<BankBookingRequest> findByStatusAndAccountIdIn(
       BankBookingRequestStatus status, Collection<UUID> accountIds, Pageable pageable);
+
+  /**
+   * Every request on the given accounts, most-recent first — the "Fremde Anträge" tab where a
+   * responsible holder sees all requests raised against the accounts they are responsible for
+   * (REQ-BANK-041). An empty id collection yields an empty list.
+   *
+   * @param accountIds the accounts the caller is responsible for
+   * @return the requests on those accounts, newest first
+   */
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "resultingTransaction"
+      })
+  List<BankBookingRequest> findByAccountIdInOrderByCreatedAtDesc(Collection<UUID> accountIds);
 
   /**
    * Existence probe backing the close-account guard (REQ-BANK-025): an account with an open request

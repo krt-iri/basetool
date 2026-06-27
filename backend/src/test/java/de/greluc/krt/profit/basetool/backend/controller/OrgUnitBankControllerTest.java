@@ -31,9 +31,11 @@ import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -75,7 +77,8 @@ class OrgUnitBankControllerTest {
             new BigDecimal("300"),
             List.of(new BigDecimal("3900"), new BigDecimal("4200")),
             new BigDecimal("10000"),
-            true);
+            true,
+            null);
     when(orgUnitBankAccessService.listOverseenOrgUnitBalances()).thenReturn(List.of(dto));
 
     List<OrgUnitBankBalanceDto> result = controller.listOverseenBalances();
@@ -96,7 +99,7 @@ class OrgUnitBankControllerTest {
   void createBookingRequest_delegatesToService() {
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
-            UUID.randomUUID(), BankBookingRequestType.DEPOSIT, new BigDecimal("500"), "note");
+            UUID.randomUUID(), BankBookingRequestType.DEPOSIT, null, new BigDecimal("500"), "note");
     BankBookingRequestDto dto = requestDto();
     when(orgUnitBankAccessService.createBookingRequest(request)).thenReturn(dto);
 
@@ -122,6 +125,58 @@ class OrgUnitBankControllerTest {
     verify(orgUnitBankAccessService).cancelOwnBookingRequest(id, 3L);
   }
 
+  @Test
+  void setRoleApprovalLimit_delegatesToService() {
+    UUID id = UUID.randomUUID();
+    OrgUnitBankAccountSettingsDto settings =
+        new OrgUnitBankAccountSettingsDto(
+            id,
+            "KB-0001",
+            "IRIDIUM",
+            BankAccountType.ORG_UNIT,
+            OrgUnitKind.SQUADRON,
+            null,
+            0L,
+            false,
+            false,
+            true,
+            true,
+            false,
+            List.of(),
+            List.of(),
+            false,
+            List.of(),
+            true,
+            null);
+    when(orgUnitBankAccessService.setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000")))
+        .thenReturn(settings);
+
+    assertSame(
+        settings,
+        controller.setRoleApprovalLimit(
+            id, "ENSIGN", new SetBankApprovalLimitRequest(new BigDecimal("1000"))));
+    verify(orgUnitBankAccessService).setRoleApprovalLimit(id, "ENSIGN", new BigDecimal("1000"));
+  }
+
+  @Test
+  void grantOwnerApproval_delegatesToService() {
+    UUID id = UUID.randomUUID();
+    BankBookingRequestDto dto = requestDto();
+    when(orgUnitBankAccessService.grantOwnerApproval(id)).thenReturn(dto);
+
+    assertSame(dto, controller.grantOwnerApproval(id));
+    verify(orgUnitBankAccessService).grantOwnerApproval(id);
+  }
+
+  @Test
+  void listForeignRequests_delegatesToService() {
+    BankBookingRequestDto dto = requestDto();
+    when(orgUnitBankAccessService.listRequestsForResponsibleAccounts()).thenReturn(List.of(dto));
+
+    assertSame(dto, controller.listForeignRequests().getFirst());
+    verify(orgUnitBankAccessService).listRequestsForResponsibleAccounts();
+  }
+
   private static BankBookingRequestDto requestDto() {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
@@ -142,6 +197,12 @@ class OrgUnitBankControllerTest {
         null,
         null,
         Instant.now(),
+        null,
+        null,
+        false,
+        null,
+        false,
+        null,
         0L);
   }
 }

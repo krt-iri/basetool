@@ -34,12 +34,19 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
  *     uniformly
  * @param canSetTarget whether the caller may set/clear the balance target (responsible holder)
  * @param canConfigureVisibility whether the caller may manage who else may view the account
- * @param canRequest whether the caller may raise a booking request against this account (their
- *     own-level org-unit account, F2)
+ * @param canRequest whether the caller may raise a booking request against this account
+ *     (REQ-BANK-039 — any viewer of a request-capable {@code ORG_UNIT} / {@code AREA} / {@code
+ *     CARTEL} account)
+ * @param canConfigureApprovalLimits whether the caller may set/clear this account's approval limits
+ *     (REQ-BANK-041 — responsible holder / bank management / admin)
+ * @param applicableLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
+ *     {@code null} = unlimited; the request form warns above it
  */
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,
     boolean canExportStatement,
     boolean canSetTarget,
     boolean canConfigureVisibility,
-    boolean canRequest) {}
+    boolean canRequest,
+    boolean canConfigureApprovalLimits,
+    @org.jetbrains.annotations.Nullable java.math.BigDecimal applicableLimit) {}

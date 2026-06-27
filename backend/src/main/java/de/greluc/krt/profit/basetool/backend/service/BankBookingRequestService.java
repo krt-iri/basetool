@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
+
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -37,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
@@ -46,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepositor
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +60,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -62,6 +68,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -102,45 +109,70 @@ public class BankBookingRequestService {
 
   /**
    * Persists a new {@code PENDING} booking request against the given account, audits it and fires
-   * the notification event (REQ-BANK-022/-026). Called by {@link OrgUnitBankAccessService} after it
-   * has verified the caller oversees the account's org unit — this method itself only enforces the
-   * bank-domain rule that a closed account accepts no request.
+   * the notification event (REQ-BANK-022/-026/-040/-041). Called by {@link
+   * OrgUnitBankAccessService} after it has verified the caller may view the source account and
+   * resolved the org-unit-aware approval snapshot — this method itself only enforces the
+   * bank-domain rules (closed account, valid + active transfer destination, no self-transfer).
    *
-   * @param accountId the target org-unit account (already scope-checked by the caller)
-   * @param type deposit or withdrawal
+   * @param accountId the source account (already view-checked by the caller)
+   * @param type deposit, withdrawal or transfer
    * @param amount the requested whole-aUEC amount
    * @param note the requester's optional note
+   * @param targetAccountId the transfer destination, or {@code null} for deposit/withdrawal
+   * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
+   *     (snapshot)
+   * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
    * @return the created request
-   * @throws NotFoundException when the account does not exist
-   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account
+   * @throws NotFoundException when the (source or destination) account does not exist
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
+   *     BANK_SELF_TRANSFER} when source equals destination
    */
   @Transactional
   public BankBookingRequestDto create(
       @NotNull UUID accountId,
       @NotNull BankBookingRequestType type,
       @NotNull BigDecimal amount,
-      String note) {
+      String note,
+      @Nullable UUID targetAccountId,
+      boolean requiresOwnerApproval,
+      @Nullable BigDecimal applicableLimit) {
     BankAccount account =
         accountRepository
             .findById(accountId)
             .orElseThrow(() -> new NotFoundException("Bank account not found"));
-    if (account.getStatus() != BankAccountStatus.ACTIVE) {
-      throw new BankConflictException(
-          BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
-          "The account is closed and accepts no booking requests",
-          Map.of("accountNo", account.getAccountNo()));
+    requireActiveForRequest(account);
+
+    BankAccount targetAccount = null;
+    if (type == BankBookingRequestType.TRANSFER) {
+      if (targetAccountId == null) {
+        throw new NotFoundException("A transfer request requires a destination account");
+      }
+      if (targetAccountId.equals(accountId)) {
+        throw new BankConflictException(
+            BankConflictException.CODE_BANK_SELF_TRANSFER,
+            "Source and destination account of a transfer must differ");
+      }
+      targetAccount =
+          accountRepository
+              .findById(targetAccountId)
+              .orElseThrow(() -> new NotFoundException("Destination account not found"));
+      requireActiveForRequest(targetAccount);
     }
+
     UUID requesterSub = authHelperService.currentUserId().orElse(null);
     String requesterHandle = resolveHandle(requesterSub);
 
     BankBookingRequest request = new BankBookingRequest();
     request.setAccount(account);
+    request.setTargetAccount(targetAccount);
     request.setType(type);
     request.setAmount(amount);
     request.setNote(note);
     request.setStatus(BankBookingRequestStatus.PENDING);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
+    request.setRequiresOwnerApproval(requiresOwnerApproval);
+    request.setApplicableLimit(applicableLimit);
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -148,7 +180,12 @@ public class BankBookingRequestService {
         account.getId(),
         null,
         requesterSub,
-        type + " request " + plain(amount) + " aUEC " + shortId(saved.getId()));
+        type
+            + " request "
+            + plain(amount)
+            + " aUEC "
+            + shortId(saved.getId())
+            + (requiresOwnerApproval ? " (needs approval)" : ""));
 
     OrgUnit orgUnit = account.getOrgUnit();
     eventPublisher.publishEvent(
@@ -181,6 +218,24 @@ public class BankBookingRequestService {
                     .map(this::toDto)
                     .toList())
         .orElseGet(List::of);
+  }
+
+  /**
+   * Lists every request on the given accounts, newest first (REQ-BANK-041) — backs the responsible
+   * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankAccessService})
+   * supplies the set of accounts the holder is responsible for.
+   *
+   * @param accountIds the accounts to list requests for
+   * @return the requests on those accounts, newest first; empty when the set is empty
+   */
+  @NotNull
+  public List<BankBookingRequestDto> listForAccounts(@NotNull Collection<UUID> accountIds) {
+    if (accountIds.isEmpty()) {
+      return List.of();
+    }
+    return requestRepository.findByAccountIdInOrderByCreatedAtDesc(accountIds).stream()
+        .map(this::toDto)
+        .toList();
   }
 
   /**
@@ -254,26 +309,40 @@ public class BankBookingRequestService {
    * and the resulting transaction.
    *
    * @param requestId the request to confirm
-   * @param holderId the holder the employee records for the booking
+   * @param holderId the holder the employee records for the booking (source holder for a transfer)
+   * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
+   * @param ownerApprovalConfirmed the over-limit "approval by responsible holder obtained"
+   *     attestation (REQ-BANK-041); required when the request needs approval
    * @param version the echoed optimistic-locking version
    * @param authentication the current authentication (capability check)
    * @return the confirmed request
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the employee lacks the matching per-account capability
-   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, or a ledger conflict
-   *     ({@code BANK_ACCOUNT_CLOSED}, {@code BANK_OVERDRAFT}); the holder may go negative
-   *     (REQ-BANK-006, ADR-0039)
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, {@code
+   *     BANK_OWNER_APPROVAL_REQUIRED}, or a ledger conflict ({@code BANK_ACCOUNT_CLOSED}, {@code
+   *     BANK_OVERDRAFT}, {@code BANK_SELF_TRANSFER}); the holder may go negative (REQ-BANK-006,
+   *     ADR-0039)
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @Transactional
   public BankBookingRequestDto confirm(
       @NotNull UUID requestId,
       @NotNull UUID holderId,
+      @Nullable UUID destinationHolderId,
+      boolean ownerApprovalConfirmed,
       long version,
       Authentication authentication) {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
+    // REQ-BANK-041: an over-limit request needs the bank employee to attest the responsible
+    // holder's approval was obtained before any money moves.
+    if (request.isRequiresOwnerApproval() && !ownerApprovalConfirmed) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED,
+          "The request exceeds the requester's approval limit; confirm the responsible holder's"
+              + " approval first");
+    }
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
@@ -287,6 +356,29 @@ public class BankBookingRequestService {
               bankLedgerService.bookWithdrawal(
                   new BankWithdrawalRequest(
                       accountId, holderId, request.getAmount(), request.getNote()));
+          case TRANSFER -> {
+            BankAccount target = request.getTargetAccount();
+            if (target == null || destinationHolderId == null) {
+              throw new NotFoundException(
+                  "A transfer confirmation requires the destination account and holder");
+            }
+            // REQ-BANK-040: confirming a transfer *request* is not a direct employee-initiated
+            // transfer. The requester (an authorized source-account viewer) already chose the
+            // destination from any active account, and requireConfirmCapability above already
+            // checked the employee's can_transfer on the SOURCE. The direct-transfer
+            // destination-visibility gate (REQ-BANK-011) therefore does not apply here, so a
+            // scoped employee without a grant on the destination can still execute the request
+            // (passing destinationVisible = true) instead of hitting a permanent dead-end.
+            yield bankLedgerService.bookTransfer(
+                new BankTransferRequest(
+                    accountId,
+                    holderId,
+                    target.getId(),
+                    destinationHolderId,
+                    request.getAmount(),
+                    request.getNote()),
+                true);
+          }
         };
 
     BankHolder holder =
@@ -316,6 +408,15 @@ public class BankBookingRequestService {
             + shortId(request.getId())
             + " @"
             + holder.getHandle());
+    // REQ-BANK-041: record the employee's over-limit approval attestation as its own audit event.
+    if (request.isRequiresOwnerApproval()) {
+      bankAuditService.record(
+          BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED,
+          accountId,
+          booked.id(),
+          request.getRequestedBy(),
+          "owner approval confirmed for request " + shortId(request.getId()));
+    }
     eventPublisher.publishEvent(
         new BankBookingRequestConfirmedEvent(
             request.getId(),
@@ -378,6 +479,55 @@ public class BankBookingRequestService {
   }
 
   /**
+   * Applies (grants or revokes) the responsible holder's in-app approval on an already-loaded,
+   * locked request (REQ-BANK-041). Org-unit-blind: the org-unit authorization (the caller is the
+   * account's responsible holder) is enforced by {@link OrgUnitBankAccessService} before this is
+   * called; here we only enforce the bank-domain rules (the request is still pending and, for a
+   * grant, actually needs approval), mutate in place (dirty-checking, no {@code save} that would
+   * double-bump {@code @Version}) and audit. {@code MANDATORY} so it always runs inside the seam's
+   * transaction.
+   *
+   * @param request the locked, managed request
+   * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
+   * @return the updated request
+   * @throws BadRequestException when granting approval to a request that needs none
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when no longer pending
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  public BankBookingRequestDto applyOwnerApprovalWithinTransaction(
+      @NotNull BankBookingRequest request, boolean granted) {
+    requirePending(request);
+    if (granted && !request.isRequiresOwnerApproval()) {
+      throw new BadRequestException(
+          "This request does not require the responsible holder's approval");
+    }
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    if (granted) {
+      request.setOwnerApprovalGranted(true);
+      request.setOwnerApprovalGrantedBy(actor);
+      request.setOwnerApprovalGrantedByHandle(resolveHandle(actor));
+      request.setOwnerApprovalGrantedAt(Instant.now());
+    } else {
+      request.setOwnerApprovalGranted(false);
+      request.setOwnerApprovalGrantedBy(null);
+      request.setOwnerApprovalGrantedByHandle(null);
+      request.setOwnerApprovalGrantedAt(null);
+    }
+    bankAuditService.record(
+        granted
+            ? BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_GRANTED
+            : BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_REVOKED,
+        request.getAccount().getId(),
+        null,
+        request.getRequestedBy(),
+        (granted ? "granted" : "revoked")
+            + " owner approval for request "
+            + shortId(request.getId()));
+    return toDto(request);
+  }
+
+  /**
    * Whether the given account has at least one open ({@code PENDING}) booking request — the input
    * to the close-account guard (REQ-BANK-025).
    *
@@ -406,6 +556,7 @@ public class BankBookingRequestService {
         switch (type) {
           case DEPOSIT -> bankSecurityService.canDeposit(accountId, authentication);
           case WITHDRAWAL -> bankSecurityService.canWithdraw(accountId, authentication);
+          case TRANSFER -> bankSecurityService.canTransfer(accountId, authentication);
         };
     if (!allowed) {
       throw new AccessDeniedException(
@@ -457,6 +608,22 @@ public class BankBookingRequestService {
   }
 
   /**
+   * Rejects raising a request against a closed account — for a transfer this guards both the source
+   * and the destination (REQ-BANK-002/-040).
+   *
+   * @param account the account to check
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a non-active account
+   */
+  private void requireActiveForRequest(@NotNull BankAccount account) {
+    if (account.getStatus() != BankAccountStatus.ACTIVE) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
+          "The account is closed and accepts no booking requests",
+          Map.of("accountNo", account.getAccountNo()));
+    }
+  }
+
+  /**
    * Snapshots a user's effective name for the requester/decider handle column, falling back to a
    * neutral marker when the user cannot be resolved (never a PII leak).
    *
@@ -483,6 +650,7 @@ public class BankBookingRequestService {
     OrgUnit orgUnit = account.getOrgUnit();
     BankHolder holder = request.getHolder();
     BankTransaction transaction = request.getResultingTransaction();
+    BankAccount target = request.getTargetAccount();
     return new BankBookingRequestDto(
         request.getId(),
         account.getId(),
@@ -502,17 +670,13 @@ public class BankBookingRequestService {
         request.getRejectReason(),
         request.getDecidedAt(),
         request.getCreatedAt(),
+        target == null ? null : target.getId(),
+        target == null ? null : target.getAccountNo(),
+        request.isRequiresOwnerApproval(),
+        request.getApplicableLimit(),
+        request.isOwnerApprovalGranted(),
+        request.getOwnerApprovalGrantedByHandle(),
         request.getVersion());
-  }
-
-  /**
-   * Renders a whole-aUEC amount for an audit detail without trailing zeros or scientific notation.
-   *
-   * @param amount the amount
-   * @return the plain whole-number string
-   */
-  private static String plain(@NotNull BigDecimal amount) {
-    return amount.stripTrailingZeros().toPlainString();
   }
 
   /**

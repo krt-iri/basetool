@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bank: Transfer-Anträge und Beantragung für alle Sichtberechtigten.** Berechtigte Nutzer können jetzt zusätzlich zu Ein-/Auszahlung einen **Transfer** vom eigenen Konto auf ein beliebiges aktives Konto beantragen, und wer ein Konto sehen darf, darf darauf Anträge stellen (bisher nur die Führungsränge). Den Transfer bucht der Bankmitarbeiter beim Bestätigen wie eine normale Buchung.
+
+- **Bank: Freigabe-Limits je Konto und Stufe mit delegierter Freigabe.** Kontoverantwortliche, Bankleitung und Admins legen je Stufe (Kommandoleiter, stellv. Kommandoleiter, Ensigns, Einzelpersonen) ein Limit fest, bis zu dem ohne zusätzliche Freigabe beantragt werden darf; die Limits sind in den Kontodetails für alle sichtbar. Über dem Limit warnt das Antragsformular, der Kontoverantwortliche kann die Freigabe im neuen Reiter „Fremde Anträge" erteilen (belegt das Häkchen beim Bankmitarbeiter vor), und der Bankmitarbeiter muss sie beim Bestätigen per Pflicht-Häkchen bestätigen. Limit-Änderungen und Freigaben stehen im Audit-Log.
+
 ### Changed
 
 - **Einsatz-Detailseite: prägnantere Info-Leiste, großer „Anmelden"-Button und Beschreibung als graue Karte.** Die Fakten-Leiste im Seitenkopf zeigt jetzt fünf größere, mit Icons versehene Angaben — TS-Treffen, Server-Join, Ende, Einsatzleiter und Teilnehmer (mit eingeklapptem „eingecheckt"-Zähler); die Zeiten erscheinen dort nur als Uhrzeit (das vollständige Datum steht in den Übersichts-Details), und die separate Gesamtsumme entfällt und bleibt im Finanzen-Tab. Der „Anmelden"-Knopf ist nun in voller Größe statt klein, und die ausklappbare „Detaillierte Beschreibung" liegt wie die übrigen Karten auf grauem Kartenhintergrund. Live-Aktualisierung und Berechtigungen bleiben unverändert.

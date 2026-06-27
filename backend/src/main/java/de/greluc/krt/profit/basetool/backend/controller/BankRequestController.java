@@ -98,12 +98,13 @@ public class BankRequestController {
   }
 
   /**
-   * Confirms a pending request: records the holder and books the deposit/withdrawal onto the ledger
-   * (REQ-BANK-023). Requires the per-account capability matching the request type, enforced in the
-   * service.
+   * Confirms a pending request: records the holder(s) and books the deposit / withdrawal / transfer
+   * onto the ledger (REQ-BANK-023/-040/-041). Requires the per-account capability matching the
+   * request type and, for an over-limit request, the responsible-holder approval attestation — both
+   * enforced in the service.
    *
    * @param id the request to confirm
-   * @param request the holder to record and the echoed version
+   * @param request the holder(s), the over-limit approval attestation and the echoed version
    * @param authentication the current authentication (capability check)
    * @return the confirmed request
    */
@@ -114,7 +115,12 @@ public class BankRequestController {
       @Valid @RequestBody ConfirmBankBookingRequest request,
       Authentication authentication) {
     return bankBookingRequestService.confirm(
-        id, request.holderId(), request.version(), authentication);
+        id,
+        request.holderId(),
+        request.destinationHolderId(),
+        request.ownerApprovalConfirmed(),
+        request.version(),
+        authentication);
   }
 
   /**

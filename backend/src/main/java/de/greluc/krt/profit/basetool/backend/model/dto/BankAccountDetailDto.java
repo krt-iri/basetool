@@ -33,9 +33,12 @@ import java.math.BigDecimal;
  * @param delta30d net change over the last 30 days (signed whole aUEC)
  * @param bookingCount total number of account ledger legs on the account
  * @param capabilities the caller's evaluated capabilities on this account
+ * @param approvalLimits the account's per-tier approval limits (REQ-BANK-041) for display, with the
+ *     bank-surface edit affordance ({@code canEdit} = bank management / admin)
  */
 public record BankAccountDetailDto(
     BankAccountDto account,
     BigDecimal delta30d,
     long bookingCount,
-    BankCapabilitiesDto capabilities) {}
+    BankCapabilitiesDto capabilities,
+    BankApprovalLimitsDto approvalLimits) {}
