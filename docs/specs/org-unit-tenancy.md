@@ -471,15 +471,62 @@ CHECK and are enforced by a **trigger AND a service-layer guard** (defence in de
 must not be able to violate them. `membership.kind` and the trigger-synced flags stay
 `insertable=false, updatable=false`.
 
+An admin assigns the (up to two) Staffeln on the **member-edit page**: two fixed Staffel slots, each
+with its own Logistician / Mission-Manager flags, are folded into the `staffeln` list of the single
+membership-delta `PATCH /api/v1/users/{id}/memberships` and **reconciled** against the user's current
+Staffel memberships by `OrgUnitMembershipService.reconcileStaffelMemberships` — squadrons are added /
+removed and per-squadron flags patched in one transaction (removals are deleted before any insert so
+the ≤2 counting trigger never miscounts a re-point). The legacy per-flag query-param toggle endpoints
+(`PATCH /api/v1/users/{id}/logistician` / `…/mission-manager`) and the member-list flag toggles were
+removed; the membership-delta reconcile is the single Staffel-flag write path. The `UserDto` exposes
+the complete Staffel set as `squadrons` (with `squadron` retained as the primary for API stability).
+
+Two-Staffel support is then honoured **project-wide** so a dual-Staffel member is never silently
+dropped to one:
+
+- **Active single Staffel** — `OwnerScopeService.currentSquadronId()` / `readPersistentSquadronFromUser`
+  (the single value used for create-time auto-stamp and current-context surfaces) is pin-aware for
+  non-admins, mirroring `currentScopePredicate()`: an `X-Active-Org-Unit-Id` pin onto one of the
+  caller's Staffeln wins; otherwise it falls back to the deterministic **name-sorted primary** (the
+  same primary as `UserDto.squadron` / `UserMapper.resolveSquadron`) instead of an arbitrary row.
+- **Union lists** — the admin user list, `/lookup`+`/search` typeaheads and the promotion
+  Bewertungsmatrix scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
+  unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
+- **Authorisation gates** OR across **all** of a target's Staffeln — the full-PII gate
+  (`UserController#isCrossSquadronNonAdmin`) and the member-evaluation gate grant when the caller
+  shares **any** of the target's Staffeln; an officer's own-Staffel **oversight scope** includes
+  every Staffel they belong to.
+- **Order-aligned audit** — a Job-Order handover's `executingSquadron` snapshot records the executor's
+  Staffel that matches the order's responsible org unit, else their primary
+  (`findExecutingStaffelForOrder`).
+- **Pin, else choose** at create time — the create-time owner-stamping matrix
+  (`resolveOrgUnitForPickerOutput` / `…Nullable` / `resolveSquadronForPickerOutput`, REQ-ORG-004 §5.5.1)
+  honours an active pin: a two-Staffel user with no explicit picker output but a pin onto one of their
+  own org units is stamped to the pinned unit; with no pin it still 400s "owningOrgUnitId is required"
+  so the create form forces an explicit choice (the owner picker lists **both** Staffeln, sourced from
+  `/api/v1/users/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent. The
+  same "pin, else choose" applies to promotion topic / rank-requirement create, which additionally
+  reject a two-Staffel officer who has not pinned (`hasAmbiguousStaffelContext`).
+- The single-Staffel `PATCH /api/v1/users/{id}/squadron` admin endpoint (and its destructive
+  `syncStaffelMembership`) were **removed** — it could silently drop a member's second Staffel; all
+  Staffel assignment now flows through the additive membership-delta reconcile.
+
 **Acceptance**
 
 - [x] A third Staffel membership is rejected; a second is accepted.
+- [x] An admin assigns up to two Staffeln on the member-edit page, each with its own Logistician /
+  Mission-Manager flags, in one membership-delta reconcile; clearing a slot drops that Staffel
+  membership and an empty set removes every Staffel membership.
+- [x] A duplicate squadron in the desired set, or more than two squadrons, is rejected with 400.
 - [x] Making a user an SK-lead while they hold a Staffel membership is rejected; assigning an SK to a
   Bereich (or making the user lead) auto-adds the reach-less Bereichsleitung membership.
 - [x] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
 - [x] A leadership flag on the wrong `kind` is rejected by CHECK.
 
-**Enforced by:** `OrgUnitMembershipServiceTest` (the service-layer guards) and `OrgHierarchyMigrationTest`
+**Enforced by:** `OrgUnitMembershipServiceTest` (the service-layer guards incl.
+`reconcileStaffelMemberships` add / remove / flag-patch / duplicate / >2 / leadership),
+`UserServiceMembershipDeltaTest` (the delta orchestrator forwards `staffeln` to the reconcile),
+`MemberManagementControllerTest` (the member-edit two-slot fold) and `OrgHierarchyMigrationTest`
 (the ≤2-Staffel counting triggers on INSERT+UPDATE, the leader-excludes-Staffel trigger, and the
 `chk_org_unit_membership_bereich_flags_only_on_bereich` / `chk_org_unit_membership_ol_flag_only_on_ol`
 CHECKs — DB-side defence in depth) · **Issues:** #692, #695.

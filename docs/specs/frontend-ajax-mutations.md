@@ -286,10 +286,12 @@ patch would desync the "+" buttons and the roving-tabindex order — the swap re
 captured before the focus-returning `closeModal()` and re-applied across animation frames until the
 freshly-swapped tree's layout settles, so the offset survives the in-place refresh on every engine.
 The member list converts the delete (a `@DeleteMapping` JSON twin whose success re-swaps the results
-fragment so pagination and the SK column stay coherent) and reverts — rather than reloads — a failed
-logistician / mission-manager toggle in place; its filter `fragment` param changes from `boolean` to
-`String` so it binds the `krtFetch.swap` helper's `fragment=results` value (a `boolean` param silently
-400'd that swap). The member-edit page saves through an in-place `{field: message}` twin (REQ-FE-007).
+fragment so pagination and the Staffel + SK columns stay coherent); its filter `fragment` param
+changes from `boolean` to `String` so it binds the `krtFetch.swap` helper's `fragment=results` value
+(a `boolean` param silently 400'd that swap). The list-level per-flag Logistician / Mission-Manager
+toggles were removed: per-Staffel flags (REQ-SEC-005) are now edited on the member-edit page, whose
+two Staffel slots (REQ-ORG-017, up to two) each carry their own flags and save through the in-place
+`{field: message}` membership-delta twin (REQ-FE-007).
 The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
 shared user-row version), and the home-page mark-announcement-read posts in place and removes its
 control. The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the

@@ -53,16 +53,15 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorisation: every write goes through {@code hasRole('ADMIN')}. Unlike the SK side there is
  * no Squadron-Lead concept — Squadron member management has always been an ADMIN / Squadron-Officer
  * concern, and the existing pre-R6.e legacy endpoints ({@code PATCH
- * /api/v1/users/{id}/logistician}) also gated on ADMIN. The V95 CHECK constraint {@code
+ * /api/v1/users/{id}/memberships}) also gated on ADMIN. The V95 CHECK constraint {@code
  * chk_org_unit_membership_lead_only_on_special_command} forbids the {@code is_lead} column being
  * set on a Squadron membership in the first place, so no {@code /lead} endpoint exists here.
  *
- * <p>The legacy {@code UserController} flag-toggle endpoints stay live during the R6.e soak window
- * as a transitional alias: they dual-write the legacy column AND delegate to {@link
- * OrgUnitMembershipService#applyStaffelMembershipFlagDelta} so a flag flip made via the old
- * query-param URL still lands on the membership row that the R6.d converter reads. Once the
- * frontend migrates to the version-aware PATCH below, the legacy endpoints can drop their
- * delegation branch in the destructive cleanup release.
+ * <p>The per-flag query-param toggle endpoints were removed once the member-edit page moved to the
+ * version-aware membership-delta PATCH ({@code PATCH /api/v1/users/{id}/memberships}); Staffel flag
+ * changes now flow through {@link OrgUnitMembershipService#reconcileStaffelMemberships(
+ * de.greluc.krt.profit.basetool.backend.model.User, java.util.List)} or the version-aware PATCH
+ * below.
  */
 @RestController
 @RequestMapping("/api/v1/squadrons/{id}/members")

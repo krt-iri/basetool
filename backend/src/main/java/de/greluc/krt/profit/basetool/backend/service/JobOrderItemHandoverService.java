@@ -156,18 +156,25 @@ public class JobOrderItemHandoverService {
 
   /**
    * Stamps the executing user and their squadron snapshot onto the handover for the cross-staffel
-   * audit trail, mirroring {@link JobOrderHandoverService}. No-op for an unresolved principal.
+   * audit trail, mirroring {@link JobOrderHandoverService}. REQ-ORG-017: the executor may hold up
+   * to two Staffeln, so the snapshot is order-aligned — the executor's Staffel that matches the
+   * order's responsible org unit, else their deterministic primary. No-op for an unresolved
+   * principal.
    *
    * @param handover the handover being created
    */
   private void stampAuditTrail(JobOrderItemHandover handover) {
+    UUID responsibleOrgUnitId =
+        handover.getJobOrder() != null && handover.getJobOrder().getResponsibleOrgUnit() != null
+            ? handover.getJobOrder().getResponsibleOrgUnit().getId()
+            : null;
     userService
         .getCurrentUser()
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
               orgUnitMembershipService
-                  .findStaffelMembershipOrgUnitId(current.getId())
+                  .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
                   .flatMap(squadronRepository::findById)
                   .ifPresent(handover::setExecutingSquadron);
             });

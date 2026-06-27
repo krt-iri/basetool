@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
@@ -26,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -57,11 +62,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Spring MVC controller for the squadron member-management pages ({@code /members}).
  *
- * <p>Lists, searches and edits squadron members. The {@code logistician}/{@code mission-manager}
- * toggles call the backend's PATCH endpoints directly and return the updated record as JSON for
- * inline UI updates — those flags are independent of Keycloak realm roles and can be granted by an
- * admin without round-tripping through Keycloak (the JWT converter then re-promotes them to {@code
- * ROLE_LOGISTICIAN}/{@code ROLE_MISSION_MANAGER} on the next login).
+ * <p>Lists, searches and edits squadron members. The member-edit page assigns up to two Staffeln
+ * (REQ-ORG-017), each with its own Logistician / Mission-Manager flags (REQ-SEC-005); the flags are
+ * persisted through the single membership-delta PATCH (see {@link #applyMemberUpdate}), not a
+ * per-flag toggle. The flags are independent of Keycloak realm roles — the JWT converter promotes
+ * them to {@code ROLE_LOGISTICIAN}/{@code ROLE_MISSION_MANAGER} on the next login.
  */
 @Controller
 @RequestMapping("/members")
@@ -204,14 +209,10 @@ public class MemberManagementController {
     try {
       UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
       model.addAttribute("user", user);
-      UUID currentSquadronId = user.squadron() != null ? user.squadron().id() : null;
 
-      // SPEZIALKOMMANDO_PLAN.md §7.4 — show the admin the full membership picture so the SK
-      // memberships are visible alongside the Staffel assignment. The lean picker-shaped DTO is
-      // enough for a read-only overview: each row links through to the corresponding SK detail
-      // page for actual flag / Lead / removal management (R5.c.b roster UI is already wired up).
-      // The Staffel section keeps the existing in-form squadron selector for assignment-changes;
-      // a follow-up release replaces both with a single membership-delta POST per plan §7.4.
+      // Read-only Mitgliedschaften overview (names + SK manage links): the lean picker-option
+      // projection is enough — each SK row links through to its detail page for Lead / removal
+      // management. The editable Staffel slots below are seeded from the detail view instead.
       try {
         List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
             memberships =
@@ -233,14 +234,26 @@ public class MemberManagementController {
                 .<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
                     emptyList());
       }
-      // §7.4 — seed the Staffel-membership flags from the loaded user so the checkboxes start
-      // in the same state the membership row has on the server. The legacy User-level flags are
-      // read by the JWT converter as a fallback for V95-backfill-gap users only; for everyone
-      // else the membership row is authoritative, but the User columns mirror it during R6.e so
-      // the value is correct either way.
-      Boolean currentLogistician = user.isLogistician();
-      Boolean currentMissionManager = user.isMissionManager();
+
+      // REQ-ORG-017 — seed up to two editable Staffel slots from the full membership detail, which
+      // carries each Staffel's own Logistician / Mission-Manager flags (REQ-SEC-005). The detail
+      // endpoint sorts Staffel-first then by name, so the SQUADRON rows are the leading entries.
+      List<OrgUnitMembershipDto> staffelRows = List.of();
+      try {
+        MembershipDeltaResponse detail =
+            backendApiClient.get(
+                "/api/v1/users/" + id + "/memberships/detail", MembershipDeltaResponse.class);
+        if (detail != null && detail.memberships() != null) {
+          staffelRows =
+              detail.memberships().stream().filter(m -> m.kind() == OrgUnitKind.SQUADRON).toList();
+        }
+      } catch (Exception ex) {
+        log.debug("Failed to load membership detail for member-edit Staffel slots", ex);
+      }
+
       if (!model.containsAttribute("memberEditForm")) {
+        OrgUnitMembershipDto slot1 = staffelRows.size() > 0 ? staffelRows.get(0) : null;
+        OrgUnitMembershipDto slot2 = staffelRows.size() > 1 ? staffelRows.get(1) : null;
         model.addAttribute(
             "memberEditForm",
             new MemberEditForm(
@@ -250,9 +263,12 @@ public class MemberManagementController {
                 user.version(),
                 source,
                 user.joinDate(),
-                currentSquadronId,
-                currentLogistician,
-                currentMissionManager));
+                slot1 != null ? slot1.orgUnitId() : null,
+                slot1 != null ? slot1.isLogistician() : null,
+                slot1 != null ? slot1.isMissionManager() : null,
+                slot2 != null ? slot2.orgUnitId() : null,
+                slot2 != null ? slot2.isLogistician() : null,
+                slot2 != null ? slot2.isMissionManager() : null));
       } else {
         MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
         if (form != null && form.source() == null) {
@@ -265,9 +281,12 @@ public class MemberManagementController {
                   form.version(),
                   source,
                   form.joinDate(),
-                  form.squadronId(),
-                  form.isLogistician(),
-                  form.isMissionManager()));
+                  form.staffel1Id(),
+                  form.staffel1Logistician(),
+                  form.staffel1MissionManager(),
+                  form.staffel2Id(),
+                  form.staffel2Logistician(),
+                  form.staffel2MissionManager()));
         }
       }
       return "member-edit";
@@ -373,10 +392,12 @@ public class MemberManagementController {
 
   /**
    * Applies a member edit to the backend: persists the attributes first (the backend bumps
-   * {@code @Version} and returns an empty body), re-fetches the user to learn the new version, then
-   * issues the optional Staffel reassignment + flag delta as one PATCH so the optimistic-lock chain
-   * stays coherent across the calls. Shared by the redirect handler and the AJAX twin; throws on a
-   * backend failure so each caller can map it to its own error shape.
+   * {@code @Version} on the user row and returns an empty body), then sends the desired complete
+   * Staffel set as the {@code staffeln} half of one membership-delta PATCH. The backend reconciles
+   * that set against the user's current Staffel memberships (add / remove / per-squadron flag patch
+   * in one transaction). The reconcile is idempotent, so re-posting an unchanged set is a no-op.
+   * Shared by the redirect handler and the AJAX twin; throws on a backend failure so each caller
+   * can map it to its own error shape.
    *
    * @param id user id
    * @param form the validated member edit form
@@ -386,48 +407,26 @@ public class MemberManagementController {
         new UserAttributesUpdateDto(
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
     backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
-    // The squadron assignment is a separate admin operation behind its own @PreAuthorize at
-    // the backend; route it through the dedicated PATCH endpoint with the freshly-loaded
-    // version so the optimistic-lock chain stays coherent across the two calls.
-    UserDto refreshed =
-        backendApiClient.get(
-            "/api/v1/users/" + id, de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
-    UUID existingSquadronId =
-        refreshed != null && refreshed.squadron() != null ? refreshed.squadron().id() : null;
-    boolean squadronChanged = !java.util.Objects.equals(existingSquadronId, form.squadronId());
-    Boolean existingLogistician = refreshed != null ? refreshed.isLogistician() : null;
-    Boolean existingMissionManager = refreshed != null ? refreshed.isMissionManager() : null;
-    boolean logisticianChanged =
-        form.isLogistician() != null
-            && !java.util.Objects.equals(existingLogistician, form.isLogistician());
-    boolean missionManagerChanged =
-        form.isMissionManager() != null
-            && !java.util.Objects.equals(existingMissionManager, form.isMissionManager());
 
-    // SPEZIALKOMMANDO_PLAN.md §7.4 — bundle the Staffel reassignment and the Staffel-flag flips
-    // into one single-POST delta. The per-row optimistic-lock survives because the backend's
-    // delta endpoint forwards through {@code updateUserSquadron} (uses {@code userVersion}) and
-    // through {@code applyStaffelMembershipFlagDelta} (which is idempotent and now race-hardened
-    // by the R7 follow-up). When nothing on the Staffel side changed, no call fires.
-    if (squadronChanged || logisticianChanged || missionManagerChanged) {
-      de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest.StaffelChange
-          staffelChange =
-              new de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest
-                  .StaffelChange(
-                  form.squadronId(),
-                  logisticianChanged ? form.isLogistician() : null,
-                  missionManagerChanged ? form.isMissionManager() : null,
-                  squadronChanged
-                      ? (refreshed != null ? refreshed.version() : form.version())
-                      : null);
-      de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest deltaBody =
-          new de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest(
-              staffelChange, null);
-      backendApiClient.patch(
-          "/api/v1/users/" + id + "/memberships",
-          deltaBody,
-          de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse.class);
+    // REQ-ORG-017 — fold the two fixed Staffel slots into the desired complete Staffel set. A
+    // second
+    // slot equal to the first is dropped here so the backend never sees the same squadron twice; an
+    // empty slot is simply omitted. An empty list removes every Staffel membership.
+    List<MembershipDeltaRequest.StaffelChange> staffeln = new ArrayList<>();
+    if (form.staffel1Id() != null) {
+      staffeln.add(
+          new MembershipDeltaRequest.StaffelChange(
+              form.staffel1Id(), form.staffel1Logistician(), form.staffel1MissionManager()));
     }
+    if (form.staffel2Id() != null && !form.staffel2Id().equals(form.staffel1Id())) {
+      staffeln.add(
+          new MembershipDeltaRequest.StaffelChange(
+              form.staffel2Id(), form.staffel2Logistician(), form.staffel2MissionManager()));
+    }
+    backendApiClient.patch(
+        "/api/v1/users/" + id + "/memberships",
+        new MembershipDeltaRequest(staffeln, null),
+        MembershipDeltaResponse.class);
   }
 
   /**
@@ -485,41 +484,6 @@ public class MemberManagementController {
     payload.put("detail", e.getProblemDetail());
     int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
     return ResponseEntity.status(status).body(payload);
-  }
-
-  /**
-   * AJAX endpoint: flips the {@code is_logistician} flag on a user. The backend handles the
-   * underlying authority promotion so the next JWT minted by Keycloak picks up {@code
-   * ROLE_LOGISTICIAN}.
-   *
-   * @param id user id
-   * @param isLogistician desired new flag value
-   * @return the updated user record
-   */
-  @PostMapping("/{id}/logistician")
-  @PreAuthorize("hasRole('ADMIN')")
-  @ResponseBody
-  public UserDto toggleLogistician(@PathVariable UUID id, @RequestParam boolean isLogistician) {
-    return backendApiClient.patch(
-        "/api/v1/users/" + id + "/logistician?isLogistician=" + isLogistician, null, UserDto.class);
-  }
-
-  /**
-   * AJAX endpoint: flips the {@code is_mission_manager} flag on a user.
-   *
-   * @param id user id
-   * @param isMissionManager desired new flag value
-   * @return the updated user record
-   */
-  @PostMapping("/{id}/mission-manager")
-  @PreAuthorize("hasRole('ADMIN')")
-  @ResponseBody
-  public UserDto toggleMissionManager(
-      @PathVariable UUID id, @RequestParam boolean isMissionManager) {
-    return backendApiClient.patch(
-        "/api/v1/users/" + id + "/mission-manager?isMissionManager=" + isMissionManager,
-        null,
-        UserDto.class);
   }
 
   /**

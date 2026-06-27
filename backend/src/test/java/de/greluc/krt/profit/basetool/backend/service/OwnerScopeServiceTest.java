@@ -1446,6 +1446,74 @@ class OwnerScopeServiceTest {
   }
 
   @Test
+  void resolveSquadronForPickerOutput_multiMembership_nullPicker_withPin_stampsPinnedStaffel() {
+    // REQ-ORG-017 "pin, else choose": a two-Staffel user who pinned one of their Staffeln via the
+    // switcher need not re-pick — the pinned Staffel is stamped instead of a 400.
+    Squadron staffelA = new Squadron();
+    UUID staffelAId = UUID.randomUUID();
+    staffelA.setId(staffelAId);
+    UUID staffelBId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), staffelAId),
+                staffelMembership(user.getId(), staffelBId)));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(staffelAId.toString());
+    when(squadronRepository.findById(staffelAId)).thenReturn(Optional.of(staffelA));
+
+    Squadron result = service.resolveSquadronForPickerOutput(user, null);
+
+    assertSame(staffelA, result, "the pinned Staffel is stamped without an explicit pick");
+  }
+
+  @Test
+  void resolveSquadronForPickerOutput_multiMembership_nullPicker_foreignPin_stillThrows() {
+    // A pin onto an org unit the user is NOT a member of does not disambiguate — still force a
+    // pick.
+    UUID staffelAId = UUID.randomUUID();
+    UUID staffelBId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), staffelAId),
+                staffelMembership(user.getId(), staffelBId)));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(UUID.randomUUID().toString());
+
+    assertThrows(
+        BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, null));
+    verify(squadronRepository, never()).findById(any());
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutput_multiMembership_nullPicker_withPin_stampsPinned() {
+    // The OrgUnit-variant shares the matrix: a pinned two-Staffel user is stamped to the pin.
+    Squadron staffelA = new Squadron();
+    UUID staffelAId = UUID.randomUUID();
+    staffelA.setId(staffelAId);
+    UUID staffelBId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(user.getId(), staffelAId),
+                staffelMembership(user.getId(), staffelBId)));
+    when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(staffelAId.toString());
+    when(squadronRepository.findById(staffelAId)).thenReturn(Optional.of(staffelA));
+
+    var result = service.resolveOrgUnitForPickerOutput(user, null);
+
+    assertSame(staffelA, result);
+  }
+
+  @Test
   void resolveSquadronForPickerOutput_validStaffelPick_returnsPickedSquadron() {
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
@@ -1955,9 +2023,6 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -1995,9 +2060,6 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -2012,9 +2074,6 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
@@ -2031,9 +2090,6 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
@@ -2111,9 +2167,6 @@ class OwnerScopeServiceTest {
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       // The officer's own Staffel is sourced from readPersistentSquadronFromUser (kind=SQUADRON).
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);

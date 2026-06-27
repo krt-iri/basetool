@@ -272,7 +272,8 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "old desc", "alice", 1L, null, null, null, null, null, null, null, null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -294,7 +295,19 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
 
       MemberEditForm existingForm =
-          new MemberEditForm(5, "old desc", "alice", 1L, "existing-source", null, null, null, null);
+          new MemberEditForm(
+              5,
+              "old desc",
+              "alice",
+              1L,
+              "existing-source",
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
       model.addAttribute("memberEditForm", existingForm);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
@@ -336,7 +349,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null, null, null, null);
 
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
       BindingResult br = mock(BindingResult.class);
@@ -356,7 +370,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -381,7 +396,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, "profile", null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
@@ -398,7 +414,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("backend down"))
@@ -417,7 +434,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 1L, "profile", null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 1L, "profile", null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("nope")).when(backendApiClient).put(anyString(), any(), any());
@@ -442,7 +460,8 @@ class MemberManagementControllerTest {
     @Test
     void updateMemberAjax_validationError_returns422WithFieldMessages() {
       UUID id = UUID.randomUUID();
-      MemberEditForm form = new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null);
+      MemberEditForm form =
+          new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
       org.springframework.validation.FieldError fe =
@@ -464,7 +483,8 @@ class MemberManagementControllerTest {
     void updateMemberAjax_happyPath_returns200WithRefreshedVersion() {
       UUID id = UUID.randomUUID();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       // The refreshed re-fetch (no squadron/flag change) AND the post-save version read both hit
@@ -486,7 +506,8 @@ class MemberManagementControllerTest {
     void updateMemberAjax_backendConflict_relaysStatusAndCodeAndDetail() {
       UUID id = UUID.randomUUID();
       MemberEditForm form =
-          new MemberEditForm(5, "desc", "Alice", 4L, null, null, null, null, null);
+          new MemberEditForm(
+              5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(
@@ -534,54 +555,6 @@ class MemberManagementControllerTest {
   }
 
   // ---------------------------------------------------------------
-  // toggleLogistician / toggleMissionManager
-  // ---------------------------------------------------------------
-
-  @Nested
-  class ToggleTests {
-
-    @Test
-    void toggleLogistician_true_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      UserDto result = controller.toggleLogistician(id, true);
-
-      assertSame(expected, result);
-      verify(backendApiClient)
-          .patch("/api/v1/users/" + id + "/logistician?isLogistician=true", null, UserDto.class);
-    }
-
-    @Test
-    void toggleLogistician_false_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      controller.toggleLogistician(id, false);
-
-      verify(backendApiClient)
-          .patch("/api/v1/users/" + id + "/logistician?isLogistician=false", null, UserDto.class);
-    }
-
-    @Test
-    void toggleMissionManager_callsBackend() {
-      UUID id = UUID.randomUUID();
-      UserDto expected = newUser("alice");
-      when(backendApiClient.patch(anyString(), eq(null), eq(UserDto.class))).thenReturn(expected);
-
-      controller.toggleMissionManager(id, true);
-
-      verify(backendApiClient)
-          .patch(
-              "/api/v1/users/" + id + "/mission-manager?isMissionManager=true",
-              null,
-              UserDto.class);
-    }
-  }
-
-  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 
@@ -601,6 +574,7 @@ class MemberManagementControllerTest {
         false,
         true,
         null,
+        java.util.List.of(),
         1L,
         null,
         false);

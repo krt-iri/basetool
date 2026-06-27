@@ -70,6 +70,7 @@ public final class EntityMappers {
         Boolean.FALSE,
         u.isInKeycloak(),
         null,
+        java.util.List.of(),
         u.getVersion(),
         u.getJoinDate(),
         u.getDiscordUserId() != null && !u.getDiscordUserId().isBlank());

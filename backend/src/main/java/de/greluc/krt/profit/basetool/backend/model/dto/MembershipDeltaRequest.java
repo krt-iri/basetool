@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -29,55 +30,52 @@ import org.jetbrains.annotations.Nullable;
  * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta payload. Endpoint {@code PATCH
  * /api/v1/users/{id}/memberships} accepts this record so the admin member-edit page can bundle
  * every Staffel-assignment change, every SK add / remove and every flag toggle into one
- * transactional round-trip. Per-membership-row optimistic-lock keeps concurrent admin edits from
- * silently clobbering each other.
+ * transactional round-trip.
  *
- * <p>The payload is two-part: a single {@link StaffelChange} (a user has at most one Staffel
- * membership) plus a list of {@link SpecialCommandChange}s (a user has zero-or-more SK
- * memberships). Both parts are optional — clients send only what they want to touch.
+ * <p>The payload is two-part: the {@link #staffeln} list — the caller's desired <em>complete</em>
+ * Staffel membership set (REQ-ORG-017 allows up to two) — plus a list of {@link
+ * SpecialCommandChange}s. Both parts are optional and treated independently:
  *
- * @param staffel the desired Staffel-membership state, or {@code null} to leave the user's Staffel
- *     assignment untouched (no add, remove or flag-patch on the Staffel row).
+ * <ul>
+ *   <li>{@code staffeln == null} → the user's Staffel memberships are left untouched.
+ *   <li>{@code staffeln} non-null (including an empty list) → the backend <em>reconciles</em> the
+ *       user's Staffel memberships to exactly this set: squadrons present here but not yet a
+ *       membership are added, current Staffel memberships absent here are removed, and a
+ *       still-present squadron's flags are patched in place. An empty list therefore removes every
+ *       Staffel membership.
+ *   <li>{@code specialCommands == null} / empty → the SK side is left untouched.
+ * </ul>
+ *
+ * @param staffeln the desired complete Staffel membership set (0–2 entries), or {@code null} to
+ *     leave the Staffel side untouched. A non-null list is reconciled against the current state.
  * @param specialCommands the list of SK changes to apply in this transaction, or {@code null} /
  *     empty when only the Staffel side is being touched.
  */
 public record MembershipDeltaRequest(
-    @Valid @Nullable StaffelChange staffel,
+    @Valid @Size(max = 2, message = "A user may belong to at most two Staffeln") @Nullable
+        List<StaffelChange> staffeln,
     @Valid @Nullable List<SpecialCommandChange> specialCommands) {
 
   /**
-   * Staffel-side instruction. A user has exactly zero or one Staffel membership (enforced by the
-   * V95 partial unique index), so the change is naturally a single record rather than a list.
+   * One entry of the desired Staffel membership set. Declarative, not action-tagged: each entry
+   * names a target Squadron plus the flag values that membership should carry once the reconcile
+   * has run. Whether the entry results in an add (no membership yet) or an in-place flag patch (the
+   * user is already a member) is decided by the backend reconcile, not the caller — so the client
+   * sends the same shape regardless. Removal is expressed by <em>omitting</em> a currently-held
+   * squadron from the {@link MembershipDeltaRequest#staffeln} list.
    *
-   * <p>Resolution rules:
-   *
-   * <ul>
-   *   <li>{@link #squadronId} differs from the user's current Staffel id → reassign the user to the
-   *       new Squadron (delegates to {@code UserService.updateUserSquadron} which deletes the old
-   *       membership row, creates a fresh one and carries the legacy flag values). After the
-   *       reassignment, any non-null flag on this record is patched onto the new row.
-   *   <li>{@link #squadronId} matches the user's current Staffel id → flags only: any non-null
-   *       value is patched, {@code null} leaves the field alone.
-   *   <li>{@link #squadronId} is {@code null} and the user currently has a Staffel → the Staffel
-   *       membership is removed (delegates to {@code UserService.updateUserSquadron} with {@code
-   *       null}).
-   *   <li>{@link #squadronId} is {@code null} and the user currently has no Staffel → no-op.
-   * </ul>
-   *
-   * @param squadronId the desired Squadron id, or {@code null} to remove the Staffel membership.
-   * @param isLogistician new value of the Logistician flag on the Staffel membership row, or {@code
-   *     null} to leave unchanged.
-   * @param isMissionManager new value of the Mission Manager flag, or {@code null} to leave
-   *     unchanged.
-   * @param userVersion current {@code @Version} of the {@code app_user} row; required when {@link
-   *     #squadronId} changes (the delegate uses it for optimistic-lock detection on the User row);
-   *     optional when only flags are being touched.
+   * @param squadronId the target Squadron id; never {@code null} (a "no Staffel" intent is an empty
+   *     {@link MembershipDeltaRequest#staffeln} list, not a {@code null} entry).
+   * @param isLogistician desired value of the Logistician flag on this Staffel membership row;
+   *     {@code null} is treated as {@code false}. The flag is scoped to this squadron
+   *     (REQ-SEC-005).
+   * @param isMissionManager desired value of the Mission Manager flag on this Staffel membership
+   *     row; {@code null} is treated as {@code false}.
    */
   public record StaffelChange(
-      @Nullable UUID squadronId,
+      @NotNull UUID squadronId,
       @Nullable Boolean isLogistician,
-      @Nullable Boolean isMissionManager,
-      @Nullable Long userVersion) {}
+      @Nullable Boolean isMissionManager) {}
 
   /**
    * SK-side instruction. One entry per SK the admin wants to add, remove or patch. The {@link

@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
@@ -389,23 +390,117 @@ class OrgUnitMembershipServiceTest {
     verify(membershipRepository, never()).save(any());
   }
 
-  // --- syncStaffelMembership guard ------------------------------------------
+  // --- reconcileStaffelMemberships (REQ-ORG-017: up to two Staffeln) ---------
 
   @Test
-  void syncStaffelMembership_userHoldsLeadershipRole_throwsBadRequest() {
-    // REQ-ORG-017: a leader (SK-Lead/Bereichsleitung/OL) is never assigned to a Staffel.
-    Squadron target = new Squadron();
-    target.setId(UUID.randomUUID());
-    OrgUnitMembership leadRow = new OrgUnitMembership();
-    leadRow.setRole(MembershipRole.SK_LEAD);
-    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
+  void reconcileStaffelMemberships_addsFirstStaffel_promotesInventoryAndAuditsGranted() {
+    UUID squadronA = UUID.randomUUID();
+    Squadron sqA = new Squadron();
+    sqA.setId(squadronA);
+    sqA.setShorthand("IRI");
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(squadronRepository.findById(squadronA)).thenReturn(Optional.of(sqA));
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
+
+    membershipService.reconcileStaffelMemberships(
+        user, List.of(new MembershipDeltaRequest.StaffelChange(squadronA, true, false)));
+
+    verify(membershipRepository).save(any(OrgUnitMembership.class));
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_GRANTED), eq(squadronA), any(), eq(userId), any());
+    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sqA);
+  }
+
+  @Test
+  void reconcileStaffelMemberships_duplicateSquadron_throwsBadRequest() {
+    UUID squadronA = UUID.randomUUID();
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.reconcileStaffelMemberships(
+                user,
+                List.of(
+                    new MembershipDeltaRequest.StaffelChange(squadronA, false, false),
+                    new MembershipDeltaRequest.StaffelChange(squadronA, true, false))));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  @Test
+  void reconcileStaffelMemberships_moreThanTwoSquadrons_throwsBadRequest() {
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            membershipService.reconcileStaffelMemberships(
+                user,
+                List.of(
+                    new MembershipDeltaRequest.StaffelChange(UUID.randomUUID(), false, false),
+                    new MembershipDeltaRequest.StaffelChange(UUID.randomUUID(), false, false),
+                    new MembershipDeltaRequest.StaffelChange(UUID.randomUUID(), false, false))));
+    verify(membershipRepository, never()).save(any());
+  }
+
+  @Test
+  void reconcileStaffelMemberships_userHoldsLeadershipRole_throwsBadRequest() {
+    UUID squadronA = UUID.randomUUID();
+    OrgUnitMembership leadRow = new OrgUnitMembership();
+    leadRow.setRole(MembershipRole.SK_LEAD);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(leadRow));
 
     assertThrows(
-        BadRequestException.class, () -> membershipService.syncStaffelMembership(user, target));
+        BadRequestException.class,
+        () ->
+            membershipService.reconcileStaffelMemberships(
+                user, List.of(new MembershipDeltaRequest.StaffelChange(squadronA, false, false))));
+    verify(squadronRepository, never()).findById(any());
     verify(membershipRepository, never()).save(any());
+  }
+
+  @Test
+  void reconcileStaffelMemberships_removesAbsentStaffel_demotesAndAuditsRevoked() {
+    UUID squadronA = UUID.randomUUID();
+    OrgUnitMembership rowA = new OrgUnitMembership();
+    rowA.setId(new OrgUnitMembershipId(userId, squadronA));
+    // before = 1, after the delete = 0 → the inventory demotes back to ownerless-personal.
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L, 0L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(rowA));
+
+    membershipService.reconcileStaffelMemberships(user, List.of());
+
+    verify(membershipRepository).deleteAll(List.of(rowA));
+    verify(auditService)
+        .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(squadronA), any(), eq(userId), any());
+    verify(orgChartService).mirrorRemoveSquadronRank(squadronA, userId);
+    verify(inventoryReconciler).onUserLostLastOrgUnit(userId);
+  }
+
+  @Test
+  void reconcileStaffelMemberships_patchesFlagsInPlace_whenSquadronStays() {
+    UUID squadronA = UUID.randomUUID();
+    Squadron sqA = new Squadron();
+    sqA.setId(squadronA);
+    OrgUnitMembership rowA = new OrgUnitMembership();
+    rowA.setId(new OrgUnitMembershipId(userId, squadronA));
+    rowA.setLogistician(false);
+    rowA.setMissionManager(false);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(rowA));
+    when(squadronRepository.findById(squadronA)).thenReturn(Optional.of(sqA));
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(rowA));
+    when(membershipRepository.saveAndFlush(rowA)).thenReturn(rowA);
+
+    membershipService.reconcileStaffelMemberships(
+        user, List.of(new MembershipDeltaRequest.StaffelChange(squadronA, true, false)));
+
+    assertTrue(rowA.isLogistician());
+    verify(membershipRepository).saveAndFlush(rowA);
+    verify(membershipRepository, never()).save(any());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.CAPABILITY_FLAGS_CHANGED), eq(squadronA), any(), eq(userId), any());
   }
 
   // --- Bereich / OL leadership membership -----------------------------------

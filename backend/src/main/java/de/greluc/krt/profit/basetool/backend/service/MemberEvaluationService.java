@@ -178,11 +178,15 @@ public class MemberEvaluationService {
    * not just the category. {@link #assertCallerMayEditCategory} validates only the category's
    * owning squadron, so without this an OFFICER of squadron X could create/overwrite/delete an
    * evaluation row for a member of squadron Y as long as the category belongs to X (a cross-tenant
-   * write of member-evaluation data). Admins span every squadron and short-circuit; otherwise the
-   * target member's home Staffel must be within the caller's editable scope ({@link
+   * write of member-evaluation data). Admins span every squadron and short-circuit; otherwise at
+   * least one of the target member's Staffeln must be within the caller's editable scope ({@link
    * OwnerScopeService#canEditSquadron(UUID)}), mirroring the officer-scope rule the rest of the
    * promotion area enforces. Fails closed when the user id is malformed or the member has no
    * Staffel the caller can edit.
+   *
+   * <p>REQ-ORG-017: the target may now hold up to two Staffeln, so the gate ORs across ALL of them
+   * — the caller may evaluate the member as soon as it can edit ANY one of the member's Staffeln,
+   * so a shared second Staffel is honoured rather than silently dropped.
    *
    * @param userId the Keycloak sub (== app_user id) of the member being evaluated; never {@code
    *     null}.
@@ -197,9 +201,9 @@ public class MemberEvaluationService {
     } catch (IllegalArgumentException e) {
       throw new AccessDeniedException("Evaluated member id is not a valid identifier");
     }
-    UUID staffelId =
-        orgUnitMembershipService.findStaffelMembershipOrgUnitId(targetUserId).orElse(null);
-    if (staffelId == null || !ownerScopeService.canEditSquadron(staffelId)) {
+    java.util.List<UUID> staffelIds =
+        orgUnitMembershipService.findStaffelMembershipOrgUnitIds(targetUserId);
+    if (staffelIds.stream().noneMatch(ownerScopeService::canEditSquadron)) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow evaluating this member");
     }

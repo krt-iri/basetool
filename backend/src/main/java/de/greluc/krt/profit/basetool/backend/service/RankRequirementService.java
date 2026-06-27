@@ -139,6 +139,13 @@ public class RankRequirementService {
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
+    // REQ-ORG-017 "pin, else choose": a two-Staffel officer must pin the target Staffel via the
+    // switcher before creating, rather than silently stamping their name-sorted primary.
+    if (ownerScopeService.hasAmbiguousStaffelContext()) {
+      throw new BadRequestException(
+          "You belong to two Staffeln — pin the Staffel this rank requirement belongs to via the"
+              + " sidebar switcher before creating it.");
+    }
     Squadron squadron =
         ownerScopeService
             .currentSquadron()

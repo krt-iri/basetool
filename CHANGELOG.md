@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Mitgliederverwaltung: bis zu zwei Staffeln je Mitglied.** In den Mitglied-Details lassen sich jetzt zwei Staffeln zuweisen statt nur einer, jede mit eigenen Logistiker-/Missions-Manager-Rollen; das Speichern gleicht die Staffelmitgliedschaften in einem Schritt ab (Hinzufügen, Entfernen, Rollen). Die Logistiker-/Missions-Manager-Schalter in der Mitgliederliste entfallen — diese Rollen werden nun je Staffel in den Mitglied-Details gepflegt; die Staffel-Spalte zeigt beide Staffeln.
+
+- **Zwei Staffeln werden projektweit unterstützt.** Profil und Mitgliederliste zeigen beide Staffeln, und Mitglieder-/Such-/Bewertungslisten eines Offiziers mit zwei Staffeln umfassen beide; die aktive Staffel (für Anzeige und automatische Zuweisung beim Erstellen) folgt dem Staffel-Umschalter in der Seitenleiste, sonst der primären (namens-sortierten) Staffel. Berechtigungen (PII-Einsicht, Bewertung) und Auftrags-Übergabe-Protokolle berücksichtigen beide Staffeln; beim Erstellen von Promotion-Themen/Rang-Anforderungen muss ein Nutzer mit zwei Staffeln zuvor die Ziel-Staffel anpinnen.
+
 ## [v0.7.16](https://github.com/krt-profit/basetool/releases/tag/v0.7.16) - 2026-06-27
 
 ### Added

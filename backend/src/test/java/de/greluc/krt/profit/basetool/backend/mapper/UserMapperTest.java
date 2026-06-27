@@ -181,7 +181,8 @@ class UserMapperTest {
   @Test
   void toDto_withoutRequestScope_fallsBackToDirectQuery() {
     // Outside an HTTP request (e.g. a scheduled task) there is no request scope to memoise on, so
-    // each resolver issues its own lookup — the fallback must not throw.
+    // each of the four membership-derived resolvers (squadron, squadrons, isLogistician,
+    // isMissionManager) issues its own lookup — the fallback must not throw.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("noRequest");
@@ -191,7 +192,7 @@ class UserMapperTest {
     UserDto dto = mapper.toDto(user);
 
     assertNotNull(dto);
-    verify(membershipRepository, times(3))
+    verify(membershipRepository, times(4))
         .findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
   }
 }

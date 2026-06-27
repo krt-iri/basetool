@@ -98,8 +98,6 @@ public class UserService {
   private final JobOrderRepository jobOrderRepository;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MaterialClaimRepository materialClaimRepository;
-  private final de.greluc.krt.profit.basetool.backend.repository.SquadronRepository
-      squadronRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
@@ -710,14 +708,14 @@ public class UserService {
 
   /**
    * Returns all users sorted case-insensitively by username, scoped to the caller's squadron
-   * context. Admin in "all squadrons" mode receives the cross-staffel list; everyone else only sees
-   * members of their own squadron (plus unassigned admins/guests). Reads {@link
-   * OwnerScopeService#currentSquadronId()} once per call (MULTI_SQUADRON_PLAN.md section 4.4).
+   * context. Admin in "all squadrons" mode receives the cross-staffel list; everyone else sees the
+   * members of <em>every</em> Staffel they belong to (REQ-ORG-017 — up to two), plus unassigned
+   * admins/guests. Reads {@link OwnerScopeService#currentUserListScopeSquadronIds()} once per call.
    *
    * @return scoped user list, case-insensitively sorted by username
    */
   public List<User> findAll() {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllScopedList(
         scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
@@ -729,61 +727,64 @@ public class UserService {
    * @return scoped paged user list
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllScoped(scope, pageable);
   }
 
   /**
    * Returns paged squadron members eligible to be evaluated in the promotion system, scoped to the
    * caller's squadron context and excluding both admins and officers — the promotion system
-   * assesses only the simple members of a squadron (issue #817). An Officer of squadron X sees only
-   * the ordinary members of squadron X; an Admin in "all squadrons" mode sees every squadron's
-   * ordinary members; an Admin with the sidebar switcher focused on a squadron sees that squadron's
-   * ordinary members. Admins and officers themselves are never returned — admins are squadron-less
-   * by design, and officers run the Bewertungsverwaltung rather than being its subject. Delegates
-   * the filter to {@link UserRepository#findEvaluatableMembers(UUID, Pageable)}.
+   * assesses only the simple members of a squadron (issue #817). An Officer sees the ordinary
+   * members of <em>every</em> Staffel they belong to (REQ-ORG-017 — up to two); an Admin in "all
+   * squadrons" mode sees every squadron's ordinary members; an Admin/officer with the sidebar
+   * switcher pinned to one Staffel sees that Staffel's ordinary members. Admins and officers
+   * themselves are never returned — admins are squadron-less by design, and officers run the
+   * Bewertungsverwaltung rather than being its subject. Delegates the filter to {@link
+   * UserRepository#findEvaluatableMembers(java.util.Collection, Pageable)}.
    *
    * @param pageable page request
    * @return paged evaluatable members (squadron-scoped, admin- and officer-free)
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findEvaluatableMembers(scope, pageable);
   }
 
   /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
-   * Squadron-scoped via {@link OwnerScopeService#currentSquadronId()} — non-admins only see their
-   * own squadron's members in pickers (MULTI_SQUADRON_PLAN.md section 4.4).
+   * Squadron-scoped via {@link OwnerScopeService#currentUserListScopeSquadronIds()} — a non-admin
+   * sees the members of every Staffel they belong to in pickers (REQ-ORG-017).
    *
    * @return lightweight reference projection used by typeaheads
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllReferenceScoped(scope);
   }
 
   /**
-   * Unpaged username/displayName substring search, squadron-scoped.
+   * Unpaged username/displayName substring search, squadron-scoped (the union of the caller's
+   * Staffeln, REQ-ORG-017).
    *
    * @param query free-text filter
    * @return matching users in the caller's squadron context
    */
   public List<User> searchByUsername(@NotNull String query) {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.searchScopedList(query, scope);
   }
 
   /**
-   * Paged username/displayName substring search, squadron-scoped.
+   * Paged username/displayName substring search, squadron-scoped (the union of the caller's
+   * Staffeln, REQ-ORG-017).
    *
    * @param query free-text filter
    * @param pageable page request
    * @return matching users in the caller's squadron context
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    UUID scope = ownerScopeService.currentSquadronId().orElse(null);
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.searchScoped(query, scope, pageable);
   }
 
@@ -821,112 +822,18 @@ public class UserService {
   }
 
   /**
-   * Flips the {@code is_logistician} flag on the user's Staffel membership row. The flag is
-   * independent of Keycloak realm roles — admins can grant the LOGISTICIAN role via this method
-   * without a Keycloak round-trip; the JWT-to-authorities converter promotes the flag to {@code
-   * ROLE_LOGISTICIAN} on the next authentication.
-   *
-   * <p>Post-R9 D3 (V101): the legacy {@code app_user.is_logistician} column was dropped — the write
-   * lands on the user's single Staffel membership in {@code org_unit_membership}. Users without a
-   * Staffel membership (admins, guests) are a no-op on the membership side; the call still returns
-   * the persisted user.
-   *
-   * @param userId user primary key
-   * @param isLogistician new flag value
-   * @return the persisted user
-   */
-  @Transactional
-  public User updateLogisticianStatus(UUID userId, boolean isLogistician) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-    orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, isLogistician, null);
-    return user;
-  }
-
-  /**
-   * Flips the {@code is_mission_manager} flag on the user's Staffel membership row. Mirrors {@link
-   * #updateLogisticianStatus} but for the MISSION_MANAGER role.
-   *
-   * @param userId user primary key
-   * @param isMissionManager new flag value
-   * @return the persisted user
-   */
-  @Transactional
-  public User updateMissionManagerStatus(UUID userId, boolean isMissionManager) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-    orgUnitMembershipService.applyStaffelMembershipFlagDelta(userId, null, isMissionManager);
-    return user;
-  }
-
-  /**
-   * Assigns the user to a squadron (or clears the assignment when {@code squadronId} is {@code
-   * null}). Admin-only at the controller boundary. Carries optimistic-locking via the {@code
-   * version} parameter: the caller must echo back the version they last read so two admins editing
-   * the same row simultaneously surface as 409 instead of one silently overwriting the other.
-   *
-   * <p>Post-R9 D3 (V101): the legacy {@code app_user.squadron_id} column was dropped — the write
-   * lands as a row in {@code org_unit_membership} (kind=SQUADRON) via {@link
-   * OrgUnitMembershipService#syncStaffelMembership(User, Squadron)}. The membership table is now
-   * the single source of truth for "which Staffel does this user belong to".
-   *
-   * @param userId user primary key; must exist
-   * @param squadronId target squadron id; {@code null} clears the assignment
-   * @param version optimistic-lock version echoed back from the last read; {@code null} bypasses
-   *     the explicit check
-   * @return the user record (unchanged on the User entity itself — the assignment lives on the
-   *     membership table)
-   * @throws NoSuchElementException when {@code userId} does not exist
-   * @throws NoSuchElementException when {@code squadronId} is non-null but unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException on version mismatch
-   */
-  @Transactional
-  public User updateUserSquadron(
-      UUID userId, @org.jetbrains.annotations.Nullable UUID squadronId, Long version) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(User.class, userId);
-    }
-    de.greluc.krt.profit.basetool.backend.model.Squadron resolvedSquadron;
-    if (squadronId == null) {
-      resolvedSquadron = null;
-    } else {
-      resolvedSquadron =
-          squadronRepository
-              .findById(squadronId)
-              .orElseThrow(
-                  () -> new NoSuchElementException("Squadron not found with id: " + squadronId));
-    }
-    // Post-R9 D3: the squadron link IS the membership row — there is no User-level column to
-    // update first. The membership-service call creates / deletes / leaves the membership row as
-    // appropriate; the User entity itself does not change.
-    orgUnitMembershipService.syncStaffelMembership(user, resolvedSquadron);
-    return user;
-  }
-
-  /**
    * SPEZIALKOMMANDO_PLAN.md §7.4 single-POST membership-delta orchestrator. Applies the supplied
    * Staffel + SK change set in one transaction so the admin member-edit page can persist every
-   * change with one Save button click — concurrent-admin safety stays intact because every row
-   * still passes through its individual optimistic-lock check (the {@code version} field on each
-   * change).
+   * change with one Save button click.
    *
    * <p>Resolution order matters and is fixed by this method:
    *
    * <ol>
-   *   <li>Staffel side first — a Staffel reassignment may delete + recreate the membership row, so
-   *       any explicit Staffel-flag patch on the same change must land on the new row, not the old
-   *       one. {@code updateUserSquadron} delegates to {@link
-   *       OrgUnitMembershipService#syncStaffelMembership} which creates the new row with the legacy
-   *       User-level flag values carried over; the explicit-flag patch (if any) then overrides on
-   *       top.
+   *   <li>Staffel side first — the {@code staffeln} list (the desired complete Staffel membership
+   *       set, REQ-ORG-017 allows up to two) is reconciled against the current state by {@link
+   *       OrgUnitMembershipService#reconcileStaffelMemberships}: squadrons are added / removed and
+   *       per-squadron flags patched in one pass. A {@code null} list leaves the Staffel side
+   *       untouched; a non-null (possibly empty) list is the authoritative target.
    *   <li>SK side second, in the order the client sent them. ADD adopts initial flags inline (no
    *       second {@code save}); REMOVE deletes by composite PK; PATCH validates the per-row
    *       {@code @Version} before writing. {@code is_lead} is intentionally not part of this
@@ -935,8 +842,9 @@ public class UserService {
    * </ol>
    *
    * <p>If any step throws (NotFoundException on a stale id, OptimisticLockingFailureException on a
-   * stale version, DuplicateEntityException on an ADD for an existing membership) the entire
-   * transaction rolls back — partial application is not exposed.
+   * stale version, DuplicateEntityException on an ADD for an existing membership,
+   * BadRequestException on a Staffel-cardinality / leadership conflict) the entire transaction
+   * rolls back — partial application is not exposed.
    *
    * @param userId the user whose memberships to mutate; never {@code null}.
    * @param delta the delta to apply; never {@code null}, but both halves may be {@code null} /
@@ -950,12 +858,13 @@ public class UserService {
       applyMembershipDelta(
           UUID userId,
           de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest delta) {
-    userRepository
-        .findById(userId)
-        .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
-    if (delta.staffel() != null) {
-      applyStaffelChange(userId, delta.staffel());
+    if (delta.staffeln() != null) {
+      orgUnitMembershipService.reconcileStaffelMemberships(user, delta.staffeln());
     }
     if (delta.specialCommands() != null) {
       for (de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest
@@ -965,34 +874,6 @@ public class UserService {
       }
     }
     return orgUnitMembershipService.findAllMembershipsForUser(userId);
-  }
-
-  /**
-   * Staffel-side half of {@link #applyMembershipDelta}. Routes through {@link
-   * #updateUserSquadron(UUID, UUID, Long)} for assignment changes (which in turn syncs the
-   * membership row) and through {@link OrgUnitMembershipService#applyStaffelMembershipFlagDelta}
-   * for explicit flag patches.
-   *
-   * @param userId target user id.
-   * @param change the Staffel-side delta record.
-   */
-  private void applyStaffelChange(
-      UUID userId,
-      de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.StaffelChange change) {
-    userRepository.findById(userId).orElseThrow(() -> new NoSuchElementException("User not found"));
-    // Post-R9 D3 (V101): the user's home Staffel is sourced from org_unit_membership directly —
-    // the legacy app_user.squadron_id column was dropped. Read the current Staffel membership row
-    // to decide whether the squadron assignment actually changes.
-    UUID currentSquadronId =
-        orgUnitMembershipService.findStaffelMembershipOrgUnitId(userId).orElse(null);
-    UUID targetSquadronId = change.squadronId();
-    if (!java.util.Objects.equals(currentSquadronId, targetSquadronId)) {
-      updateUserSquadron(userId, targetSquadronId, change.userVersion());
-    }
-    if (change.isLogistician() != null || change.isMissionManager() != null) {
-      orgUnitMembershipService.applyStaffelMembershipFlagDelta(
-          userId, change.isLogistician(), change.isMissionManager());
-    }
   }
 
   /**
