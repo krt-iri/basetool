@@ -144,7 +144,9 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId);
+        // The details form (name/save) lives in the Verwaltung tab of the new tab layout; deeplink
+        // straight to it via ?tab=verw so the inputs are visible on load.
+        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
         page.waitForLoadState();
 
         page.locator("#op-name").fill(firstName);
@@ -196,7 +198,8 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId);
+        // The delete action lives in the Verwaltung tab; deeplink to it so the button is visible.
+        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
         page.waitForLoadState();
 
         // Open the confirm modal, then confirm — the AJAX delete navigates back to the list.
