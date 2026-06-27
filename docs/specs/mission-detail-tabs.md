@@ -19,9 +19,19 @@ optimistic-locking versions) and every permission gate of the previous panel lay
 
 ### REQ-MISSION-004 — Tab structure, deeplink, and state
 
-The detail page renders a sticky head (title, owning-squadron badge, status pill, "Anmelden" CTA),
-a `.facts-bar` (server join = planned start, TS meeting time, participants, checked-in count,
-finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
+The detail page renders a sticky head (title, owning-squadron badge, status pill, and a full-size
+"Anmelden" CTA — #818 follow-up: the primary action is no longer a `btn-xs2`), a high-signal
+`.facts-bar`, and a `.tab-nav` with up to four tabs. The facts bar (#818 follow-up) shows five
+icon-led facts at larger type — TS meeting time (headset), server join = planned start (clock),
+planned end (clock), party lead (user) and a combined participants fact (users) that folds the
+checked-in count into the registered count (`registered · N eingecheckt`). The three time facts
+show **time only** (`data-format="time"` on the `.krt-local-dt` span, localised client-side); the
+full date stays in the Übersicht details. The standalone
+finance-total fact was dropped (it stays on the Finanzen tab). Its `#facts-ts` /
+`#facts-planned-start` / `#facts-planned-end` / `#facts-party-lead` / `#facts-registered` /
+`#facts-checked-in` ids are patched in place by the overview / crew / party-lead live-update
+handlers (carried on `#overview-head-meta` + `#crew-count-meta`) so a peer's schedule, party-lead
+or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 
 1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
    2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout). Two columns of
@@ -34,7 +44,10 @@ finance total for member+ viewers) and a `.tab-nav` with up to four tabs:
    panel collapses when nothing is set, #816); **right** = a "Teilnehmer" attendance meter (registered count + a
    checked-in progress bar derived from `checkedInParticipants/registeredParticipants`), the
    read-only **Ablauf** checklist (REQ-MISSION-009) and a "Kalender" open card. The long **Markdown**
-   description moves into a collapsible `<details>` below the grid (member+ gate unchanged; rendered
+   description moves into a collapsible gray-card `<details class="more">` below the grid — the same
+   `--color-bg-dark-gray` panel surface as the other overview cards (owner request 2026-06-27, #818
+   follow-up), with a chevron that flips on open, replacing the former bare `hud-details` summary that
+   sat directly on the honeycomb backdrop (member+ gate unchanged; rendered
    server-side via the `@markdown` bean — raw HTML escaped, unsafe link protocols stripped, so
    `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
    banner). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
