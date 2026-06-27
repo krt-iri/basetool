@@ -2231,6 +2231,114 @@ class MissionPageControllerMvcTest {
   }
 
   /**
+   * #816 follow-up (review finding): the "Funk" panel must collapse — not paint a bare heading over
+   * an empty list — when the frequency-types lookup fails (a Resilience4j-wrapped fetch whose
+   * failure the controller swallows, leaving the {@code frequencyTypes} attribute null) while the
+   * mission still carries a stored central frequency value and no unit has a frequency.
+   *
+   * <p>The central rows iterate {@code frequencyTypes}; the panel gate therefore AND-s the
+   * central-value flag with {@code hasCentralTypes} so it stays hidden when the type list is
+   * absent.
+   */
+  @Test
+  void missionOverviewFragment_FreqTypesFetchFailed_CollapsesFunkPanel() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID befehlTypeId = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto befehlFrequency =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto(
+            UUID.randomUUID(),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto
+                .FrequencyTypeRef(befehlTypeId, "Befehl"),
+            new java.math.BigDecimal("121.50"),
+            1L);
+
+    MissionDto mission =
+        new MissionDto(
+            missionId,
+            "Freq Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            Collections.emptySet(),
+            Collections.emptyList(),
+            List.of(befehlFrequency),
+            Collections.emptySet(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            null,
+            null,
+            Collections.emptySet(),
+            true,
+            true,
+            1L,
+            1L,
+            1L,
+            1L,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
+
+    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+            Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
+    when(backendApiClient.getCached(
+            anyString(),
+            any(ParameterizedTypeReference.class),
+            org.mockito.ArgumentMatchers.anyBoolean()))
+        .thenReturn(emptyPage);
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), any(Class.class), eq(false))).thenReturn(null);
+    // The frequency-types fetch fails -> the controller swallows it and never sets frequencyTypes.
+    when(backendApiClient.getCached(
+            eq("/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc"),
+            any(ParameterizedTypeReference.class),
+            eq(true)))
+        .thenThrow(new RuntimeException("frequency types unavailable"));
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(false)))
+        .thenReturn(mission);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"),
+            any(ParameterizedTypeReference.class),
+            eq(false)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/missions/" + missionId)
+                .param("fragment", "overview")
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.oidcLogin()
+                        .idToken(
+                            token ->
+                                token
+                                    .subject(UUID.randomUUID().toString())
+                                    .claim("preferred_username", "viewer1"))))
+        .andExpect(status().isOk())
+        // The panel collapses entirely: no "Funk" heading and no orphaned central value.
+        .andExpect(content().string(not(containsString(">Funk<"))))
+        .andExpect(content().string(not(containsString("121.50"))));
+  }
+
+  /**
    * Reproducer for the "creating a finance entry 500s the mission detail page" bug (live log:
    * {@code TemplateProcessingException ... mission-detail line 856} right after a finance entry is
    * persisted).
