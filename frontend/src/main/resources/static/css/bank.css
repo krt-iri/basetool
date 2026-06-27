@@ -735,3 +735,218 @@ tr.is-inert td {
     padding: 0.25rem 0;
     border-bottom: var(--border-hairline);
 }
+
+/* ==========================================================================
+   Org-unit bank overview (REQ-BANK-021/-038) — DS alignment: tabs + a dense
+   account list (no CTA-heavy cards) + quiet detail visibility toggles.
+   ========================================================================== */
+
+/* Tab panels: the [hidden] attribute must win even if a layout rule sets display. */
+[data-tabpanel][hidden] {
+    display: none;
+}
+
+/* Dense account list: one grid row per account, header strip on top. */
+.ou-list {
+    border: var(--border-hairline);
+    background: var(--color-bg-dark-gray);
+}
+
+.ou-rowhead,
+.ou-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.6fr) 132px minmax(120px, 1.1fr) 168px 116px;
+    gap: 16px;
+    align-items: center;
+}
+
+.ou-rowhead {
+    padding: 10px 18px;
+    background: var(--color-surface-input);
+    border-bottom: 2px solid var(--color-primary);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+}
+
+.ou-rowhead .e {
+    text-align: right;
+}
+
+.ou-row {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--color-gray-3);
+}
+
+.ou-row:last-child {
+    border-bottom: none;
+}
+
+.ou-row:hover {
+    background: rgb(255 255 255 / 2%);
+}
+
+.ou-row .r-name {
+    font-weight: var(--fw-bold);
+    color: var(--color-white);
+    font-size: 0.9rem;
+}
+
+.ou-row .r-name a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.ou-row .r-name a:hover {
+    color: var(--color-primary);
+}
+
+.ou-row .r-sub {
+    font-size: 0.68rem;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+.r-trend {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ou-row .r-bal {
+    text-align: right;
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1.15rem;
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.ou-row .unit {
+    color: var(--color-gray-2);
+    font-weight: 400;
+    font-size: 0.62em;
+}
+
+.r-act {
+    text-align: right;
+}
+
+.r-noziel {
+    color: var(--color-gray-2);
+    font-size: 0.72rem;
+}
+
+/* Compact balance-target progress in the list "Ziel" column. */
+.ou-target {
+    width: 100%;
+}
+
+.ou-target-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.68rem;
+    color: var(--color-gray-2);
+    margin-top: 4px;
+}
+
+.ou-target-meta b {
+    color: var(--color-gray-1);
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The list collapses to stacked rows on the smartphone device class. */
+@media (width <= 820px) {
+    .ou-rowhead {
+        display: none;
+    }
+
+    .ou-row {
+        grid-template-columns: 1fr;
+        gap: 9px;
+        padding: 16px;
+    }
+
+    .ou-row .r-bal {
+        text-align: left;
+        font-size: 1.4rem;
+    }
+
+    .r-act {
+        text-align: left;
+    }
+
+    .r-act .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Org-unit account-detail facts: a 4-up kpi-total grid (NOT the shared .bank-facts strip,
+   which two other bank pages keep using with .fact-key/.fact-value). */
+.ou-facts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+@media (width <= 820px) {
+    .ou-facts {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Detail visibility toggles: one quiet row per audience. */
+.sub-h {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    margin: 18px 0 9px;
+}
+
+.vis-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--color-surface-input);
+}
+
+.vis-row:last-of-type {
+    border-bottom: none;
+}
+
+.vis-row .v-label {
+    font-size: 0.82rem;
+    color: var(--color-gray-1);
+}
+
+.vis-state {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Inline label + control + action row (the "grant a user" picker). */
+.field-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.field-row .grow {
+    flex: 1;
+    min-width: 220px;
+    max-width: 340px;
+    margin-bottom: 0;
+}

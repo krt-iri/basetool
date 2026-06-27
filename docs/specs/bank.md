@@ -586,6 +586,17 @@ org-unit-blind.
 > history and a Halter-redacted Kontoauszug** (REQ-BANK-038) — booking actions stay out; the history
 > and statement are no longer a bank-staff-only surface for these viewers, but player custody is
 > redacted.
+>
+> **Amendment (design-system layout):** the page uses the design-system tab nav — **Konten** (the
+> dense account list) and **Meine Anträge** (the requester's own requests) — with both panels and
+> their counts living inside the `orgUnitBank` swap fragment, so a request create/cancel updates the
+> list and the request tab-count in place (REQ-FE-005); the active tab is carried in a `#tab=` deeplink
+> that is re-applied after each swap. A booking request is raised from a **single page-level CTA**
+> whose modal carries an **account selector** filled only with the caller's requestable accounts
+> (`canRequest`); the CTA + modal are shown only when at least one such account is visible, replacing
+> the former per-card request button + "view only" label. Accounts render as compact list rows (linked
+> name, 30-day trend, balance, target progress, a single "Details" action) — no per-account status
+> chip and no per-card CTA.
 
 **Acceptance**
 
@@ -1081,6 +1092,16 @@ redacted**: the backend nulls the holder/counter-holder handles on the booking r
 the wire, and the statement PDF is rendered without the Halter column. Bank staff keep the full,
 non-redacted detail and statement (REQ-BANK-014). Authorization is enforced in the seam, which then
 reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
+
+> **Amendment (design-system layout):** the drill-in header drops the always-"Aktiv" status pill (the
+> page only ever lists active accounts), the facts render as a four-up `kpi-total` grid (balance,
+> target with progress bar — or a muted "no target" note —, ±30-day delta, booking count), and the
+> responsible-holder/OL visibility controls are quiet per-audience toggles (a `chip--success`
+> "granted" badge + a ghost "remove" when granted, an outline "grant" otherwise) rather than a wall of
+> filled CTAs. The only filled CTA on the page stays "Ziel speichern" (and the statement modal's "PDF
+>
+>> herunterladen"). Endpoints, methods, optimistic-lock versions and the `orgUnitBankSettings` /
+>> `orgUnitBankBookings` swap seams are unchanged.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 

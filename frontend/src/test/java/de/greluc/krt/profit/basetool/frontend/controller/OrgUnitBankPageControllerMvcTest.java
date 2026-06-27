@@ -29,8 +29,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankCapabilitiesDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankViewUserDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -136,10 +145,13 @@ class OrgUnitBankPageControllerMvcTest {
         // mirroring the bank dashboard cards (REQ-BANK-016).
         .andExpect(content().string(Matchers.containsString("kpi-delta")))
         .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
-        // The request modal exists and the card primes it with the org unit id.
+        // The single page-level request CTA shows (an account is requestable) and opens the modal.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
-        .andExpect(
-            content().string(Matchers.containsString("data-field-orgunitid=\"" + orgUnitId + "\"")))
+        // The modal's account selector lists the requestable org unit as an option (replacing the
+        // former per-card data-field-orgunitid priming).
+        .andExpect(content().string(Matchers.containsString("name=\"orgUnitId\"")))
+        .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
         // The own-request row renders with a cancel form.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")));
   }
@@ -172,9 +184,11 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"LOGISTICIAN"})
-  void orgUnitBank_specialAccountRendersViewOnlyWithoutRequestButton() throws Exception {
-    // REQ-BANK-028: a special account (Sonderkonto) carries no org-unit identity, is view-only and
-    // must not offer the booking-request button. Pins that the template handles the null org unit.
+  void orgUnitBank_specialAccountRendersRowWithoutRequestButton() throws Exception {
+    // REQ-BANK-028: a special account (Sonderkonto) carries no org-unit identity and is not
+    // requestable. A page of only such accounts renders the row but offers NO page-level request
+    // CTA at all (it is gated on at least one requestable account). Pins that the template handles
+    // the null org unit.
     OrgUnitBankBalanceDto special =
         new OrgUnitBankBalanceDto(
             UUID.randomUUID(),
@@ -202,8 +216,129 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("Event Sonderkonto")))
-        .andExpect(content().string(Matchers.containsString("org-unit-bank-viewonly")))
+        // The account row renders (its testid is unchanged from the former card).
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-card")))
+        // No requestable account -> neither the page-level CTA nor the request modal is rendered.
         .andExpect(
-            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))));
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-request-modal"))));
+  }
+
+  /**
+   * Stubs the read-only account drill-in (REQ-BANK-038) plus the holder/OL settings region: an
+   * ORG_UNIT account with a balance target, a single booking, one granted role bucket and one
+   * granted user, and a user-lookup for the "grant a user" picker.
+   *
+   * @param accountId the account id used in every backend URI
+   */
+  private void stubDetail(UUID accountId) {
+    BankAccountDto account =
+        new BankAccountDto(
+            accountId,
+            "KB-0001",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "ACTIVE",
+            null,
+            null,
+            new BigDecimal("1850000"),
+            new BigDecimal("2000000"),
+            3L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    BankAccountDetailDto inner =
+        new BankAccountDetailDto(
+            account,
+            new BigDecimal("420000"),
+            128L,
+            new BankCapabilitiesDto(false, false, false, false));
+    OrgUnitBankAccountDetailDto detail =
+        new OrgUnitBankAccountDetailDto(inner, true, true, true, true);
+    OrgUnitBankAccountSettingsDto settings =
+        new OrgUnitBankAccountSettingsDto(
+            accountId,
+            "KB-0001",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "SQUADRON",
+            new BigDecimal("2000000"),
+            3L,
+            true,
+            true,
+            true,
+            true,
+            false,
+            List.of("LOGISTICIAN", "MISSION_MANAGER"),
+            List.of("LOGISTICIAN"),
+            false,
+            List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")));
+    BankBookingDto booking =
+        new BankBookingDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "DEPOSIT",
+            new BigDecimal("250000"),
+            "someHolder",
+            "Missionsertrag",
+            Instant.parse("2026-06-10T18:30:00Z"),
+            null,
+            null,
+            null,
+            null,
+            false,
+            BigDecimal.ZERO);
+    PageResponse<BankBookingDto> bookings =
+        new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
+    UserReferenceDto user =
+        new UserReferenceDto(UUID.randomUUID(), "cmdr.valk", "cmdr.valk", "cmdr.valk", 1);
+
+    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+        .thenReturn(detail);
+    when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
+        .thenReturn(settings);
+    when(backendApiClient.get(
+            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+        .thenReturn(bookings);
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(user));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBankAccount_rendersDetailWithSettingsAndVisibilityToggles() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId);
+
+    mockMvc
+        .perform(get("/org-unit-bank/accounts/" + accountId))
+        .andExpect(status().isOk())
+        .andExpect(view().name("org-unit-bank-account-detail"))
+        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
+        // Facts render as the kpi-total grid, target fact included.
+        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
+        // Settings region with the quiet per-audience visibility toggles.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-settings")))
+        .andExpect(content().string(Matchers.containsString("vis-row")))
+        .andExpect(content().string(Matchers.containsString("org-unit-vis-role-LOGISTICIAN")))
+        // History panel kept (4-column, Halter-redacted).
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
+        // The always-"Aktiv" status pill was dropped from the header.
+        .andExpect(content().string(Matchers.not(Matchers.containsString("status-pill"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBankAccount_settingsFragmentViewResolves() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId);
+
+    mockMvc
+        .perform(
+            get("/org-unit-bank/accounts/" + accountId).param("fragment", "orgUnitBankSettings"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("org-unit-bank-account-detail :: orgUnitBankSettings"));
   }
 }

@@ -88,6 +88,11 @@ public class OrgUnitBankPageController {
     model.addAttribute(
         "ownRequests", ownRequests == null ? List.<BankBookingRequestDto>of() : ownRequests);
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
+    // Drives the single page-level "request" CTA + its modal account selector (REQ-BANK-022): both
+    // are shown iff at least one visible account is the caller's own-level one (canRequest); a page
+    // of view-only / special accounts offers no request affordance at all.
+    model.addAttribute(
+        "anyCanRequest", safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest));
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }

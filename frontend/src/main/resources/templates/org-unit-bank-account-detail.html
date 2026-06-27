@@ -42,12 +42,11 @@
             <p style="margin: 0 0 0.25rem;"><a th:href="@{/org-unit-bank}" class="text-muted"
                   style="font-size: 0.75rem;" th:text="'&#8592; ' + #{bank.orgUnit.detail.back}">&#8592; Zur&uuml;ck zur &Uuml;bersicht</a></p>
             <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
+            <!-- The page only ever lists active accounts, so the always-"Aktiv" status pill is
+                 dropped; the header keeps the type chip + account number. -->
             <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
                 <span class="chip" style="font-size: 0.55rem;"
                       th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
-                <span class="status-pill"
-                      th:classappend="${acct.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
-                      th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
                 <span th:text="${acct.accountNo()}" data-testid="org-unit-bank-detail-no">KB-0001</span>
             </p>
         </div>
@@ -61,7 +60,7 @@
     <!-- Facts + responsibility settings; re-rendered in place after a target/visibility write. -->
     <div id="org-unit-bank-settings-results">
     <th:block th:fragment="orgUnitBankSettings" th:with="d=${detail.detail()}, acct=${detail.detail().account()}">
-        <div class="bank-facts mt-2"
+        <div class="ou-facts mt-2"
              th:with="hasTarget=${acct.balanceTarget() != null and acct.balanceTarget().signum() > 0},
                       pct=${(acct.balanceTarget() != null and acct.balanceTarget().signum() > 0) ? (acct.balance().doubleValue() / acct.balanceTarget().doubleValue() * 100.0) : 0.0}">
             <div class="kpi-total">
@@ -69,11 +68,12 @@
                 <div class="kpi-value" data-testid="org-unit-bank-detail-balance"
                      th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
             </div>
-            <div class="kpi-total" th:if="${hasTarget}" data-testid="org-unit-bank-detail-target">
+            <div class="kpi-total" data-testid="org-unit-bank-detail-target">
                 <div class="kpi-label" th:text="#{bank.orgUnit.balanceTarget}">Zielkontostand</div>
-                <div class="kpi-value"
+                <div class="kpi-value" th:if="${hasTarget}"
                      th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</div>
-                <div class="bank-target-bar" aria-hidden="true">
+                <div class="kpi-value r-noziel" th:unless="${hasTarget}" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+                <div class="bank-target-bar" th:if="${hasTarget}" aria-hidden="true">
                     <div class="bank-target-bar-fill"
                          th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
                 </div>
@@ -96,7 +96,7 @@
 
             <!-- Balance target -->
             <div th:if="${settings.canSetTarget()}" class="mt-2" data-testid="org-unit-bank-target-settings">
-                <h3 th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
+                <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
                 <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
                     Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
                 <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
@@ -117,66 +117,74 @@
                 </form>
             </div>
 
-            <!-- Configurable visibility -->
+            <!-- Configurable visibility (REQ-BANK-035): quiet per-entry toggles instead of a wall of
+                 filled CTAs. Each entry shows a chip--success "granted" + a ghost "remove" when the
+                 grant is set, and an outline "grant" otherwise. Endpoints/methods/_id/data-refresh are
+                 unchanged from the previous chip layout. -->
             <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="mt-2"
                  data-testid="org-unit-bank-visibility-settings">
-                <h3 th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
+                <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
                 <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.visibility.hint}">
                     Lege fest, wer den Kontostand und die Detailansicht zus&auml;tzlich sehen darf.</p>
 
-                <!-- Role buckets -->
-                <div th:if="${!#lists.isEmpty(settings.availableRoleCodes())}" class="bank-vis-group">
-                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.roles}">Nach Rolle</span>
-                    <div class="bank-vis-chips">
-                        <span th:each="role : ${settings.availableRoleCodes()}" class="bank-vis-chip"
-                              th:with="granted=${settings.grantedRoleCodes().contains(role)}">
-                            <span th:text="#{'bank.orgUnit.visibility.role.' + ${role}}">Rolle</span>
+                <!-- Role buckets + all-members in one toggle list. -->
+                <div th:if="${!#lists.isEmpty(settings.availableRoleCodes())}">
+                    <div class="vis-row" th:each="role : ${settings.availableRoleCodes()}"
+                         th:with="granted=${settings.grantedRoleCodes().contains(role)}">
+                        <span class="v-label" th:text="#{'bank.orgUnit.visibility.role.' + ${role}}">Logistiker</span>
+                        <span class="vis-state">
+                            <span th:if="${granted}" class="chip chip--success"
+                                  th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
                             <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
                                   th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/role/' + ${role},data-method=${granted ? 'DELETE' : 'POST'}"
                                   style="display:inline;">
                                 <input type="hidden" name="_id" th:value="${acct.id()}">
-                                <button type="submit" class="btn btn-sm"
-                                        th:classappend="${granted} ? ' btn-outline' : ' btn--cta'"
+                                <button type="submit" class="btn btn-xs"
+                                        th:classappend="${granted} ? ' btn-ghost' : ' btn-outline'"
                                         th:attr="data-testid='org-unit-vis-role-' + ${role}"
-                                        th:text="${granted} ? #{bank.orgUnit.settings.visibility.revoke} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                                        th:text="${granted} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
                             </form>
                         </span>
                     </div>
                 </div>
 
                 <!-- All members -->
-                <div th:if="${settings.allMembersSupported()}" class="bank-vis-group">
-                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder</span>
-                    <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
-                          th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/' + ${!settings.allMembersGranted()}"
-                          data-method="PUT" style="display:inline;">
-                        <input type="hidden" name="_id" th:value="${acct.id()}">
-                        <button type="submit" class="btn btn-sm"
-                                th:classappend="${settings.allMembersGranted()} ? ' btn-outline' : ' btn--cta'"
-                                data-testid="org-unit-vis-all-members"
-                                th:text="${settings.allMembersGranted()} ? #{bank.orgUnit.settings.visibility.revoke} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
-                    </form>
+                <div th:if="${settings.allMembersSupported()}" class="vis-row">
+                    <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder der Org-Einheit</span>
+                    <span class="vis-state">
+                        <span th:if="${settings.allMembersGranted()}" class="chip chip--success"
+                              th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
+                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                              th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/' + ${!settings.allMembersGranted()}"
+                              data-method="PUT" style="display:inline;">
+                            <input type="hidden" name="_id" th:value="${acct.id()}">
+                            <button type="submit" class="btn btn-xs"
+                                    th:classappend="${settings.allMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
+                                    data-testid="org-unit-vis-all-members"
+                                    th:text="${settings.allMembersGranted()} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                        </form>
+                    </span>
                 </div>
 
                 <!-- Individual users -->
-                <div class="bank-vis-group">
-                    <span class="bank-kv-key" th:text="#{bank.orgUnit.settings.visibility.users}">Einzelne Nutzer</span>
-                    <ul class="bank-vis-users" th:if="${!#lists.isEmpty(settings.grantedUsers())}">
-                        <li th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
-                            <span th:text="${u.displayName()}">greluc</span>
-                            <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
-                                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/user/' + ${u.userId()}"
-                                  data-method="DELETE" style="display:inline;">
-                                <input type="hidden" name="_id" th:value="${acct.id()}">
-                                <button type="submit" class="btn btn-ghost btn-sm"
-                                        th:text="#{bank.orgUnit.settings.visibility.user.remove}">Entfernen</button>
-                            </form>
-                        </li>
-                    </ul>
-                    <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
-                          data-endpoint="/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId}" data-method="POST">
-                        <input type="hidden" name="_id" th:value="${acct.id()}">
-                        <div class="bank-form-row">
+                <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.users}">Einzelne Nutzer</h3>
+                <div th:if="${!#lists.isEmpty(settings.grantedUsers())}">
+                    <div class="vis-row" th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
+                        <span class="v-label" th:text="${u.displayName()}">greluc</span>
+                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                              th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/user/' + ${u.userId()}"
+                              data-method="DELETE" style="display:inline;">
+                            <input type="hidden" name="_id" th:value="${acct.id()}">
+                            <button type="submit" class="btn btn-xs btn-ghost"
+                                    th:text="#{bank.orgUnit.settings.visibility.user.remove}">Entfernen</button>
+                        </form>
+                    </div>
+                </div>
+                <form class="bank-ajax-form no-track mt-2" data-refresh="orgUnitBankSettings"
+                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId}" data-method="POST">
+                    <input type="hidden" name="_id" th:value="${acct.id()}">
+                    <div class="field-row">
+                        <div class="bank-form-row grow">
                             <label for="org-unit-vis-user-select" th:text="#{bank.orgUnit.settings.visibility.user.add}">Nutzer freigeben</label>
                             <select id="org-unit-vis-user-select" name="_userId" required data-testid="org-unit-vis-user-select">
                                 <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
@@ -185,10 +193,10 @@
                             </select>
                             <span class="bank-field-error" data-error-for="_global"></span>
                         </div>
-                        <button type="submit" class="btn btn--cta btn-sm" data-testid="org-unit-vis-user-add"
+                        <button type="submit" class="btn btn-outline" data-testid="org-unit-vis-user-add"
                                 th:text="#{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
         </div>
     </th:block>

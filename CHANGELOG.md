@@ -24,6 +24,8 @@
 
 - **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
 
+- **Org-Einheits-Bankseite im Design-System-Layout.** „Bank meiner Org-Einheit" trennt Konten und „Meine Anträge" jetzt in zwei Tabs, und eine einzige Schaltfläche „Ein-/Auszahlung beantragen" oben öffnet den Antrag mit einer Konto-Auswahl (statt einer eigenen Schaltfläche je Konto). Die Konten erscheinen als kompakte Liste mit Trend, Kontostand und Zielfortschritt statt als überladene Karten. In der Konto-Detailansicht sind die Sichtbarkeits-Freigaben ruhige Umschalter (Status-Chip „Freigegeben" + „Entfernen"/„Freigeben"), und der stets gleiche „Aktiv"-Status entfällt. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
+
 ### Fixed
 
 - **Auftragsdetails: kompakter Kommentar und Abstand vor „Bestellte Items".** Der Kommentar-Kasten umschließt jetzt seinen Inhalt, statt als hoher, halbleerer Block mit weit eingerücktem Titel zu erscheinen (Ursache war ein versehentlich gerendertes Einrückungs-Whitespace); Beschriftung und Text stehen platzsparend in einer Zeile, Zeilenumbrüche im Kommentar bleiben erhalten. Zwischen Kopfbereich und „Bestellte Items" bzw. „Benötigte Materialien" gibt es wieder den üblichen Abstand.
