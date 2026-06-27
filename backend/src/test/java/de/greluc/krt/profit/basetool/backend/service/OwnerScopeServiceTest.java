@@ -55,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -105,6 +106,8 @@ class OwnerScopeServiceTest {
 
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
 
+  @Mock private StaffelMembershipResolver staffelMembershipResolver;
+
   @Mock private HttpServletRequest request;
 
   @InjectMocks private OwnerScopeService service;
@@ -149,6 +152,16 @@ class OwnerScopeServiceTest {
               }
               return ids;
             });
+
+    // The "name-sorted primary" definition is owned by StaffelMembershipResolver (tested
+    // independently in StaffelMembershipResolverTest). Delegate the mock to a real instance backed
+    // by the squadron-repo mock so the single-Staffel fast path stays load-free and the two-Staffel
+    // name-sort is exercised through the real resolver — without re-stubbing it per scenario.
+    StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
+    lenient()
+        .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
+        .thenAnswer(
+            invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -254,6 +267,46 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of());
 
       assertTrue(service.currentSquadronId().isEmpty());
+    }
+
+    @Test
+    void nonAdmin_twoStaffeln_noMatchingPin_returnsNameSortedPrimary() {
+      // REQ-ORG-017: with two Staffeln and no active pin the fallback is the deterministic
+      // name-sorted primary (Alpha < Bravo), resolved through StaffelMembershipResolver — the rows
+      // /
+      // squadron entities are returned in non-alphabetical order to prove the sort decides.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID),
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      squadronA.setName("Alpha");
+      squadronB.setName("Bravo");
+      when(squadronRepository.findAllById(any())).thenReturn(List.of(squadronB, squadronA));
+
+      assertEquals(Optional.of(SQUADRON_A_ID), service.currentSquadronId());
+    }
+
+    @Test
+    void nonAdmin_twoStaffeln_pinMatchesNonPrimary_returnsPinned() {
+      // An active pin that points at one of the caller's Staffeln wins over the name-sorted
+      // primary;
+      // the pin path never touches the squadron table.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertEquals(Optional.of(SQUADRON_B_ID), service.currentSquadronId());
     }
   }
 
@@ -1753,7 +1806,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
@@ -1765,7 +1818,7 @@ class OwnerScopeServiceTest {
       UUID orgUnitB = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnitA);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnitB, "LOGISTICIAN"));
@@ -1776,7 +1829,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
               "MISSION_MANAGER", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));

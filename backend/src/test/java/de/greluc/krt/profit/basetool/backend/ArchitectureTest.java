@@ -23,6 +23,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
@@ -263,8 +264,11 @@ class ArchitectureTest {
     // into SecurityContextHolder from a resolver method (as MissionMapper did before
     // the refactor) couples DTO shaping to the request-scoped security context and
     // makes the mapper untestable without a full Spring security setup. If a mapper
-    // needs to know "is the caller authenticated / which roles do they have", it
-    // must depend on AuthHelperService — never on SecurityContextHolder directly.
+    // needs to know "is the caller authenticated / may they edit this", it must depend
+    // on a dependency-leaf SPI (e.g. support.MissionViewerAccess, implemented in the
+    // service layer) — never on SecurityContextHolder directly, and (since ADR-0047's
+    // cycle cleanup) never on the service layer directly either, which would re-close
+    // the mapper <-> service package cycle the leaf interface was introduced to break.
     noClasses()
         .that()
         .resideInAPackage("..backend.mapper..")
@@ -272,9 +276,9 @@ class ArchitectureTest {
         .dependOnClassesThat()
         .haveFullyQualifiedName(SECURITY_CONTEXT_HOLDER)
         .because(
-            "Mappers must stay pure transformers; route any auth lookup through "
-                + "AuthHelperService so the mapper does not depend on the request-scoped "
-                + "SecurityContextHolder.")
+            "Mappers must stay pure transformers; route any auth lookup through a dependency-leaf "
+                + "SPI (e.g. support.MissionViewerAccess) so the mapper depends on neither the "
+                + "request-scoped SecurityContextHolder nor the service layer.")
         .check(CLASSES);
   }
 
@@ -383,6 +387,147 @@ class ArchitectureTest {
             "Controllers must go through the service layer — a controller depending on a "
                 + "repository bypasses @Transactional boundaries, owner filtering and the "
                 + "@PreAuthorize seam, all of which live in services.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void supportPackageMustStayADependencyLeaf() {
+    // Reasoning: the `support` package holds cross-layer collaborators (e.g.
+    // StaffelMembershipResolver) that BOTH the `mapper` and the `service` layer reuse. For that
+    // sharing to be safe it must stay a dependency LEAF — depending only downward on `model` /
+    // `repository` — so it can never sit on both ends of a package cycle. Forbidding any dependency
+    // on the orchestration / web layers (which themselves depend on `support`) keeps the graph
+    // acyclic by construction.
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.support..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "..backend.controller..",
+            "..backend.service..",
+            "..backend.mapper..",
+            "..backend.config..",
+            "..backend.integration..",
+            "..backend.task..",
+            "..backend.filter..",
+            "..backend.interceptor..",
+            "..backend.web..",
+            "..backend.event..",
+            "..backend.health..")
+        .because(
+            "The `support` package must stay a dependency leaf (depending only on model + "
+                + "repository) so the helpers it holds can be shared by both the mapper and the "
+                + "service layer without forming a package cycle.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void backendPackagesShouldBeFreeOfDependencyCycles() {
+    // Reasoning: a package dependency cycle (slice A -> slice B -> ... -> slice A) is the
+    // structural
+    // smell behind "everything depends on everything" — it defeats layering, makes the build order
+    // ambiguous, blocks extracting a package into its own module, and lets an innocent-looking edit
+    // close a loop that ripples across unrelated subsystems. The backend was made fully acyclic
+    // (ADR-0047): the per-first-segment slices (config, service, controller, mapper, model,
+    // repository, exception, integration, event, filter, validation, support, …) form a DAG. This
+    // rule pins that — any new cross-package edge that re-introduces a cycle (a mapper importing a
+    // service, `support` importing upward, a config @Component reaching into service, …) fails
+    // here.
+    // Shared, dependency-free collaborators belong in the `support` leaf (see
+    // supportPackageMustStayADependencyLeaf); a layer that needs a peer's behaviour without owning
+    // the dependency direction inverts it through a leaf interface (e.g. MaterialPieceTypeLookup,
+    // MissionViewerAccess).
+    slices()
+        .matching("de.greluc.krt.profit.basetool.backend.(*)..")
+        .should()
+        .beFreeOfCycles()
+        .because(
+            "backend packages must form an acyclic dependency graph (ADR-0047); put shared"
+                + " dependency-free helpers in the `support` leaf or invert the dependency through"
+                + " a leaf interface instead of closing a package cycle.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void mapperLayerShouldNotDependOnServiceLayer() {
+    // Directional, clear-message guard pinning one edge of
+    // backendPackagesShouldBeFreeOfDependencyCycles. The service layer already depends on the
+    // mapper
+    // layer (services map entities to DTOs through the mappers), so a mapper depending back on a
+    // service re-closes the mapper <-> service package cycle ADR-0047 removed. A mapper that needs
+    // caller-aware behaviour depends on a dependency-leaf SPI instead (e.g.
+    // support.MissionViewerAccess), implemented in the service layer.
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.mapper..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("..backend.service..")
+        .because(
+            "the service layer depends on mappers, so a mapper -> service edge re-creates the "
+                + "mapper <-> service package cycle (ADR-0047). Put shared logic in the `support` "
+                + "leaf or invert it through a leaf SPI.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void integrationLayerShouldNotDependOnServiceLayer() {
+    // integration is the low-level external-API client layer (UexClient, ScWikiClient); the service
+    // layer orchestrates those clients, so service -> integration is the only legal direction. The
+    // SC-Wiki sync orchestrators that used to live here (and import services) moved to
+    // service.scwiki (ADR-0047); a new integration -> service edge would re-close the
+    // integration <-> service cycle.
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.integration..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("..backend.service..")
+        .because(
+            "the service layer orchestrates the integration clients, so an integration -> service "
+                + "edge re-creates the integration <-> service package cycle (ADR-0047). "
+                + "Orchestrators that call services belong in service.scwiki, not integration.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void eventLayerShouldNotDependOnServiceLayer() {
+    // The event package holds after-commit domain-event payload records (data only); the listeners
+    // and producers that consume services live in the service layer (service -> event is the legal
+    // direction). NotificationEventListener moved to service (ADR-0047), so an event -> service
+    // edge would re-close the event <-> service package cycle.
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.event..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("..backend.service..")
+        .because(
+            "event payloads are data-only, so an event -> service edge re-creates the "
+                + "event <-> service package cycle (ADR-0047). Event listeners/producers belong in "
+                + "the service layer.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void validationLayerMustStayADependencyLeaf() {
+    // model.dto carries the bean-validation constraint annotations (model -> validation), so the
+    // validation package must stay a dependency leaf: a validation -> model / repository / service
+    // edge would re-close the model <-> validation (and model -> validation -> repository -> model)
+    // cycles ADR-0047 removed. A validator that needs domain data depends on a leaf SPI instead
+    // (e.g. validation.MaterialPieceTypeLookup, implemented by the service layer).
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.validation..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("..backend.model..", "..backend.repository..", "..backend.service..")
+        .because(
+            "model.dto references the constraint annotations, so validation must stay a leaf; a"
+                + " validation -> model/repository/service edge re-creates the model <-> validation"
+                + " package cycle (ADR-0047). Invert through a leaf SPI like"
+                + " MaterialPieceTypeLookup.")
         .check(CLASSES);
   }
 
@@ -1493,16 +1638,14 @@ class ArchitectureTest {
 
   /**
    * Pure-helper classes under {@code integration.scwiki} that legitimately do NOT inject {@code
-   * ScWikiClient}: they encode SC-Wiki-sourced domain knowledge as code maps rather than making any
-   * HTTP call, so they have no client dependency to wire. {@code BlueprintOutputNameOverrides}
-   * (#327) is the curated map of CIG-mislabeled blueprint output names — conceptually part of the
-   * blueprint sync that consumes it, kept in the package next to it (there is no {@code
-   * service.scwiki} package to move it to). Extend this set only for a stateless, HTTP-free helper
-   * that genuinely belongs beside the sync services; anything that talks to the Wiki must inject
-   * the client like the rest.
+   * ScWikiClient}. Empty since the cycle cleanup (ADR-0047) relocated the SC-Wiki sync
+   * orchestrators — including the curated {@code BlueprintOutputNameOverrides} map (#327) — to the
+   * {@code service.scwiki} package, leaving {@code integration.scwiki} with only {@code
+   * ScWikiClient} itself. Re-add a simple name here only if a new stateless, HTTP-free helper
+   * genuinely belongs beside the client in {@code integration.scwiki}; anything that talks to the
+   * Wiki must inject the client.
    */
-  private static final Set<String> SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES =
-      Set.of("BlueprintOutputNameOverrides");
+  private static final Set<String> SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES = Set.of();
 
   /**
    * SC_WIKI_SYNC_PLAN.md §3.4 / R1 guard: every class in the {@code integration.scwiki} package

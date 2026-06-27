@@ -42,8 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,15 +61,15 @@ import org.springframework.beans.factory.annotation.Autowired;
     unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public abstract class MissionMapper {
 
-  // MapStruct generates a concrete subclass via the annotation processor; the
-  // generated subclass cannot accept additional constructor parameters, so we
-  // fall back to field-level @Autowired here. The architectural concern of
-  // touching SecurityContextHolder directly is solved by routing through
-  // AuthHelperService — the mapper itself no longer depends on Spring's
-  // security-context classes.
-  @Autowired protected MissionSecurityService missionSecurityService;
-
-  @Autowired protected AuthHelperService authHelperService;
+  // MapStruct generates a concrete subclass via the annotation processor; the generated subclass
+  // cannot accept additional constructor parameters, so we fall back to field-level @Autowired
+  // here.
+  // The mapper depends ONLY on the MissionViewerAccess leaf interface (support package), never on
+  // Spring's SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext) and —
+  // since the cycle cleanup, ADR-0047 — never on the service layer directly: the implementation
+  // (MissionViewerAccessService) is what wires AuthHelperService + MissionSecurityService, so the
+  // mapper -> service edge that closed the mapper <-> service package cycle is gone.
+  @Autowired protected MissionViewerAccess missionViewerAccess;
 
   /**
    * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
@@ -199,22 +198,18 @@ public abstract class MissionMapper {
     if (mission == null || mission.getDescription() == null) {
       return null;
     }
-    if (authHelperService.isAuthenticated()) {
+    if (missionViewerAccess.isAuthenticated()) {
       return mission.getDescription();
     }
     return null;
   }
 
-  /**
-   * Returns {@code true} iff the current caller may edit this mission (see {@link
-   * MissionSecurityService}).
-   */
+  /** Returns {@code true} iff the current caller may edit this mission. */
   public boolean resolveCanEdit(Mission mission) {
     if (mission == null) {
       return false;
     }
-    return missionSecurityService.canManageMission(
-        mission.getId(), authHelperService.rawAuthentication());
+    return missionViewerAccess.canManageMission(mission.getId());
   }
 
   /** Returns {@code true} iff the current caller may add/remove mission managers. */
@@ -222,8 +217,7 @@ public abstract class MissionMapper {
     if (mission == null) {
       return false;
     }
-    return missionSecurityService.canManageManagers(
-        mission.getId(), authHelperService.rawAuthentication());
+    return missionViewerAccess.canManageManagers(mission.getId());
   }
 
   /**

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -95,6 +96,7 @@ public class OrgUnitMembershipService {
   private final InventoryOrgUnitReconciler inventoryReconciler;
   private final AuditService auditService;
   private final OrgChartService orgChartService;
+  private final StaffelMembershipResolver staffelMembershipResolver;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -1033,9 +1035,11 @@ public class OrgUnitMembershipService {
    * case-insensitively by squadron name so the first element is the deterministic <em>primary</em>
    * Staffel — the same primary definition {@code UserMapper.resolveSquadron} / {@code
    * UserDto.squadron} use. Backs the authorization gates that must consider ALL of a target's
-   * Staffeln (grant on any overlap), and the single-valued callers that want a stable primary.
-   * Tolerates a dangling membership (a row whose squadron no longer resolves) by skipping it, so
-   * the accessor never throws.
+   * Staffeln (grant on any overlap), and the single-valued callers that want a stable primary. The
+   * name-sort (and the single-Staffel fast path that skips the squadron load) lives in {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffelIds(List)}, the single owner of the primary
+   * definition; a dangling membership (a row whose squadron no longer resolves) is skipped there,
+   * so the accessor never throws.
    *
    * @param userId the user whose Staffel memberships to resolve; never {@code null}.
    * @return the user's Staffel ids, name-sorted (primary first); never {@code null}, possibly
@@ -1043,21 +1047,8 @@ public class OrgUnitMembershipService {
    */
   @NotNull
   public List<UUID> findStaffelMembershipOrgUnitIds(@NotNull UUID userId) {
-    List<OrgUnitMembership> rows =
-        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
-    if (rows.isEmpty()) {
-      return List.of();
-    }
-    if (rows.size() == 1) {
-      // The common single-Staffel case needs no name sort and no squadron load.
-      return List.of(rows.get(0).getId().getOrgUnitId());
-    }
-    return rows.stream()
-        .map(r -> squadronRepository.findById(r.getId().getOrgUnitId()).orElse(null))
-        .filter(s -> s != null)
-        .sorted(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
-        .map(Squadron::getId)
-        .toList();
+    return staffelMembershipResolver.resolveNameSortedStaffelIds(
+        membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON));
   }
 
   /**

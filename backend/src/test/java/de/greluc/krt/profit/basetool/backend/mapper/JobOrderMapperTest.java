@@ -56,7 +56,9 @@ class JobOrderMapperTest {
 
     var userMapper = Mappers.getMapper(UserMapper.class);
     // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
-    // two repositories (mocked, returning empty for this fixture).
+    // membership repository plus the StaffelMembershipResolver collaborator (both mocked / empty
+    // for
+    // this fixture, so the squadron table is never read).
     ReflectionTestUtils.setField(
         userMapper,
         "membershipRepository",
@@ -64,9 +66,10 @@ class JobOrderMapperTest {
             de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(
         userMapper,
-        "squadronRepository",
-        org.mockito.Mockito.mock(
-            de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class));
+        "staffelMembershipResolver",
+        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class)));
     var materialMapper = Mappers.getMapper(MaterialMapper.class);
     var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);

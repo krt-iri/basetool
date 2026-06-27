@@ -39,8 +39,8 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -162,6 +162,7 @@ public class OwnerScopeService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
+  private final StaffelMembershipResolver staffelMembershipResolver;
   private final HttpServletRequest request;
 
   /**
@@ -1147,7 +1148,7 @@ public class OwnerScopeService {
   /**
    * SPEZIALKOMMANDO_PLAN.md §6.1 contextual-authority check. Returns {@code true} iff the current
    * authenticated principal carries an {@link
-   * de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority} matching {@code
+   * de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority} matching {@code
    * (roleName, orgUnitId)}. Admins always pass — they have implicit elevated access in every
    * OrgUnit (mirrors the {@link #canEditSquadron} short-circuit).
    *
@@ -1182,12 +1183,12 @@ public class OwnerScopeService {
         || authentication.get().getAuthorities() == null) {
       return false;
     }
-    de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority target =
-        new de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority(
+    de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority target =
+        new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
             roleName, orgUnitId);
     for (org.springframework.security.core.GrantedAuthority a :
         authentication.get().getAuthorities()) {
-      if (a instanceof de.greluc.krt.profit.basetool.backend.config.OrgUnitContextualAuthority ctx
+      if (a instanceof de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority ctx
           && ctx.equals(target)) {
         return true;
       }
@@ -1890,16 +1891,11 @@ public class OwnerScopeService {
                           .anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
                     return pinned;
                   }
-                  if (rows.size() == 1) {
-                    // The common single-Staffel case needs no sort and no squadron load.
-                    return Optional.of(rows.get(0).getId().getOrgUnitId());
-                  }
-                  // Two Staffeln, no matching pin: the deterministic name-sorted primary.
-                  List<UUID> staffelIds = rows.stream().map(r -> r.getId().getOrgUnitId()).toList();
-                  return squadronRepository.findAllById(staffelIds).stream()
-                      .sorted(
-                          Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
-                      .map(Squadron::getId)
+                  // No matching pin: the deterministic name-sorted primary. The name-sort (and the
+                  // single-Staffel fast path that skips the squadron load) is owned by
+                  // StaffelMembershipResolver so this fallback agrees with UserDto.squadron /
+                  // OrgUnitMembershipService.findStaffelMembershipOrgUnitIds by construction.
+                  return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
                       .findFirst();
                 });
     request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);

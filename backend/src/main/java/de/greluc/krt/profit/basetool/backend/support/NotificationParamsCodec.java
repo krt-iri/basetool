@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -34,12 +34,16 @@ import tools.jackson.databind.ObjectMapper;
  * Converts a notification's i18n render parameters between the in-memory {@code Map<String,String>}
  * form and the opaque JSON text stored in {@code notification.params}.
  *
- * <p>Registered as a MapStruct {@code uses} helper so {@link
+ * <p>Registered as a MapStruct {@code uses} helper so {@code
  * de.greluc.krt.profit.basetool.backend.mapper.NotificationMapper} maps the stored JSON column
  * straight to the DTO's parameter map; the creation path uses {@link #serialize(Map)} to write
  * rows. The shared Jackson 3 {@link ObjectMapper} is injected by constructor (the project runs on
  * {@code tools.jackson}). Deserialization is defensive: a malformed payload yields an empty map and
  * a log line rather than failing the inbox read.
+ *
+ * <p>Lives in the dependency-leaf {@code support} package (it depends only on Jackson) so {@code
+ * mapper} can reuse it through MapStruct {@code uses=} without a {@code mapper} &rarr; {@code
+ * service} package cycle.
  */
 @Component
 @RequiredArgsConstructor

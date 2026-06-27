@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -134,7 +135,9 @@ class RefineryImportServiceTest {
     ReflectionTestUtils.setField(
         userMapper, "membershipRepository", Mockito.mock(OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(
-        userMapper, "squadronRepository", Mockito.mock(SquadronRepository.class));
+        userMapper,
+        "staffelMembershipResolver",
+        new StaffelMembershipResolver(Mockito.mock(SquadronRepository.class)));
 
     service =
         new RefineryImportService(

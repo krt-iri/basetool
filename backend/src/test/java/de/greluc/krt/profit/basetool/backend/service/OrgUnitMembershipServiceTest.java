@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +89,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
   @Mock private AuditService auditService;
   @Mock private OrgChartService orgChartService;
+  @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -111,6 +114,66 @@ class OrgUnitMembershipServiceTest {
     user.setDisplayName("Alice");
 
     id = new OrgUnitMembershipId(userId, scId);
+
+    // findStaffelMembershipOrgUnitIds delegates the "name-sorted primary" rule to
+    // StaffelMembershipResolver (tested independently in StaffelMembershipResolverTest). Delegate
+    // the mock to a real instance backed by the squadron-repo mock so the single-Staffel fast path
+    // stays load-free and the two-Staffel name-sort runs through the real resolver.
+    StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
+    lenient()
+        .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
+        .thenAnswer(
+            invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+  }
+
+  // --- findStaffelMembershipOrgUnitIds (name-sorted primary, REQ-ORG-017) -------------------
+
+  @Test
+  void findStaffelMembershipOrgUnitIds_noStaffel_returnsEmpty() {
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+
+    assertTrue(membershipService.findStaffelMembershipOrgUnitIds(userId).isEmpty());
+  }
+
+  @Test
+  void findStaffelMembershipOrgUnitIds_singleStaffel_returnsItWithoutSquadronLoad() {
+    UUID squadronId = UUID.randomUUID();
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelRow(userId, squadronId)));
+
+    assertEquals(List.of(squadronId), membershipService.findStaffelMembershipOrgUnitIds(userId));
+    // The single-Staffel fast path must not hit the squadron table.
+    verify(squadronRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void findStaffelMembershipOrgUnitIds_twoStaffeln_returnsNameSortedPrimaryFirst() {
+    UUID alphaId = UUID.randomUUID();
+    UUID bravoId = UUID.randomUUID();
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelRow(userId, bravoId), staffelRow(userId, alphaId)));
+    when(squadronRepository.findAllById(any()))
+        .thenReturn(List.of(squadron(bravoId, "Bravo"), squadron(alphaId, "Alpha")));
+
+    assertEquals(
+        List.of(alphaId, bravoId), membershipService.findStaffelMembershipOrgUnitIds(userId));
+  }
+
+  /** Builds a {@code SQUADRON}-kind membership row pointing the user at the given squadron. */
+  private static OrgUnitMembership staffelRow(UUID userId, UUID squadronId) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    return m;
+  }
+
+  /** Builds a squadron fixture with the given id and name. */
+  private static Squadron squadron(UUID id, String name) {
+    Squadron s = new Squadron();
+    s.setId(id);
+    s.setName(name);
+    return s;
   }
 
   // --- listMembers ----------------------------------------------------------

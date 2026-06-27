@@ -28,13 +28,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -73,7 +71,7 @@ public abstract class UserMapper {
   // come in via field-level @Autowired.
   @Autowired protected OrgUnitMembershipRepository membershipRepository;
 
-  @Autowired protected SquadronRepository squadronRepository;
+  @Autowired protected StaffelMembershipResolver staffelMembershipResolver;
 
   /**
    * Request-attribute key under which {@link #loadStaffelMemberships(User)} memoises the per-user
@@ -138,9 +136,12 @@ public abstract class UserMapper {
 
   /**
    * Resolves the user's <em>complete</em> Staffel membership set for the DTO's {@code squadrons}
-   * projection (REQ-ORG-017 — up to two). Reads every {@code SQUADRON}-kind membership row,
-   * resolves each {@link Squadron} entity through {@link SquadronRepository#findById(Object)}, and
-   * sorts the references case-insensitively by name so the order is deterministic across requests.
+   * projection (REQ-ORG-017 — up to two). Reads every {@code SQUADRON}-kind membership row (via the
+   * request-memoised {@link #loadStaffelMemberships(User)}) and hands them to {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffeln(List)}, the single owner of the name-sort,
+   * so this projection's order agrees with {@code OwnerScopeService} and {@code
+   * OrgUnitMembershipService} by construction. Each resolved {@link Squadron} becomes a {@link
+   * SquadronReferenceDto}; a row whose squadron no longer resolves is dropped by the resolver.
    * Returns an empty list when the user has no Staffel membership (admins / guests) or is itself
    * {@code null}.
    *
@@ -151,11 +152,10 @@ public abstract class UserMapper {
     if (user == null || user.getId() == null) {
       return List.of();
     }
-    return loadStaffelMemberships(user).stream()
-        .map(m -> squadronRepository.findById(m.getId().getOrgUnitId()).orElse(null))
-        .filter(Objects::nonNull)
+    return staffelMembershipResolver
+        .resolveNameSortedStaffeln(loadStaffelMemberships(user))
+        .stream()
         .map(s -> new SquadronReferenceDto(s.getId(), s.getName(), s.getShorthand()))
-        .sorted(Comparator.comparing(SquadronReferenceDto::name, String.CASE_INSENSITIVE_ORDER))
         .toList();
   }
 

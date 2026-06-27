@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

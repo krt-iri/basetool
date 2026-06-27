@@ -30,7 +30,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.integration.scwiki.BlueprintOutputNameOverrides;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
@@ -48,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.service.scwiki.BlueprintOutputNameOverrides;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;

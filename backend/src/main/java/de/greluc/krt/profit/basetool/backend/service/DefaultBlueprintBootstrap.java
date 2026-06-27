@@ -17,19 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.config;
+package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintCatalog;
-import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintKeyService;
-import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintProvisioningService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
