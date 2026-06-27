@@ -24,7 +24,9 @@ The detail page renders a sticky head (title, owning-squadron badge, status pill
 `.facts-bar`, and a `.tab-nav` with up to four tabs. The facts bar (#818 follow-up) shows five
 icon-led facts at larger type — TS meeting time (headset), server join = planned start (clock),
 planned end (clock), party lead (user) and a combined participants fact (users) that folds the
-checked-in count into the registered count (`registered · N eingecheckt`); the standalone
+checked-in count into the registered count (`registered · N eingecheckt`). The three time facts
+show **time only** (`data-format="time"` on the `.krt-local-dt` span, localised client-side); the
+full date stays in the Übersicht details. The standalone
 finance-total fact was dropped (it stays on the Finanzen tab). Its `#facts-ts` /
 `#facts-planned-start` / `#facts-planned-end` / `#facts-party-lead` / `#facts-registered` /
 `#facts-checked-in` ids are patched in place by the overview / crew / party-lead live-update
