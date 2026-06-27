@@ -174,7 +174,7 @@ public class HangarService {
    * the breakdown can never surface a ship from an org unit the caller is not scoped to. Without an
    * active pin a member sees every org unit they belong to, a Bereichsleitung the Staffeln/SKs of
    * their Bereich, and the OL <em>every</em> ship including ownerless personal ones (the owner-
-   * approved widening of REQ-ORG-015, ADR-0047); an active pin still narrows the overview to the
+   * approved widening of REQ-ORG-015, ADR-0048); an active pin still narrows the overview to the
    * pinned unit, and an admin keeps the unchanged admin-all / admin-pin reach.
    *
    * @param pageable page request (sortable by {@code shipType.name})

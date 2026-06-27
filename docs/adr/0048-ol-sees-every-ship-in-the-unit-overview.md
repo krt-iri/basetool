@@ -1,4 +1,4 @@
-# ADR-0047 — OL sees every ship (incl. ownerless) in the hangar unit overview
+# ADR-0048 — OL sees every ship (incl. ownerless) in the hangar unit overview
 
 - **Status:** Accepted
 - **Date:** 2026-06-27

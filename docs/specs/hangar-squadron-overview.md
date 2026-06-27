@@ -73,7 +73,7 @@ single Staffel:
 - An **OL** member sees **every** ship in the system, including the ownerless personal ships
   (`owningOrgUnit == null`) of members who belong to no unit at all — the owner-approved,
   read-only widening of REQ-ORG-015 recorded in
-  [ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md). The widening is confined to this
+  [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md). The widening is confined to this
   one read and grants no admin rights elsewhere.
 - An **admin** keeps the unchanged admin-all / admin-pin behaviour.
 
@@ -95,7 +95,7 @@ BL / OL sees the complete counts but not the per-owner breakdown.
 **Enforced by:** `OwnerScopeServiceTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest` ·
 **Code:** `OwnerScopeService#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
 `ShipRepository#countShipsByType` · **ADR:**
-[ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md) · amends
+[ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) · amends
 [REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —
 
 ## Out of scope

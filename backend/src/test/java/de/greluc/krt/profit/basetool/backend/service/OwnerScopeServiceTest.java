@@ -2569,7 +2569,7 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * REQ-HANGAR-003 / ADR-0047: the hangar unit-overview scope mirrors {@link
+   * REQ-HANGAR-003 / ADR-0048: the hangar unit-overview scope mirrors {@link
    * OwnerScopeService#currentScopePredicate()} for every caller except one owner-approved widening
    * — a non-pinned OL member is upgraded to {@code adminAllScope} so the Org-Einheitsübersicht
    * surfaces every ship, including ownerless personal ones. A pin still narrows it, and no other

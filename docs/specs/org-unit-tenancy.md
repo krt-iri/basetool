@@ -345,7 +345,7 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 Hard invariants:
 
 - The reach is a **concrete `memberOrgUnitIds` union — never** the `adminAllScope=true` branch (one
-  narrow, read-only exception below: ADR-0047). An OL/Bereich principal **must never satisfy
+  narrow, read-only exception below: ADR-0048). An OL/Bereich principal **must never satisfy
   `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK lifecycle, system settings, stammdaten, the
   promotion-topic guards in REQ-ORG-005) stay ADMIN-only.
 - **Strict silo:** a Bereichsleitung's union contains only its own Bereich's descendants; only the OL
@@ -363,7 +363,7 @@ Hard invariants:
   both short-circuit ahead of or alongside the `memberOrgUnitIds` membership check, which the cascade
   only ever enlarges.
 
-> **Amended by [ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
+> **Amended by [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
 > the hangar **unit overview** (`/hangar/squadron`, "Org-Einheitsübersicht") is the single, deliberate
 > exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
 > `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),

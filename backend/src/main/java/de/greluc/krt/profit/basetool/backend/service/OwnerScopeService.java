@@ -265,7 +265,7 @@ public class OwnerScopeService {
    * it grants the {@code adminAllScope=true} read <em>only</em> for this one aggregation surface
    * and confers no {@code isAdmin()} rights anywhere else — every other {@code can*} gate and
    * scoped list still routes OL through the concrete-membership-union {@link
-   * #currentScopePredicate()}. The exception is recorded in ADR-0047 and amends REQ-ORG-015 in
+   * #currentScopePredicate()}. The exception is recorded in ADR-0048 and amends REQ-ORG-015 in
    * {@code org-unit-tenancy.md}.
    *
    * <p>The widening applies only when <b>no single unit is pinned</b> (owner decision: a pin still
