@@ -23,12 +23,13 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code CraftabilityMaterialDto}: the per-material craftability
- * breakdown for one RESOURCE commodity a blueprint consumes (#781). Every availability/quality
+ * breakdown for one material a blueprint consumes (#781) — a RESOURCE commodity or a
+ * PIECE-material-bridged ITEM ingredient (a hand-mined gem, ADR-0046). Every availability/quality
  * figure is given twice (inventory alone and with the open refinery yield) so the refinery toggle
  * switches client-side.
  *
- * @param materialId the commodity's id
- * @param materialName the commodity's display name
+ * @param materialId the material's id
+ * @param materialName the material's display name
  * @param requiredScu the SCU one craft needs of this material
  * @param qualityFloor the lowest qualifying quality applied
  * @param availableScu qualifying SCU in "My Inventory" stock alone

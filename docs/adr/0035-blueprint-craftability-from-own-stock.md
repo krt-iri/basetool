@@ -1,9 +1,9 @@
 # ADR-0035 — Blueprint craftability computed from the user's own stock
 
-- **Status:** Accepted
+- **Status:** Accepted — ITEM-ingredient scope extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
-- **Related:** spec [REQ-INV-019](../specs/personal-inventory-blueprints.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781)
+- **Related:** spec [REQ-INV-019](../specs/personal-inventory-blueprints.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781) · ingredient scope extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 ## Context
 
@@ -40,7 +40,10 @@ SCU. No migration.
   requested, behind a default-off UI toggle. Both inventory-only and refinery-included figures are
   returned so the toggle switches client-side.
 - **Only RESOURCE ingredients** are evaluated (v1); ITEM ingredients are surfaced as "not
-  evaluated".
+  evaluated". *(Extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md):
+  non-craftable, name-resolvable ITEM ingredients — the hand-mined gems the wiki counts in pieces —
+  are now bridged to their PIECE material and evaluated too; only craftable sub-assemblies and
+  unresolved items stay "not evaluated".)*
 - **Craftable count** `N = floor( min over materials of ( qualifying available SCU / required SCU ) )`,
   required SCU aggregated per material per craft.
 - **Effective quality** = SCU-weighted average of the best-quality qualifying stock consumed first,

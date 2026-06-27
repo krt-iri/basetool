@@ -139,6 +139,25 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   java.util.List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
 
   /**
+   * Returns the subset of {@code gameItemIds} that an active (non-soft-deleted) blueprint produces
+   * — i.e. the game items that are themselves <em>craftable</em>. The batched counterpart of {@link
+   * #findByOutputItemId(UUID)}: the blueprint craftability calculation (#781) resolves the bridge
+   * of a recipe's ITEM ingredients across the caller's whole owned set in one query, so a craftable
+   * sub-assembly (handled as its own line, never as a raw material) is told apart from a
+   * non-craftable component that bridges to a {@code material} — exactly the distinction {@code
+   * JobOrderItemService.bridgedMaterial} makes per ingredient.
+   *
+   * @param gameItemIds the candidate game-item ids to test
+   * @return the distinct ids among them that an active blueprint outputs; empty when none are
+   *     craftable or {@code gameItemIds} is empty
+   */
+  @Query(
+      "SELECT DISTINCT b.outputItem.id FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL "
+          + "AND b.outputItem.id IN :gameItemIds")
+  java.util.List<UUID> findCraftableOutputItemIds(
+      @Param("gameItemIds") Collection<UUID> gameItemIds);
+
+  /**
    * Page of distinct game items that are orderable as item-order lines: the output item of at least
    * one active blueprint that has a resolved RESOURCE ingredient (so a non-empty material list can
    * be derived). Items whose every blueprint resolves no usable material are excluded (issue #304

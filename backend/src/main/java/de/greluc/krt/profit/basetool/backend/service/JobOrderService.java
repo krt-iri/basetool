@@ -113,6 +113,7 @@ public class JobOrderService {
   private final MaterialClaimService materialClaimService;
   private final AuditService auditService;
   private final JobOrderMapper jobOrderMapper;
+  private final de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
   private final de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper
       jobOrderItemHandoverMapper;
@@ -387,6 +388,7 @@ public class JobOrderService {
                     o.getDisplayId(),
                     o.getHandle(),
                     o.getStatus(),
+                    squadronMapper.orgUnitToReferenceDto(o.getRequestingOrgUnit()),
                     o.getMaterials() != null
                         ? o.getMaterials().stream().map(jobOrderMapper::toDto).toList()
                         : List.of(),

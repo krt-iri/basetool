@@ -68,12 +68,15 @@ association edit (the Lager "Auftrag" picker) — MUST be rejected with HTTP `40
 material is not one of the order's **required materials**. The required-material set is
 kind-agnostic: for a `MATERIAL` order its material lines, for an `ITEM` order the materials
 derived and snapshotted from the ordered items' blueprints (`JobOrderItemService.requiredMaterialIds`).
-The Lager "Auftrag" picker MUST hide an order that does not require the row's material; it MAY
-still list the order a row is **already** assigned to, so an existing (possibly orphaned) link
-stays visible and clearable. The picker filter MUST be correct for `ITEM` orders too — these
-carry no `job_order_material` rows, so the reference payload exposes
-`JobOrderReferenceDto.requiredMaterialIds` (both kinds) for the filter rather than the
-MATERIAL-only `materials` list.
+Every job-order picker that links stock to an order MUST hide an order that does not require the
+material being linked, and MAY still list the order the row is **already** assigned to, so an
+existing (possibly orphaned) link stays visible and clearable. This covers both the Lager
+"Auftrag" picker and the refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which
+links the refined output material to an order that needs it. The picker filter MUST be correct
+for `ITEM` orders too — these carry no `job_order_material` rows, so every picker keys on the
+kind-agnostic `JobOrderReferenceDto.requiredMaterialIds` (served by `/api/v1/orders/lookup`)
+rather than the MATERIAL-only `materials` list; a picker fed by the full order list and filtered
+on `materials` would silently drop every `ITEM` order.
 
 **Acceptance**
 
@@ -82,12 +85,16 @@ MATERIAL-only `materials` list.
 - [ ] The same link succeeds when the order requires the material (both order kinds).
 - [ ] The Lager "Auftrag" dropdown for a row offers only orders that require that row's material,
   plus the order the row is already assigned to.
+- [ ] The refinery store dialog's "Auftrag" dropdown for an output material offers only orders
+  that require that material (both order kinds, `ITEM` orders included).
 
 **Enforced by:** `InventoryItemServiceTest` (create/update gate),
-`JobOrderItemServiceTest` (`requiredMaterialIds`) · **Code:**
-`InventoryItemService.createInventoryItem` / `updateInventoryItem`,
+`JobOrderItemServiceTest` (`requiredMaterialIds`),
+`InventoryPageControllerMvcTest` / `RefineryOrderStoreJobOrderDropdownTest` (picker filters) ·
+**Code:** `InventoryItemService.createInventoryItem` / `updateInventoryItem`,
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
-`JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`
+`JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`,
+`RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
