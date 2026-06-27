@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.RankRequirementMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
@@ -63,6 +64,7 @@ public class RankRequirementService {
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
 
   /**
    * Returns a paginated slice of every {@link RankRequirementResponse} across all rank transitions.
@@ -156,6 +158,12 @@ public class RankRequirementService {
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_RANK_REQUIREMENT_CREATED,
+        saved.getId(),
+        rankRequirementLabel(saved),
+        null,
+        rankRequirementDetails(saved));
     log.info(
         "Created RankRequirement id={} {}->{} squadron={}",
         saved.getId(),
@@ -200,6 +208,12 @@ public class RankRequirementService {
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_RANK_REQUIREMENT_UPDATED,
+        saved.getId(),
+        rankRequirementLabel(saved),
+        null,
+        rankRequirementDetails(saved));
     log.info("Updated RankRequirement id={}", id);
     return mapper.toResponse(saved);
   }
@@ -217,8 +231,32 @@ public class RankRequirementService {
     ownerScopeService.assertPromotionFeatureEnabled();
     RankRequirement entity = load(id);
     assertCallerMayEdit(entity);
+    String label = rankRequirementLabel(entity);
     repository.delete(entity);
+    auditService.record(AuditEventType.PROMOTION_RANK_REQUIREMENT_DELETED, id, label, null, null);
     log.info("Deleted RankRequirement id={}", id);
+  }
+
+  /**
+   * Builds the non-personal audit subject label for a rank requirement: the rank step it governs,
+   * e.g. {@code "20->19"}.
+   *
+   * @param entity the rank requirement; never {@code null}
+   * @return the {@code fromRank->toRank} label
+   */
+  private static @NotNull String rankRequirementLabel(@NotNull RankRequirement entity) {
+    return entity.getFromRank() + "->" + entity.getToRank();
+  }
+
+  /**
+   * Builds the compact, non-PII audit details payload for a rank requirement create/update: the
+   * minimum level enum and required count, e.g. {@code "level=BRONZE count=3"}.
+   *
+   * @param entity the rank requirement; never {@code null}
+   * @return the details string
+   */
+  private static @NotNull String rankRequirementDetails(@NotNull RankRequirement entity) {
+    return "level=" + entity.getMinimumLevel() + " count=" + entity.getRequiredCount();
   }
 
   private void assertCallerMaySee(@NotNull RankRequirement entity) {

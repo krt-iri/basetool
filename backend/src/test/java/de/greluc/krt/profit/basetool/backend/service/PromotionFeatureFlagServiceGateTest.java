@@ -231,7 +231,8 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
-    PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
+    PromotionTopicService service =
+        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
     Pageable pageable = PageRequest.of(0, 20);
 
@@ -247,7 +248,8 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
-    PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
+    PromotionTopicService service =
+        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
     when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
 
     assertTrue(service.listAll().isEmpty());
@@ -260,7 +262,8 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
-    PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
+    PromotionTopicService service =
+        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
     assertThrows(
@@ -275,7 +278,8 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
-    PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
+    PromotionTopicService service =
+        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
     assertThrows(
@@ -292,7 +296,8 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
-    PromotionTopicService service = new PromotionTopicService(topicRepository, mapper, scopeStub);
+    PromotionTopicService service =
+        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
     doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
 
     assertThrows(AccessDeniedException.class, () -> service.delete(UUID.randomUUID()));

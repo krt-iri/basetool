@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
@@ -56,6 +57,7 @@ public class PromotionLevelContentService {
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
 
   /**
    * Returns a paginated slice of every {@link PromotionLevelContentResponse} across all categories.
@@ -132,6 +134,12 @@ public class PromotionLevelContentService {
     PromotionLevelContent entity = mapper.toEntity(request);
     entity.setCategory(category);
     PromotionLevelContent saved = repository.save(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_LEVEL_CONTENT_CREATED,
+        saved.getId(),
+        category.getName() + " / " + saved.getLevel(),
+        null,
+        null);
     log.info("Created PromotionLevelContent id={} level={}", saved.getId(), saved.getLevel());
     return mapper.toResponse(saved);
   }
@@ -173,6 +181,12 @@ public class PromotionLevelContentService {
     // the returned version back onto its data-lc-version attribute in place (no re-swap, unlike the
     // category/topic paths), so a stale save() version 409s the next consecutive edit.
     PromotionLevelContent saved = repository.saveAndFlush(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_LEVEL_CONTENT_UPDATED,
+        saved.getId(),
+        category.getName() + " / " + saved.getLevel(),
+        null,
+        null);
     log.info("Updated PromotionLevelContent id={}", id);
     return mapper.toResponse(saved);
   }
@@ -190,7 +204,10 @@ public class PromotionLevelContentService {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());
+    PromotionCategory category = entity.getCategory();
+    String label = (category != null ? category.getName() + " / " : "") + entity.getLevel();
     repository.delete(entity);
+    auditService.record(AuditEventType.PROMOTION_LEVEL_CONTENT_DELETED, id, label, null, null);
     log.info("Deleted PromotionLevelContent id={}", id);
   }
 

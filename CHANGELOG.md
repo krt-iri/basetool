@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
+
 ### Fixed
 
 - **Raffinerieauftrag einlagern: Auftrags-Dropdown blieb leer.** Beim Einlagern eines Raffinerieauftrags zeigte die „Auftrag"-Auswahl keine passenden Aufträge, obwohl welche das Material in der Qualität benötigten. Ursache: Der Filter prüfte nur die Material-Zeilen, die bei Item-Aufträgen leer sind — solche Aufträge fielen immer heraus. Das Dropdown bietet jetzt (wie der Lager-Picker) alle aktiven Aufträge an, die das eingelagerte Material benötigen, über beide Auftragsarten hinweg.

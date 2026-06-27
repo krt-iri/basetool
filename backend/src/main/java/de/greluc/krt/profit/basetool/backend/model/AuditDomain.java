@@ -54,5 +54,14 @@ public enum AuditDomain {
    * (Bereichsleitung, OL, SK-Lead and, from Phase 3, the squadron ranks) and the Logistician /
    * Mission-Manager capability flags (Rollen &amp; Mitglieder).
    */
-  ROLE
+  ROLE,
+
+  /**
+   * Promotion system — the per-Staffel promotion catalogue and member grading (Beförderung): the
+   * {@code PromotionTopic} / {@code PromotionCategory} / {@code PromotionLevelContent} subtree, the
+   * {@code RankRequirement} promotion-rules catalogue, and the per-member {@code MemberEvaluation}
+   * gradings. Every catalogue or evaluation mutation is captured here. For an evaluation the
+   * subject is the graded category (its non-personal label); the member is the target reference.
+   */
+  PROMOTION
 }

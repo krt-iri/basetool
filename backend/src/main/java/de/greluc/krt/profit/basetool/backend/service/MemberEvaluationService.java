@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MemberEvaluationMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
@@ -33,6 +34,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -69,6 +71,7 @@ public class MemberEvaluationService {
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final AuthHelperService authHelperService;
+  private final AuditService auditService;
 
   /**
    * Returns all evaluations for the given user (JWT-sub filtered – data isolation), additionally
@@ -136,8 +139,17 @@ public class MemberEvaluationService {
       throw new ObjectOptimisticLockingFailureException(MemberEvaluation.class, entity.getId());
     }
 
+    boolean isNew = entity.getId() == null;
     entity.setAssignedLevel(request.assignedLevel());
     MemberEvaluation saved = repository.save(entity);
+    auditService.record(
+        isNew
+            ? AuditEventType.PROMOTION_EVALUATION_CREATED
+            : AuditEventType.PROMOTION_EVALUATION_UPDATED,
+        category.getId(),
+        categoryLabel(category),
+        parseUserUuid(userId),
+        "level=" + request.assignedLevel());
     log.info(
         "Upserted MemberEvaluation userId={} categoryId={} level={}",
         userId,
@@ -157,8 +169,46 @@ public class MemberEvaluationService {
             .orElseThrow(() -> new EntityNotFoundException("MemberEvaluation not found: " + id));
     assertCallerMayEditCategory(entity.getCategory());
     assertCallerMayEvaluateUser(entity.getUserId());
+    PromotionCategory category = entity.getCategory();
+    UUID subjectId = category != null ? category.getId() : null;
+    String label = categoryLabel(category);
+    UUID targetUserId = parseUserUuid(entity.getUserId());
     repository.delete(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_EVALUATION_DELETED, subjectId, label, targetUserId, null);
     log.info("Deleted MemberEvaluation id={}", id);
+  }
+
+  /**
+   * Builds the non-personal audit subject label for an evaluation: the graded category, prefixed
+   * with its topic name when available (e.g. {@code "Grundlagen / Teamplay"}). Carries no member
+   * handle — the affected member is recorded separately as the audit target reference.
+   *
+   * @param category the graded category, or {@code null}
+   * @return the {@code topic / category} label, or {@code "—"} when no category is present
+   */
+  private static @NotNull String categoryLabel(@Nullable PromotionCategory category) {
+    if (category == null) {
+      return "—";
+    }
+    var topic = category.getTopic();
+    return (topic != null ? topic.getName() + " / " : "") + category.getName();
+  }
+
+  /**
+   * Parses a member's JWT-{@code sub} string into the {@code targetUserId} UUID for the audit row,
+   * returning {@code null} for a malformed id rather than throwing — a non-parseable id must never
+   * roll back the business mutation it accompanies.
+   *
+   * @param userId the member's Keycloak sub (== app_user id) string; never {@code null}
+   * @return the parsed UUID, or {@code null} when {@code userId} is not a valid UUID
+   */
+  private static @Nullable UUID parseUserUuid(@NotNull String userId) {
+    try {
+      return UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   private void assertCallerMayEditCategory(PromotionCategory category) {

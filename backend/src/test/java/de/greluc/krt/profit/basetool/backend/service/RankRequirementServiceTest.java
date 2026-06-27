@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.RankRequirementMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
@@ -62,6 +63,8 @@ class RankRequirementServiceTest {
   @Mock private RankRequirementMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private AuditService auditService;
 
   @InjectMocks private RankRequirementService service;
 
@@ -173,6 +176,13 @@ class RankRequirementServiceTest {
     // Then: the owner is stamped from the active squadron context.
     assertSame(squadron, entity.getOwningSquadron());
     verify(repository).save(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_RANK_REQUIREMENT_CREATED),
+            any(),
+            eq("20->19"),
+            isNull(),
+            eq("level=LEVEL_A count=3"));
   }
 
   @Test
@@ -322,6 +332,13 @@ class RankRequirementServiceTest {
 
     // Then
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_RANK_REQUIREMENT_DELETED),
+            eq(id),
+            eq("20->19"),
+            isNull(),
+            isNull());
   }
 
   @Test
