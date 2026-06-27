@@ -58,6 +58,18 @@
             display: inline;
         }
         .mission-head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        /* Final Einsatz design (#818 follow-up): the primary "Anmelden" CTA in the sticky head is a
+           full-size button (not btn-xs2) so the page's main action reads as the main action. */
+        .mission-head-actions .btn--cta { font-size: 0.92rem; padding: 0.8rem 1.5rem; min-height: 50px; }
+        /* Final Einsatz design (#818 follow-up): a higher-signal facts bar — larger type, a leading
+           orange icon per fact, and the checked-in count folded into the participants fact. Scoped to
+           the mission head so the shared .facts-bar on other detail pages is untouched. */
+        .mission-head-sticky .facts-bar { gap: 22px; padding: 12px 16px; font-size: 0.95rem; align-items: center; }
+        .mission-head-sticky .facts-bar .fact { display: inline-flex; align-items: center; gap: 8px; }
+        .mission-head-sticky .facts-bar .fact > .krt-icon { width: 17px; height: 17px; color: var(--color-primary); flex: none; }
+        .mission-head-sticky .facts-bar .fact-k { font-size: 0.7rem; margin-right: 0; }
+        .mission-head-sticky .facts-bar .fact-v { font-size: 1rem; }
+        .mission-head-sticky .facts-bar .facts-checked-in-suffix { font-size: 0.82rem; font-weight: 400; color: var(--color-gray-2); }
         .tab-panes { padding: 14px 16px 18px; }
         .tab-pane { display: none; flex-direction: column; gap: 12px; }
         .tab-pane.on { display: flex; }
@@ -96,6 +108,15 @@
 
         /* Uebersicht */
         .desc { font-size: 0.85rem; font-weight: 300; color: var(--color-gray-1); margin: 0; line-height: 1.55; max-width: 80ch; white-space: pre-line; }
+        /* Detaillierte Beschreibung — sits on the same gray card surface as the other overview
+           panels (.kpanel) instead of bare on the honeycomb backdrop (owner request 2026-06-27,
+           #818 follow-up). Collapsible with a chevron that flips when open. */
+        details.more { border: var(--border-hairline); background-color: var(--color-bg-dark-gray); margin-top: 12px; }
+        details.more > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--fw-bold); color: var(--color-gray-1); display: flex; align-items: center; gap: 8px; min-height: var(--touch-target); box-sizing: border-box; }
+        details.more > summary::-webkit-details-marker { display: none; }
+        details.more > summary .krt-icon { width: 14px; height: 14px; color: var(--color-primary); transition: transform 0.2s; flex: none; }
+        details.more[open] > summary .krt-icon { transform: rotate(180deg); }
+        details.more .more-body { padding: 0 14px 14px; }
         .chiprow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .navrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
         @media (max-width: 880px) { .navrow { grid-template-columns: 1fr; } }
@@ -263,16 +284,16 @@
                       th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">PLANNED</span>
             </div>
             <div class="mission-head-actions">
-                <button id="add-participant-btn" type="button" class="btn btn--cta btn-xs2"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
-                <a th:href="@{/missions}" class="btn btn-ghost btn-xs2" th:text="#{general.back}">Zur&uuml;ck</a>
+                <button id="add-participant-btn" type="button" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
+                <a th:href="@{/missions}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg> <span th:text="#{general.back}">Zur&uuml;ck</span></a>
             </div>
         </div>
         <div class="facts-bar">
-            <span><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span th:title="#{mission.participants.count.tooltip}"><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span id="facts-registered" class="fact-v" th:text="${mission.registeredParticipants}">0</span></span>
-            <span><span class="fact-k" th:text="#{mission.facts.checked_in}">Eingecheckt</span><span id="facts-checked-in" class="fact-v" th:text="${mission.checkedInParticipants}">0</span></span>
-            <span th:if="${financeSum != null}"><span class="fact-k" th:text="#{mission.finance.total}">Gesamtsumme</span><span class="fact-v" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-headset"/></svg><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.end}">Ende</span><span id="facts-planned-end" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-party-lead" class="fact-v" th:text="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))}">&mdash;</span></span>
+            <span class="fact" th:title="#{mission.participants.count.tooltip}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span class="fact-v"><span id="facts-registered" th:text="${mission.registeredParticipants}">0</span><span class="facts-checked-in-suffix"> &middot; <span id="facts-checked-in" th:text="${mission.checkedInParticipants}">0</span> <span th:text="#{mission.facts.checked_in_suffix}">eingecheckt</span></span></span></span>
         </div>
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
             <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
@@ -297,7 +318,9 @@
                            data-status=${#strings.toLowerCase(mission.status)},
                            data-status-label=${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status},
                            data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
-                           data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}"></span>
+                           data-planned-end-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'},
+                           data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'},
+                           data-party-lead=${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))}"></span>
             <!-- Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
                  einen Blick" (Ziel + key facts), separate "Weitere Leads" / "Funk" panels, a
                  participant attendance meter, the read-only Ablauf checklist, a Kalender card and a
@@ -449,15 +472,18 @@
                     </div>
                 </div>
             </div>
-            <!-- Detaillierte Beschreibung (Markdown) — collapsible, member+ gate unchanged. -->
-            <details class="hud-details" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')"
-                     th:if="${!#strings.isEmpty(mission.description)}" style="margin-top: 12px;">
-                <summary><span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
-                <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
-                     link protocols, so only renderer-generated markup is emitted. -->
-                <div class="markdown-content" style="margin-top: 10px;"
-                     th:with="descriptionHtml=${@markdown.render(mission.description)}"
-                     th:utext="${descriptionHtml}">Beschreibung</div>
+            <!-- Detaillierte Beschreibung (Markdown) — collapsible gray card (.more) matching the
+                 other overview panels (#818 follow-up); member+ gate unchanged. -->
+            <details class="more" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')"
+                     th:if="${!#strings.isEmpty(mission.description)}">
+                <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
+                <div class="more-body">
+                    <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
+                         link protocols, so only renderer-generated markup is emitted. -->
+                    <div class="markdown-content"
+                         th:with="descriptionHtml=${@markdown.render(mission.description)}"
+                         th:utext="${descriptionHtml}">Beschreibung</div>
+                </div>
             </details>
             </th:block></div>
         </section>
@@ -1873,7 +1899,15 @@
             }
         }
         patchFact('facts-planned-start', 'data-planned-start-utc');
+        patchFact('facts-planned-end', 'data-planned-end-utc');
         patchFact('facts-ts', 'data-meeting-utc');
+        // The "Leiter" fact (party lead) mirrors the overview party-lead row — patch it from the
+        // fresh name the fragment exposes so a peer's party-lead change shows in the header too.
+        const lead = meta.getAttribute('data-party-lead');
+        const leadEl = document.getElementById('facts-party-lead');
+        if (leadEl && lead != null) {
+            leadEl.textContent = lead;
+        }
     });
 
     // ---- Live multi-user sync receiver (REQ-FE-010 / ADR-0031) ----------------------------------
@@ -3105,6 +3139,10 @@
                     : (dto.partyLeadGuestName || noneLabel);
                 if (display) display.textContent = resolvedName;
                 if (overview) overview.textContent = resolvedName;
+                // Keep the sticky facts-bar "Leiter" fact in sync — it lives outside the overview
+                // fragment, so the local patch must touch it directly (peers get it via the swap).
+                const factLead = document.getElementById('facts-party-lead');
+                if (factLead) factLead.textContent = resolvedName;
                 if (versionInput && dto.partyLeadVersion != null) {
                     versionInput.value = dto.partyLeadVersion;
                 }
@@ -4085,11 +4123,17 @@
         if (utcMsStr && utcMsStr !== 'null') {
             const date = new Date(parseInt(utcMsStr, 10));
             if (!isNaN(date)) {
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                // The facts bar shows time only (data-format="time") — the full date lives in the
+                // Übersicht details; everywhere else keeps the full dd.MM.yyyy HH:mm.
+                if (el.getAttribute('data-format') === 'time') {
+                    el.innerText = `${hours}:${minutes}`;
+                    return;
+                }
                 const day = String(date.getDate()).padStart(2, '0');
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const year = date.getFullYear();
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
                 el.innerText = `${day}.${month}.${year} ${hours}:${minutes}`;
                 return;
             }
