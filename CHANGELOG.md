@@ -6,6 +6,8 @@
 
 - **Einsatz-Detailseite: prägnantere Info-Leiste, großer „Anmelden"-Button und Beschreibung als graue Karte.** Die Fakten-Leiste im Seitenkopf zeigt jetzt fünf größere, mit Icons versehene Angaben — TS-Treffen, Server-Join, Ende, Einsatzleiter und Teilnehmer (mit eingeklapptem „eingecheckt"-Zähler); die Zeiten erscheinen dort nur als Uhrzeit (das vollständige Datum steht in den Übersichts-Details), und die separate Gesamtsumme entfällt und bleibt im Finanzen-Tab. Der „Anmelden"-Knopf ist nun in voller Größe statt klein, und die ausklappbare „Detaillierte Beschreibung" liegt wie die übrigen Karten auf grauem Kartenhintergrund. Live-Aktualisierung und Berechtigungen bleiben unverändert.
 
+- **Meine Blueprints: Feinschliff an der Design-System-Vorlage.** Der Kopfbereich stellt das Feld zum Suchen und Hinzufügen jetzt rechts neben den Titel (statt darunter), das Suchfeld trägt links ein Lupen-Symbol, und über den vorgemerkten Chips erscheint die Beschriftung „Auswahl", sobald mindestens ein Blueprint ausgewählt ist. Der Schalter „Raffinerie-Ertrag einrechnen" sitzt jetzt oben in der Sammlungs-Box (mit Trennlinie) und behält seinen Zustand, wenn die Liste nach Hinzufügen, Import oder Entfernen aktualisiert wird. Reine Optik — keine Funktionsänderung.
+
 ## [v0.7.15](https://github.com/krt-profit/basetool/releases/tag/v0.7.15) - 2026-06-27
 
 ### Added
