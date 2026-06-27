@@ -151,7 +151,11 @@ class MissionManagerRoleTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            Collections.emptyList(), // steps
+            0L, // stepsVersion
+            null, // objective
+            null); // meetingPoint
     return objectMapper.writeValueAsString(dto);
   }
 

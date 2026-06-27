@@ -33,10 +33,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -50,7 +52,7 @@ import org.hibernate.annotations.OptimisticLock;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries"})
+@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries", "steps"})
 public class Mission extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -62,6 +64,22 @@ public class Mission extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   private String description;
+
+  /**
+   * Short free-text objective ("Ziel") shown prominently in the overview's "Mission auf einen
+   * Blick" panel. Distinct from the long Markdown {@link #description}: capped at 250 characters
+   * and rendered as plain text. Nullable. Part of the {@code core} section (guarded by {@link
+   * #coreVersion}).
+   */
+  @Column(length = 250)
+  private String objective;
+
+  /**
+   * Free-text rally point ("Treffpunkt", e.g. "Lobby Mining → ARC-L1") shown in the overview.
+   * Nullable. Part of the {@code core} section (guarded by {@link #coreVersion}).
+   */
+  @Column(name = "meeting_point", length = 200)
+  private String meetingPoint;
 
   @Column(length = 2048)
   private String calendarLink;
@@ -115,6 +133,16 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Long partyLeadVersion = 0L;
 
+  /**
+   * Section-scoped optimistic-lock counter for the Ablauf editor and the per-step done-toggle
+   * ({@link #steps}). Independent of the global {@link AbstractEntity#getVersion()} and marked
+   * {@code @OptimisticLock(excluded = true)} so editing the procedure timeline never invalidates
+   * another user's open core / schedule / flags form on the same mission.
+   */
+  @Column(name = "steps_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long stepsVersion = 0L;
+
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionParticipant> participants = new HashSet<>();
@@ -131,6 +159,23 @@ public class Mission extends AbstractEntity<UUID> {
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionFinanceEntry> financeEntries = new HashSet<>();
+
+  /**
+   * Ordered, reorderable "Ablauf" (procedure timeline) steps. Loaded by ascending {@link
+   * MissionStep#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
+   * list) preserves the checklist order. Excluded from the global optimistic-lock; the dedicated
+   * {@link #stepsVersion} guards concurrent edits instead.
+   *
+   * <p>The Lombok getter is suppressed ({@link AccessLevel#NONE}) in favour of the hand-written
+   * {@link #getSteps()}, which hands out an unmodifiable view so callers cannot mutate the managed
+   * collection through the getter; structural changes go through {@link #addStep(MissionStep)} /
+   * {@link #removeStep(UUID)}.
+   */
+  @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("orderIndex ASC")
+  @OptimisticLock(excluded = true)
+  @Getter(AccessLevel.NONE)
+  private Set<MissionStep> steps = new LinkedHashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_mission_id")
@@ -221,4 +266,38 @@ public class Mission extends AbstractEntity<UUID> {
   @JoinColumn(name = "owning_org_unit_id")
   @OptimisticLock(excluded = true)
   private OrgUnit owningOrgUnit;
+
+  /**
+   * Returns the Ablauf steps as an unmodifiable view ordered by {@code orderIndex}. Reads (DTO
+   * mapping, index lookups, reorder validation) iterate this view; callers that need to add or
+   * remove a step use {@link #addStep(MissionStep)} / {@link #removeStep(UUID)} so the managed
+   * collection is never mutated through the getter.
+   *
+   * @return an unmodifiable view of the mission's procedure-timeline steps
+   */
+  public Set<MissionStep> getSteps() {
+    return Collections.unmodifiableSet(steps);
+  }
+
+  /**
+   * Appends a step to the Ablauf collection and wires the inverse side so the bidirectional
+   * association stays consistent before the cascade persists it.
+   *
+   * @param step the step to attach to this mission
+   */
+  public void addStep(MissionStep step) {
+    step.setMission(this);
+    steps.add(step);
+  }
+
+  /**
+   * Removes the step with the given id from the Ablauf collection (orphan-removal then deletes the
+   * row on flush).
+   *
+   * @param stepId the id of the step to remove
+   * @return {@code true} if a step was removed, {@code false} if no step had that id
+   */
+  public boolean removeStep(UUID stepId) {
+    return steps.removeIf(s -> stepId.equals(s.getId()));
+  }
 }

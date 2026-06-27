@@ -61,7 +61,7 @@ class MissionPageControllerTest {
     Model model = new ConcurrentModel();
 
     // Act
-    String viewName = controller.createMissionForm(model, null);
+    String viewName = controller.createMissionForm(model, null, null);
 
     // Assert
     assertEquals("mission-detail", viewName);
@@ -481,7 +481,11 @@ class MissionPageControllerTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
@@ -557,7 +561,11 @@ class MissionPageControllerTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
@@ -637,7 +645,11 @@ class MissionPageControllerTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))

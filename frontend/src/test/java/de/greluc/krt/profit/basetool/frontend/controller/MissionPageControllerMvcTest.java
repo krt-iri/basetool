@@ -184,6 +184,103 @@ class MissionPageControllerMvcTest {
         .get(contains("/finance-entries"), any(ParameterizedTypeReference.class), eq(false));
   }
 
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_rendersAblaufChecklistAndEditor_whenStepsPresent() throws Exception {
+    // The other render tests use empty step lists, so the per-step Thymeleaf path (the th:each over
+    // mission.steps, the derived step--now via mission.steps.^[!done], the data-step-id toggle and
+    // the editor rows) is only exercised here, with one done + one open step. Guards
+    // REQ-MISSION-009.
+    UUID missionId = UUID.randomUUID();
+    var step1 =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto(
+            UUID.randomUUID(), "Briefing", "TS 19:30", true, 0);
+    var step2 =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto(
+            UUID.randomUUID(), "Mining", null, false, 1);
+
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(missionWithSteps(missionId, java.util.List.of(step1, step2)));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        // Overview read-only checklist: titles, done + derived current-phase classes, toggle
+        // control.
+        .andExpect(content().string(containsString("class=\"ablauf\"")))
+        .andExpect(content().string(containsString("Briefing")))
+        .andExpect(content().string(containsString("Mining")))
+        .andExpect(content().string(containsString("step--done")))
+        .andExpect(content().string(containsString("step--now")))
+        .andExpect(content().string(containsString("data-trigger=\"mission-toggle-step\"")))
+        // Re-split overview + the new core fields.
+        .andExpect(content().string(containsString("Mission auf einen Blick")))
+        .andExpect(content().string(containsString("Janalite sammeln")))
+        // Verwaltung drag-editor (canEdit fixture) + the new form fields.
+        .andExpect(content().string(containsString("id=\"mission-step-list\"")))
+        .andExpect(content().string(containsString("name=\"objective\"")))
+        .andExpect(content().string(containsString("name=\"meetingPoint\"")));
+  }
+
+  /**
+   * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus a non-empty
+   * objective (Ziel) and meeting point (Treffpunkt), so the per-step checklist/editor and the new
+   * at-a-glance rows actually render (REQ-MISSION-009/-010). Editable (canEdit), so the editor +
+   * done-toggle show.
+   *
+   * @param missionId the id to stamp on the mission
+   * @param steps the Ablauf steps to render
+   * @return a mission fixture with steps + objective + meeting point
+   */
+  private MissionDto missionWithSteps(
+      UUID missionId,
+      java.util.List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto> steps) {
+    de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto manager =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto(
+            UUID.randomUUID(), "manager", null, "Test Manager", 0);
+    return new MissionDto(
+        missionId,
+        "Test Mission",
+        null,
+        null,
+        "ACTIVE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        null,
+        null,
+        java.util.Set.of(manager),
+        true,
+        true,
+        1L,
+        1L,
+        1L,
+        1L,
+        0,
+        0,
+        null,
+        null,
+        null,
+        0L,
+        steps,
+        0L,
+        "Janalite sammeln",
+        "ARC-L1");
+  }
+
   /**
    * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable)
    * for the mission-detail template tests, so the 32-argument constructor lives in one place.
@@ -227,7 +324,11 @@ class MissionPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        java.util.List.of(),
+        0L,
+        null,
+        null);
   }
 
   /**
@@ -300,7 +401,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -370,7 +475,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -458,7 +567,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -563,7 +676,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -629,7 +746,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
         .thenReturn(mission);
@@ -713,7 +834,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     MissionDto refreshed =
         new MissionDto(
             missionId,
@@ -747,7 +872,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
         .thenReturn(refreshed);
@@ -805,7 +934,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
     // The actual-time endpoint dispatches a section-scoped PATCH on /schedule. A stale
@@ -1394,7 +1527,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -1514,7 +1651,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -1713,7 +1854,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -1882,7 +2027,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -2001,7 +2150,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -2127,7 +2280,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -2213,7 +2370,11 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null);
 
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -2264,7 +2425,11 @@ class MissionPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        java.util.List.of(),
+        0L,
+        null,
+        null);
   }
 
   @Test

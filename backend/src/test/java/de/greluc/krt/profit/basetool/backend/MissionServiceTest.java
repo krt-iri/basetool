@@ -369,7 +369,7 @@ class MissionServiceTest {
 
     UpdateMissionRequest details =
         new UpdateMissionRequest(
-            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L);
+            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null, null);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -390,7 +390,20 @@ class MissionServiceTest {
     Instant manualStart = Instant.now().minus(1, ChronoUnit.HOURS);
     UpdateMissionRequest details =
         new UpdateMissionRequest(
-            "Test", null, null, "ACTIVE", null, null, null, manualStart, null, null, null, 0L);
+            "Test",
+            null,
+            null,
+            "ACTIVE",
+            null,
+            null,
+            null,
+            manualStart,
+            null,
+            null,
+            null,
+            0L,
+            null,
+            null);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -411,7 +424,7 @@ class MissionServiceTest {
 
     UpdateMissionRequest details =
         new UpdateMissionRequest(
-            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L);
+            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null, null);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -431,7 +444,20 @@ class MissionServiceTest {
 
     UpdateMissionRequest details =
         new UpdateMissionRequest(
-            "Test", null, "new-link", "PLANNED", null, null, null, null, null, null, null, 0L);
+            "Test",
+            null,
+            "new-link",
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0L,
+            null,
+            null);
 
     when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -455,6 +481,8 @@ class MissionServiceTest {
             null,
             false,
             null,
+            null,
+            null,
             null);
 
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
@@ -473,6 +501,8 @@ class MissionServiceTest {
             now.plus(2, ChronoUnit.HOURS),
             now.plus(1, ChronoUnit.HOURS),
             false,
+            null,
+            null,
             null,
             null);
 
@@ -500,7 +530,7 @@ class MissionServiceTest {
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null));
 
     assertEquals(home, saved.getOwningOrgUnit());
     assertEquals(caller, saved.getOwner());
@@ -530,6 +560,8 @@ class MissionServiceTest {
                 null,
                 false,
                 null,
+                null,
+                null,
                 null));
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
@@ -552,7 +584,7 @@ class MissionServiceTest {
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null));
 
     assertEquals(scopeSquadron, saved.getOwningOrgUnit());
   }
@@ -572,7 +604,18 @@ class MissionServiceTest {
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null, picked.getId()));
+                "Test",
+                null,
+                null,
+                "PLANNED",
+                null,
+                null,
+                null,
+                false,
+                null,
+                picked.getId(),
+                null,
+                null));
 
     assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
   }
@@ -593,7 +636,7 @@ class MissionServiceTest {
         missionService.addSubMission(
             parentId,
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Sub", null, null, "PLANNED", null, null, null, false, null, null));
+                "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null));
 
     assertEquals(parentSquadron, saved.getOwningOrgUnit());
     assertEquals(parent, saved.getParent());

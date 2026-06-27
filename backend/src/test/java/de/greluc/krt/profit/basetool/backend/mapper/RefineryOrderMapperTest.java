@@ -251,7 +251,11 @@ class RefineryOrderMapperTest {
             null, // owningSquadron
             null, // partyLeadUser
             null, // partyLeadGuestName
-            0L // partyLeadVersion
+            0L, // partyLeadVersion
+            null, // steps
+            null, // stepsVersion
+            null, // objective
+            null // meetingPoint
             );
 
     // When

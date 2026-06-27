@@ -101,6 +101,8 @@ class MissionUnitManagementTest {
                 null,
                 false,
                 null,
+                null,
+                null,
                 null));
 
     // The ship owner must be a registered participant before the ship can be pinned to a unit.

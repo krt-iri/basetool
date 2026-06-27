@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyReposito
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -55,11 +57,15 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -103,6 +109,7 @@ public class MissionService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionUnitRepository missionUnitRepository;
   private final MissionCrewRepository missionCrewRepository;
+  private final MissionStepRepository missionStepRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
@@ -382,6 +389,8 @@ public class MissionService {
   private void applyCreatePayload(Mission mission, CreateMissionRequest request) {
     mission.setName(request.name());
     mission.setDescription(request.description());
+    mission.setObjective(request.objective());
+    mission.setMeetingPoint(request.meetingPoint());
     mission.setCalendarLink(request.calendarLink());
     mission.setStatus(request.status());
     mission.setMeetingTime(request.meetingTime());
@@ -443,6 +452,8 @@ public class MissionService {
 
     mission.setName(request.name());
     mission.setDescription(request.description());
+    mission.setObjective(request.objective());
+    mission.setMeetingPoint(request.meetingPoint());
     mission.setCalendarLink(request.calendarLink());
     mission.setStatus(request.status());
     mission.setMeetingTime(request.meetingTime());
@@ -517,6 +528,8 @@ public class MissionService {
       String calendarLink,
       String status,
       UUID operationId,
+      String objective,
+      String meetingPoint,
       @NotNull Long expectedCoreVersion) {
     Mission mission =
         missionRepository
@@ -535,6 +548,8 @@ public class MissionService {
 
     mission.setName(name);
     mission.setDescription(description);
+    mission.setObjective(objective);
+    mission.setMeetingPoint(meetingPoint);
     mission.setCalendarLink(calendarLink);
     if (status != null) {
       mission.setStatus(status);
@@ -710,6 +725,20 @@ public class MissionService {
   private void bumpPartyLeadVersion(@NotNull Mission mission) {
     long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
     mission.setPartyLeadVersion(current + 1L);
+  }
+
+  private void assertStepsVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    long current = mission.getStepsVersion() == null ? 0L : mission.getStepsVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
+  private void bumpStepsVersion(@NotNull Mission mission) {
+    long current = mission.getStepsVersion() == null ? 0L : mission.getStepsVersion();
+    mission.setStepsVersion(current + 1L);
   }
 
   /**
@@ -1565,6 +1594,239 @@ public class MissionService {
         null,
         "unit=" + unitId);
     return mission;
+  }
+
+  // --- Ablauf steps (procedure timeline) ---
+
+  /**
+   * Appends a step to the mission's Ablauf timeline. The new step lands at the end ({@code
+   * orderIndex = max + 1}) and is initially not done. Validates and bumps the dedicated {@code
+   * stepsVersion} section counter so a concurrent step edit surfaces as a 409 while never colliding
+   * with a parallel core / schedule / flags edit.
+   *
+   * @param missionId the mission id
+   * @param title the required step title
+   * @param meta the optional free-text time/place hint
+   * @param expectedStepsVersion the steps-section version the caller last saw
+   * @return the managed mission
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   *     unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedStepsVersion} is stale
+   */
+  @Transactional
+  public Mission addStep(
+      @NotNull UUID missionId, String title, String meta, @NotNull Long expectedStepsVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertStepsVersion(mission, expectedStepsVersion, missionId);
+
+    MissionStep step = new MissionStep();
+    step.setTitle(title == null ? null : title.trim());
+    step.setMeta(normalizeStepMeta(meta));
+    step.setDone(false);
+    step.setOrderIndex(nextStepOrderIndex(mission));
+    mission.addStep(step);
+    missionStepRepository.save(step);
+
+    bumpStepsVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_STEP_ADDED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "step=" + step.getId());
+    return mission;
+  }
+
+  /**
+   * Edits an existing Ablauf step's title and time/place hint. Mutates the managed child via
+   * dirty-checking (no explicit child save) and bumps {@code stepsVersion}.
+   *
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedStepsVersion} is stale
+   */
+  @Transactional
+  public Mission updateStep(
+      @NotNull UUID missionId,
+      @NotNull UUID stepId,
+      String title,
+      String meta,
+      @NotNull Long expectedStepsVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertStepsVersion(mission, expectedStepsVersion, missionId);
+
+    MissionStep step = findStep(mission, stepId);
+    step.setTitle(title == null ? null : title.trim());
+    step.setMeta(normalizeStepMeta(meta));
+
+    bumpStepsVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_STEP_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "step=" + stepId);
+    return mission;
+  }
+
+  /**
+   * Removes an Ablauf step and re-packs the remaining steps' {@code orderIndex} to 0..n-1 so the
+   * timeline stays contiguous. Bumps {@code stepsVersion}.
+   *
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
+   *     a child of the mission
+   */
+  @Transactional
+  public Mission deleteStep(
+      @NotNull UUID missionId, @NotNull UUID stepId, @NotNull Long expectedStepsVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertStepsVersion(mission, expectedStepsVersion, missionId);
+
+    boolean removed = mission.removeStep(stepId);
+    if (!removed) {
+      throw new NotFoundException("MissionStep not found in this mission");
+    }
+    repackStepOrder(mission);
+
+    bumpStepsVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_STEP_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "step=" + stepId);
+    return mission;
+  }
+
+  /**
+   * Reorders the mission's Ablauf steps. {@code orderedStepIds} must be exactly the mission's step
+   * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
+   * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
+   * double-version bump). The {@code stepsVersion} optimistic guard serialises concurrent reorders,
+   * making a pessimistic lock unnecessary. Records a single reorder event (count only, no titles).
+   *
+   * @throws IllegalArgumentException when the id set does not match the mission's steps exactly
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedStepsVersion} is stale
+   */
+  @Transactional
+  public Mission reorderSteps(
+      @NotNull UUID missionId,
+      @NotNull List<UUID> orderedStepIds,
+      @NotNull Long expectedStepsVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertStepsVersion(mission, expectedStepsVersion, missionId);
+
+    Set<UUID> existingIds =
+        mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
+    if (orderedStepIds.size() != existingIds.size()
+        || !existingIds.equals(new HashSet<>(orderedStepIds))) {
+      throw new IllegalArgumentException("Reorder id set must match the mission's steps exactly");
+    }
+
+    Map<UUID, MissionStep> byId =
+        mission.getSteps().stream().collect(Collectors.toMap(MissionStep::getId, s -> s));
+    for (int i = 0; i < orderedStepIds.size(); i++) {
+      byId.get(orderedStepIds.get(i)).setOrderIndex(i);
+    }
+
+    bumpStepsVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_STEP_REORDERED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "count=" + existingIds.size());
+    return mission;
+  }
+
+  /**
+   * Toggles a step's shared {@code done} flag to the requested state and bumps {@code
+   * stepsVersion}. The single "current phase" (first not-done step) is derived on read, never
+   * stored.
+   *
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
+   *     a child of the mission
+   */
+  @Transactional
+  public Mission toggleStepDone(
+      @NotNull UUID missionId,
+      @NotNull UUID stepId,
+      boolean done,
+      @NotNull Long expectedStepsVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertStepsVersion(mission, expectedStepsVersion, missionId);
+
+    MissionStep step = findStep(mission, stepId);
+    step.setDone(done);
+
+    bumpStepsVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_STEP_DONE_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "step=" + stepId + " done=" + done);
+    return mission;
+  }
+
+  /**
+   * Finds a managed step by id within the mission, or throws.
+   *
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
+   *     a child of the mission
+   */
+  private static MissionStep findStep(@NotNull Mission mission, @NotNull UUID stepId) {
+    return mission.getSteps().stream()
+        .filter(s -> s.getId() != null && s.getId().equals(stepId))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException("MissionStep not found in this mission"));
+  }
+
+  /**
+   * Normalises a step's optional time/place hint: trims surrounding whitespace and collapses blank
+   * input to {@code null}.
+   */
+  private static String normalizeStepMeta(String meta) {
+    return meta == null || meta.isBlank() ? null : meta.trim();
+  }
+
+  /** Returns the {@code orderIndex} to assign a newly appended step (max existing + 1, or 0). */
+  private static int nextStepOrderIndex(@NotNull Mission mission) {
+    int max = -1;
+    for (MissionStep s : mission.getSteps()) {
+      max = Math.max(max, s.getOrderIndex());
+    }
+    return max + 1;
+  }
+
+  /** Re-assigns the remaining steps' {@code orderIndex} to a contiguous 0..n-1 by current order. */
+  private static void repackStepOrder(@NotNull Mission mission) {
+    List<MissionStep> ordered = new ArrayList<>(mission.getSteps());
+    ordered.sort(Comparator.comparingInt(MissionStep::getOrderIndex));
+    for (int i = 0; i < ordered.size(); i++) {
+      ordered.get(i).setOrderIndex(i);
+    }
   }
 
   /**
