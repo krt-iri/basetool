@@ -678,8 +678,10 @@ public class OrgUnitMembershipService {
    * </ul>
    *
    * <p>Inventory lifecycle: if this reconcile grants the user their first-ever org-unit membership
-   * the ownerless-personal inventory adopts the first added Staffel; if it removes the user's last
-   * remaining membership the inventory demotes back to ownerless-personal.
+   * the ownerless-personal inventory adopts the name-sorted <em>primary</em> of the newly added
+   * Staffeln (the same deterministic primary {@code UserDto.squadron} / the create-time auto-stamp
+   * use, rather than whichever Staffel the client happened to list first); if it removes the user's
+   * last remaining membership the inventory demotes back to ownerless-personal.
    *
    * @param user the user whose Staffel memberships to reconcile; never {@code null}.
    * @param desired the complete desired Staffel membership set (0–2 entries); never {@code null},
@@ -744,7 +746,7 @@ public class OrgUnitMembershipService {
     }
 
     // 2. Additions + in-place flag patches.
-    Squadron firstAdded = null;
+    List<Squadron> addedSquadrons = new ArrayList<>();
     for (MembershipDeltaRequest.StaffelChange change : desired) {
       UUID squadronId = change.squadronId();
       boolean wantLogistician = Boolean.TRUE.equals(change.isLogistician());
@@ -775,16 +777,22 @@ public class OrgUnitMembershipService {
             orgUnitLabel(sq),
             user.getId(),
             "kind=SQUADRON");
-        if (firstAdded == null) {
-          firstAdded = sq;
-        }
+        addedSquadrons.add(sq);
       }
     }
 
-    // 3. Inventory lifecycle: first-ever membership adopts the new Staffel; last membership removed
+    // 3. Inventory lifecycle: a first-ever membership adopts the name-sorted PRIMARY of the newly
+    // added Staffeln (REQ-ORG-017) — not the request-order-first — so the inventory's owning
+    // Staffel
+    // matches the deterministic primary every other surface (UserDto.squadron, the create-time
+    // auto-stamp, officer oversight) derives from the same name sort. The last membership removed
     // demotes the org-stamped inventory back to ownerless-personal.
-    if (membershipsBefore == 0 && firstAdded != null) {
-      inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), firstAdded);
+    if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
+      Squadron primaryAdded =
+          addedSquadrons.stream()
+              .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
+              .orElseThrow();
+      inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), primaryAdded);
     } else if (membershipsBefore > 0 && membershipRepository.countByIdUserId(user.getId()) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(user.getId());
     }

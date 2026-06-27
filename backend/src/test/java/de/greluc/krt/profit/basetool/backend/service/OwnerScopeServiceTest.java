@@ -155,13 +155,16 @@ class OwnerScopeServiceTest {
 
     // The "name-sorted primary" definition is owned by StaffelMembershipResolver (tested
     // independently in StaffelMembershipResolverTest). Delegate the mock to a real instance backed
-    // by the squadron-repo mock so the single-Staffel fast path stays load-free and the two-Staffel
-    // name-sort is exercised through the real resolver — without re-stubbing it per scenario.
+    // by the squadron-repo mock so the single-Staffel cheap existence check and the two-Staffel
+    // name-sort are exercised through the real resolver — without re-stubbing it per scenario.
     StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+    // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
+    // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
+    lenient().when(squadronRepository.existsById(any())).thenReturn(true);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */

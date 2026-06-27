@@ -64,6 +64,10 @@
               th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
             <input type="hidden" name="source" th:field="*{source}">
+            <!-- REQ-ORG-017: round-trips whether the authoritative Staffel-membership detail loaded
+                 on the GET. When false (detail fetch failed) the controller skips the Staffel
+                 reconcile on save, so blank slots never strip the member's Staffeln. -->
+            <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
             <div class="form-group">
                 <label th:text="#{profile.rank}">Rang</label>
                 <select name="rank">
@@ -108,6 +112,15 @@
             <div class="form-group" sec:authorize="hasRole('ADMIN')" id="staffel-section">
                 <label th:text="#{members.staffel.title}">Staffeln</label>
 
+                <!-- REQ-ORG-017: the authoritative Staffel-membership detail (each Staffel's own
+                     flags) failed to load. The editable slots are hidden so the admin cannot make a
+                     change that the save would silently drop, and a non-null reconcile that would
+                     strip every Staffel is avoided (the controller skips the PATCH when
+                     staffelDetailLoaded is false). The other fields above still save normally. -->
+                <p class="field-error" th:unless="${memberEditForm.staffelDetailLoaded}"
+                   th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</p>
+
+                <th:block th:if="${memberEditForm.staffelDetailLoaded}">
                 <!-- Slot 1 -->
                 <div class="staffel-slot hud-box" style="padding:1rem; margin-bottom:0.75rem;">
                     <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
@@ -172,6 +185,7 @@
                 <button type="button" class="btn btn-ghost" id="staffel-add-2"
                         th:style="${memberEditForm.staffel2Id == null} ? '' : 'display:none;'"
                         th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</button>
+                </th:block>
             </div>
 
             <div class="form-actions">

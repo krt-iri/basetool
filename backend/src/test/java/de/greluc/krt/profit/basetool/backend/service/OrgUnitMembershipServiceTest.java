@@ -137,13 +137,14 @@ class OrgUnitMembershipServiceTest {
   }
 
   @Test
-  void findStaffelMembershipOrgUnitIds_singleStaffel_returnsItWithoutSquadronLoad() {
+  void findStaffelMembershipOrgUnitIds_singleStaffel_returnsItWithoutFullSquadronLoad() {
     UUID squadronId = UUID.randomUUID();
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelRow(userId, squadronId)));
+    when(squadronRepository.existsById(squadronId)).thenReturn(true);
 
     assertEquals(List.of(squadronId), membershipService.findStaffelMembershipOrgUnitIds(userId));
-    // The single-Staffel fast path must not hit the squadron table.
+    // The single-Staffel fast path does only a cheap existsById, never a full entity load/sort.
     verify(squadronRepository, never()).findAllById(any());
   }
 
@@ -474,6 +475,39 @@ class OrgUnitMembershipServiceTest {
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_GRANTED), eq(squadronA), any(), eq(userId), any());
     verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sqA);
+  }
+
+  @Test
+  void reconcileStaffelMemberships_addsTwoStaffelnToZeroMembership_adoptsNameSortedPrimary() {
+    // REQ-ORG-017: a brand-new member assigned two Staffeln at once must have their ownerless
+    // inventory adopted by the name-sorted PRIMARY of the two — not whichever Staffel the client
+    // listed first — so inventory ownership matches UserDto.squadron and the create-time
+    // auto-stamp.
+    UUID squadronZeta = UUID.randomUUID();
+    UUID squadronAlpha = UUID.randomUUID();
+    Squadron sqZeta = new Squadron();
+    sqZeta.setId(squadronZeta);
+    sqZeta.setName("Zeta");
+    Squadron sqAlpha = new Squadron();
+    sqAlpha.setId(squadronAlpha);
+    sqAlpha.setName("Alpha");
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(squadronRepository.findById(squadronZeta)).thenReturn(Optional.of(sqZeta));
+    when(squadronRepository.findById(squadronAlpha)).thenReturn(Optional.of(sqAlpha));
+
+    // Client lists Zeta FIRST, Alpha second: the request-order-first is Zeta, but Alpha is the
+    // name-sorted primary — the inventory must adopt Alpha.
+    membershipService.reconcileStaffelMemberships(
+        user,
+        List.of(
+            new MembershipDeltaRequest.StaffelChange(squadronZeta, false, false),
+            new MembershipDeltaRequest.StaffelChange(squadronAlpha, false, false)));
+
+    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sqAlpha);
+    verify(inventoryReconciler, never()).onUserGainedFirstOrgUnit(userId, sqZeta);
   }
 
   @Test

@@ -59,11 +59,13 @@ import org.springframework.stereotype.Service;
  * supportPackageMustStayADependencyLeaf} and {@code backendPackagesShouldBeFreeOfDependencyCycles},
  * ADR-0047).
  *
- * <p>A row whose squadron no longer resolves (a dangling membership) is skipped via {@link
- * SquadronRepository#findAllById(Iterable)}, so the resolver never throws on a bad-data edge case.
- * It carries no {@code @Transactional} of its own on purpose: it is a pure read helper that
- * participates in whichever transaction (if any) the caller already holds, matching how the three
- * call sites read the squadron table inline before the extraction.
+ * <p>A row whose squadron no longer resolves (a dangling membership) is skipped — dropped by the
+ * batch {@link SquadronRepository#findAllById(Iterable)} on the multi-row path and by an {@code
+ * existsById} check on the single-row fast path — so the resolver never throws on a bad-data edge
+ * case and treats a dangling row identically whether the user holds one Staffel or two. It carries
+ * no {@code @Transactional} of its own on purpose: it is a pure read helper that participates in
+ * whichever transaction (if any) the caller already holds, matching how the three call sites read
+ * the squadron table inline before the extraction.
  */
 @Service
 @RequiredArgsConstructor
@@ -97,9 +99,11 @@ public class StaffelMembershipResolver {
    * Resolves the given {@code SQUADRON}-kind membership rows to their owning Staffel ids,
    * name-sorted (primary first) exactly as {@link #resolveNameSortedStaffeln(List)}. Used where the
    * caller only needs the ids (authorization gates, the single-valued primary accessors). The
-   * common single-Staffel case is short-circuited <em>without</em> a squadron load — one row is
-   * already its own primary and needs no name to sort — preserving the per-call-site fast path the
-   * extraction inherited.
+   * common single-Staffel case skips the name sort and the full squadron <em>entity</em> load — one
+   * row is already its own primary and needs no name to sort — doing only a cheap {@code
+   * existsById} check so a dangling row (a membership whose squadron no longer resolves) is dropped
+   * exactly as the multi-row batch load drops it; the dangling-row treatment is therefore identical
+   * regardless of how many Staffeln the user holds.
    *
    * @param squadronRows the user's {@code SQUADRON}-kind membership rows; never {@code null},
    *     possibly empty.
@@ -112,8 +116,11 @@ public class StaffelMembershipResolver {
       return List.of();
     }
     if (squadronRows.size() == 1) {
-      // The common single-Staffel case needs no name sort and no squadron load.
-      return List.of(squadronRows.get(0).getId().getOrgUnitId());
+      // The common single-Staffel case needs no name sort and no entity hydration — but still
+      // confirms the squadron resolves (cheap existsById) so a dangling row is dropped consistently
+      // with the multi-row branch, rather than returned unchecked.
+      UUID staffelId = squadronRows.get(0).getId().getOrgUnitId();
+      return squadronRepository.existsById(staffelId) ? List.of(staffelId) : List.of();
     }
     return resolveNameSortedStaffeln(squadronRows).stream().map(Squadron::getId).toList();
   }

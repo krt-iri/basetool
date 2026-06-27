@@ -239,6 +239,7 @@ public class MemberManagementController {
       // carries each Staffel's own Logistician / Mission-Manager flags (REQ-SEC-005). The detail
       // endpoint sorts Staffel-first then by name, so the SQUADRON rows are the leading entries.
       List<OrgUnitMembershipDto> staffelRows = List.of();
+      boolean staffelDetailLoaded = false;
       try {
         MembershipDeltaResponse detail =
             backendApiClient.get(
@@ -246,6 +247,11 @@ public class MemberManagementController {
         if (detail != null && detail.memberships() != null) {
           staffelRows =
               detail.memberships().stream().filter(m -> m.kind() == OrgUnitKind.SQUADRON).toList();
+          // The authoritative Staffel set (incl. each Staffel's own flags) loaded — the two slots
+          // below can be trusted as the complete desired set on save. A failed/empty load leaves
+          // this false so applyMemberUpdate skips the Staffel reconcile (REQ-ORG-017): the blank
+          // slots must NOT be misread as "remove every Staffel".
+          staffelDetailLoaded = true;
         }
       } catch (Exception ex) {
         log.debug("Failed to load membership detail for member-edit Staffel slots", ex);
@@ -268,7 +274,8 @@ public class MemberManagementController {
                 slot1 != null ? slot1.isMissionManager() : null,
                 slot2 != null ? slot2.orgUnitId() : null,
                 slot2 != null ? slot2.isLogistician() : null,
-                slot2 != null ? slot2.isMissionManager() : null));
+                slot2 != null ? slot2.isMissionManager() : null,
+                staffelDetailLoaded));
       } else {
         MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
         if (form != null && form.source() == null) {
@@ -286,7 +293,8 @@ public class MemberManagementController {
                   form.staffel1MissionManager(),
                   form.staffel2Id(),
                   form.staffel2Logistician(),
-                  form.staffel2MissionManager()));
+                  form.staffel2MissionManager(),
+                  form.staffelDetailLoaded()));
         }
       }
       return "member-edit";
@@ -392,12 +400,18 @@ public class MemberManagementController {
 
   /**
    * Applies a member edit to the backend: persists the attributes first (the backend bumps
-   * {@code @Version} on the user row and returns an empty body), then sends the desired complete
-   * Staffel set as the {@code staffeln} half of one membership-delta PATCH. The backend reconciles
-   * that set against the user's current Staffel memberships (add / remove / per-squadron flag patch
-   * in one transaction). The reconcile is idempotent, so re-posting an unchanged set is a no-op.
-   * Shared by the redirect handler and the AJAX twin; throws on a backend failure so each caller
-   * can map it to its own error shape.
+   * {@code @Version} on the user row and returns an empty body), then — <em>only when the edit
+   * form's authoritative Staffel detail loaded</em> ({@link MemberEditForm#staffelDetailLoaded()})
+   * — sends the desired complete Staffel set as the {@code staffeln} half of one membership-delta
+   * PATCH. The backend reconciles that set against the user's current Staffel memberships (add /
+   * remove / per-squadron flag patch in one transaction). The reconcile is idempotent, so
+   * re-posting an unchanged set is a no-op.
+   *
+   * <p>If the Staffel-detail fetch failed when the form was rendered, the two slots are blank and
+   * sending them would be reconciled as "remove every Staffel" — so the PATCH is skipped entirely
+   * and the Staffel memberships are left untouched (REQ-ORG-017). Shared by the redirect handler
+   * and the AJAX twin; throws on a backend failure so each caller can map it to its own error
+   * shape.
    *
    * @param id user id
    * @param form the validated member edit form
@@ -408,10 +422,19 @@ public class MemberManagementController {
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
     backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
 
-    // REQ-ORG-017 — fold the two fixed Staffel slots into the desired complete Staffel set. A
-    // second
-    // slot equal to the first is dropped here so the backend never sees the same squadron twice; an
-    // empty slot is simply omitted. An empty list removes every Staffel membership.
+    // REQ-ORG-017 — reconcile the Staffel set ONLY when the authoritative membership detail loaded
+    // on the edit-form GET (form.staffelDetailLoaded()). If that fetch failed, the two slots render
+    // blank, and a non-null staffeln list (even empty) is reconciled by the backend as the complete
+    // desired set — i.e. it would strip every Staffel membership (MEMBERSHIP_REVOKED, org-chart
+    // seats, inventory demotion). Skipping the PATCH entirely leaves the Staffel side untouched.
+    if (!Boolean.TRUE.equals(form.staffelDetailLoaded())) {
+      return;
+    }
+
+    // Fold the two fixed Staffel slots into the desired complete Staffel set. A second slot equal
+    // to
+    // the first is dropped here so the backend never sees the same squadron twice; an empty slot is
+    // simply omitted. An empty list removes every Staffel membership.
     List<MembershipDeltaRequest.StaffelChange> staffeln = new ArrayList<>();
     if (form.staffel1Id() != null) {
       staffeln.add(

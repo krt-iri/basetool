@@ -53,6 +53,14 @@ import org.springframework.format.annotation.DateTimeFormat;
  * @param staffel2Logistician second slot's desired Logistician flag (defaults {@code false}).
  * @param staffel2MissionManager second slot's desired Mission Manager flag (defaults {@code
  *     false}).
+ * @param staffelDetailLoaded whether the authoritative Staffel-membership detail (each Staffel's
+ *     own flags) was successfully loaded when the edit form was rendered. {@code false} when that
+ *     fetch failed (resilience timeout / open circuit breaker), in which case the two slots render
+ *     blank and the controller must NOT reconcile the Staffel set on save — otherwise the blank
+ *     slots would be misread as "remove every Staffel" and silently strip the member's memberships.
+ *     The hidden field round-trips the flag from the GET render to the POST. Defaults to {@code
+ *     true} via the convenience constructor for callers that build the form without the membership
+ *     detail.
  */
 public record MemberEditForm(
     Integer rank,
@@ -66,4 +74,54 @@ public record MemberEditForm(
     @Nullable Boolean staffel1MissionManager,
     @Nullable UUID staffel2Id,
     @Nullable Boolean staffel2Logistician,
-    @Nullable Boolean staffel2MissionManager) {}
+    @Nullable Boolean staffel2MissionManager,
+    @Nullable Boolean staffelDetailLoaded) {
+
+  /**
+   * Convenience constructor that defaults {@link #staffelDetailLoaded()} to {@code true} — the
+   * normal "detail loaded" path. Lets callers (and tests) that do not track the Staffel-detail load
+   * outcome build the form without the trailing flag; the page controller uses the full canonical
+   * constructor to thread the real load outcome.
+   *
+   * @param rank pay-grade rank (1-20).
+   * @param description profile description.
+   * @param displayName visible display name.
+   * @param version {@code app_user} row {@code @Version} for the optimistic-lock check.
+   * @param source origin marker — {@code "profile"} keeps the round-trip on the profile page.
+   * @param joinDate squadron-join date.
+   * @param staffel1Id first Staffel slot's target Squadron id, or {@code null}.
+   * @param staffel1Logistician first slot's desired Logistician flag.
+   * @param staffel1MissionManager first slot's desired Mission Manager flag.
+   * @param staffel2Id second Staffel slot's target Squadron id, or {@code null}.
+   * @param staffel2Logistician second slot's desired Logistician flag.
+   * @param staffel2MissionManager second slot's desired Mission Manager flag.
+   */
+  public MemberEditForm(
+      Integer rank,
+      String description,
+      String displayName,
+      Long version,
+      String source,
+      @Nullable LocalDate joinDate,
+      @Nullable UUID staffel1Id,
+      @Nullable Boolean staffel1Logistician,
+      @Nullable Boolean staffel1MissionManager,
+      @Nullable UUID staffel2Id,
+      @Nullable Boolean staffel2Logistician,
+      @Nullable Boolean staffel2MissionManager) {
+    this(
+        rank,
+        description,
+        displayName,
+        version,
+        source,
+        joinDate,
+        staffel1Id,
+        staffel1Logistician,
+        staffel1MissionManager,
+        staffel2Id,
+        staffel2Logistician,
+        staffel2MissionManager,
+        Boolean.TRUE);
+  }
+}

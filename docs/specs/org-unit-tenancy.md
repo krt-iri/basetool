@@ -480,6 +480,14 @@ the ≤2 counting trigger never miscounts a re-point). The legacy per-flag query
 (`PATCH /api/v1/users/{id}/logistician` / `…/mission-manager`) and the member-list flag toggles were
 removed; the membership-delta reconcile is the single Staffel-flag write path. The `UserDto` exposes
 the complete Staffel set as `squadrons` (with `squadron` retained as the primary for API stability).
+When a reconcile grants a previously membership-less user their first Staffel(n) the
+ownerless-personal inventory adopts the **name-sorted primary** of the newly added Staffeln — not
+whichever the client listed first — matching the same primary every other surface derives. The
+admin member-edit form only sends the `staffeln` set when the authoritative per-Staffel detail
+(`GET /api/v1/users/{id}/memberships/detail`, which carries each Staffel's own flags) loaded on the
+edit-form GET; if that fetch failed the two slots render blank with a notice and the save **skips**
+the Staffel reconcile entirely, so a transient detail outage can never be misread as "remove every
+Staffel" and silently strip the member's memberships.
 
 Two-Staffel support is then honoured **project-wide** so a dual-Staffel member is never silently
 dropped to one:
@@ -489,6 +497,10 @@ dropped to one:
   non-admins, mirroring `currentScopePredicate()`: an `X-Active-Org-Unit-Id` pin onto one of the
   caller's Staffeln wins; otherwise it falls back to the deterministic **name-sorted primary** (the
   same primary as `UserDto.squadron` / `UserMapper.resolveSquadron`) instead of an arbitrary row.
+  The single owner of the name-sorted-primary rule is `StaffelMembershipResolver` (ADR-0047); it
+  drops a dangling Staffel membership (one whose squadron no longer resolves) **identically whether
+  the user holds one Staffel or two**, so a corrupt row never leaks into one branch while being
+  filtered from the other.
 - **Union lists** — the admin user list, `/lookup`+`/search` typeaheads and the promotion
   Bewertungsmatrix scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
   unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
@@ -526,7 +538,9 @@ dropped to one:
 **Enforced by:** `OrgUnitMembershipServiceTest` (the service-layer guards incl.
 `reconcileStaffelMemberships` add / remove / flag-patch / duplicate / >2 / leadership),
 `UserServiceMembershipDeltaTest` (the delta orchestrator forwards `staffeln` to the reconcile),
-`MemberManagementControllerTest` (the member-edit two-slot fold) and `OrgHierarchyMigrationTest`
+`MemberManagementControllerTest` (the member-edit two-slot fold and the detail-load wipe-guard),
+`UserScopedQueriesDataTest` (the union-list scope queries' null + two-Staffel binding against the
+real dialect) and `OrgHierarchyMigrationTest`
 (the ≤2-Staffel counting triggers on INSERT+UPDATE, the leader-excludes-Staffel trigger, and the
 `chk_org_unit_membership_bereich_flags_only_on_bereich` / `chk_org_unit_membership_ol_flag_only_on_ol`
 CHECKs — DB-side defence in depth) · **Issues:** #692, #695.

@@ -112,13 +112,17 @@ class PromotionFeatureFlagServiceGateTest {
   void stubMembershipLookup() {
     lenient().when(authHelper.isAdmin()).thenReturn(false);
     // readPersistentSquadronFromUser delegates the name-sorted-primary fallback to
-    // StaffelMembershipResolver; back the mock with a real instance so the single-Staffel fast path
-    // these tests rely on stays load-free.
+    // StaffelMembershipResolver; back the mock with a real instance so the single-Staffel
+    // resolution
+    // these tests rely on runs through the real resolver.
     StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+    // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
+    // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
+    lenient().when(squadronRepository.existsById(any())).thenReturn(true);
   }
 
   @Test

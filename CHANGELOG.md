@@ -18,6 +18,8 @@
 
 - **Meine Blueprints: Craftbarkeit rechnet jetzt auch Hand-Minables (Stück) ein.** In der Craftbarkeits-Ansicht fehlten bisher die Zutaten mit Mengeneinheit „Stück" — handabgebaute Edelsteine wie Hadanite oder Beradom, die das Wiki als Item führt. Sie werden jetzt (wie schon im Auftrags-Pfad) an das passende Material gekoppelt und mitgezählt (benötigt/vorhanden/fehlt in ganzen Stück, ggf. als limitierendes Material); craftbare Unterbaugruppen bleiben „nicht bewertet".
 
+- **Mitglied-Details: Speichern entfernt keine Staffeln mehr, wenn die Staffel-Daten nicht geladen werden konnten.** Schlug beim Öffnen der Bearbeitung der Abruf der Staffel-Mitgliedschaften fehl (z. B. Zeitüberschreitung), zeigte das Formular leere Staffel-Felder — ein anschließendes Speichern hätte alle Staffeln des Mitglieds entfernt. Jetzt erscheint stattdessen ein Hinweis, die Staffel-Felder bleiben ausgeblendet und der Staffel-Abgleich wird übersprungen; die übrigen Felder speichern normal.
+
 ## [v0.7.16](https://github.com/krt-profit/basetool/releases/tag/v0.7.16) - 2026-06-27
 
 ### Added

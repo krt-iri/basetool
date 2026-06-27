@@ -130,7 +130,7 @@
         let membersFilterTimer = null;
 
         // In-place filter + pagination (epic #571 / #573). The GET form stays the no-JS fallback;
-        // the row actions (logistician/mission-manager toggle, delete) are delegated via krtEvents
+        // the row actions (delete) are delegated via krtEvents
         // below, so they keep working after the results fragment is swapped.
         function applyMembersFilter() {
             if (!filterForm || !resultsContainer || !window.krtFetch) {

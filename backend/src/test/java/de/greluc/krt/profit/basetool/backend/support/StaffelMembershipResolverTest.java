@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -60,16 +61,33 @@ class StaffelMembershipResolverTest {
   }
 
   @Test
-  void resolveNameSortedStaffelIds_single_returnsItWithoutSquadronLoad() {
+  void resolveNameSortedStaffelIds_single_returnsItAfterCheapExistenceCheck() {
     UUID userId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
+    when(squadronRepository.existsById(squadronId)).thenReturn(true);
 
     List<UUID> result =
         resolver.resolveNameSortedStaffelIds(List.of(staffelRow(userId, squadronId)));
 
     assertEquals(List.of(squadronId), result);
-    // The single-Staffel case is already its own primary — no name sort, no squadron load.
-    verifyNoInteractions(squadronRepository);
+    // The single-Staffel case is already its own primary — only a cheap existence check, no name
+    // sort and no full entity load.
+    verify(squadronRepository).existsById(squadronId);
+    verify(squadronRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void resolveNameSortedStaffelIds_singleDangling_returnsEmpty() {
+    UUID userId = UUID.randomUUID();
+    UUID danglingId = UUID.randomUUID();
+    // A single dangling row (its squadron no longer resolves) is dropped exactly like a dangling
+    // row among two — not returned unchecked (finding #4: consistent dangling-row handling).
+    when(squadronRepository.existsById(danglingId)).thenReturn(false);
+
+    List<UUID> result =
+        resolver.resolveNameSortedStaffelIds(List.of(staffelRow(userId, danglingId)));
+
+    assertTrue(result.isEmpty());
   }
 
   @Test
