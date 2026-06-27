@@ -24,145 +24,188 @@
 </header>
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
-    <div class="greeting hud-box">
-        <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
-        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
-           th:text="#{bank.orgUnit.subtitle}">Kontostand und Ein-/Auszahlungsantr&auml;ge deiner Org-Einheit.</p>
+    <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022). The CTA opens the
+         request modal whose account selector is filled with the caller's requestable accounts; it is
+         shown only when at least one visible account is requestable (anyCanRequest). It sits OUTSIDE
+         the swapped fragment because the requestable set never changes on a request create/cancel. -->
+    <div class="greeting hud-box flex-between">
+        <div>
+            <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+               th:text="#{bank.orgUnit.subtitle}">Kontostand und Ein-/Auszahlungsantr&auml;ge deiner Org-Einheit.</p>
+        </div>
+        <div class="bank-head-actions" th:if="${anyCanRequest}">
+            <button type="button" class="btn btn--cta"
+                    data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
+                    data-testid="org-unit-bank-request-btn"
+                    th:text="#{bank.orgUnit.requestAction}">Ein-/Auszahlung beantragen</button>
+        </div>
     </div>
 
-    <!-- orgUnitBank fragment: balance cards + own-request list; swapped in place after a write. -->
+    <!-- orgUnitBank fragment: tabs (accounts + my-requests) with their counts and both panels;
+         swapped in place after a write so the dense account list AND the request count update without
+         a reload (REQ-FE-005). Both tab panels live INSIDE the fragment for that reason. -->
     <div id="org-unit-bank-results" th:fragment="orgUnitBank">
 
-        <div class="bank-acc-grid mt-2" th:if="${!#lists.isEmpty(balances)}">
-            <div th:each="b : ${balances}" class="kpi-card" th:with="spark=${sparks.get(b.accountId())}"
-                 data-testid="org-unit-bank-card" th:attr="data-account-no=${b.accountNo()}">
-                <div class="kpi-card-top">
-                    <div>
-                        <div class="kpi-title" th:text="${b.accountName()}">Staffel IRIDIUM</div>
-                        <!-- Org-unit account: account no + its org-unit shorthand (or name). A special
-                             account (Sonderkonto, REQ-BANK-028) belongs to no org unit, so it is labelled
-                             by its account-type label instead. -->
-                        <div class="kpi-sub">
-                            <span th:text="${b.accountNo()}">KB-0001</span>
-                            <span> &middot; </span>
-                            <span th:if="${b.orgUnitId() != null}"
-                                  th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
-                            <span th:if="${b.orgUnitId() == null}"
-                                  th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
-                        </div>
-                    </div>
-                    <!-- The page lists only ACTIVE accounts (REQ-BANK-028), so this always reads "active". -->
-                    <span class="chip" style="font-size: 0.55rem;"
-                          th:text="#{'bank.account.status.' + ${b.status()}}">Aktiv</span>
-                </div>
-                <div class="kpi-label" th:text="#{bank.orgUnit.balance}">Kontostand</div>
-                <div class="kpi-value"
-                     th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
-                <!-- 30-day trend: sign-colored delta + inline SVG sparkline, identical to the bank
-                     dashboard cards (REQ-BANK-016). The SVG is decorative (aria-hidden); the delta
-                     carries the accessible figure. -->
-                <div class="kpi-card-foot">
-                    <span class="kpi-delta"
-                          th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                          th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
-                    <svg th:if="${spark != null and spark.points() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
-                        <polyline th:attr="points=${spark.points()}"
-                                  th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
-                                  class="kpi-sparkline" fill="none" stroke-width="1.5"/>
-                    </svg>
-                </div>
-                <!-- Balance target progress (REQ-BANK-036), shown when a target is set. -->
-                <div class="kpi-card-foot" data-testid="org-unit-bank-card-target"
-                     th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
-                     th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
-                    <div style="width:100%;">
-                        <span class="kpi-label"
-                              th:text="#{bank.orgUnit.balanceTarget} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">Ziel: 10.000.000 aUEC</span>
-                        <div class="bank-target-bar" aria-hidden="true">
-                            <div class="bank-target-bar-fill"
-                                 th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Drill-in + request affordance: pinned to the card bottom via the --actions
-                     modifier so the detail and request buttons line up across the grid whether or
-                     not a card carries the optional balance-target progress above (REQ-BANK-036). -->
-                <div class="kpi-card-foot kpi-card-foot--actions">
-                    <a class="btn btn-ghost btn-sm" data-testid="org-unit-bank-card-detail"
-                       th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                       th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details &amp; Verlauf</a>
-                </div>
-                <div class="kpi-card-foot">
-                    <!-- Own-level account (officer's Staffel / Bereich's AREA / OL's CARTEL): the F2
-                         request affordance. A subordinate account reached by the cascade is view-only
-                         (epic #692 Phase 6, owner decision Q4). -->
-                    <button th:if="${b.canRequest()}" type="button" class="btn btn--cta btn-sm"
-                            data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
-                            data-testid="org-unit-bank-request-btn"
-                            th:attr="data-field-orgunitid=${b.orgUnitId()},data-field-orglabel=${b.accountName()} + ' (' + ${b.accountNo()} + ')'"
-                            th:text="#{bank.orgUnit.requestAction}">Ein-/Auszahlung beantragen</button>
-                    <span th:unless="${b.canRequest()}" class="text-muted" style="font-size: 0.7rem;"
-                          data-testid="org-unit-bank-viewonly" th:text="#{bank.orgUnit.viewOnly}">Nur Ansicht</span>
-                </div>
+        <!-- Empty: no visible account at all. -->
+        <div class="empty-state mt-2" th:if="${#lists.isEmpty(balances)}">
+            <div class="empty-text" data-testid="org-unit-bank-empty" th:text="#{bank.orgUnit.empty}">
+                Du beaufsichtigst keine Org-Einheit mit einem Bankkonto.
             </div>
         </div>
 
-        <div class="hud-box mt-2" th:if="${#lists.isEmpty(balances)}">
-            <p class="text-center" data-testid="org-unit-bank-empty" th:text="#{bank.orgUnit.empty}">
-                Du beaufsichtigst keine Org-Einheit mit einem Bankkonto.
-            </p>
-        </div>
+        <div th:if="${!#lists.isEmpty(balances)}">
+            <div class="tab-nav mt-2" role="tablist" th:aria-label="#{bank.orgUnit.title}">
+                <button type="button" class="tab active" role="tab" aria-selected="true"
+                        id="ou-tab-konten" aria-controls="ou-panel-konten" data-tab="konten"
+                        data-testid="org-unit-bank-tab-accounts">
+                    <span th:text="#{bank.orgUnit.tab.accounts}">Konten</span>
+                    <span class="tab-count" th:text="${#lists.size(balances)}">3</span>
+                </button>
+                <button type="button" class="tab" role="tab" aria-selected="false"
+                        id="ou-tab-antraege" aria-controls="ou-panel-antraege" data-tab="antraege"
+                        data-testid="org-unit-bank-tab-requests">
+                    <span th:text="#{bank.orgUnit.tab.requests}">Meine Antr&auml;ge</span>
+                    <span class="tab-count" th:text="${#lists.size(ownRequests)}">0</span>
+                </button>
+            </div>
 
-        <!-- My requests -->
-        <div class="hud-box mt-2" th:if="${!#lists.isEmpty(balances)}">
-            <h2 th:text="#{bank.orgUnit.requests.title}">Meine Antr&auml;ge</h2>
-            <p class="text-muted" th:if="${#lists.isEmpty(ownRequests)}"
-               data-testid="org-unit-bank-requests-empty" th:text="#{bank.orgUnit.requests.empty}">
-                Noch keine Antr&auml;ge.
-            </p>
-            <table class="data-table" th:if="${!#lists.isEmpty(ownRequests)}" data-testid="org-unit-bank-requests">
-                <thead>
-                <tr>
-                    <th th:text="#{bank.request.col.type}">Typ</th>
-                    <th th:text="#{bank.request.col.amount}">Betrag</th>
-                    <th th:text="#{bank.request.col.status}">Status</th>
-                    <th th:text="#{bank.request.col.holder}">Halter</th>
-                    <th th:text="#{bank.request.col.created}">Erstellt</th>
-                    <th th:text="#{bank.request.col.actions}">Aktionen</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="r : ${ownRequests}" data-testid="org-unit-bank-request-row">
-                    <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
-                    <td th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                    <td>
-                        <span class="chip"
-                              th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
-                              th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
-                        <span class="text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
-                              th:text="' &mdash; ' + ${r.rejectReason()}"></span>
-                    </td>
-                    <td th:text="${r.holderHandle() != null} ? ${r.holderHandle()} : '&ndash;'">&ndash;</td>
-                    <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
-                    <td>
-                        <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track" data-refresh="orgUnitBank"
-                              data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
-                            <input type="hidden" name="_id" th:value="${r.id()}">
-                            <input type="hidden" name="version" th:value="${r.version()}">
-                            <button type="submit" class="btn btn-ghost btn-sm" data-testid="org-unit-bank-cancel-btn"
-                                    th:text="#{bank.request.action.cancel}">Zur&uuml;ckziehen</button>
-                            <span class="bank-field-error" data-error-for="_global"></span>
-                        </form>
-                        <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <!-- KONTEN: dense list, one row per visible account. Newest-first stays server-ordered. -->
+            <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
+                 aria-labelledby="ou-tab-konten">
+                <div class="ou-list">
+                    <div class="ou-rowhead" aria-hidden="true">
+                        <span th:text="#{bank.request.col.account}">Konto</span>
+                        <span th:text="#{bank.orgUnit.col.trend}">Trend &middot; 30 T</span>
+                        <span class="e" th:text="#{bank.orgUnit.balance}">Kontostand</span>
+                        <span th:text="#{bank.orgUnit.balanceTarget}">Ziel</span>
+                        <span class="e" th:text="#{bank.request.col.actions}">Aktion</span>
+                    </div>
+                    <div th:each="b : ${balances}" class="ou-row" th:with="spark=${sparks.get(b.accountId())}"
+                         data-testid="org-unit-bank-card" th:attr="data-account-no=${b.accountNo()}">
+                        <!-- Konto: name (linked to the drill-in) + account no and its org-unit shorthand
+                             (or name). A special account (Sonderkonto, REQ-BANK-028) belongs to no org
+                             unit, so it is labelled by its account-type label instead. -->
+                        <div>
+                            <div class="r-name">
+                                <a th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+                                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
+                            </div>
+                            <div class="r-sub">
+                                <span th:text="${b.accountNo()}">KB-0001</span>
+                                <span> &middot; </span>
+                                <span th:if="${b.orgUnitId() != null}"
+                                      th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                                <span th:if="${b.orgUnitId() == null}"
+                                      th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
+                            </div>
+                        </div>
+                        <!-- 30-day trend: sign-colored delta + inline SVG sparkline, identical to the
+                             bank dashboard cards (REQ-BANK-016). The SVG is decorative (aria-hidden);
+                             the delta carries the accessible figure. The column header conveys the
+                             window, so the per-row delta omits the "/ 30 T" suffix. -->
+                        <div class="r-trend">
+                            <span class="kpi-delta"
+                                  th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+                            <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
+                                <polyline th:attr="points=${spark.points()}"
+                                          th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
+                                          class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <!-- Kontostand: neutral-light, right-aligned, tabular figures (orange is never
+                             used on a data value). -->
+                        <div class="r-bal">
+                            <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
+                            <span class="unit">aUEC</span>
+                        </div>
+                        <!-- Ziel: mini progress bar + percentage when a balance target is set
+                             (REQ-BANK-036); a muted "no target" note otherwise. -->
+                        <div class="ou-target" data-testid="org-unit-bank-card-target"
+                             th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+                             th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
+                            <div class="bank-target-bar" aria-hidden="true">
+                                <div class="bank-target-bar-fill"
+                                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+                            </div>
+                            <div class="ou-target-meta">
+                                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
+                                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
+                            </div>
+                        </div>
+                        <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+                             th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+                        <!-- Aktion: the read-only drill-in (history + Halter-redacted statement,
+                             REQ-BANK-038); the holder/OL get the "manage" label. Booking requests are
+                             raised from the single page-level CTA, never per row. -->
+                        <div class="r-act">
+                            <a class="btn btn-ghost btn-xs" data-testid="org-unit-bank-card-detail"
+                               th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+                               th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MEINE ANTRÄGE: the requester's own requests (per-user isolation, REQ-BANK-022). -->
+            <div class="mt-2" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
+                 aria-labelledby="ou-tab-antraege" hidden>
+                <div class="empty-state" th:if="${#lists.isEmpty(ownRequests)}">
+                    <div class="empty-text" data-testid="org-unit-bank-requests-empty"
+                         th:text="#{bank.orgUnit.requests.empty}">Noch keine Antr&auml;ge.</div>
+                </div>
+                <div class="table-responsive" th:if="${!#lists.isEmpty(ownRequests)}">
+                    <table class="data-table" data-testid="org-unit-bank-requests">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.request.col.type}">Typ</th>
+                            <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
+                            <th th:text="#{bank.request.col.status}">Status</th>
+                            <th th:text="#{bank.request.col.holder}">Halter</th>
+                            <th th:text="#{bank.request.col.created}">Erstellt</th>
+                            <th th:text="#{bank.request.col.actions}">Aktionen</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${ownRequests}" data-testid="org-unit-bank-request-row">
+                            <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                            <td class="text-right bank-amount"
+                                th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
+                            <td>
+                                <!-- Status tone-chip: PENDING warning, CONFIRMED success, the terminal
+                                     REJECTED/CANCELLED muted (+ reason on a rejection). -->
+                                <span class="chip"
+                                      th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
+                                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                                <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
+                                      th:text="' &mdash; ' + ${r.rejectReason()}"></span>
+                            </td>
+                            <td th:text="${r.holderHandle() != null} ? ${r.holderHandle()} : '&ndash;'">&ndash;</td>
+                            <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
+                            <td>
+                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track" data-refresh="orgUnitBank"
+                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
+                                    <input type="hidden" name="_id" th:value="${r.id()}">
+                                    <input type="hidden" name="version" th:value="${r.version()}">
+                                    <button type="submit" class="btn btn-ghost btn-xs" data-testid="org-unit-bank-cancel-btn"
+                                            th:text="#{bank.request.action.cancel}">Zur&uuml;ckziehen</button>
+                                    <span class="bank-field-error" data-error-for="_global"></span>
+                                </form>
+                                <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Request modal (outside the swapped fragment; orgUnitId + label primed per card). -->
-    <div class="krt-modal-overlay" id="org-unit-request-modal">
+    <!-- Request modal (outside the swapped fragment). Its account selector lists ONLY the caller's
+         requestable accounts (canRequest); the chosen account's owning org unit is the request
+         target. Shown only when at least one such account exists. -->
+    <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${anyCanRequest}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.modal.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.modal.title}">Ein-/Auszahlung beantragen</h3>
@@ -172,8 +215,17 @@
             <form class="bank-ajax-form no-track" data-refresh="orgUnitBank"
                   data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
                 <div class="krt-modal-body">
-                    <input type="hidden" name="orgUnitId">
-                    <p class="text-muted"><span data-bank-label="orglabel">Staffel IRIDIUM (KB-0001)</span></p>
+                    <div class="bank-form-row">
+                        <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
+                        <select id="org-unit-request-account" name="orgUnitId" required
+                                data-testid="org-unit-request-account">
+                            <option th:each="b : ${balances}" th:if="${b.canRequest()}"
+                                    th:value="${b.orgUnitId()}"
+                                    th:text="${b.accountName()} + ' (' + ${b.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
+                        <span class="bank-field-error" data-error-for="orgUnitId"></span>
+                    </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
                         <select id="org-unit-request-type" name="type" required data-testid="org-unit-request-type">
@@ -210,5 +262,55 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:attr="nonce=${cspNonce}">
+    // Tab controller for the org-unit bank overview (DS .tab-nav pattern: arrow-key navigation +
+    // #tab= deeplink). The tab nav + both panels live inside the swapped orgUnitBank fragment, so the
+    // click/keydown handlers are document-delegated (they survive the swap) and the active tab is
+    // re-applied from #tab= on every krt:swapped — otherwise the freshly rendered fragment would show
+    // its default (Konten) tab after a request create/cancel. No inline on* handlers (CSP).
+    (function () {
+        function panels() { return document.querySelectorAll('[data-tabpanel]'); }
+        function tabs() { return document.querySelectorAll('.tab-nav .tab[data-tab]'); }
+
+        function activate(key, focus) {
+            var ps = panels();
+            if (!ps.length) { return; }
+            var ts = Array.prototype.slice.call(tabs());
+            var keys = ts.map(function (t) { return t.getAttribute('data-tab'); });
+            if (keys.indexOf(key) === -1) { key = keys.length ? keys[0] : null; }
+            if (!key) { return; }
+            ts.forEach(function (t) {
+                var on = t.getAttribute('data-tab') === key;
+                t.classList.toggle('active', on);
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                if (on && focus) { t.focus(); }
+            });
+            ps.forEach(function (p) { p.hidden = p.getAttribute('data-tabpanel') !== key; });
+            if (history.replaceState) { history.replaceState(history.state, '', '#tab=' + key); }
+        }
+
+        document.addEventListener('click', function (e) {
+            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
+            if (t) { activate(t.getAttribute('data-tab')); }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
+            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
+            if (!t) { return; }
+            e.preventDefault();
+            var ts = Array.prototype.slice.call(tabs());
+            var i = ts.indexOf(t);
+            var n = (i + (e.key === 'ArrowRight' ? 1 : ts.length - 1)) % ts.length;
+            activate(ts[n].getAttribute('data-tab'), true);
+        });
+
+        function applyFromHash() {
+            var m = (location.hash.match(/tab=(\w+)/) || [])[1];
+            if (m) { activate(m); }
+        }
+        applyFromHash();
+        document.addEventListener('krt:swapped', applyFromHash);
+    })();
+</script>
 </body>
 </html>

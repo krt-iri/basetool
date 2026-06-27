@@ -244,6 +244,10 @@ class BankOrgUnitRequestsE2eTest {
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        // The own-requests list now lives behind the "Meine Anträge" tab; activate it so the cancel
+        // control inside the (otherwise hidden) panel becomes clickable.
+        page.locator("[data-testid='org-unit-bank-tab-requests']")
+            .click(new Locator.ClickOptions().setTimeout(20_000));
         Locator cancelButton =
             page.locator("form:has(input[name='_id'][value='" + requestId + "'])")
                 .locator("[data-testid='org-unit-bank-cancel-btn']");
