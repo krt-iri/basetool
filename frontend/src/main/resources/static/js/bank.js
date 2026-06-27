@@ -796,8 +796,7 @@
         }
         const requiresApproval =
             trigger.getAttribute('data-field-requiresownerapproval') === 'true';
-        const alreadyGranted =
-            trigger.getAttribute('data-field-ownerapprovalgranted') === 'true';
+        const alreadyGranted = trigger.getAttribute('data-field-ownerapprovalgranted') === 'true';
         const isTransfer = trigger.getAttribute('data-field-reqtype') === 'TRANSFER';
         const submit = form.querySelector('button[type="submit"]');
 

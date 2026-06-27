@@ -971,7 +971,7 @@ tr.is-inert td {
     border: 1px solid var(--color-warning);
     border-left-width: 4px;
     border-radius: 2px;
-    background: rgba(255, 210, 63, 0.08);
+    background: rgb(255 210 63 / 8%);
 }
 
 .bank-owner-approval-warning {
@@ -980,7 +980,7 @@ tr.is-inert td {
     border: 1px solid var(--color-warning);
     border-left-width: 4px;
     border-radius: 2px;
-    background: rgba(255, 210, 63, 0.08);
+    background: rgb(255 210 63 / 8%);
 }
 
 .bank-owner-approval-warning > p {
