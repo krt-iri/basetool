@@ -1624,12 +1624,11 @@ public class MissionService {
     assertStepsVersion(mission, expectedStepsVersion, missionId);
 
     MissionStep step = new MissionStep();
-    step.setMission(mission);
     step.setTitle(title == null ? null : title.trim());
     step.setMeta(normalizeStepMeta(meta));
     step.setDone(false);
     step.setOrderIndex(nextStepOrderIndex(mission));
-    mission.getSteps().add(step);
+    mission.addStep(step);
     missionStepRepository.save(step);
 
     bumpStepsVersion(mission);
@@ -1694,7 +1693,7 @@ public class MissionService {
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     assertStepsVersion(mission, expectedStepsVersion, missionId);
 
-    boolean removed = mission.getSteps().removeIf(s -> s.getId().equals(stepId));
+    boolean removed = mission.removeStep(stepId);
     if (!removed) {
       throw new NotFoundException("MissionStep not found in this mission");
     }

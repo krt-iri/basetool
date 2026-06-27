@@ -33,10 +33,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -163,10 +165,16 @@ public class Mission extends AbstractEntity<UUID> {
    * MissionStep#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
    * list) preserves the checklist order. Excluded from the global optimistic-lock; the dedicated
    * {@link #stepsVersion} guards concurrent edits instead.
+   *
+   * <p>The Lombok getter is suppressed ({@link AccessLevel#NONE}) in favour of the hand-written
+   * {@link #getSteps()}, which hands out an unmodifiable view so callers cannot mutate the managed
+   * collection through the getter; structural changes go through {@link #addStep(MissionStep)} /
+   * {@link #removeStep(UUID)}.
    */
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("orderIndex ASC")
   @OptimisticLock(excluded = true)
+  @Getter(AccessLevel.NONE)
   private Set<MissionStep> steps = new LinkedHashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -258,4 +266,38 @@ public class Mission extends AbstractEntity<UUID> {
   @JoinColumn(name = "owning_org_unit_id")
   @OptimisticLock(excluded = true)
   private OrgUnit owningOrgUnit;
+
+  /**
+   * Returns the Ablauf steps as an unmodifiable view ordered by {@code orderIndex}. Reads (DTO
+   * mapping, index lookups, reorder validation) iterate this view; callers that need to add or
+   * remove a step use {@link #addStep(MissionStep)} / {@link #removeStep(UUID)} so the managed
+   * collection is never mutated through the getter.
+   *
+   * @return an unmodifiable view of the mission's procedure-timeline steps
+   */
+  public Set<MissionStep> getSteps() {
+    return Collections.unmodifiableSet(steps);
+  }
+
+  /**
+   * Appends a step to the Ablauf collection and wires the inverse side so the bidirectional
+   * association stays consistent before the cascade persists it.
+   *
+   * @param step the step to attach to this mission
+   */
+  public void addStep(MissionStep step) {
+    step.setMission(this);
+    steps.add(step);
+  }
+
+  /**
+   * Removes the step with the given id from the Ablauf collection (orphan-removal then deletes the
+   * row on flush).
+   *
+   * @param stepId the id of the step to remove
+   * @return {@code true} if a step was removed, {@code false} if no step had that id
+   */
+  public boolean removeStep(UUID stepId) {
+    return steps.removeIf(s -> stepId.equals(s.getId()));
+  }
 }

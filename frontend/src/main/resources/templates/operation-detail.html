@@ -494,8 +494,6 @@
         }
 
         tabs.forEach(tab => tab.addEventListener('click', () => show(tab.getAttribute('data-tab'), true)));
-        const nav = document.querySelector('.tab-panes').previousElementSibling
-            ? document.querySelector('.mission-head-sticky .tab-nav') : null;
         const tabNav = document.querySelector('.mission-head-sticky .tab-nav');
         if (tabNav) {
             tabNav.addEventListener('keydown', e => {
