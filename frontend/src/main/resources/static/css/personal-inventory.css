@@ -976,14 +976,13 @@
 /* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
 .krt-bp-head {
     display: flex;
-    /* Title left, add-bar (search + add + import) right. Without an explicit row the shared
-       .krt-personal-inventory-header (flex-direction: column) would stack the add-bar below
-       the title; the wrap below keeps the stacked fallback on narrow screens. */
-    flex-direction: row;
+    /* Title left, add-bar (search + add + import) right. Without an explicit row direction the
+       shared .krt-personal-inventory-header (flex-direction: column) would stack the add-bar
+       below the title; "wrap" keeps the stacked fallback on narrow screens. */
+    flex-flow: row wrap;
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
-    flex-wrap: wrap;
 }
 
 .krt-bp-addbar {
