@@ -316,6 +316,75 @@ public final class BackendSeeder {
   }
 
   /**
+   * Resolves the id of an existing {@code ShipType} by its (unique) name via {@code GET
+   * /api/v1/ship-types?size=1000}, so a test can seed ships of the catalog-provided {@code E2E Ship
+   * Type} without hard-coding its UUID. The endpoint returns a {@code PageResponse}, so the match
+   * is scanned over the {@code content} array.
+   *
+   * @param username the Keycloak username of the (authenticated) test user
+   * @param password the Keycloak password of the test user
+   * @param name the exact ship-type name to match
+   * @return the matching ship-type's id, or {@code null} if none carries that name
+   */
+  public String findShipTypeIdByName(String username, String password, String name) {
+    try {
+      String token = passwordGrant(username, password);
+      HttpRequest request =
+          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/ship-types?size=1000"))
+              .header("Authorization", "Bearer " + token)
+              .GET()
+              .build();
+      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+      if (response.statusCode() != 200) {
+        throw new IllegalStateException("Ship-types lookup failed: HTTP " + response.statusCode());
+      }
+      for (JsonElement element :
+          JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("content")) {
+        JsonObject shipType = element.getAsJsonObject();
+        if (shipType.has("name")
+            && !shipType.get("name").isJsonNull()
+            && name.equals(shipType.get("name").getAsString())) {
+          return shipType.get("id").getAsString();
+        }
+      }
+      return null;
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.findShipTypeIdByName failed", e);
+    }
+  }
+
+  /**
+   * Seeds a single ship into the test user's own hangar via {@code POST /api/v1/hangar/ships} so
+   * the personal-hangar pagination test (REQ-HANGAR-002) has enough rows to span multiple pages
+   * without driving the add-ship modal once per ship. The owning org unit is auto-stamped from the
+   * user's single IRIDIUM membership ({@code owningOrgUnitId} omitted), and {@code fitted} is
+   * always sent because the request record carries a primitive {@code boolean}.
+   *
+   * @param username the Keycloak username of the test user (the ship owner)
+   * @param password the Keycloak password of the test user
+   * @param name the ship's display name
+   * @param shipTypeId the ship type's id (see {@link #findShipTypeIdByName})
+   * @param insurance the insurance string ({@code 0}, {@code 1}–{@code 120} or {@code LTI})
+   * @return the created ship's id
+   */
+  public String seedShip(
+      String username, String password, String name, String shipTypeId, String insurance) {
+    return seedEntity(
+        username,
+        password,
+        "/api/v1/hangar/ships",
+        "{\"name\":\""
+            + name
+            + "\",\"shipTypeId\":\""
+            + shipTypeId
+            + "\",\"insurance\":\""
+            + insurance
+            + "\",\"fitted\":false}");
+  }
+
+  /**
    * Creates a {@code RefiningMethod} the create form's method dropdown can select.
    *
    * @param username admin username

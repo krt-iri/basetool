@@ -84,9 +84,18 @@ public class HangarController {
   private final ShipMapper shipMapper;
 
   /**
-   * Lists the calling user's own ships.
+   * One server-side page of the calling user's own ships (REQ-HANGAR-002). The page is ordered by
+   * the rich personal-hangar comparator (manufacturer, ship type, insurance tier/amount, location,
+   * fitted, name) entirely in the repository, so the order — and the optional {@code search} filter
+   * — span the user's whole fleet rather than a single fetched page. There is no caller-supplied
+   * {@code sort}: the ordering is fixed and includes a computed insurance-tier bucket that no
+   * column {@code Sort} could express, so the request carries page/size/search only.
    *
-   * @return paged ship DTOs
+   * @param jwt caller's JWT — its {@code sub} claim derives the owner; never read from the URL
+   * @param page zero-based page index
+   * @param size page size
+   * @param search optional case-insensitive ship-type/manufacturer name filter; blank means none
+   * @return one ordered, optionally filtered page of the caller's ships
    */
   @GetMapping("/my-ships")
   @Transactional(readOnly = true)
@@ -94,11 +103,10 @@ public class HangarController {
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
-    Page<Ship> p = hangarService.getMyShips(userService.getUserIdFromJwt(jwt), pageable);
+      @RequestParam(required = false) String search) {
+    Pageable pageable = PaginationUtil.createUnsortedPageRequest(page, size);
+    Page<Ship> p =
+        hangarService.getMyShipsFiltered(userService.getUserIdFromJwt(jwt), search, pageable);
     List<ShipDto> dtos = p.getContent().stream().map(shipMapper::toDto).toList();
     return new PageResponse<>(
         dtos,

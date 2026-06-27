@@ -1,21 +1,27 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
 > **Owner area:** HANGAR/UI · **Related ADRs:** none
 
-# Squadron hangar overview — pagination & server-side filter
+# Unit hangar overview (Org-Einheitsübersicht) — pagination, scope & server-side filter
+
+> The page lives at `/hangar/squadron` (route unchanged) but is titled **"Org-Einheitsübersicht"** in
+> the UI (`hangar.squadron.title`), because it spans every org unit the caller can see — not a single
+> Staffel. The "Org-" prefix deliberately sets these organisational units apart from the dynamic
+> units created inside a mission (Einsatz).
 
 ## Context & goal
 
-The squadron hangar page (`/hangar/squadron`) aggregates the scoped fleet into one row per
-ship type (count + fitted count, with an ADMIN/OFFICER-only per-ship drill-down). The page
-originally fetched up to 1000 rows in one request and filtered them client-side, which
-stops scaling once a fleet grows past a screenful and silently truncates beyond the fetch
-cap. This spec pins the listing contract after the rework to true server-side pagination:
-the table pages across **all** entries that exist in the caller's scope, and the filter is
-applied by the backend so it spans the whole fleet rather than the currently rendered rows.
+The unit hangar page (`/hangar/squadron`, "Org-Einheitsübersicht") aggregates the scoped fleet into one
+row per ship type (count + fitted count, with an ADMIN/OFFICER-only per-ship drill-down). The page
+originally fetched up to 1000 rows in one request and filtered them client-side, which stops scaling
+once a fleet grows past a screenful and silently truncates beyond the fetch cap. This spec pins the
+listing contract after the rework to true server-side pagination: the table pages across **all**
+entries that exist in the caller's scope, and the filter is applied by the backend so it spans the
+whole fleet rather than the currently rendered rows. It also pins the **scope** of that "all" — the
+cross-unit visibility and the OL widening (REQ-HANGAR-003).
 
-Who sees which rows (the OrgUnit scope triple, the strict-staffel rule, the role-shaped
-owner drill-down) is **not** redefined here — see
-[`org-unit-tenancy.md`](org-unit-tenancy.md) and `HangarService`.
+The general OrgUnit scope triple, the cascade and the role-shaped owner drill-down are defined in
+[`org-unit-tenancy.md`](org-unit-tenancy.md) and `HangarService`; REQ-HANGAR-003 below pins only how
+this page selects its scope on top of them.
 
 ## Requirements
 
@@ -53,10 +59,50 @@ scope. No fetch cap may silently truncate the fleet.
 `ShipRepository#countShipsByType`, `HangarPageController`,
 `frontend/src/main/resources/templates/hangar-squadron.html` · **Issues:** —
 
+### REQ-HANGAR-003 — Unit overview spans every unit the caller can see, OL sees all ships
+
+The unit overview selects its scope through the dedicated
+`OwnerScopeService#currentUnitOverviewScope()` (not the bare `currentScopePredicate()`), so that —
+with **no single unit pinned** — it shows ships across **all** the units the caller can see, not a
+single Staffel:
+
+- A **plain member** sees the ships of every org unit they belong to (all their Staffeln **and** all
+  their SKs).
+- A **Bereichsleitung** member additionally sees the ships of every subordinate unit of their Bereich
+  (its Staffeln + SKs) — the REQ-ORG-015 cascade.
+- An **OL** member sees **every** ship in the system, including the ownerless personal ships
+  (`owningOrgUnit == null`) of members who belong to no unit at all — the owner-approved,
+  read-only widening of REQ-ORG-015 recorded in
+  [ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md). The widening is confined to this
+  one read and grants no admin rights elsewhere.
+- An **admin** keeps the unchanged admin-all / admin-pin behaviour.
+
+An **active unit pin** still narrows the overview to the pinned unit for every caller (owner
+decision) — the cross-unit/OL widening applies only when no unit is pinned, exactly like every other
+scoped surface. The per-ship owner/location/fitted drill-down stays ADMIN/OFFICER-only, so a member /
+BL / OL sees the complete counts but not the per-owner breakdown.
+
+**Acceptance**
+
+- [ ] Without a pin, a multi-unit member's overview counts ships from every Staffel and SK they belong
+  to; a Bereichsleitung's also from their Bereich's subordinate units.
+- [ ] Without a pin, an OL member's overview includes ships whose `owningOrgUnit` is `null` (members in
+  no unit); a plain/BL member's never does.
+- [ ] The OL widening grants no `isAdmin()` and no `hasRole('ADMIN')` carve-out — every other scoped
+  list / `can*` gate still routes OL through `currentScopePredicate()`.
+- [ ] With a single unit pinned, every caller (incl. OL) sees only the pinned unit's ships.
+
+**Enforced by:** `OwnerScopeServiceTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest` ·
+**Code:** `OwnerScopeService#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
+`ShipRepository#countShipsByType` · **ADR:**
+[ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md) · amends
+[REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —
+
 ## Out of scope
 
-- The personal hangar (`/hangar`) and the admin per-user hangar — they keep their own
-  listing behaviour.
+- The personal hangar (`/hangar`) — its own server-side pagination/sort/filter contract is
+  [`personal-hangar-overview.md`](personal-hangar-overview.md) (REQ-HANGAR-002) — and the admin
+  per-user hangar, which keeps its own listing behaviour.
 - The drill-down rendering mechanics (details-row class toggle) — a UI implementation
   detail, kept consistent with the blueprint overview's REQ-INV-012 fix.
 - The shared pagination fragment's look — governed by the design system

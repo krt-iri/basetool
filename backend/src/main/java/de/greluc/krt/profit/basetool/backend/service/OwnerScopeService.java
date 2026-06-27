@@ -254,6 +254,44 @@ public class OwnerScopeService {
   }
 
   /**
+   * Effective scope for the hangar <b>unit overview</b> ({@code /hangar/squadron}, REQ-HANGAR-003).
+   * Identical to {@link #currentScopePredicate()} for every caller except one owner-approved
+   * widening: a non-pinned <b>OL member</b> sees <em>every</em> ship — including the ownerless
+   * personal ships ({@code owningOrgUnit == null}) of members who belong to no org unit at all — so
+   * the OL's cross-org view of the fleet is complete.
+   *
+   * <p>This is a deliberate, narrowly-scoped exception to the REQ-ORG-015 hard invariant
+   * ("OL/Bereich leadership never inherits the admin carve-outs, including ownerless-row access"):
+   * it grants the {@code adminAllScope=true} read <em>only</em> for this one aggregation surface
+   * and confers no {@code isAdmin()} rights anywhere else — every other {@code can*} gate and
+   * scoped list still routes OL through the concrete-membership-union {@link
+   * #currentScopePredicate()}. The exception is recorded in ADR-0047 and amends REQ-ORG-015 in
+   * {@code org-unit-tenancy.md}.
+   *
+   * <p>The widening applies only when <b>no single unit is pinned</b> (owner decision: a pin still
+   * narrows the unit overview to the pinned unit, like every other scoped surface) and only to an
+   * OL member — a plain or BL member keeps their exact membership/cascade reach (their own
+   * Staffeln/SKs, and a BL their Bereich's Staffeln/SKs), and an admin keeps the unchanged
+   * admin-all / admin-pin behaviour.
+   *
+   * @return the unit-overview scope vector: {@code adminAllScope} for a non-pinned OL member,
+   *     otherwise exactly {@link #currentScopePredicate()}.
+   */
+  @NotNull
+  public ScopePredicate currentUnitOverviewScope() {
+    ScopePredicate base = currentScopePredicate();
+    // Only upgrade a non-admin OL member who has not pinned a single unit; everyone else (admins,
+    // plain/BL members, and any pinned caller) keeps the base scope unchanged.
+    if (!base.adminAllScope()
+        && base.activeOrgUnitId() == null
+        && !authHelper.isAdmin()
+        && currentUserIsOlMember()) {
+      return new ScopePredicate(true, null, java.util.Set.of());
+    }
+    return base;
+  }
+
+  /**
    * Helper for {@link #currentScopePredicate()}: resolves every OrgUnit id the current non-admin
    * caller has effective reach over — their direct memberships <em>plus</em> the cascading
    * leadership expansion (epic #692, REQ-ORG-015). Used by the union-of-memberships branch of the

@@ -84,4 +84,5 @@ We use a lightweight [MADR](https://adr.github.io/madr/)-style format — copy
 | [0044](0044-mission-ablauf-procedure-steps.md)                            | Mission Ablauf: persisted ordered `MissionStep` child + dedicated `stepsVersion` lock + shared per-step done state (derived current phase) | Accepted                                          |
 | [0045](0045-bank-user-transfers-and-per-account-approval-limits.md)       | Bank: view-based request eligibility + user-initiated transfer requests + per-account approval limits with two-step owner approval         | Accepted                                          |
 | [0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)     | Blueprint craftability bridges non-craftable PIECE-material ITEM ingredients (hand-mined gems) instead of skipping them                    | Accepted                                          |
+| [0047](0047-ol-sees-every-ship-in-the-unit-overview.md)                   | OL sees every ship (incl. ownerless) in the hangar unit overview — a narrow, read-only exception to the REQ-ORG-015 admin-only invariant   | Accepted                                          |
 

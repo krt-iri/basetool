@@ -6,6 +6,12 @@
 
 - **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
 
+### Changed
+
+- **Hangar „Meine Schiffe": serverseitige Seitennummerierung, Sortierung und Suche.** Die persönliche Schiffsliste lädt jetzt seitenweise (10/50/100, Standard 50) statt alle Schiffe auf einmal; die feste Sortierung (Hersteller, Typ, Versicherung, Ort, Name) und das Suchfeld arbeiten serverseitig über die gesamte Flotte statt nur über die gerade angezeigte Seite. Hinzufügen, Bearbeiten, Löschen und Import behalten Seite und Suche bei, ohne die Seite neu zu laden.
+
+- **Hangar: „Staffelübersicht" heißt jetzt „Org-Einheitsübersicht" und spannt alle sichtbaren Org-Einheiten.** Ohne aktiv gewählte Org-Einheit zeigt sie die Schiffe aller eigenen Staffeln und Spezialkommandos, für Bereichsleitungen zusätzlich die der untergeordneten Org-Einheiten ihres Bereichs, und für die Organisationsleitung alle Schiffe (auch von Mitgliedern ohne Org-Einheit). Eine aktiv gewählte Org-Einheit schränkt die Übersicht weiterhin auf diese ein. („Org-Einheit" grenzt die Organisationseinheiten von den dynamischen Einsatz-Einheiten ab.)
+
 ### Fixed
 
 - **Raffinerieauftrag einlagern: Auftrags-Dropdown blieb leer.** Beim Einlagern eines Raffinerieauftrags zeigte die „Auftrag"-Auswahl keine passenden Aufträge, obwohl welche das Material in der Qualität benötigten. Ursache: Der Filter prüfte nur die Material-Zeilen, die bei Item-Aufträgen leer sind — solche Aufträge fielen immer heraus. Das Dropdown bietet jetzt (wie der Lager-Picker) alle aktiven Aufträge an, die das eingelagerte Material benötigen, über beide Auftragsarten hinweg.

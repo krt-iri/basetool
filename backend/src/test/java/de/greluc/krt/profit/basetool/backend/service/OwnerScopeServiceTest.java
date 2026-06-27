@@ -2567,4 +2567,74 @@ class OwnerScopeServiceTest {
       assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
     }
   }
+
+  /**
+   * REQ-HANGAR-003 / ADR-0047: the hangar unit-overview scope mirrors {@link
+   * OwnerScopeService#currentScopePredicate()} for every caller except one owner-approved widening
+   * — a non-pinned OL member is upgraded to {@code adminAllScope} so the Org-Einheitsübersicht
+   * surfaces every ship, including ownerless personal ones. A pin still narrows it, and no other
+   * caller class is affected.
+   */
+  @Nested
+  class CurrentUnitOverviewScopeTests {
+
+    private static final UUID OL_ID = UUID.randomUUID();
+
+    @Test
+    void olMemberWithoutPin_isUpgradedToAdminAllScope() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, OL_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentUnitOverviewScope();
+
+      assertTrue(scope.adminAllScope(), "a non-pinned OL member sees every ship");
+      assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
+    void olMemberWithActivePin_respectsThePin() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, OL_ID)));
+      // The pin points at a unit in the OL member's reach, so it is honoured and the widening does
+      // not apply — a pinned unit overview shows only the pinned unit, like every scoped surface.
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(OL_ID.toString());
+
+      ScopePredicate scope = service.currentUnitOverviewScope();
+
+      assertFalse(scope.adminAllScope());
+      assertEquals(OL_ID, scope.activeOrgUnitId());
+    }
+
+    @Test
+    void plainMemberWithoutPin_keepsTheirMembershipReach_notAdminAll() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentUnitOverviewScope();
+
+      assertFalse(scope.adminAllScope(), "a plain member never gets the OL widening");
+      assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().contains(SQUADRON_A_ID));
+    }
+
+    @Test
+    void admin_keepsAdminAllScope_unchanged() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      ScopePredicate scope = service.currentUnitOverviewScope();
+
+      assertTrue(scope.adminAllScope());
+    }
+  }
 }

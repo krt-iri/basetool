@@ -344,9 +344,10 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 
 Hard invariants:
 
-- The reach is a **concrete `memberOrgUnitIds` union — never** the `adminAllScope=true` branch. An
-  OL/Bereich principal **must never satisfy `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK
-  lifecycle, system settings, stammdaten, the promotion-topic guards in REQ-ORG-005) stay ADMIN-only.
+- The reach is a **concrete `memberOrgUnitIds` union — never** the `adminAllScope=true` branch (one
+  narrow, read-only exception below: ADR-0047). An OL/Bereich principal **must never satisfy
+  `isAdmin()`**, so all `hasRole('ADMIN')` carve-outs (SK lifecycle, system settings, stammdaten, the
+  promotion-topic guards in REQ-ORG-005) stay ADMIN-only.
 - **Strict silo:** a Bereichsleitung's union contains only its own Bereich's descendants; only the OL
   crosses Bereiche. No peer-Bereich visibility.
 - An **SK-lead is not expanded** — they keep SK-only reach; their Bereichsleitung membership is
@@ -361,6 +362,17 @@ Hard invariants:
   blueprint union ([ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md)); neither is weakened —
   both short-circuit ahead of or alongside the `memberOrgUnitIds` membership check, which the cascade
   only ever enlarges.
+
+> **Amended by [ADR-0047](../adr/0047-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
+> the hangar **unit overview** (`/hangar/squadron`, "Org-Einheitsübersicht") is the single, deliberate
+> exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
+> `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),
+> so the OL's fleet view also includes ownerless personal ships (`owningOrgUnit == null`) of
+> membership-less members — which a concrete id union can never reach. The exception is read-only and
+> confined to that method: it grants **no** `isAdmin()` and leaves every other `can*` gate, scoped list
+> and the `hasRole('ADMIN')` carve-outs ADMIN-only, and it does not apply when a single unit is pinned
+> (a pin still narrows the overview). A plain or Bereichsleitung member is unaffected — they keep their
+> exact membership/cascade reach.
 
 **Acceptance**
 

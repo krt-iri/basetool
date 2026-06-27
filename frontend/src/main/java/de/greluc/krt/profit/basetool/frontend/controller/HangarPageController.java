@@ -64,11 +64,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * Spring MVC controller for the personal hangar pages ({@code /hangar} and {@code
  * /hangar/squadron}).
  *
- * <p>The personal hangar lists the current user's ships with a multi-key sort: manufacturer name,
- * ship type, insurance tier (LTI &lt; numeric &lt; unset), insurance number desc, location and
- * finally fitted-status + name. The order is deliberate — fleet members compare insurance state
- * across ships of the same type, so insurance grouping has to win over location. The squadron
- * overview aggregates the entire org's hangar into a count-per-type table.
+ * <p>The personal hangar lists the current user's ships, server-side paginated and ordered by the
+ * backend's rich multi-key comparator: manufacturer name, ship type, insurance tier (LTI &lt;
+ * numeric &lt; unset), insurance number desc, location and finally fitted-status + name. The order
+ * is deliberate — fleet members compare insurance state across ships of the same type, so insurance
+ * grouping has to win over location. Since #773 the ordering and the text filter live in the
+ * backend ({@code /my-ships} with {@code page}/{@code size}/{@code search}, REQ-HANGAR-002) so they
+ * span the user's whole fleet rather than one client-fetched page. The squadron overview aggregates
+ * the entire org's hangar into a count-per-type table.
  */
 @Controller
 @RequestMapping("/hangar")
@@ -81,84 +84,68 @@ public class HangarPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Multi-key comparator that orders ships by manufacturer, ship type, insurance tier (LTI &lt;
-   * numeric &lt; unset), insurance amount desc, location, fitted-status and finally name. Kept as a
-   * shared instance because the comparator is stateless and the controller sorts the ship list on
-   * every render.
-   */
-  private static final Comparator<ShipDto> SHIP_SORT =
-      Comparator.comparing(
-              (ShipDto s) ->
-                  s.shipType() != null && s.shipType().manufacturer() != null
-                      ? s.shipType().manufacturer().name()
-                      : "",
-              String.CASE_INSENSITIVE_ORDER)
-          .thenComparing(
-              s -> s.shipType() != null ? s.shipType().name() : "", String.CASE_INSENSITIVE_ORDER)
-          .thenComparing(
-              (ShipDto s) -> {
-                String ins = s.insurance();
-                if (ins == null || ins.equals("0")) {
-                  return 3;
-                }
-                if (ins.equals("LTI")) {
-                  return 1;
-                }
-                return 2;
-              })
-          .thenComparing(
-              (ShipDto s) -> {
-                String ins = s.insurance();
-                if (ins == null || ins.equals("LTI") || ins.equals("0")) {
-                  return 0;
-                }
-                try {
-                  return Integer.parseInt(ins);
-                } catch (NumberFormatException e) {
-                  return 0;
-                }
-              },
-              Comparator.reverseOrder())
-          .thenComparing(
-              s -> s.location() != null ? s.location().name() : "", String.CASE_INSENSITIVE_ORDER)
-          .thenComparing(s -> (s.fitted() != null && s.fitted()) ? 0 : 1)
-          .thenComparing(s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER);
-
-  /**
-   * Renders the personal hangar page. Fetches my ships and the three cached reference catalogs
-   * (ship types, locations, manufacturers) in parallel via {@link ParallelPageLoader}; each catalog
-   * call independently degrades to an empty list on backend failure so a single dead reference
-   * catalog never blanks the whole page. The ship list is sorted client-side with the multi-key
-   * comparator described in the class Javadoc.
+   * Renders the personal hangar page, server-side paginated (REQ-HANGAR-002). Fetches one page of
+   * my ships and the three cached reference catalogs (ship types, locations, manufacturers) in
+   * parallel via {@link ParallelPageLoader}; each catalog call independently degrades to an empty
+   * list on backend failure so a single dead reference catalog never blanks the whole page. The
+   * ship page is ordered and filtered entirely by the backend (no client-side {@code SHIP_SORT}),
+   * so the order and the {@code search} term span the user's whole fleet, not one fetched page. The
+   * {@code /my-ships} call is intentionally <em>uncached</em> (per-user data must never be served
+   * from a shared cache); only the reference catalogs go through {@code getCached}.
    *
+   * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
+   * @param size page size, validated against {@link #HANGAR_PAGE_SIZES} (else snapped to the
+   *     default)
+   * @param search optional ship-type/manufacturer filter, applied server-side by the backend
    * @param fragment when {@code "results"}, only the ship-table results fragment is rendered for an
-   *     in-place AJAX swap after a ship write (epic #571 / REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with the ship form, ship list and reference catalogs
+   *     in-place AJAX swap after a ship write or a filter/page change (epic #571 / REQ-FE-005);
+   *     otherwise the full page
+   * @param model Thymeleaf model populated with the ship form, ship page, reference catalogs and
+   *     the pagination state (page metadata, page sizes, search-preserving base URL, total ship
+   *     count)
    * @return the {@code hangar} view name, or its {@code hangarResults} fragment selector
    */
   @GetMapping
-  public String viewHangar(@RequestParam(required = false) String fragment, Model model) {
+  public String viewHangar(
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     if (!model.containsAttribute("shipForm")) {
       model.addAttribute("shipForm", new ShipForm());
     }
 
-    CompletableFuture<List<ShipDto>> shipsFuture =
+    int effectiveSize =
+        size != null && HANGAR_PAGE_SIZES.contains(size) ? size : HANGAR_DEFAULT_PAGE_SIZE;
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
+
+    String myShipsUrl =
+        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/hangar/my-ships")
+            .queryParam("page", effectivePage)
+            .queryParam("size", effectiveSize)
+            .queryParamIfPresent("search", java.util.Optional.ofNullable(effectiveSearch))
+            .toUriString();
+
+    CompletableFuture<PageResponse<ShipDto>> shipsFuture =
         parallelPageLoader
-            .<List<ShipDto>>loadAsync(
+            .<PageResponse<ShipDto>>loadAsync(
                 () -> {
                   PageResponse<ShipDto> p =
                       backendApiClient.get(
-                          "/api/v1/hangar/my-ships?size=1000",
-                          new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
-                  return p != null && p.content() != null
-                      ? new ArrayList<>(p.content())
-                      : new ArrayList<>();
+                          myShipsUrl, new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
+                  return p != null
+                      ? p
+                      : new PageResponse<>(
+                          List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 })
             .exceptionally(
                 e -> {
                   log.error("Failed to fetch my ships", e);
                   model.addAttribute("error", "error.hangar.ships.load");
-                  return new ArrayList<>();
+                  return new PageResponse<>(
+                      List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 });
 
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
@@ -239,9 +226,6 @@ public class HangarPageController {
             shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture, homeLocationsFuture)
         .join();
 
-    List<ShipDto> myShips = shipsFuture.join();
-    myShips.sort(SHIP_SORT);
-
     List<ShipTypeDto> shipTypes = shipTypesFuture.join();
     shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
 
@@ -255,7 +239,29 @@ public class HangarPageController {
     // them alphabetically descending (Z->A); preserve that order (do not re-sort).
     List<LocationDto> homeLocations = homeLocationsFuture.join();
 
-    model.addAttribute("myShips", myShips);
+    // Page links must keep the active filter, so the fragment's base URL carries the search term
+    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
+    // params into every pagination link); page/size are appended by the shared pagination fragment.
+    String paginationBaseUrl =
+        effectiveSearch == null
+            ? "/hangar"
+            : org.springframework.web.util.UriComponentsBuilder.fromPath("/hangar")
+                .queryParam("search", effectiveSearch)
+                .toUriString();
+
+    // The page is already ordered + filtered by the backend (REQ-HANGAR-002); render its content
+    // verbatim. No client-side SHIP_SORT — that would only reorder the rows of the current page.
+    PageResponse<ShipDto> myShipsPage = shipsFuture.join();
+    model.addAttribute(
+        "myShips", myShipsPage.content() != null ? myShipsPage.content() : List.of());
+    model.addAttribute("myShipsPage", myShipsPage);
+    // Home-location / delete-all act on ALL the user's ships (not the current page), so their count
+    // reflects the page envelope's total, not the size of the rendered page.
+    model.addAttribute("totalShipCount", myShipsPage.totalElements());
+    model.addAttribute("pageSizes", HANGAR_PAGE_SIZES);
+    model.addAttribute("pageSize", effectiveSize);
+    model.addAttribute("search", effectiveSearch);
+    model.addAttribute("paginationBaseUrl", paginationBaseUrl);
     model.addAttribute("shipTypes", shipTypes);
     model.addAttribute("locations", locations);
     model.addAttribute("manufacturers", manufacturers);
@@ -293,15 +299,15 @@ public class HangarPageController {
   }
 
   /**
-   * Page sizes the squadron overview offers in its picker (REQ-HANGAR-001, same trio as the
-   * blueprint availability overview). Any other client-supplied {@code size} is snapped back to
-   * {@link #SQUADRON_DEFAULT_PAGE_SIZE} so a crafted URL cannot request an unbounded page from the
-   * backend.
+   * Page sizes both hangar pages offer in their pickers — the personal hangar (REQ-HANGAR-002) and
+   * the squadron overview (REQ-HANGAR-001), the shared REQ-INV-013 trio (10/50/100). Any other
+   * client-supplied {@code size} is snapped back to {@link #HANGAR_DEFAULT_PAGE_SIZE} so a crafted
+   * URL cannot request an unbounded page from the backend.
    */
-  private static final List<Integer> SQUADRON_PAGE_SIZES = List.of(10, 50, 100);
+  private static final List<Integer> HANGAR_PAGE_SIZES = List.of(10, 50, 100);
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
-  private static final int SQUADRON_DEFAULT_PAGE_SIZE = 50;
+  private static final int HANGAR_DEFAULT_PAGE_SIZE = 50;
 
   /**
    * Renders the squadron-wide hangar overview ({@code /hangar/squadron}), server-side paginated
@@ -311,7 +317,7 @@ public class HangarPageController {
    * are echoed into the model so the pagination links and the filter form can reproduce the state.
    *
    * @param page zero-based page index, defaults to the first page; negatives are clamped to 0
-   * @param size page size, validated against {@link #SQUADRON_PAGE_SIZES}
+   * @param size page size, validated against {@link #HANGAR_PAGE_SIZES}
    * @param search optional ship-type/manufacturer filter, applied server-side by the backend
    * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
    *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
@@ -327,7 +333,7 @@ public class HangarPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     int effectiveSize =
-        size != null && SQUADRON_PAGE_SIZES.contains(size) ? size : SQUADRON_DEFAULT_PAGE_SIZE;
+        size != null && HANGAR_PAGE_SIZES.contains(size) ? size : HANGAR_DEFAULT_PAGE_SIZE;
     int effectivePage = page == null || page < 0 ? 0 : page;
     String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
 
@@ -364,7 +370,7 @@ public class HangarPageController {
     model.addAttribute("overview", overview);
     model.addAttribute("overviewPage", res);
     model.addAttribute("search", effectiveSearch);
-    model.addAttribute("pageSizes", SQUADRON_PAGE_SIZES);
+    model.addAttribute("pageSizes", HANGAR_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
     model.addAttribute("paginationBaseUrl", paginationBaseUrl);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -395,7 +401,7 @@ public class HangarPageController {
       // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/add");
-      return viewHangar(null, model);
+      return viewHangar(null, null, null, null, model);
     }
 
     try {
@@ -442,7 +448,7 @@ public class HangarPageController {
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/" + id + "/update");
-      return viewHangar(null, model);
+      return viewHangar(null, null, null, null, model);
     }
 
     try {

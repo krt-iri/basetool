@@ -75,6 +75,25 @@ public final class PaginationUtil {
     return PageRequest.of(page, size, sort);
   }
 
+  /**
+   * Builds an <em>unsorted</em> {@link Pageable} (page + size only) for endpoints whose ordering is
+   * baked into the repository query's own {@code ORDER BY} rather than a caller-supplied {@code
+   * Sort} whitelist — e.g. the personal hangar's rich multi-key comparator (REQ-HANGAR-002), whose
+   * computed insurance-tier bucket cannot be expressed as a column {@code Sort}. Passing a sorted
+   * Pageable to such a query would only append redundant ORDER BY terms, so callers use this helper
+   * to get the same {@code page}/{@code size} clamping ({@code page} clamped to {@code >= 0},
+   * {@code size} to {@code [1, 100000]}) without any sort.
+   *
+   * @param pageParam zero-based page index, may be {@code null}
+   * @param sizeParam page size, may be {@code null}
+   * @return an unsorted {@link Pageable} ready to hand to a custom-ordered repository query
+   */
+  public static Pageable createUnsortedPageRequest(Integer pageParam, Integer sizeParam) {
+    int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
+    int size = sizeParam == null || sizeParam <= 0 ? 50 : Math.min(sizeParam, 100000);
+    return PageRequest.of(page, size);
+  }
+
   private static boolean containsProperty(Sort sort, String property) {
     for (Sort.Order order : sort) {
       if (order.getProperty().equalsIgnoreCase(property)) {

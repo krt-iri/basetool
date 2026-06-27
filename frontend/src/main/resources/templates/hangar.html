@@ -124,11 +124,18 @@
                 width: 100%;
             }
         }
-    /* ---- Ship-type live filter ---- */
+    /* ---- Server-side ship-type filter above the table ---- */
+        .hangar-filter-form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
         .hangar-filter {
             position: relative;
-            max-width: 360px;
-            margin-bottom: 1.25rem;
+            width: 360px;
+            max-width: 100%;
         }
         .hangar-filter .hangar-filter-icon {
             position: absolute;
@@ -166,7 +173,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{hangar.title}">Hangar</h1>
-        <a th:href="@{/hangar/squadron}" class="btn btn-ghost" th:text="#{hangar.squadron.title}">Staffelübersicht</a>
+        <a th:href="@{/hangar/squadron}" class="btn btn-ghost" th:text="#{hangar.squadron.title}">Org-Einheitsübersicht</a>
     </div>
 
     <div class="hud-box mt-2">
@@ -183,20 +190,33 @@
                 <div class="flex-gap-xs">
                     <button id="set-home-location-btn" type="button" class="btn btn-outline"
                             data-trigger="hangar-open-home"
-                            th:if="${!#lists.isEmpty(myShips)}"
-                            th:data-ship-count="${#lists.size(myShips)}"
+                            th:if="${totalShipCount > 0}"
+                            th:data-ship-count="${totalShipCount}"
                             th:text="#{hangar.home_location.btn}">Home-Location setzen</button>
                     <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
                 </div>
             </div>
 
-            <div class="hangar-filter" th:if="${!#lists.isEmpty(myShips)}">
-                <span class="hangar-filter-icon" aria-hidden="true">
-                    <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
-                </span>
-                <input type="search" id="hangar-ship-filter" autocomplete="off"
-                       th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
-            </div>
+            <!-- Server-side filter (REQ-HANGAR-002): the form GETs back to /hangar; a new search
+                 resets to page 0 by omitting the page param. It stays visible while a search yields
+                 nothing so the filter can always be cleared. The hidden size keeps the active page
+                 size on the no-JS submit; the .page-btn pagination links below carry it too. -->
+            <form th:if="${totalShipCount > 0 or search != null}"
+                  id="hangar-filter-form" class="hangar-filter-form" role="search"
+                  method="get" th:action="@{/hangar}">
+                <div class="hangar-filter">
+                    <span class="hangar-filter-icon" aria-hidden="true">
+                        <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
+                    </span>
+                    <input type="search" id="hangar-ship-filter" name="search" autocomplete="off"
+                           th:value="${search}"
+                           th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
+                    <input type="hidden" name="size" th:value="${pageSize}">
+                </div>
+                <a th:if="${search != null}" id="hangar-filter-clear" class="btn btn-ghost"
+                   th:href="@{/hangar(size=${pageSize})}"
+                   th:text="#{hangar.filter.clear}">Filter zur&uuml;cksetzen</a>
+            </form>
 
             <div class="table-responsive">
             <table>
@@ -213,8 +233,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
-                        th:attr="data-ship-filter=${#strings.toLowerCase((ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : '') + ' ' + (ship.shipType != null ? ship.shipType.name : ''))}">
+                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row">
                         <td th:text="${ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : ''}">Hersteller</td>
                         <td th:text="${ship.shipType != null ? ship.shipType.name : ''}">Typ</td>
                         <td>
@@ -251,14 +270,22 @@
                                     th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                         </td>
                     </tr>
-                    <tr th:if="${#lists.isEmpty(myShips)}">
+                    <tr th:if="${#lists.isEmpty(myShips) and search == null}">
                         <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
                     </tr>
-                    <tr id="hangar-filter-empty" style="display: none;">
+                    <tr th:if="${#lists.isEmpty(myShips) and search != null}">
                         <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>
                     </tr>
                 </tbody>
             </table>
+            </div>
+
+            <!-- Footer bar: size picker left, page-nav right (same pattern as the squadron overview
+                 and the blueprint overview). The base URL keeps the active search so paging and
+                 re-sizing never drop the filter. -->
+            <div class="pagination-controls" th:if="${myShipsPage != null}">
+                <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+                <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></nav>
             </div>
         </th:block>
         </div>
@@ -412,7 +439,7 @@
                         <option th:each="loc : ${homeLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
                 </div>
-                <p id="home-location-body" class="mb-2" th:text="#{hangar.home_location.modal.body(${#lists.size(myShips)})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
+                <p id="home-location-body" class="mb-2" th:text="#{hangar.home_location.modal.body(${totalShipCount})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta" th:text="#{hangar.home_location.confirm}">Bestätigen</button>
@@ -473,9 +500,17 @@
             reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
         };
 
+        // Re-render the ship table in place after a write (add/edit/delete/import/home-location),
+        // carrying the active page/size/search from the address bar so the write does not bounce the
+        // user back to page 0 or drop the filter (REQ-HANGAR-002). The pagination/search swaps keep
+        // the address bar in sync (history:true), so window.location.search is the live state.
         function reswapHangar() {
             if (window.krtFetch) {
-                window.krtFetch.swap({ url: '/hangar', container: '#hangar-results', history: false });
+                window.krtFetch.swap({
+                    url: '/hangar' + window.location.search,
+                    container: '#hangar-results',
+                    history: false
+                });
             }
         }
 
@@ -859,30 +894,96 @@
             });
         });
 
-        // ---- Live filter: hide ship rows whose ship type does not match the query ----
-        // Delegated on document (matching the filter input by id) and querying rows fresh on each
-        // keystroke, so it keeps working after the #hangar-results fragment is re-swapped.
-        document.addEventListener("input", function(e) {
-            const filterInput = e.target;
-            if (!filterInput || filterInput.id !== "hangar-ship-filter") {
+        // ---- Server-side search + pagination (REQ-HANGAR-002) ----
+        // The filter now spans the user's whole fleet, not just the rows currently in the DOM: a
+        // debounced keystroke re-swaps #hangar-results via GET /hangar?search=...&size=... so the
+        // backend re-orders + re-pages the matching ships. The form/input live INSIDE the swapped
+        // fragment, so all handlers are delegated on document (the elements are replaced on every
+        // swap) and focus is restored to the search box after the swap. The GET form is the no-JS
+        // fallback. bindSwap wires the in-fragment .page-btn pagination links for the very first
+        // page click (later swaps re-bind the container themselves).
+        let hangarFilterTimer = null;
+
+        function applyHangarFilter(url) {
+            const resultsContainer = document.getElementById("hangar-results");
+            const form = document.getElementById("hangar-filter-form");
+            if (!resultsContainer || !window.krtFetch) {
+                if (url) {
+                    window.location.assign(url);
+                } else if (form) {
+                    form.submit();
+                }
+                return Promise.resolve(false);
+            }
+            let target = url;
+            if (!target) {
+                const params = new URLSearchParams();
+                if (form) {
+                    const data = new FormData(form);
+                    for (const [key, value] of data.entries()) {
+                        if (value !== "") {
+                            params.append(key, value);
+                        }
+                    }
+                }
+                const query = params.toString();
+                target = "/hangar" + (query ? "?" + query : "");
+            }
+            return window.krtFetch
+                .swap({ url: target, container: resultsContainer, history: true })
+                .then(function (ok) {
+                    // The swap replaced the input; restore focus + caret so typing is uninterrupted.
+                    const input = document.getElementById("hangar-ship-filter");
+                    if (input) {
+                        input.focus();
+                        const v = input.value;
+                        try {
+                            input.setSelectionRange(v.length, v.length);
+                        } catch (_ignored) {
+                            /* setSelectionRange is unsupported on some input states; ignore */
+                        }
+                    }
+                    return ok;
+                });
+        }
+
+        document.addEventListener("input", function (e) {
+            if (!e.target || e.target.id !== "hangar-ship-filter") {
                 return;
             }
-            const query = filterInput.value.trim().toLowerCase();
-            const shipRows = document.querySelectorAll("tr[data-ship-filter]");
-            const noResultsRow = document.getElementById("hangar-filter-empty");
-            let anyVisible = false;
-            shipRows.forEach(function(row) {
-                const haystack = row.getAttribute("data-ship-filter") || "";
-                const match = query === "" || haystack.indexOf(query) !== -1;
-                row.style.display = match ? "" : "none";
-                if (match) {
-                    anyVisible = true;
-                }
-            });
-            if (noResultsRow) {
-                noResultsRow.style.display = (!anyVisible && query !== "") ? "" : "none";
-            }
+            clearTimeout(hangarFilterTimer);
+            hangarFilterTimer = setTimeout(function () {
+                applyHangarFilter();
+            }, 300);
         });
+
+        document.addEventListener("submit", function (e) {
+            if (!e.target || e.target.id !== "hangar-filter-form") {
+                return;
+            }
+            e.preventDefault();
+            clearTimeout(hangarFilterTimer);
+            applyHangarFilter();
+        });
+
+        document.addEventListener("click", function (e) {
+            const clear = e.target.closest ? e.target.closest("#hangar-filter-clear") : null;
+            if (!clear) {
+                return;
+            }
+            e.preventDefault();
+            const input = document.getElementById("hangar-ship-filter");
+            if (input) {
+                input.value = "";
+            }
+            applyHangarFilter(clear.getAttribute("href"));
+        });
+
+        // Initial-load pagination interception: the .page-btn links inside #hangar-results re-swap
+        // in place instead of navigating (later swaps re-bind the container automatically).
+        if (window.krtFetch && typeof window.krtFetch.bindSwap === "function") {
+            window.krtFetch.bindSwap({ container: "#hangar-results", history: true });
+        }
     });
     /*]]>*/
 </script>
