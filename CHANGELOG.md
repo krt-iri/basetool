@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.16](https://github.com/krt-profit/basetool/releases/tag/v0.7.16) - 2026-06-27
+
 ### Added
 
 - **Bank: Transfer-Anträge und Beantragung für alle Sichtberechtigten.** Berechtigte Nutzer können jetzt zusätzlich zu Ein-/Auszahlung einen **Transfer** vom eigenen Konto auf ein beliebiges aktives Konto beantragen, und wer ein Konto sehen darf, darf darauf Anträge stellen (bisher nur die Führungsränge). Den Transfer bucht der Bankmitarbeiter beim Bestätigen wie eine normale Buchung.
