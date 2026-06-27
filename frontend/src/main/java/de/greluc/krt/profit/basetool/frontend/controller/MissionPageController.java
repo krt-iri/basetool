@@ -506,7 +506,9 @@ public class MissionPageController {
                 mission.scheduleVersion(),
                 mission.flagsVersion(),
                 // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
-                null));
+                null,
+                mission.objective(),
+                mission.meetingPoint()));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
@@ -734,6 +736,7 @@ public class MissionPageController {
         case "finance" -> "mission-detail :: financeSection";
         case "mgmt" -> "mission-detail :: mgmtPanels";
         case "overview" -> "mission-detail :: overviewSection";
+        case "steps-editor" -> "mission-detail :: stepsEditor";
         default -> "mission-detail";
       };
     }
@@ -1349,21 +1352,75 @@ public class MissionPageController {
    */
   @GetMapping("/new")
   @PreAuthorize("isAuthenticated()")
-  public String createMissionForm(Model model, @AuthenticationPrincipal OidcUser principal) {
+  public String createMissionForm(
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      @RequestParam(required = false) UUID operationId) {
     if (!model.containsAttribute("missionForm")) {
+      // operationId preselects the parent operation when the create form is opened from an
+      // operation's Einsätze tab ("Einsatz hinzufügen"); null for the plain create flow.
       model.addAttribute(
           "missionForm",
           new MissionForm(
-              "", "", "", "PLANNED", "", "", "", "", "", false, null, null, null, null, null,
+              "",
+              "",
+              "",
+              "PLANNED",
+              "",
+              "",
+              "",
+              "",
+              "",
+              false,
+              operationId != null ? operationId.toString() : null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
               null));
     }
     model.addAttribute("isNew", true);
     model.addAttribute(
         "mission",
         new MissionDto(
-            null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
-            null, null, null, null, null, null, true, true, null, null, null, null, 0, 0, null,
-            null, null, 0L));
+            null,
+            "",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            true,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            null,
+            null,
+            null,
+            0L,
+            java.util.List.of(),
+            0L,
+            null,
+            null));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
@@ -1415,8 +1472,9 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render the create form directly; BindingResult stays request-scoped.
-      return createMissionForm(model, principal);
+      // Render the create form directly; BindingResult stays request-scoped. The submitted form
+      // (already in the model) carries any operationId, so pass null here.
+      return createMissionForm(model, principal, null);
     }
     try {
       Instant meetingTime =
@@ -1457,7 +1515,9 @@ public class MissionPageController {
               plannedEndTime,
               form.isInternal(),
               operation != null ? operation.id() : null,
-              form.owningOrgUnitId());
+              form.owningOrgUnitId(),
+              form.objective(),
+              form.meetingPoint());
 
       backendApiClient.post("/api/v1/missions", createRequest, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -1559,6 +1619,8 @@ public class MissionPageController {
     corePatch.put("calendarLink", form.calendarLink());
     corePatch.put("status", form.status());
     corePatch.put("operationId", operationId);
+    corePatch.put("objective", form.objective());
+    corePatch.put("meetingPoint", form.meetingPoint());
     corePatch.put("version", form.coreVersion());
     backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
 
@@ -2016,6 +2078,167 @@ public class MissionPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  // --- Ablauf steps (procedure timeline) ---
+
+  /**
+   * AJAX proxy: appends an Ablauf step via the backend slim endpoint and returns the resulting
+   * ordered step list. The page re-renders the editor + overview-checklist fragments in place; the
+   * backend's {@code stepsVersion} guard keeps the Ablauf section's optimistic lock narrow.
+   *
+   * @param id the mission id
+   * @param body the step payload (title, optional meta, expected stepsVersion)
+   * @return the ordered step list, or the propagated backend error
+   */
+  @PostMapping(
+      value = "/{id}/steps/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> addStepAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.post(
+              "/api/v1/missions/" + id + "/steps/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: edits an Ablauf step's title / time-place hint and returns the ordered step list.
+   *
+   * @param id the mission id
+   * @param stepId the step id
+   * @param body the step payload (title, optional meta, expected stepsVersion)
+   * @return the ordered step list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/steps/{stepId}/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> updateStepAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.put(
+              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Update step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in updateStepAjax for mission {} step {}", id, stepId, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: removes an Ablauf step and returns the remaining ordered step list. The expected
+   * {@code stepsVersion} travels as a query parameter (DELETE carries no body).
+   *
+   * @param id the mission id
+   * @param stepId the step id
+   * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
+   * @return the ordered step list, or the propagated backend error
+   */
+  @DeleteMapping(
+      value = "/{id}/steps/{stepId}/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> deleteStepAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @RequestParam @NotNull Long stepsVersion) {
+    try {
+      Object result =
+          backendApiClient.delete(
+              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim?stepsVersion=" + stepsVersion,
+              Object.class,
+              false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Delete step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in deleteStepAjax for mission {} step {}", id, stepId, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: reorders the mission's Ablauf steps and returns the new ordered step list.
+   *
+   * @param id the mission id
+   * @param body the desired step-id order + expected stepsVersion
+   * @return the ordered step list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/steps/reorder/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> reorderStepsAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.put(
+              "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Reorder steps (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in reorderStepsAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: toggles an Ablauf step's shared done flag and returns the ordered step list. Used
+   * by the overview checklist's click-to-complete control (edit-authorised users only — enforced by
+   * the backend's {@code canManageMission} gate).
+   *
+   * @param id the mission id
+   * @param stepId the step id
+   * @param body the new done state + expected stepsVersion
+   * @return the ordered step list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PatchMapping(
+      value = "/{id}/steps/{stepId}/done/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> toggleStepDoneAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID stepId,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.patch(
+              "/api/v1/missions/" + id + "/steps/" + stepId + "/done/slim", body, Object.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Toggle step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in toggleStepDoneAjax for mission {} step {}", id, stepId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

@@ -5,385 +5,122 @@
     <th:block th:fragment="extraLinks">
         <style th:attr="nonce=${cspNonce}">
             label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; }
-            input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
+            input[type="text"], input[type="url"], select, textarea { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
             input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
-            .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
             .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
             .form-row > .form-group { flex: 1; min-width: 250px; }
 
             /* =========================================================
-               Operation-Detail Panel Layout (responsive, KRT HUD)
-               Mirrors mission-detail.html: CSS grid with content-aware
-               minimum widths per panel, single-column fallback on all
-               viewports below the ultra-wide breakpoint so tables and
-               action buttons never overflow the viewport horizontally.
+               Operation-Detail Tab Layout (final Einsatz design, #818):
+               sticky head + facts bar + tab nav, five panes. Mirrors the
+               mission-detail tab shell (Variante B). The shell/panel CSS is
+               duplicated here intentionally — extracting it into a shared
+               stylesheet would touch the shipped mission page; kept local
+               to keep this change frontend-only and regression-free.
                ========================================================= */
-            html, body {
-                margin: 0;
-                overflow-x: hidden;
-            }
+            html, body { margin: 0; overflow-x: hidden; }
             .page-wrapper {
                 width: 100%;
-                max-width: 100%;
-                overflow-x: hidden;
+                max-width: 1800px;
+                margin: 0 auto;
+                overflow-x: clip;
                 box-sizing: border-box;
-                /* Reserve viewport-bottom space for the fixed footer. The
-                   global `main { padding-bottom: calc(--krt-footer-height + 5rem) }`
-                   reservation is defeated on this page: <main> only holds the
-                   greeting header and is zeroed to `padding-bottom: 0`, while the
-                   actual content sits in the sibling .mission-columns-container
-                   below it. Without this the last panel scrolls under the
-                   always-pinned footer. Put it on .page-wrapper (not the columns
-                   container, whose padding the media queries override). */
                 padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
             }
-            .main-sticky-wrapper {
-                width: 100%;
-                box-sizing: border-box;
-            }
-            .mission-columns-container {
-                display: grid;
-                grid-template-columns: 1fr;
-                grid-auto-flow: dense;
-                gap: 1rem;
-                margin-top: 2rem;
-                padding: 0 2rem 1rem 2rem;
-                box-sizing: border-box;
-                width: 100%;
-                max-width: 100%;
-                align-items: start;
-            }
-            .mission-column {
-                display: flex;
-                flex-direction: column;
-                --panel-min-width: 420px;
-                min-width: 0;
-                max-width: 100%;
-                background-color: transparent;
-                transition: opacity 0.2s ease;
-            }
-            .mission-column:not(.collapsed) {
-                min-width: min(100%, var(--panel-min-width));
-            }
-            /* Per-panel content-aware minimums for the operation page. */
-            .mission-column[data-panel-key="details"]  { --panel-min-width: 420px; }
-            .mission-column[data-panel-key="missions"] { --panel-min-width: 720px; }
-            .mission-column[data-panel-key="payout"]   { --panel-min-width: 820px; }
-            .mission-column[data-panel-key="finance"]  { --panel-min-width: 820px; }
+            .mission-head-sticky { position: sticky; top: 0; z-index: 900; background-color: var(--color-bg-black); }
+            .mission-head { background-color: var(--color-bg-dark-gray); border-bottom: var(--border-hairline); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+            .mission-head-title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; min-width: 0; }
+            .mission-head-title h1 { font-family: var(--font-headline); font-weight: var(--fw-bold); color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em; font-size: 1.05rem; margin: 0; display: inline; }
+            .mission-head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+            .tab-panes { padding: 14px 16px 18px; }
+            .tab-pane { display: none; flex-direction: column; gap: 12px; }
+            .tab-pane.on { display: flex; }
 
-            .mission-column .col-content table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .mission-column .col-content table th:last-child,
-            .mission-column .col-content table td:last-child {
-                white-space: nowrap;
-                text-align: right;
-            }
-            .mission-column .col-content .table-responsive {
-                width: 100%;
-            }
+            .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+            .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+            @media (max-width: 980px) { .pane-grid-2 { grid-template-columns: 1fr; } }
 
-            .mission-column.collapsed {
-                grid-column: span 1;
-                min-width: 0;
-            }
-            .mission-column.collapsed .col-content {
-                display: none;
-            }
-            .mission-column .col-header {
-                all: unset;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 0.75rem;
-                box-sizing: border-box;
-                width: 100%;
-                min-height: 44px;
-                background-color: var(--color-surface-input);
-                padding: 0.8rem 1rem;
-                border: 1px solid var(--color-gray-3);
-                border-left: 4px solid var(--color-primary);
-                cursor: pointer;
-                margin-bottom: 1rem;
-                font-family: var(--font-headline);
-                color: var(--color-gray-1);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            .mission-column .col-header:focus-visible {
-                outline: 2px solid var(--color-primary);
-                outline-offset: 2px;
-                box-shadow: 0 0 0 3px rgba(231, 126, 35, 0.35);
-            }
-            .mission-column .col-header:hover {
-                background-color: var(--color-gray-3);
-            }
-            .mission-column .col-header h2 {
-                margin: 0;
-                font-size: 1.1rem;
-                color: var(--color-white);
-                font-family: var(--font-headline);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                flex: 1 1 auto;
-                min-width: 0;
-            }
-            .mission-column .col-header .toggle-icon {
-                display: inline-block;
-                flex: 0 0 auto;
-                font-size: 1.1rem;
-                line-height: 1;
-                color: var(--color-primary);
-                transition: transform 0.25s ease;
-                transform: rotate(0deg);
-                width: 0.6em;
-                height: 0.6em;
-                border-right: 2px solid currentColor;
-                border-bottom: 2px solid currentColor;
-                transform-origin: 55% 55%;
-            }
-            .mission-column:not(.collapsed) .col-header .toggle-icon {
-                transform: rotate(45deg);
-            }
-            .mission-column.collapsed .col-header .toggle-icon {
-                transform: rotate(-45deg);
-            }
-            .mission-column.collapsed .col-header {
-                margin-bottom: 0;
-                border-left: 4px solid var(--color-primary);
-            }
-            .mission-column .col-content {
-                flex-grow: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-                min-width: 0;
-            }
-            .mission-column .col-content p {
-                max-width: 80ch;
-            }
-            @media (max-width: 479px) {
-                .mission-column .col-content .table-responsive {
-                    overflow-x: auto;
-                }
-            }
-            @media (max-width: 768px) {
-                .mission-columns-container {
-                    grid-template-columns: 1fr;
-                    padding: 0 1rem 1rem 1rem;
-                    gap: 0.75rem;
-                }
-                .mission-column .col-header {
-                    min-height: 48px;
-                    padding: 0.9rem 1rem;
-                }
-            }
-            @media (min-width: 768px) and (max-width: 1399px) {
-                .mission-columns-container {
-                    grid-template-columns: 1fr;
-                }
-            }
-            @media (min-width: 2400px) {
-                .mission-columns-container {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                }
-            }
-            @media (min-width: 3600px) {
-                .mission-columns-container {
-                    grid-template-columns: repeat(3, minmax(0, 1fr));
-                }
-            }
+            .kpanel { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); min-width: 0; }
+            .kpanel-head { padding: 8px 12px; background-color: var(--color-surface-input); border-left: 4px solid var(--color-primary); border-bottom: var(--border-hairline); font-family: var(--font-body); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--fw-bold); color: var(--color-gray-1); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+            .kpanel-body { padding: 12px; }
+            .kpanel-body > .table-responsive { width: 100%; overflow-x: auto; }
+            .btn-xs2 { min-height: 32px; padding: 0.25rem 0.6rem; font-size: 0.68rem; }
+            .desc { font-size: 0.85rem; font-weight: 300; color: var(--color-gray-1); margin: 0; line-height: 1.55; max-width: 80ch; }
+            .ph-extra { color: var(--color-gray-2); font-weight: var(--fw-bold); text-transform: none; font-variant-numeric: tabular-nums; }
+            #pane-op-fin details.hud-details, #pane-op-ueb details.hud-details { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 12px 14px; }
+            .op-mission-result-link { color: var(--color-gray-1); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+            .op-mission-result-link:hover { color: var(--color-primary); }
+
+            /* Finance summary strip (matches the mission Finanzen tab). */
+            .sumstrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+            @media (max-width: 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
+            .sum { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 14px; }
+            .sum.is-total { border-top: 3px solid var(--color-primary); }
+            .sum .sk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2); font-weight: var(--fw-bold); }
+            .sum .sv { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.15rem; color: var(--color-white); font-variant-numeric: tabular-nums; margin-top: 2px; }
+            .sum .sv.pos { color: var(--color-success); }
+            .sum .sv.neg { color: var(--color-danger-text); }
+            .sum .sv.donate { color: var(--color-dept-profit, #239E33); }
+            .sum .sd { font-size: 0.66rem; color: var(--color-gray-2); margin-top: 2px; }
+
+            /* "Ergebnis je Einsatz" proportional result bars (Übersicht). */
+            .holder-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+            .holder-name { flex: 0 0 38%; min-width: 0; font-size: 0.8rem; color: var(--color-gray-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .holder-bar { flex: 1; height: 8px; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); overflow: hidden; }
+            .holder-bar i { display: block; height: 100%; background: var(--color-success); }
+            .holder-value { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-weight: var(--fw-bold); color: var(--color-success); font-size: 0.82rem; }
+            .holder-sum { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: var(--border-hairline); font-weight: var(--fw-bold); color: var(--color-gray-1); font-size: 0.85rem; }
+
+            /* Markdown description editor (Verwaltung): Bearbeiten / Vorschau + formatting toolbar. */
+            .md-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+            .md-toolbar .btn-xs2 { min-width: 34px; }
+            .md-input { min-height: 200px; resize: vertical; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5; }
+            .md-preview { min-height: 200px; padding: 12px; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); }
+            .md-preview:empty::before { content: attr(data-empty); color: var(--color-gray-2); font-style: italic; }
 
             /* =========================================================
-               Auszahlungen panel — Payout table layout
-               -----------------------------------------------------------
-               The parent .mission-column applies a global
-                 ".col-content table td:last-child { text-align: right }"
-               rule that's meant for action-button columns. The payout
-               table's last column is the "Bezahlt" checkbox, which under
-               that rule clings to the right edge and looks unbalanced —
-               we reset it per-column to the semantically correct
-               alignment instead: text left, percentages and amounts
-               right, status badge + checkbox centered. Numbers use
-               tabular figures so the digits line up vertically across
-               rows (best practice for monetary tables). Paid rows get a
-               subtle profit-green left border on the checkbox cell as a
-               scan-at-a-glance marker.
+               Auszahlungen panel — Payout table layout (preserved verbatim
+               from the previous column layout; the table itself is unchanged,
+               only its container moved into the Auszahlung tab).
                ========================================================= */
-            .payout-table {
-                margin-top: 1rem;
-            }
-            /* Override the inherited last-child right-align — the
-               payout-paid column is centered, not right-pushed. */
+            .payout-table { margin-top: 1rem; }
             .payout-table th:last-child,
-            .payout-table td:last-child {
-                text-align: center;
-                white-space: nowrap;
-            }
+            .payout-table td:last-child { text-align: center; white-space: nowrap; }
             .payout-table th.payout-user-col,
-            .payout-table td.payout-user-cell {
-                text-align: left;
-                font-weight: 600;
-            }
+            .payout-table td.payout-user-cell { text-align: left; font-weight: 600; }
             .payout-table th.payout-percentage-col,
-            .payout-table td.payout-percentage-cell {
-                text-align: right;
-                white-space: nowrap;
-                font-variant-numeric: tabular-nums;
-                color: var(--color-gray-2);
-            }
+            .payout-table td.payout-percentage-cell { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--color-gray-2); }
             .payout-table th.payout-preference-col,
-            .payout-table td.payout-preference-cell {
-                text-align: left;
-                white-space: nowrap;
-            }
-            .payout-preference-badge {
-                display: inline-block;
-                padding: 0.18rem 0.65rem;
-                border: 1px solid currentColor;
-                border-radius: 999px;
-                font-size: 0.78em;
-                font-weight: 600;
-                letter-spacing: 0.04em;
-                text-transform: uppercase;
-                line-height: 1.4;
-            }
-            .payout-preference-badge--payout {
-                color: var(--color-primary);
-                background-color: rgba(231, 126, 35, 0.12);
-            }
-            .payout-preference-badge--donate {
-                /* Marine-Corps purple from the Styleguide for the
-                   "donating" preference — distinct from the brand orange
-                   so PAYOUT/DONATE are recognisable at a glance. */
-                color: var(--color-dept-marine, #7A5E96);
-                background-color: rgba(122, 94, 150, 0.14);
-            }
+            .payout-table td.payout-preference-cell { text-align: left; white-space: nowrap; }
+            .payout-preference-badge { display: inline-block; padding: 0.18rem 0.65rem; border: 1px solid currentColor; border-radius: 999px; font-size: 0.78em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.4; }
+            .payout-preference-badge--payout { color: var(--color-primary); background-color: rgba(231, 126, 35, 0.12); }
+            .payout-preference-badge--donate { color: var(--color-dept-marine, #7A5E96); background-color: rgba(122, 94, 150, 0.14); }
             .payout-table th.payout-amount-col,
-            .payout-table td.payout-amount-cell {
-                text-align: right;
-                white-space: nowrap;
-                font-variant-numeric: tabular-nums;
-                min-width: 11em; /* fits "1.500.000,00 aUEC" without wrap */
-            }
-            .payout-table .payout-amount-value {
-                display: block;
-                font-weight: 600;
-                color: var(--color-gray-1);
-            }
+            .payout-table td.payout-amount-cell { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 11em; }
+            .payout-table .payout-amount-value { display: block; font-weight: 600; color: var(--color-gray-1); }
             .payout-table .payout-amount-reimbursement,
             .payout-table .payout-amount-transferfee,
-            .payout-table .payout-amount-donation {
-                display: block;
-                font-size: 0.78em;
-                color: var(--color-gray-2);
-                font-style: italic;
-                margin-top: 0.2rem;
-            }
-            /* Operation-wide donation total below the payout table. Profit-green
-               reads as "money that stayed with the org" rather than a payout. */
-            .payout-donation-total {
-                margin: 1rem 0 0;
-                text-align: right;
-                font-family: 'Lato', sans-serif;
-                font-weight: 700;
-                color: var(--color-dept-profit, #239E33);
-            }
+            .payout-table .payout-amount-donation { display: block; font-size: 0.78em; color: var(--color-gray-2); font-style: italic; margin-top: 0.2rem; }
+            .payout-donation-total { margin: 1rem 0 0; text-align: right; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-dept-profit, #239E33); }
             .payout-table th.payout-paid-col,
-            .payout-table td.payout-paid-cell {
-                text-align: center;
-                white-space: nowrap;
-                min-width: 9em; /* breathing room for checkbox + audit name */
-            }
-            .payout-table .payout-paid-label {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.55rem;
-                cursor: pointer;
-                margin: 0;
-                font-weight: normal;
-                color: inherit;
-            }
-            .payout-table .payout-paid-checkbox {
-                /* 20×20 keeps the touch target generous while the
-                   wrapping <label> still satisfies the 44px-min rule. */
-                width: 20px;
-                height: 20px;
-                cursor: pointer;
-                accent-color: var(--color-primary);
-                flex: 0 0 auto;
-                margin: 0;
-            }
-            .payout-table .payout-paid-status {
-                font-size: 0.78em;
-                color: var(--color-gray-2);
-                line-height: 1.2;
-            }
-            .payout-table .payout-paid-yes {
-                color: var(--color-dept-profit, #239E33);
-                font-weight: 600;
-            }
-            .payout-table .payout-paid-no {
-                color: var(--color-gray-2);
-            }
-            /* Faint scan-at-a-glance marker for paid rows: a 3px
-               profit-green inset on the Bezahlt cell + a very subtle
-               row tint. Editors see a checkbox (".payout-paid-checkbox"),
-               read-only viewers see a static yes/no span
-               (".payout-paid-yes" / ".payout-paid-no") -- match both so
-               the marker shows up regardless of canEdit. ":has()" is
-               widely supported in modern browsers; older browsers simply
-               skip the marker, the checkbox/yes state itself remains the
-               source of truth. */
+            .payout-table td.payout-paid-cell { text-align: center; white-space: nowrap; min-width: 9em; }
+            .payout-table .payout-paid-label { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; cursor: pointer; margin: 0; font-weight: normal; color: inherit; }
+            .payout-table .payout-paid-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-primary); flex: 0 0 auto; margin: 0; }
+            .payout-table .payout-paid-status { font-size: 0.78em; color: var(--color-gray-2); line-height: 1.2; }
+            .payout-table .payout-paid-yes { color: var(--color-dept-profit, #239E33); font-weight: 600; }
+            .payout-table .payout-paid-no { color: var(--color-gray-2); }
             .payout-table tbody tr:has(.payout-paid-checkbox:checked),
-            .payout-table tbody tr:has(.payout-paid-yes) {
-                background-color: rgba(35, 158, 51, 0.06);
-            }
+            .payout-table tbody tr:has(.payout-paid-yes) { background-color: rgba(35, 158, 51, 0.06); }
             .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
-            .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell {
-                box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33);
-            }
-            @media (max-width: 768px) {
-                .payout-table th,
-                .payout-table td {
-                    padding: 0.75rem 0.6rem;
-                }
-            }
+            .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell { box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33); }
+            @media (max-width: 768px) { .payout-table th, .payout-table td { padding: 0.75rem 0.6rem; } }
 
-            /* Nested mission-finance cards inside the finance panel. */
-            .operation-mission-fin {
-                margin-bottom: 1rem;
-                border: 1px solid var(--color-gray-3);
-                background: var(--color-surface-input);
-            }
-            .operation-mission-fin-header {
-                padding: 0.8rem;
-                cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 1px solid var(--color-gray-3);
-                min-height: 44px;
-                gap: 0.75rem;
-                flex-wrap: wrap;
-            }
-            .operation-mission-fin-content {
-                display: none;
-                padding: 0.8rem;
-                background: var(--color-surface-input);
-            }
-            .operation-mission-fin-content.expanded { display: block; }
-            .operation-mission-fin .toggle-icon-msn { margin-left: 10px; }
+            .footacts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; border-top: var(--border-hairline); padding-top: 12px; }
+            .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }
         </style>
     </th:block>
 </head>
 <body class="operation-page">
-
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <header>
@@ -401,76 +138,117 @@
 </header>
 
 <div class="page-wrapper">
-    <div class="main-sticky-wrapper">
-        <main style="padding-bottom: 0;">
-            <div class="greeting hud-box flex-between">
-                <h1 id="operation-title" class="m-0" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
-                <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zurück</a>
+    <!-- Sticky head (title + status pill + back), facts bar, tab nav — mirrors the mission shell. -->
+    <div class="mission-head-sticky" id="operation-head-sticky">
+        <div class="mission-head">
+            <div class="mission-head-title">
+                <h1 id="operation-title" th:text="#{operation.prefix} + ' ' + ${operation.name}">Operation Name</h1>
+                <span class="status-pill" th:classappend="'status-' + ${#strings.toLowerCase(operation.status)}"
+                      th:text="#{__${'operation.status.' + #strings.toLowerCase(operation.status)}__}">Status</span>
             </div>
-        </main>
-    </div>
-
-    <div class="mission-columns-container">
-
-        <!-- Column 1: Operation Details (inline editable, mirrors mission-detail) -->
-        <div class="mission-column" id="col-details" data-panel-key="details" th:attr="data-operation-id=${operation.id}">
-            <button type="button" class="col-header" aria-expanded="true" aria-controls="col-details-content"
-                    data-panel-toggle="col-details"
-                    th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{operation.details}, title=#{mission.panel.toggle.aria}">
-                <h2 th:text="#{operation.details}">Details</h2>
-                <span class="toggle-icon" aria-hidden="true"></span>
-            </button>
-            <div class="col-content" id="col-details-content">
-                <div class="hud-box">
-                    <form id="operation-form" th:action="@{/operations/{id}/update(id=${operation.id})}" method="post">
-                        <input type="hidden" name="version" th:value="${operation.version}">
-
-                        <div class="form-group">
-                            <label for="op-name" th:text="#{operation.name}">Name</label>
-                            <input type="text" id="op-name" name="name" th:value="${operation.name}" required
-                                   th:disabled="${!canEdit}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="op-status" th:text="#{operation.status}">Status</label>
-                            <select id="op-status" name="status" required th:disabled="${!canEdit}">
-                                <option value="PLANNED" th:selected="${operation.status == 'PLANNED'}" th:text="#{operation.status.planned}">PLANNED</option>
-                                <option value="ACTIVE" th:selected="${operation.status == 'ACTIVE'}" th:text="#{operation.status.active}">ACTIVE</option>
-                                <option value="COMPLETED" th:selected="${operation.status == 'COMPLETED'}" th:text="#{operation.status.completed}">COMPLETED</option>
-                                <option value="CANCELED" th:selected="${operation.status == 'CANCELED'}" th:text="#{operation.status.canceled}">CANCELED</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="op-desc" th:text="#{operation.description}">Description</label>
-                            <textarea id="op-desc" name="description" rows="6" th:disabled="${!canEdit}" th:text="${operation.description}"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <!-- Buttons box at the bottom of the Details column, same pattern as mission-detail. -->
-                <div class="hud-box" style="display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
-                    <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger" style="margin-right: auto;"
-                            th:data-id="${operation.id}"
-                            data-trigger="operation-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{general.delete}">Delete</span></button>
-                    <button th:if="${canEdit}" type="submit" form="operation-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Save</span></button>
-                    <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Back</a>
-                </div>
+            <div class="mission-head-actions">
+                <a th:href="@{/operations}" class="btn btn-ghost btn-xs2" th:text="#{general.back}">Zur&uuml;ck</a>
             </div>
         </div>
+        <div class="facts-bar">
+            <span><span class="fact-k" th:text="#{operation.facts.missions}">Eins&auml;tze</span><span class="fact-v" th:text="${missionsPage != null ? missionsPage.totalElements : 0}">0</span></span>
+            <span sec:authorize="isAuthenticated()"><span class="fact-k" th:text="#{operation.finances.total}">Gesamtergebnis</span><span class="fact-v" th:classappend="${operationFinance != null and operationFinance.totalSum != null and operationFinance.totalSum.signum() >= 0 ? 'pos' : 'neg'}" th:text="${(operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0')} + ' aUEC'">0 aUEC</span></span>
+            <span sec:authorize="isAuthenticated()" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"><span class="fact-k" th:text="#{operation.finances.donations}">Gespendet</span><span class="fact-v" style="color: var(--color-dept-profit, #239E33);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
+        </div>
+        <div class="tab-nav" role="tablist" th:aria-label="#{operation.details}">
+            <button class="tab" id="optab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-op-ueb" data-tab="ueb" th:text="#{operation.tab.overview}">&Uuml;bersicht</button>
+            <button class="tab" id="optab-missions" type="button" role="tab" aria-selected="false" aria-controls="pane-op-missions" data-tab="missions"><span th:text="#{missions.title}">Eins&auml;tze</span> <span class="tab-count" th:text="${missionsPage != null ? missionsPage.totalElements : 0}">0</span></button>
+            <button class="tab" id="optab-payout" type="button" role="tab" aria-selected="false" aria-controls="pane-op-payout" data-tab="payout"><span th:text="#{operation.payout}">Auszahlung</span> <span class="tab-count" th:if="${operationPayouts != null}" th:text="${operationPayouts.size()}">0</span></button>
+            <button class="tab" id="optab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-op-fin" data-tab="fin" th:text="#{operation.finances}">Finanzen</button>
+            <button class="tab" id="optab-verw" type="button" role="tab" aria-selected="false" aria-controls="pane-op-verw" data-tab="verw" th:text="#{mission.tab.admin}">Verwaltung</button>
+        </div>
+    </div>
 
-        <!-- Column 2: Missions -->
-        <div class="mission-column" id="col-missions" data-panel-key="missions" th:attr="data-operation-id=${operation.id}">
-            <button type="button" class="col-header" aria-expanded="true" aria-controls="col-missions-content"
-                    data-panel-toggle="col-missions"
-                    th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{missions.title}, title=#{mission.panel.toggle.aria}">
-                <h2 th:text="#{missions.title}">Missions</h2>
-                <span class="toggle-icon" aria-hidden="true"></span>
-            </button>
-            <div class="col-content" id="col-missions-content">
-                <div class="hud-box">
-                    <!-- AJAX swap target (REQ-FE-002): the embedded missions pager re-renders only
-                         this block via krtFetch (fragment=missions); the no-JS page-btn links still
-                         reload the whole operation page. -->
+    <div class="tab-panes">
+
+        <!-- ================= Tab 1: Übersicht ================= -->
+        <section id="pane-op-ueb" class="tab-pane" role="tabpanel" aria-labelledby="optab-ueb">
+            <div class="pane-grid-2">
+                <div class="pane-col">
+                    <div class="kpanel">
+                        <div class="kpanel-head" th:text="#{operation.overview.at_a_glance}">Operation auf einen Blick</div>
+                        <div class="kpanel-body">
+                            <dl class="kv-list">
+                                <dt th:text="#{operation.status}">Status</dt>
+                                <dd><span class="status-pill" th:classappend="'status-' + ${#strings.toLowerCase(operation.status)}" th:text="#{__${'operation.status.' + #strings.toLowerCase(operation.status)}__}">Status</span></dd>
+                                <dt th:text="#{operation.facts.missions}">Eins&auml;tze</dt>
+                                <dd th:text="${missionsPage != null ? missionsPage.totalElements : 0}">0</dd>
+                                <th:block sec:authorize="isAuthenticated()">
+                                    <dt th:text="#{operation.finances.total}">Gesamtergebnis</dt>
+                                    <dd><span class="data-value" th:text="${(operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0')} + ' aUEC'">0 aUEC</span></dd>
+                                    <th:block th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}">
+                                        <dt th:text="#{operation.finances.donations}">Gespendet</dt>
+                                        <dd><span class="data-value" style="color: var(--color-dept-profit, #239E33);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></dd>
+                                    </th:block>
+                                </th:block>
+                                <dt th:text="#{general.created}">Erstellt</dt>
+                                <dd><span class="krt-local-dt" th:attr="data-utc=${operation.createdAt != null ? operation.createdAt.toEpochMilli() : 'null'}" th:text="${operation.createdAt != null ? #temporals.format(operation.createdAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
+                            </dl>
+                        </div>
+                    </div>
+                    <div class="kpanel" sec:authorize="isAuthenticated()"
+                         th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
+                        <div class="kpanel-head" th:text="#{operation.overview.result_per_mission}">Ergebnis je Einsatz</div>
+                        <div class="kpanel-body">
+                            <div th:each="msnFin : ${operationFinance.missions}" class="holder-row">
+                                <span class="holder-name" th:text="${msnFin.missionName}" th:title="${msnFin.missionName}">Einsatz</span>
+                                <span class="holder-bar"><i th:style="'width:' + ${(msnFin.totalSum != null and msnFin.totalSum.signum() > 0 and operationMaxMissionResult != null and operationMaxMissionResult.signum() > 0) ? (msnFin.totalSum.doubleValue() * 100 / operationMaxMissionResult.doubleValue()) : 0} + '%'"></i></span>
+                                <span class="holder-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg'"
+                                      th:style="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'color: var(--color-danger-text);'"
+                                      th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')}">0</span>
+                            </div>
+                            <div class="holder-sum">
+                                <span th:text="#{operation.finances.total}">Gesamtergebnis</span>
+                                <span style="color: var(--color-success);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pane-col">
+                    <div class="kpanel">
+                        <div class="kpanel-head"><span th:text="#{missions.title}">Eins&auml;tze</span><span class="ph-extra" th:text="${missionsPage != null ? missionsPage.totalElements : 0}">0</span></div>
+                        <div class="kpanel-body">
+                            <div class="table-responsive">
+                                <table th:if="${missions != null and !missions.isEmpty()}">
+                                    <thead><tr><th th:text="#{mission.name}">Name</th><th th:text="#{mission.status}">Status</th><th th:text="#{general.action}">Aktion</th></tr></thead>
+                                    <tbody>
+                                        <tr th:each="msn : ${missions}">
+                                            <td th:text="${msn.name}">Name</td>
+                                            <td><span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}" th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span></td>
+                                            <td><a class="btn btn-ghost btn-xs2" th:href="@{/missions/{id}(id=${msn.id})}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{general.details}">&Ouml;ffnen</span></a></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p th:if="${missions == null or missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Eins&auml;tze.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <details class="hud-details" th:if="${!#strings.isEmpty(operation.description)}" style="margin-top: 12px;">
+                <summary><span th:text="#{operation.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
+                <!-- th:utext is safe: @markdown escapes raw HTML and strips unsafe link protocols. -->
+                <div class="markdown-content" style="margin-top: 10px;"
+                     th:with="descriptionHtml=${@markdown.render(operation.description)}"
+                     th:utext="${descriptionHtml}">Beschreibung</div>
+            </details>
+        </section>
+
+        <!-- ================= Tab 2: Einsätze ================= -->
+        <section id="pane-op-missions" class="tab-pane" role="tabpanel" aria-labelledby="optab-missions">
+            <div class="kpanel">
+                <div class="kpanel-head">
+                    <span th:text="#{operation.overview.missions_of}">Eins&auml;tze der Operation</span>
+                    <a th:if="${canEdit}" th:href="@{/missions/new(operationId=${operation.id})}" class="btn btn--cta btn-xs2"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{operation.mission.add}">Einsatz hinzuf&uuml;gen</span></a>
+                </div>
+                <div class="kpanel-body">
+                    <!-- AJAX swap target (REQ-FE-002): the embedded missions pager re-renders only this
+                         block via krtFetch (fragment=missions); the no-JS page-btn links reload the page. -->
                     <div id="op-missions-results">
                     <th:block th:fragment="missions">
                     <div class="table-responsive">
@@ -479,19 +257,14 @@
                                 <tr>
                                     <th th:text="#{mission.name}">Name</th>
                                     <th th:text="#{mission.status}">Status</th>
-                                    <th th:text="#{general.action}">Action</th>
+                                    <th th:text="#{general.action}">Aktion</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr th:each="msn : ${missions}">
                                     <td th:text="${msn.name}">Name</td>
-                                    <td>
-                                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}"
-                                              th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
-                                    </td>
-                                    <td>
-                                        <a class="btn btn-ghost" th:href="@{/missions/{id}(id=${msn.id})}" th:text="#{general.details}">Details</a>
-                                    </td>
+                                    <td><span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}" th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span></td>
+                                    <td><a class="btn btn-ghost btn-xs2" th:href="@{/missions/{id}(id=${msn.id})}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{general.details}">&Ouml;ffnen</span></a></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -499,32 +272,24 @@
                     <div th:if="${missionsPage != null and missionsPage.totalPages > 1}">
                         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${missionsPage}, baseUrl='/operations/' + ${operation.id})}"></div>
                     </div>
-                    <p th:if="${missions == null or missions.isEmpty()}" th:text="#{mission.empty}">No missions.</p>
+                    <p th:if="${missions == null or missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Eins&auml;tze.</p>
                     </th:block>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Column 3: Payout -->
-        <div class="mission-column" id="col-payout" data-panel-key="payout"
-             th:attr="data-operation-id=${operation.id},
-                      data-can-unset-paid-out=${canUnsetPaidOut}">
-            <button type="button" class="col-header" aria-expanded="true" aria-controls="col-payout-content"
-                    data-panel-toggle="col-payout"
-                    th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{operation.payout}, title=#{mission.panel.toggle.aria}">
-                <h2 th:text="#{operation.payout}">Auszahlung</h2>
-                <span class="toggle-icon" aria-hidden="true"></span>
-            </button>
-            <div class="col-content" id="col-payout-content">
-                <div class="hud-box">
-                    <div th:if="${operation != null and operation.payoutPreliminary != null and operation.payoutPreliminary}"
-                         class="alert alert-warning"
-                         role="status"
-                         th:attr="aria-label=#{operation.payout.preliminary.title}">
-                        <strong th:text="#{operation.payout.preliminary.title}">Vorlaeufige Werte</strong>
-                        <span th:text="' ' + #{operation.payout.preliminary.message}">Die Anteile sind noch nicht endgueltig, solange nicht alle Einsaetze eine tatsaechliche Start- und Endzeit haben.</span>
-                    </div>
+        <!-- ================= Tab 3: Auszahlung ================= -->
+        <section id="pane-op-payout" class="tab-pane" role="tabpanel" aria-labelledby="optab-payout"
+                 th:attr="data-operation-id=${operation.id}, data-can-unset-paid-out=${canUnsetPaidOut}">
+            <div th:if="${operation.payoutPreliminary != null and operation.payoutPreliminary}"
+                 class="alert alert-warning" role="status" th:attr="aria-label=#{operation.payout.preliminary.title}">
+                <strong th:text="#{operation.payout.preliminary.title}">Vorl&auml;ufige Werte</strong>
+                <span th:text="' ' + #{operation.payout.preliminary.message}">Die Anteile sind noch nicht endg&uuml;ltig.</span>
+            </div>
+            <div class="kpanel">
+                <div class="kpanel-head"><span th:text="#{operation.payout}">Auszahlung</span><span class="ph-extra" th:if="${operationPayouts != null}" th:text="${operationPayouts.size()}">0</span></div>
+                <div class="kpanel-body">
                     <div class="table-responsive">
                         <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}" class="payout-table">
                             <thead>
@@ -537,8 +302,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="payout : ${operationPayouts}"
-                                    th:attr="data-participant-id=${payout.participantId}">
+                                <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
                                     <td th:text="${payout.participantName}" class="payout-user-cell">User</td>
                                     <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()" class="payout-percentage-cell">0,00%</td>
                                     <td class="payout-preference-cell">
@@ -546,29 +310,19 @@
                                         <span th:if="${payout.payoutPreference.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}" class="payout-preference-badge payout-preference-badge--donate">Spenden</span>
                                     </td>
                                     <td class="payout-amount-cell" sec:authorize="isAuthenticated()">
-                                        <span class="payout-amount-value"
-                                              th:text="${#numbers.formatInteger(payout.payoutAmount, 3, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                        <span class="payout-amount-reimbursement"
-                                              th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC)'">(davon 0 aUEC Auslagen)</span>
-                                        <span class="payout-amount-transferfee"
-                                              th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC)'">(bereits abgezogene Überweisungsgebühr: 0 aUEC)</span>
-                                        <span class="payout-amount-donation"
-                                              th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}"
-                                              th:text="'(' + #{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC)'">(gespendet: 0 aUEC)</span>
+                                        <span class="payout-amount-value" th:text="${#numbers.formatInteger(payout.payoutAmount, 3, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                        <span class="payout-amount-reimbursement" th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}" th:text="'(' + #{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC)'">(davon 0 aUEC Auslagen)</span>
+                                        <span class="payout-amount-transferfee" th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}" th:text="'(' + #{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC)'">(0 aUEC)</span>
+                                        <span class="payout-amount-donation" th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}" th:text="'(' + #{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC)'">(gespendet: 0 aUEC)</span>
                                     </td>
                                     <td class="payout-paid-cell" sec:authorize="isAuthenticated()">
                                         <label class="payout-paid-label" th:if="${canEdit}">
-                                            <input type="checkbox"
-                                                   class="payout-paid-checkbox"
-                                                   th:attr="data-participant-id=${payout.participantId},
-                                                            data-operation-id=${operation.id}"
+                                            <input type="checkbox" class="payout-paid-checkbox"
+                                                   th:attr="data-participant-id=${payout.participantId}, data-operation-id=${operation.id}"
                                                    th:checked="${payout.paidOut}"
                                                    th:disabled="${payout.paidOut and not canUnsetPaidOut}"
                                                    th:title="${payout.paidOut and not canUnsetPaidOut} ? #{operation.payout.paid.unset.locked} : ''">
-                                            <span class="payout-paid-status"
-                                                  th:if="${payout.paidOut and payout.paidOutByName != null}"
+                                            <span class="payout-paid-status" th:if="${payout.paidOut and payout.paidOutByName != null}"
                                                   th:text="${payout.paidOutByName}"
                                                   th:title="${payout.paidOutAt != null ? #temporals.format(payout.paidOutAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">audit name</span>
                                         </label>
@@ -581,94 +335,121 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="payout-donation-total"
-                       th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}">
+                    <p class="payout-donation-total" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}">
                         <span th:text="#{operation.payout.donation.total}">Spenden gesamt</span>:
                         <span th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                     </p>
-                    <p th:if="${operationPayouts == null or operationPayouts.isEmpty()}" th:text="#{mission.empty}">No participants.</p>
+                    <p th:if="${operationPayouts == null or operationPayouts.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Teilnehmer.</p>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Column 4: Finances -->
-        <div class="mission-column" id="col-finance" data-panel-key="finance" th:attr="data-operation-id=${operation.id}">
-            <button type="button" class="col-header" aria-expanded="true" aria-controls="col-finance-content"
-                    data-panel-toggle="col-finance"
-                    th:attr="aria-label=#{mission.panel.toggle.aria} + ' ' + #{operation.finances}, title=#{mission.panel.toggle.aria}">
-                <h2 th:text="#{operation.finances}">Finanzen</h2>
-                <span class="toggle-icon" aria-hidden="true"></span>
-            </button>
-            <div class="col-content" id="col-finance-content">
-                <div class="hud-box">
-                    <div style="margin-bottom: 1.5rem; text-align: center;">
-                        <h3 style="margin: 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-primary);">
-                            <span th:text="#{operation.finances.total}">Gesamtergebnis</span>:
-                            <span th:text="${operationFinance != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'} + ' aUEC'">0 aUEC</span>
-                        </h3>
-                        <p th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"
-                           style="margin: 0.4rem 0 0; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-dept-profit, #239E33);">
-                            <span th:text="#{operation.finances.donations}">Davon gespendet</span>:
-                            <span th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                        </p>
+        <!-- ================= Tab 4: Finanzen ================= -->
+        <section id="pane-op-fin" class="tab-pane" role="tabpanel" aria-labelledby="optab-fin" sec:authorize="isAuthenticated()">
+            <div class="sumstrip" th:if="${operationFinance != null}">
+                <div class="sum is-total"><div class="sk" th:text="#{operation.finances.total}">Gesamtergebnis</div><div class="sv" th:classappend="${operationFinance.totalSum != null and operationFinance.totalSum.signum() >= 0 ? 'pos' : 'neg'}" th:text="${operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'}">0</div><div class="sd" th:text="|aUEC &middot; ${missionsPage != null ? missionsPage.totalElements : 0} ${#messages.msg('operation.facts.missions')}|">aUEC</div></div>
+                <div class="sum"><div class="sk" th:text="#{operation.finances.donations}">Gespendet</div><div class="sv donate" th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}">0</div><div class="sd">aUEC</div></div>
+            </div>
+            <th:block th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
+                <details class="hud-details" th:each="msnFin : ${operationFinance.missions}" style="margin-top: 12px;">
+                    <summary>
+                        <span th:text="${msnFin.missionName}">Einsatz</span>
+                        <span class="data-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg'"
+                              th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                    </summary>
+                    <div class="table-responsive">
+                        <table style="margin-top: 8px;">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{general.type}">Typ</th>
+                                    <th th:text="#{general.user}">Nutzer</th>
+                                    <th th:text="#{mission.finance.note}">Notiz</th>
+                                    <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${msnFin.entries}">
+                                    <td>
+                                        <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                    </td>
+                                    <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
+                                    <td th:text="${entry.note}">Notiz</td>
+                                    <td class="num" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                </tr>
+                                <tr th:each="order : ${msnFin.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
+                                    <td><span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
+                                    <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
+                                    <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-profit); text-decoration: underline;">Raffinerieauftrag</a></td>
+                                    <td class="num" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
+                    <p th:if="${(msnFin.entries == null or msnFin.entries.isEmpty()) and (msnFin.refineryOrders == null or msnFin.refineryOrders.isEmpty())}" class="desc" style="padding-top: 8px;" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
+                </details>
+            </th:block>
+            <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Missionen vorhanden.</p>
+        </section>
 
-                    <div th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
-                        <div th:each="msnFin : ${operationFinance.missions}" class="operation-mission-fin">
-                            <div th:id="'mission-fin-header-' + ${msnFin.missionId}"
-                                 class="operation-mission-fin-header"
-                                 th:data-mission-id="${msnFin.missionId}"
-                                 data-trigger="operation-toggle-mission-finances">
-                                <strong style="color: var(--color-gray-1);" th:text="${msnFin.missionName}">Mission Name</strong>
-                                <span>
-                                    <span th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                    <span class="toggle-icon-msn">&#9660;</span>
-                                </span>
+        <!-- ================= Tab 5: Verwaltung (editor-only) ================= -->
+        <section id="pane-op-verw" class="tab-pane" role="tabpanel" aria-labelledby="optab-verw">
+            <div class="kpanel">
+                <div class="kpanel-head" th:text="#{operation.details}">Details</div>
+                <div class="kpanel-body">
+                    <form id="operation-form" th:action="@{/operations/{id}/update(id=${operation.id})}" method="post">
+                        <input type="hidden" name="version" th:value="${operation.version}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="op-name" th:text="#{operation.name}">Name</label>
+                                <input type="text" id="op-name" name="name" th:value="${operation.name}" required th:disabled="${!canEdit}">
                             </div>
-                            <div th:id="'mission-fin-content-' + ${msnFin.missionId}" class="operation-mission-fin-content">
-                                <div class="table-responsive">
-                                    <table style="font-size: 0.9em;">
-                                        <thead>
-                                            <tr>
-                                                <th th:text="#{general.type}" class="text-left">Typ</th>
-                                                <th th:text="#{general.user}" class="text-left">Nutzer</th>
-                                                <th th:text="#{mission.finance.note}" class="text-left">Notiz</th>
-                                                <th th:text="#{mission.finance.amount}">Betrag</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr th:each="entry : ${msnFin.entries}">
-                                                <td>
-                                                    <span th:if="${entry.type.name() == 'INCOME'}" th:text="#{mission.finance.type.income}" style="color: var(--color-success);">Einnahme</span>
-                                                    <span th:if="${entry.type.name() == 'EXPENSE'}" th:text="#{mission.finance.type.expense}" class="text-danger">Ausgabe</span>
-                                                </td>
-                                                <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
-                                                <td th:text="${entry.note}">Notiz</td>
-                                                <td th:text="${#numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'"
-                                                    th:class="${entry.type.name() == 'INCOME'} ? 'text-success' : 'text-danger'">0 aUEC</td>
-                                            </tr>
-                                            <tr th:each="order : ${msnFin.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
-                                                <td>
-                                                    <span th:text="#{mission.finance.type.expense}" class="text-danger">Ausgabe</span>
-                                                </td>
-                                                <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
-                                                <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color:var(--color-primary);text-decoration:none;">Raffinerieauftrag</a></td>
-                                                <td th:text="${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'" class="text-danger">0 aUEC</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <p th:if="${(msnFin.entries == null or msnFin.entries.isEmpty()) and (msnFin.refineryOrders == null or msnFin.refineryOrders.isEmpty())}" th:text="#{mission.finance.empty}" style="margin:0; padding-top:0.5rem; text-align:center;">Keine Einträge</p>
+                            <div class="form-group">
+                                <label for="op-status" th:text="#{operation.status}">Status</label>
+                                <select id="op-status" name="status" required th:disabled="${!canEdit}">
+                                    <option value="PLANNED" th:selected="${operation.status == 'PLANNED'}" th:text="#{operation.status.planned}">PLANNED</option>
+                                    <option value="ACTIVE" th:selected="${operation.status == 'ACTIVE'}" th:text="#{operation.status.active}">ACTIVE</option>
+                                    <option value="COMPLETED" th:selected="${operation.status == 'COMPLETED'}" th:text="#{operation.status.completed}">COMPLETED</option>
+                                    <option value="CANCELED" th:selected="${operation.status == 'CANCELED'}" th:text="#{operation.status.canceled}">CANCELED</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
-                    <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" th:text="#{mission.empty}" class="text-center">Keine Missionen vorhanden.</p>
+
+                        <!-- Markdown description editor: Bearbeiten / Vorschau + formatting toolbar.
+                             The textarea stays the form field (name=description); the preview renders
+                             server-side via POST /operations/markdown-preview so it matches the saved
+                             output exactly. -->
+                        <div class="form-group" id="op-md-editor">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <label for="op-desc" style="margin: 0;" th:text="#{operation.description}">Beschreibung</label>
+                                <span class="tab-nav" style="position: static; padding: 0;" role="tablist" th:if="${canEdit}" th:aria-label="#{operation.description}">
+                                    <button type="button" class="tab on" data-md-view="edit" th:text="#{operation.md.edit}">Bearbeiten</button>
+                                    <button type="button" class="tab" data-md-view="preview" th:text="#{operation.md.preview}">Vorschau</button>
+                                </span>
+                            </div>
+                            <div class="md-toolbar" id="op-md-toolbar" th:if="${canEdit}">
+                                <button type="button" class="btn btn-ghost btn-xs2" data-md-wrap="**" th:title="#{operation.md.bold}"><strong>B</strong></button>
+                                <button type="button" class="btn btn-ghost btn-xs2" data-md-wrap="_" th:title="#{operation.md.italic}"><em>I</em></button>
+                                <button type="button" class="btn btn-ghost btn-xs2" data-md-line="## " th:title="#{operation.md.heading}">H</button>
+                                <button type="button" class="btn btn-ghost btn-xs2" data-md-line="- " th:title="#{operation.md.list}">&bull; <span th:text="#{operation.md.list}">Liste</span></button>
+                                <button type="button" class="btn btn-ghost btn-xs2" data-md-link th:title="#{operation.md.link}" th:text="#{operation.md.link}">Link</button>
+                            </div>
+                            <textarea id="op-desc" name="description" class="md-input" rows="9" th:disabled="${!canEdit}" th:text="${operation.description}"></textarea>
+                            <div id="op-md-preview" class="md-preview markdown-content" style="display: none;" th:attr="data-empty=#{operation.md.preview.empty}"></div>
+                        </div>
+                    </form>
                 </div>
             </div>
-        </div>
+            <div class="footacts">
+                <button th:if="${canEdit}" sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger" style="margin-right: auto;"
+                        th:data-id="${operation.id}" data-trigger="operation-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{operation.delete}">L&ouml;schen</span></button>
+                <button th:if="${canEdit}" type="submit" form="operation-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+                <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zur&uuml;ck</a>
+            </div>
+        </section>
 
-    </div>
-</div>
+    </div> <!-- End tab-panes -->
+</div> <!-- End page-wrapper -->
 
 <!-- Delete Modal -->
 <div id="delete-operation-modal" class="modal" style="display:none;">
@@ -685,116 +466,151 @@
 </div>
 
 <script th:attr="nonce=${cspNonce}">
-    const PANEL_COL_IDS = ['col-details', 'col-missions', 'col-payout', 'col-finance'];
+    window.operationId = /*[[${operation.id.toString()}]]*/ null;
 
-    function panelStorageKey(col) {
-        const operationId = col.getAttribute('data-operation-id') || 'new';
-        const panelKey = col.getAttribute('data-panel-key') || col.id;
-        return 'krt.operation.' + operationId + '.panel.' + panelKey + '.collapsed';
-    }
+    // ---- Tab switching (deeplink ?tab= + localStorage fallback, WAI-ARIA tabs) -----------------
+    (function () {
+        const tabs = Array.from(document.querySelectorAll('.tab-nav[role="tablist"] > .tab[data-tab]'));
+        const panes = Array.from(document.querySelectorAll('.tab-panes > .tab-pane'));
+        if (!tabs.length) return;
+        const STORAGE_KEY = 'krt.operation.' + (window.operationId || 'new') + '.tab';
 
-    function applyPanelState(col, collapsed) {
-        col.classList.toggle('collapsed', collapsed);
-        const btn = col.querySelector('.col-header');
-        if (btn) {
-            btn.setAttribute('aria-expanded', String(!collapsed));
+        function show(key, push) {
+            const tab = tabs.find(t => t.getAttribute('data-tab') === key) || tabs[0];
+            key = tab.getAttribute('data-tab');
+            tabs.forEach(t => {
+                const on = t === tab;
+                t.classList.toggle('active', on);
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                t.setAttribute('tabindex', on ? '0' : '-1');
+            });
+            panes.forEach(p => p.classList.toggle('on', p.id === 'pane-op-' + key));
+            try { localStorage.setItem(STORAGE_KEY, key); } catch (e) { /* ignore */ }
+            if (push && window.history && window.history.replaceState) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', key);
+                window.history.replaceState({ opTab: key }, '', url.toString());
+            }
         }
-    }
 
-    function toggleColumn(colId) {
-        const col = document.getElementById(colId);
-        if (!col) return;
-        const willCollapse = !col.classList.contains('collapsed');
-        applyPanelState(col, willCollapse);
-        try {
-            localStorage.setItem(panelStorageKey(col), String(willCollapse));
-        } catch (e) {
-            // localStorage may be unavailable (private mode); ignore.
+        tabs.forEach(tab => tab.addEventListener('click', () => show(tab.getAttribute('data-tab'), true)));
+        const tabNav = document.querySelector('.mission-head-sticky .tab-nav');
+        if (tabNav) {
+            tabNav.addEventListener('keydown', e => {
+                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+                const i = tabs.indexOf(document.activeElement);
+                if (i < 0) return;
+                e.preventDefault();
+                const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+                tabs[next].focus();
+                show(tabs[next].getAttribute('data-tab'), true);
+            });
         }
-    }
 
-    function toggleMissionFinances(missionId) {
-        const content = document.getElementById('mission-fin-content-' + missionId);
-        const header = document.getElementById('mission-fin-header-' + missionId);
-        if (!content || !header) return;
-        const isExpanded = content.classList.toggle('expanded');
-        const icon = header.querySelector('.toggle-icon-msn');
-        if (icon) icon.innerHTML = isExpanded ? '&#9650;' : '&#9660;';
-        try {
-            const operationCol = document.getElementById('col-finance');
-            const opId = operationCol ? (operationCol.getAttribute('data-operation-id') || 'new') : 'new';
-            localStorage.setItem('krt.operation.' + opId + '.fin.' + missionId + '.expanded', String(isExpanded));
-        } catch (e) {
-            // ignore
+        const params = new URLSearchParams(window.location.search);
+        let initial = params.get('tab');
+        if (!initial || !tabs.some(t => t.getAttribute('data-tab') === initial)) {
+            try { initial = localStorage.getItem(STORAGE_KEY); } catch (e) { initial = null; }
         }
-    }
+        show(initial && tabs.some(t => t.getAttribute('data-tab') === initial) ? initial : tabs[0].getAttribute('data-tab'), false);
+    })();
 
+    // ---- Delete modal ----
     function openDeleteModal(id) {
-        var deleteForm = document.getElementById('delete-operation-form');
+        const deleteForm = document.getElementById('delete-operation-form');
         deleteForm.action = window.safeSameOriginUrl('/operations/' + id + '/delete', deleteForm.action);
         document.getElementById('delete-operation-modal').style.display = 'flex';
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        PANEL_COL_IDS.forEach(function(colId) {
-            const col = document.getElementById(colId);
-            if (!col) return;
-            const state = localStorage.getItem(panelStorageKey(col));
-            applyPanelState(col, state === 'true');
-        });
-
-        document.querySelectorAll('.mission-column > .col-header[data-panel-toggle]').forEach(function(btn) {
-            btn.addEventListener('click', function(ev) {
-                ev.preventDefault();
-                toggleColumn(btn.getAttribute('data-panel-toggle'));
-            });
-        });
-
-        const operationCol = document.getElementById('col-finance');
-        const opId = operationCol ? (operationCol.getAttribute('data-operation-id') || 'new') : 'new';
-        document.querySelectorAll('[id^="mission-fin-content-"]').forEach(function(content) {
-            const missionId = content.id.replace('mission-fin-content-', '');
-            const isExpanded = localStorage.getItem('krt.operation.' + opId + '.fin.' + missionId + '.expanded') === 'true';
-            if (isExpanded) {
-                content.classList.add('expanded');
-                const header = document.getElementById('mission-fin-header-' + missionId);
-                if (header) {
-                    const icon = header.querySelector('.toggle-icon-msn');
-                    if (icon) icon.innerHTML = '&#9650;';
-                }
-            }
-        });
-
-        // Embedded missions pager -> in-place swap (REQ-FE-002). The page-btn links inside
-        // #op-missions-results point at /operations/{id}?page=N; krtFetch intercepts them and
-        // re-renders only that block via fragment=missions. The sub-table carries no per-element
-        // handlers, so nothing needs re-init on krt:swapped. No-JS fallback reloads the page.
+    document.addEventListener('DOMContentLoaded', function () {
+        // Embedded missions pager -> in-place swap (REQ-FE-002).
         if (window.krtFetch) {
-            window.krtFetch.bindSwap({
-                container: '#op-missions-results',
-                fragmentValue: 'missions',
-                history: true
-            });
+            window.krtFetch.bindSwap({ container: '#op-missions-results', fragmentValue: 'missions', history: true });
         }
     });
 
-    // CSP-safe delegated bindings (replace onclick="openDeleteModal(...)" and
-    // onclick="toggleMissionFinances(...)" inline handlers).
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'operation-open-delete', function (el) {
             openDeleteModal(el.getAttribute('data-id'));
         });
-        window.krtEvents.on('click', 'operation-toggle-mission-finances', function (el) {
-            toggleMissionFinances(el.getAttribute('data-mission-id'));
-        });
     }
+</script>
+
+<script th:attr="nonce=${cspNonce}">
+    // ---- Markdown description editor: Bearbeiten / Vorschau + formatting toolbar --------------
+    (function () {
+        const editor = document.getElementById('op-md-editor');
+        if (!editor) return;
+        const input = document.getElementById('op-desc');
+        const preview = document.getElementById('op-md-preview');
+        const toolbar = document.getElementById('op-md-toolbar');
+        const viewTabs = Array.prototype.slice.call(editor.querySelectorAll('[data-md-view]'));
+        // The editing chrome (toolbar + Bearbeiten/Vorschau tabs) only renders for editors; a
+        // read-only viewer just sees the disabled textarea, so there is nothing to wire up.
+        if (!input || !preview || !toolbar || !viewTabs.length) return;
+
+        function showView(view) {
+            const edit = view !== 'preview';
+            input.style.display = edit ? '' : 'none';
+            toolbar.style.display = edit ? '' : 'none';
+            preview.style.display = edit ? 'none' : '';
+            viewTabs.forEach(t => {
+                const on = t.getAttribute('data-md-view') === view;
+                t.classList.toggle('on', on);
+                t.classList.toggle('active', on);
+            });
+            if (!edit) { renderPreview(); }
+        }
+
+        function renderPreview() {
+            preview.textContent = '';
+            const headers = window.krtCsrf
+                ? window.krtCsrf.headers()
+                : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            fetch('/operations/markdown-preview', {
+                method: 'POST', headers: headers,
+                body: JSON.stringify({ markdown: input.value })
+            })
+                .then(r => r.ok ? r.text() : Promise.reject(r.status))
+                .then(html => { preview.innerHTML = html; })
+                .catch(() => { preview.textContent = ''; });
+        }
+
+        // selection-aware wrap (bold/italic), line-prefix (heading/list) and link insert.
+        function wrapSelection(marker) {
+            const s = input.selectionStart, e = input.selectionEnd;
+            const sel = input.value.slice(s, e) || '';
+            input.setRangeText(marker + sel + marker, s, e, 'end');
+            input.focus();
+        }
+        function prefixLines(prefix) {
+            const s = input.selectionStart, e = input.selectionEnd;
+            const lineStart = input.value.lastIndexOf('\n', s - 1) + 1;
+            const block = input.value.slice(lineStart, e);
+            const replaced = block.split('\n').map(l => prefix + l).join('\n');
+            input.setRangeText(replaced, lineStart, e, 'end');
+            input.focus();
+        }
+        function insertLink() {
+            const s = input.selectionStart, e = input.selectionEnd;
+            const sel = input.value.slice(s, e) || 'Text';
+            input.setRangeText('[' + sel + '](https://)', s, e, 'end');
+            input.focus();
+        }
+
+        viewTabs.forEach(t => t.addEventListener('click', () => showView(t.getAttribute('data-md-view'))));
+        toolbar.addEventListener('click', function (e) {
+            const btn = e.target.closest('button'); if (!btn) return;
+            if (btn.hasAttribute('data-md-wrap')) { wrapSelection(btn.getAttribute('data-md-wrap')); }
+            else if (btn.hasAttribute('data-md-line')) { prefixLines(btn.getAttribute('data-md-line')); }
+            else if (btn.hasAttribute('data-md-link')) { insertLink(); }
+        });
+    })();
 </script>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // #576: save the operation core-edit form (#operation-form) and delete the operation in place
-    // (no full-page reload). The classic POST->redirect handlers stay the no-JS fallback. On save we
-    // write the bumped version back into the form (a second save does not 409) and patch the page
-    // title; on delete the operation is gone, so we navigate back to the list (navigate-after-AJAX).
+    // (no full-page reload). The classic POST->redirect handlers stay the no-JS fallback.
     /*<![CDATA[*/
     const OPS_DETAIL_MSG = {
         prefix: /*[[#{operation.prefix}]]*/ 'Operation:',
@@ -842,11 +658,9 @@
                     errorMessage: OPS_DETAIL_MSG.updateError,
                     conflict: opsDetailConflict(),
                     onSuccess: function (body) {
-                        // Write the bumped version back so an immediate second save does not 409.
                         if (body && body.version != null && versionInput) {
                             versionInput.value = body.version;
                         }
-                        // Keep the page title in sync with the (possibly renamed) operation.
                         const title = document.getElementById('operation-title');
                         if (title && body && body.name != null) {
                             title.textContent = OPS_DETAIL_MSG.prefix + ' ' + body.name;
@@ -866,10 +680,7 @@
                     successMessage: OPS_DETAIL_MSG.deleteSuccess,
                     errorMessage: OPS_DETAIL_MSG.deleteError,
                     conflict: opsDetailConflict(),
-                    onSuccess: function () {
-                        // The operation no longer exists; navigate back to the list (REQ-FE-006).
-                        window.location.assign('/operations');
-                    }
+                    onSuccess: function () { window.location.assign('/operations'); }
                 });
             });
         }
@@ -878,40 +689,26 @@
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // ---- Payout paid-out toggle (AJAX) ---------------------------------
-    // The Auszahlungen panel has a "Bezahlt" checkbox per participant that
-    // mission managers can flip. We POST to the page controller, which
-    // proxies to the backend, then patch the row in place — no full
-    // page reload. On failure we revert the checkbox optimistically and
-    // surface a toast (CLAUDE.md forbids native alerts).
     /*<![CDATA[*/
     const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';
-    const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung, den Auszahlungsstatus zu aendern.';
+    const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung.';
     const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
     /*]]>*/
 
     function payoutPaidUrl() {
-        const col = document.getElementById('col-payout');
-        const operationId = col ? col.getAttribute('data-operation-id') : null;
-        return operationId ? ('/operations/' + operationId + '/payouts/paid-out') : null;
+        return window.operationId ? ('/operations/' + window.operationId + '/payouts/paid-out') : null;
     }
 
     function canUnsetPaidOut() {
-        const col = document.getElementById('col-payout');
-        // Default to false: a missing attribute means we cannot prove the user
-        // is an officer/admin, so lock the unchecking path conservatively. The
-        // backend remains the source of truth and would 403 anyway.
-        return col != null && col.getAttribute('data-can-unset-paid-out') === 'true';
+        const pane = document.getElementById('pane-op-payout');
+        return pane != null && pane.getAttribute('data-can-unset-paid-out') === 'true';
     }
 
     function refreshPayoutPaidStatusCell(row, dto) {
         if (!row) return;
-        // Only mutate the audit subtitle for the canEdit branch (the one with the checkbox).
         const checkbox = row.querySelector('.payout-paid-checkbox');
         if (!checkbox) return;
         checkbox.checked = !!dto.paidOut;
-        // Mirror the server-side rule: once paid and the current user cannot
-        // unset, lock the checkbox so a plain mission manager does not run
-        // into a 403 on the next click.
         if (checkbox.checked && !canUnsetPaidOut()) {
             checkbox.disabled = true;
             checkbox.title = MSG_PAYOUT_PAID_UNSET_LOCKED;
@@ -929,9 +726,7 @@
             statusSpan.textContent = dto.paidOutByName;
             if (dto.paidOutAt) {
                 const date = new Date(dto.paidOutAt);
-                if (!isNaN(date)) {
-                    statusSpan.title = date.toLocaleString();
-                }
+                if (!isNaN(date)) { statusSpan.title = date.toLocaleString(); }
             }
         } else if (statusSpan) {
             statusSpan.remove();
@@ -945,58 +740,40 @@
         if (!participantKey) return;
         const desired = checkbox.checked;
         const previous = !desired;
-
-        // #576: read the CSRF header through the shared krtCsrf single source of truth (REQ-FE-002)
-        // instead of a bespoke meta read; krtCsrf.headers() already sets Content-Type + X-Requested-With.
         const headers = window.krtCsrf
             ? window.krtCsrf.headers()
             : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-
-        // Disable while in-flight so a double-click does not race two writes.
         checkbox.disabled = true;
-        fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ participantKey: participantKey, paidOut: desired })
-        })
-        .then(response => {
-            if (!response.ok) {
-                checkbox.checked = previous;
-                if (response.status === 401 || response.status === 403) {
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_FORBIDDEN);
-                } else {
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+        fetch(url, { method: 'POST', headers: headers, body: JSON.stringify({ participantKey: participantKey, paidOut: desired }) })
+            .then(response => {
+                if (!response.ok) {
+                    checkbox.checked = previous;
+                    if (response.status === 401 || response.status === 403) {
+                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_FORBIDDEN);
+                    } else {
+                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                    }
+                    return null;
                 }
-                return null;
-            }
-            return response.json();
-        })
-        .then(dto => {
-            if (!dto) return;
-            const row = checkbox.closest('tr[data-participant-id]');
-            refreshPayoutPaidStatusCell(row, dto);
-        })
-        .catch(err => {
-            console.error('payout paid-out toggle failed', err);
-            checkbox.checked = previous;
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
-        })
-        .finally(() => {
-            // Re-enable for the next interaction — UNLESS we just confirmed
-            // paidOut=true as a non-officer, in which case refreshPayoutPaidStatusCell
-            // has already locked the box and the user is no longer allowed
-            // to flip it back. Don't undo that lock here.
-            if (!(checkbox.checked && !canUnsetPaidOut())) {
-                checkbox.disabled = false;
-            }
-        });
+                return response.json();
+            })
+            .then(dto => {
+                if (!dto) return;
+                refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), dto);
+            })
+            .catch(err => {
+                console.error('payout paid-out toggle failed', err);
+                checkbox.checked = previous;
+                if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+            })
+            .finally(() => {
+                if (!(checkbox.checked && !canUnsetPaidOut())) { checkbox.disabled = false; }
+            });
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.payout-paid-checkbox').forEach(function (checkbox) {
-            checkbox.addEventListener('change', function () {
-                handlePayoutPaidToggle(checkbox);
-            });
+            checkbox.addEventListener('change', function () { handlePayoutPaidToggle(checkbox); });
         });
     });
 </script>

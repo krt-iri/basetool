@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Operation-Detailseite im neuen Tab-Layout mit Markdown-Editor.** Die Operationsseite nutzt jetzt dieselbe Tab-Optik wie die Einsatz-Seite — Übersicht (Operation auf einen Blick, Ergebnis je Einsatz, Einsätze, ausklappbare Beschreibung), Einsätze (mit „Einsatz hinzufügen", das die Erstellseite mit vorausgewählter Operation öffnet), Auszahlung, Finanzen und Verwaltung. Die Beschreibung lässt sich mit einem Formatierungs-Werkzeug (Fett/Kursiv/Überschrift/Liste/Link) und einer Live-Vorschau bearbeiten.
+
+- **Einsatz-Seite: Ablauf-Checkliste, neu aufgeteilte Übersicht und die Felder „Ziel"/„Treffpunkt".** Ein Einsatz hat jetzt einen sortierbaren Ablauf (Schritte mit Titel und optionaler Zeit/Ort), den Bearbeiter im Verwaltungs-Tab pflegen; in der Übersicht erscheint er als Checkliste, deren aktuelle Phase der erste offene Schritt ist und deren Häkchen Bearbeiter live für alle setzen. Die Übersicht ist in kompakte Karten neu aufgeteilt (Mission auf einen Blick mit Ziel, Weitere Leads, Funk, Teilnehmer-Fortschritt, Ablauf, Kalender) samt ausklappbarer Beschreibung; alle Ablauf-Aktionen stehen im Aktivitätsprotokoll (Missionen).
+
+- **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
+
 ### Changed
 
 - **Profilseite im einheitlichen Design-System.** „Mein Profil" trennt die schreibgeschützten Identitätsdaten (Initialen-Kachel, Anzeigename, Rang, aktive Staffel sowie E-Mail/Beitrittsdatum/Monate als Faktenraster) jetzt klar von den Einstellungen: Eigene Daten, Standard-Auszahlung, Blaupausen-Freigabe und „Zugang & Sicherheit" sind je eine eigene Karte mit genau einer Aktion. Funktion, In-Place-Speichern und Übersetzungen bleiben unverändert.
@@ -11,12 +19,6 @@
 - **Meine Blueprints: ruhigere, design-konforme Darstellung.** Die Sammlungs-Box nutzt jetzt die dezente HUD-Haarlinie mit Eckmarken statt eines vollen Orange-Rahmens, Formular- und Abschnitts-Beschriftungen sind neutral statt orange, und die Auswahl-Chips beim Hinzufügen verwenden die Standard-Chips des Designsystems. In der Blueprint-Liste sitzt der Notiz-Stift jetzt als sauberes Icon gemeinsam mit dem Craftbarkeits-Badge am rechten Zeilenrand. Reine Optik — keine Funktionsänderung.
 
 - **Admin-Seite „Fremde Blueprints" im einheitlichen Design.** Die Admin-Verwaltung der Blueprints anderer Mitglieder nutzt jetzt dieselben Design-System-Komponenten wie die Mitglieder-Seite: die DS-Tabelle, den KRT-Modalrahmen für Notiz bearbeiten, Entfernen-Bestätigung und JSON-Import (Icon-Schließen mit Beschriftung, Esc, eine hervorgehobene Aktion), die DS-Chips für die Auswahl sowie einen flachen Admin-Banner ohne Verlauf. Funktion, Berechtigungen, Live-Aktualisierung und Übersetzungen bleiben unverändert.
-
-### Added
-
-- **Auftrag: Blaupausen-Verfügbarkeit wahlweise mit oder ohne Varianten zählen.** Bei Item-Aufträgen lässt sich jetzt direkt im Verfügbarkeits-Panel umschalten, ob die Abdeckung kosmetische Varianten der bestellten Items mitzählt (Standard) oder nur exakt die bestellte Variante — hilfreich, wenn genau eine Variante gefordert ist und Mitglieder mit anderen Varianten die Zahl sonst verfälschen. Die Wahl wird am Auftrag gespeichert, gilt für alle Betrachter und das Panel aktualisiert sich ohne Neuladen.
-
-### Changed
 
 - **Organigramm: aufgeräumter Seitenkopf.** Der Hinweistext über dem Diagramm („Kontogebundene Sitze werden unter Organisation → Leitung verwaltet …") entfällt; der „Bearbeiten"-Button sitzt jetzt rechts in der Titelbox und erscheint weiterhin nur für Nutzer mit Bearbeitungsrecht (Admins). Der „Leitung-verwaltet"-Hinweis an den einzelnen Knoten bleibt erhalten.
 

@@ -193,7 +193,11 @@ class MissionControllerLifecycleTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        List.of(), // steps
+        0L, // stepsVersion
+        null, // objective
+        null); // meetingPoint
   }
 
   // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
@@ -625,11 +629,19 @@ class MissionControllerLifecycleTest {
     UUID operationId = UUID.randomUUID();
     PatchMissionCoreRequest request =
         new PatchMissionCoreRequest(
-            "New name", "New description", "https://cal", "PLANNED", operationId, 5L);
+            "New name", "New description", "https://cal", "PLANNED", operationId, 5L, null, null);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
     when(missionService.updateCoreSection(
-            id, "New name", "New description", "https://cal", "PLANNED", operationId, 5L))
+            id,
+            "New name",
+            "New description",
+            "https://cal",
+            "PLANNED",
+            operationId,
+            null,
+            null,
+            5L))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
@@ -643,7 +655,15 @@ class MissionControllerLifecycleTest {
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .updateCoreSection(
-            id, "New name", "New description", "https://cal", "PLANNED", operationId, 5L);
+            id,
+            "New name",
+            "New description",
+            "https://cal",
+            "PLANNED",
+            operationId,
+            null,
+            null,
+            5L);
   }
 
   // ── PATCH /api/v1/missions/{id}/schedule ─────────────────────────────
@@ -762,7 +782,7 @@ class MissionControllerLifecycleTest {
     UUID parentId = UUID.randomUUID();
     CreateMissionRequest request =
         new CreateMissionRequest(
-            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null);
+            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null, null);
     Mission persistedParent = new Mission();
     MissionDto parentDto = fullMissionDto(parentId);
     when(missionService.addSubMission(parentId, request)).thenReturn(persistedParent);

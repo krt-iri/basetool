@@ -30,9 +30,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +79,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
+  private final MarkdownRenderer markdown;
 
   /**
    * Renders the paginated, filtered operations list. Mirrors the missions overview filter contract
@@ -236,6 +240,21 @@ public class OperationPageController {
               "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
       model.addAttribute("operationPayouts", payoutSummary.payouts());
       model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+
+      // Largest per-mission result, so the "Ergebnis je Einsatz" overview bars can be sized
+      // proportionally (BigDecimal.ZERO when there are no positive results — the template then
+      // renders zero-width bars rather than dividing by zero).
+      BigDecimal maxMissionResult =
+          operationFinance.missions() == null
+              ? BigDecimal.ZERO
+              : operationFinance.missions().stream()
+                  .map(
+                      de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto
+                          ::totalSum)
+                  .filter(Objects::nonNull)
+                  .max(BigDecimal::compareTo)
+                  .orElse(BigDecimal.ZERO);
+      model.addAttribute("operationMaxMissionResult", maxMissionResult);
 
       // Resolved at the HTTP boundary so the template stays free of inline
       // role-expression checks. The backend's PUT /api/v1/operations/{id}
@@ -428,6 +447,30 @@ public class OperationPageController {
       log.error("Update payout paid-out flag failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
+  }
+
+  /**
+   * Server-side Markdown preview for the Verwaltung description editor's "Vorschau" tab. Renders
+   * the posted Markdown through the same {@link MarkdownRenderer} (the {@code @markdown} bean) the
+   * detail page uses, so the live preview is byte-identical to what is shown on save — raw HTML is
+   * escaped and unsafe link/image protocols stripped, making the returned fragment safe for the
+   * client to inject via {@code innerHTML}. Authenticated-only (the operation pages are
+   * auth-gated).
+   *
+   * @param request JSON body carrying the raw Markdown under the {@code markdown} key
+   * @return the sanitized rendered HTML (text/html)
+   */
+  @PostMapping(
+      value = "/markdown-preview",
+      produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public ResponseEntity<String> markdownPreview(
+      @RequestBody java.util.Map<String, String> request) {
+    String source = request != null ? request.get("markdown") : null;
+    return ResponseEntity.ok()
+        .contentType(org.springframework.http.MediaType.TEXT_HTML)
+        .body(markdown.render(source));
   }
 
   /**
