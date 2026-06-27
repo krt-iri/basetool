@@ -38,11 +38,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring MVC controller for the unified admin audit-log page ({@code /admin/audit-log},
- * REQ-AUDIT-001, ADR-0037). One page, a seven-way tab switcher: the existing bank trail plus the
- * six generic areas (Lager / Aufträge / Raffinerie / Mein Inventar / Missionen / Operationen). The
- * bank tab reads the existing {@code /api/v1/bank/admin/audit} endpoint, the others read {@code
- * /api/v1/audit/{domain}}; both DTO shapes are adapted into the uniform {@link AuditRowView} so a
- * single template renders every tab.
+ * REQ-AUDIT-001, ADR-0037). One page, a nine-way tab switcher: the existing bank trail plus the
+ * eight generic areas (Lager / Aufträge / Raffinerie / Mein Inventar / Missionen / Operationen /
+ * Rollen / Beförderung). The bank tab reads the existing {@code /api/v1/bank/admin/audit} endpoint,
+ * the others read {@code /api/v1/audit/{domain}}; both DTO shapes are adapted into the uniform
+ * {@link AuditRowView} so a single template renders every tab.
  *
  * <p>Admin-only — the class-level {@code @PreAuthorize} matches the backend's admin URL gates;
  * filtering and paging swap in place via {@code krtFetch} (epic #571 pattern).
@@ -69,12 +69,13 @@ public class AdminAuditLogPageController {
           "PERSONAL_INVENTORY",
           "MISSION",
           "OPERATION",
-          "ROLE");
+          "ROLE",
+          "PROMOTION");
 
   /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
   private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
 
-  /** Message-bundle key prefix for the generic (four-area) event-type labels. */
+  /** Message-bundle key prefix for the generic-area event-type labels. */
   private static final String GENERIC_EVENT_PREFIX = "admin.audit.event.";
 
   /** The event types offered in the per-tab filter dropdown, by domain (in a sensible order). */
@@ -230,7 +231,26 @@ public class AdminAuditLogPageController {
               "KOMMANDO_GROUP_UPDATED",
               "KOMMANDO_GROUP_DELETED",
               "ROLE_AUDIT_EXPORTED",
-              "ROLE_AUDIT_PURGED"));
+              "ROLE_AUDIT_PURGED"),
+          "PROMOTION",
+          List.of(
+              "PROMOTION_TOPIC_CREATED",
+              "PROMOTION_TOPIC_UPDATED",
+              "PROMOTION_TOPIC_DELETED",
+              "PROMOTION_CATEGORY_CREATED",
+              "PROMOTION_CATEGORY_UPDATED",
+              "PROMOTION_CATEGORY_DELETED",
+              "PROMOTION_LEVEL_CONTENT_CREATED",
+              "PROMOTION_LEVEL_CONTENT_UPDATED",
+              "PROMOTION_LEVEL_CONTENT_DELETED",
+              "PROMOTION_RANK_REQUIREMENT_CREATED",
+              "PROMOTION_RANK_REQUIREMENT_UPDATED",
+              "PROMOTION_RANK_REQUIREMENT_DELETED",
+              "PROMOTION_EVALUATION_CREATED",
+              "PROMOTION_EVALUATION_UPDATED",
+              "PROMOTION_EVALUATION_DELETED",
+              "PROMOTION_AUDIT_EXPORTED",
+              "PROMOTION_AUDIT_PURGED"));
 
   private final BackendApiClient backendApiClient;
 

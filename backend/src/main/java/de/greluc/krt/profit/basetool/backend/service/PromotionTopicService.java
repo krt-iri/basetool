@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
@@ -65,6 +66,7 @@ public class PromotionTopicService {
   private final PromotionTopicRepository repository;
   private final PromotionTopicMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final AuditService auditService;
 
   /**
    * Returns a paginated slice of every {@link PromotionTopicResponse} visible to the caller. The
@@ -144,6 +146,8 @@ public class PromotionTopicService {
     PromotionTopic entity = mapper.toEntity(request);
     entity.setOwningSquadron(squadron);
     PromotionTopic saved = repository.save(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_TOPIC_CREATED, saved.getId(), saved.getName(), null, null);
     log.info(
         "Created PromotionTopic id={} name={} squadron={}",
         saved.getId(),
@@ -180,6 +184,8 @@ public class PromotionTopicService {
     }
     mapper.updateEntity(entity, request);
     PromotionTopic saved = repository.save(entity);
+    auditService.record(
+        AuditEventType.PROMOTION_TOPIC_UPDATED, saved.getId(), saved.getName(), null, null);
     log.info("Updated PromotionTopic id={}", id);
     return mapper.toResponse(saved);
   }
@@ -198,7 +204,9 @@ public class PromotionTopicService {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
+    String label = entity.getName();
     repository.delete(entity);
+    auditService.record(AuditEventType.PROMOTION_TOPIC_DELETED, id, label, null, null);
     log.info("Deleted PromotionTopic id={}", id);
   }
 

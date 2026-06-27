@@ -176,6 +176,7 @@ public class AuditReportService {
       case MISSION -> AuditEventType.MISSION_AUDIT_EXPORTED;
       case OPERATION -> AuditEventType.OPERATION_AUDIT_EXPORTED;
       case ROLE -> AuditEventType.ROLE_AUDIT_EXPORTED;
+      case PROMOTION -> AuditEventType.PROMOTION_AUDIT_EXPORTED;
     };
   }
 

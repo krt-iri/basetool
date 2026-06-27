@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -54,6 +55,8 @@ class PromotionCategoryServiceTest {
   @Mock private PromotionCategoryMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private AuditService auditService;
 
   @InjectMocks private PromotionCategoryService service;
 
@@ -156,6 +159,13 @@ class PromotionCategoryServiceTest {
     // Then
     assertEquals("Flug Kenntnisse", result.name());
     verify(repository).save(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_CATEGORY_CREATED),
+            any(),
+            eq("Grundlagen / Flug Kenntnisse"),
+            isNull(),
+            isNull());
   }
 
   @Test
@@ -187,5 +197,12 @@ class PromotionCategoryServiceTest {
 
     // Then
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PROMOTION_CATEGORY_DELETED),
+            eq(id),
+            eq("Flug Kenntnisse"),
+            isNull(),
+            isNull());
   }
 }

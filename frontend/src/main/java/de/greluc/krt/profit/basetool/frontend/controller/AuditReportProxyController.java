@@ -42,8 +42,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Frontend proxy for the unified audit-log PDF exports (REQ-AUDIT-001, ADR-0037). One seam for all
- * five tabs: {@code BANK} routes to the bank admin export, the four generic areas to {@code
+ * Frontend proxy for the unified audit-log PDF exports (REQ-AUDIT-001, ADR-0037). One seam for
+ * every tab: {@code BANK} routes to the bank admin export, the generic areas to {@code
  * /api/v1/audit/{domain}/export}. Streams the backend's PDF bytes back to the browser via the
  * authenticated {@link WebClient} (OAuth2 token attached automatically) and forwards the caller's
  * IANA time zone so the documents render local timestamps. Authorization (ADMIN) is decided by the
@@ -56,7 +56,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuditReportProxyController {
 
   /**
-   * The known audit tabs — the bank plus the four generic areas (mirrors {@code
+   * The known audit tabs — the bank plus the generic areas (mirrors {@code
    * AdminAuditLogPageController.DOMAINS}). The raw {@code domain} path segment is validated against
    * this allowlist before it is concatenated into the backend URI, so an unknown or crafted value
    * (e.g. one containing {@code ..}) never reaches the URI builder. Defense-in-depth: the backend
@@ -71,7 +71,8 @@ public class AuditReportProxyController {
           "PERSONAL_INVENTORY",
           "MISSION",
           "OPERATION",
-          "ROLE");
+          "ROLE",
+          "PROMOTION");
 
   private final WebClient webClient;
 

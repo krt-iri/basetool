@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Beförderung: Alle Änderungen am Beförderungssystem stehen jetzt im Audit-Log.** Anlegen, Bearbeiten und Löschen von Beförderungs-Themen, -Kategorien, Stufeninhalten und Ranganforderungen sowie das Setzen und Entfernen von Mitglieder-Bewertungen erscheinen als eigener Reiter „Beförderung" im Aktivitätsprotokoll (Admin → Audit-Logs) — inklusive Zeitraum-Export (PDF/JSON) und Aufbewahrungs-Bereinigung wie die übrigen Bereiche.
+
 ### Fixed
 
 - **Meine Blueprints: Craftbarkeit rechnet jetzt auch Hand-Minables (Stück) ein.** In der Craftbarkeits-Ansicht fehlten bisher die Zutaten mit Mengeneinheit „Stück" — handabgebaute Edelsteine wie Hadanite oder Beradom, die das Wiki als Item führt. Sie werden jetzt (wie schon im Auftrags-Pfad) an das passende Material gekoppelt und mitgezählt (benötigt/vorhanden/fehlt in ganzen Stück, ggf. als limitierendes Material); craftbare Unterbaugruppen bleiben „nicht bewertet".
