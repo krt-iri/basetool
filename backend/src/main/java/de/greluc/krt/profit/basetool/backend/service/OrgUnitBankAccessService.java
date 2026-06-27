@@ -22,11 +22,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGranteeKind;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -34,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountRefDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankApprovalLimitsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
@@ -44,8 +49,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
+import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -53,6 +60,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -150,9 +158,12 @@ public class OrgUnitBankAccessService {
   private final BankAccountRepository bankAccountRepository;
   private final BankPostingRepository bankPostingRepository;
   private final BankAccountViewGrantRepository viewGrantRepository;
+  private final BankAccountApprovalLimitRepository approvalLimitRepository;
+  private final BankBookingRequestRepository bankBookingRequestRepository;
   private final BereichRepository bereichRepository;
   private final UserRepository userRepository;
   private final BankAccountService bankAccountService;
+  private final BankApprovalLimitService bankApprovalLimitService;
   private final BankStatementReportService bankStatementReportService;
   private final BankBookingRequestService bankBookingRequestService;
   private final BankAuditService bankAuditService;
@@ -202,9 +213,13 @@ public class OrgUnitBankAccessService {
     if (visible.isEmpty()) {
       return List.of();
     }
-    ScopePredicate requestScope = ownerScopeService.currentOwnLevelOversightScope();
     Map<UUID, BigDecimal> balances = balancesByAccountId(visible);
     Map<UUID, List<BankPostingSlice>> slicesByAccount = slicesByAccountId(visible);
+    Map<UUID, List<BankAccountApprovalLimit>> limitsByAccount =
+        approvalLimitRepository
+            .findByAccountIdIn(visible.stream().map(BankAccount::getId).toList())
+            .stream()
+            .collect(Collectors.groupingBy(limit -> limit.getAccount().getId()));
     return visible.stream()
         .map(
             account -> {
@@ -212,16 +227,22 @@ public class OrgUnitBankAccessService {
               List<BankPostingSlice> slices =
                   slicesByAccount.getOrDefault(account.getId(), List.of());
               BigDecimal delta = BankTrendCalculator.windowDelta(slices);
-              boolean canRequest =
-                  account.getOrgUnit() != null
-                      && requestScope.permits(account.getOrgUnit().getId());
+              // REQ-BANK-039: eligibility = view eligibility — every viewable, request-capable
+              // account the caller can already see is requestable.
+              boolean canRequest = isRequestCapable(account);
+              BigDecimal approvalLimit =
+                  canRequest
+                      ? resolveApplicableLimit(
+                          account, limitsByAccount.getOrDefault(account.getId(), List.of()))
+                      : null;
               return toDto(
                   account,
                   balance,
                   canRequest,
                   delta,
                   BankTrendCalculator.sparkline(balance, delta, slices),
-                  canManageSettings(account));
+                  canManageSettings(account),
+                  approvalLimit);
             })
         .toList();
   }
@@ -246,14 +267,18 @@ public class OrgUnitBankAccessService {
   public OrgUnitBankAccountDetailDto getViewableAccountDetail(@NotNull UUID accountId) {
     BankAccount account = requireViewableAccount(accountId);
     BankAccountDetailDto detail =
-        bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES);
-    boolean canRequest =
-        account.getOrgUnit() != null
-            && ownerScopeService
-                .currentOwnLevelOversightScope()
-                .permits(account.getOrgUnit().getId());
+        bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES, false);
+    // REQ-BANK-039: any viewer of a request-capable account may request against it.
+    boolean canRequest = isRequestCapable(account);
+    BigDecimal applicableLimit = canRequest ? resolveApplicableLimit(account) : null;
     return new OrgUnitBankAccountDetailDto(
-        detail, true, canSetTarget(account), canConfigureVisibility(account), canRequest);
+        detail,
+        true,
+        canSetTarget(account),
+        canConfigureVisibility(account),
+        canRequest,
+        canConfigureApprovalLimits(account),
+        applicableLimit);
   }
 
   /**
@@ -526,7 +551,174 @@ public class OrgUnitBankAccessService {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // F2 — booking requests (unchanged)
+  // Settings — per-tier approval limits (REQ-BANK-041)
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Sets or changes a role-bucket approval limit on an account (REQ-BANK-041). The role code is
+   * validated against the account's limit buckets (squadron / Bereich sub-ranks); the limit is an
+   * idempotent upsert.
+   *
+   * @param accountId the account
+   * @param roleCode the role bucket ({@code MembershipRole} name)
+   * @param limit the whole-aUEC ceiling (>= 0)
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   * @throws BadRequestException when the role code is not a valid bucket for this account
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
+      @NotNull UUID accountId, @NotNull String roleCode, @NotNull BigDecimal limit) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    requireValidLimitRoleBucket(account, roleCode);
+    upsertLimit(account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode, null, limit);
+    bankAuditService.record(
+        BankAuditEventType.APPROVAL_LIMIT_SET,
+        accountId,
+        null,
+        null,
+        "MEMBERSHIP_ROLE:" + roleCode + "=" + plain(limit));
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Removes a role-bucket approval limit from an account (REQ-BANK-041).
+   *
+   * @param accountId the account
+   * @param roleCode the role bucket to clear
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   * @throws BadRequestException when the role code is not a valid bucket for this account
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
+      @NotNull UUID accountId, @NotNull String roleCode) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    requireValidLimitRoleBucket(account, roleCode);
+    long removed =
+        approvalLimitRepository.deleteByAccountIdAndGranteeKindAndRoleCode(
+            accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
+    if (removed > 0) {
+      bankAuditService.record(
+          BankAuditEventType.APPROVAL_LIMIT_CLEARED,
+          accountId,
+          null,
+          null,
+          "MEMBERSHIP_ROLE:" + roleCode);
+    }
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Sets or changes the all-members approval limit on an account (REQ-BANK-041): the ceiling for
+   * any member who may view the account but matches no more specific tier.
+   *
+   * @param accountId the account
+   * @param limit the whole-aUEC ceiling (>= 0)
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   * @throws BadRequestException when the account type has no all-members tier
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
+      @NotNull UUID accountId, @NotNull BigDecimal limit) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    if (!BankApprovalLimitService.allMembersSupported(account.getType())) {
+      throw new BadRequestException("This account type has no all-members approval-limit tier");
+    }
+    upsertLimit(account, BankAccountViewGranteeKind.ALL_MEMBERS, null, null, limit);
+    bankAuditService.record(
+        BankAuditEventType.APPROVAL_LIMIT_SET,
+        accountId,
+        null,
+        null,
+        "ALL_MEMBERS=" + plain(limit));
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Removes the all-members approval limit from an account (REQ-BANK-041).
+   *
+   * @param accountId the account
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID accountId) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    long removed =
+        approvalLimitRepository.deleteByAccountIdAndGranteeKind(
+            accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
+    if (removed > 0) {
+      bankAuditService.record(
+          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, null, "ALL_MEMBERS");
+    }
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Sets or changes an individual user's approval limit on an account (REQ-BANK-041); the most
+   * specific tier, overriding any role/all-members limit for that user.
+   *
+   * @param accountId the account
+   * @param userId the user the limit addresses
+   * @param limit the whole-aUEC ceiling (>= 0)
+   * @return the refreshed settings
+   * @throws NotFoundException when the account or the user does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
+      @NotNull UUID accountId, @NotNull UUID userId, @NotNull BigDecimal limit) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    if (!userRepository.existsById(userId)) {
+      throw new NotFoundException("User not found");
+    }
+    upsertLimit(account, BankAccountViewGranteeKind.USER, null, userId, limit);
+    bankAuditService.record(
+        BankAuditEventType.APPROVAL_LIMIT_SET, accountId, null, userId, "USER=" + plain(limit));
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Removes an individual user's approval limit from an account (REQ-BANK-041).
+   *
+   * @param accountId the account
+   * @param userId the user whose limit to clear
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
+      @NotNull UUID accountId, @NotNull UUID userId) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    long removed = approvalLimitRepository.deleteByAccountIdAndGranteeUserId(accountId, userId);
+    if (removed > 0) {
+      bankAuditService.record(
+          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, userId, "USER");
+    }
+    return toSettingsDto(account);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // F2 — booking requests, "Fremde Anträge" and the responsible-holder in-app approval
   // ---------------------------------------------------------------------------------------------
 
   /**
@@ -543,17 +735,42 @@ public class OrgUnitBankAccessService {
   @NotNull
   @Transactional
   public BankBookingRequestDto createBookingRequest(@NotNull CreateBankBookingRequest request) {
-    ScopePredicate scope = ownerScopeService.currentOwnLevelOversightScope();
-    if (!scope.permits(request.orgUnitId())) {
-      throw new AccessDeniedException(
-          "The caller may not raise a booking request for the requested org unit");
-    }
     BankAccount account =
         bankAccountRepository
-            .findByOrgUnitId(request.orgUnitId())
-            .orElseThrow(() -> new NotFoundException("The org unit has no bank account"));
+            .findById(request.sourceAccountId())
+            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    // REQ-BANK-039: booking-request eligibility = view eligibility — anyone who may view the
+    // account may raise a request against it.
+    if (!canView(account)) {
+      throw new AccessDeniedException("The caller may not raise a booking request on this account");
+    }
+    if (!isRequestCapable(account)) {
+      throw new BadRequestException("This account does not accept booking requests");
+    }
+    // REQ-BANK-040: a transfer names a destination (any active account); deposit/withdrawal must
+    // not.
+    UUID targetAccountId = null;
+    if (request.type() == BankBookingRequestType.TRANSFER) {
+      if (request.targetAccountId() == null) {
+        throw new BadRequestException("A transfer request requires a destination account");
+      }
+      targetAccountId = request.targetAccountId();
+    } else if (request.targetAccountId() != null) {
+      throw new BadRequestException("A non-transfer request must not carry a destination account");
+    }
+    // REQ-BANK-041: resolve the requester's applicable limit now and snapshot whether the request
+    // needs the responsible holder's approval; the org-unit-blind confirm path only reads the flag.
+    BigDecimal applicableLimit = resolveApplicableLimit(account);
+    boolean requiresOwnerApproval =
+        applicableLimit != null && request.amount().compareTo(applicableLimit) > 0;
     return bankBookingRequestService.create(
-        account.getId(), request.type(), request.amount(), request.note());
+        account.getId(),
+        request.type(),
+        request.amount(),
+        request.note(),
+        targetAccountId,
+        requiresOwnerApproval,
+        applicableLimit);
   }
 
   /**
@@ -576,6 +793,113 @@ public class OrgUnitBankAccessService {
   @NotNull
   public BankBookingRequestDto cancelOwnBookingRequest(@NotNull UUID requestId, long version) {
     return bankBookingRequestService.cancelOwn(requestId, version);
+  }
+
+  /**
+   * Lists every active account as a transfer-request destination (REQ-BANK-040): a requester may
+   * transfer from a viewable source account to <em>any</em> active account. Balance-free references
+   * only; ordered by account number.
+   *
+   * @return the active accounts as transfer targets; never {@code null}
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public List<BankAccountRefDto> listTransferTargetAccounts() {
+    return bankAccountRepository.findAllByOrderByAccountNoAsc().stream()
+        .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
+        .map(
+            account ->
+                new BankAccountRefDto(
+                    account.getId(), account.getAccountNo(), account.getName(), account.getType()))
+        .toList();
+  }
+
+  /**
+   * Lists every booking request raised against the accounts the caller is responsible for — the
+   * "Fremde Anträge" tab (REQ-BANK-041). Newest first; an admin sees the requests of every account.
+   *
+   * @return the requests on the caller's responsible accounts; never {@code null}, empty when the
+   *     caller is responsible for no account
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
+    Set<UUID> accountIds = responsibleAccountIds();
+    if (accountIds.isEmpty()) {
+      return List.of();
+    }
+    return bankBookingRequestService.listForAccounts(accountIds);
+  }
+
+  /**
+   * Grants the responsible holder's in-app approval for an over-limit booking request
+   * (REQ-BANK-041), which pre-fills the bank employee's confirmation checkbox. Only the account's
+   * responsible holder (or an admin) may do this; the request must currently require approval and
+   * still be pending.
+   *
+   * @param requestId the request to approve
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the caller is not responsible for the request's account
+   * @throws BadRequestException when the request needs no approval or is no longer pending
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto grantOwnerApproval(@NotNull UUID requestId) {
+    return applyOwnerApproval(requestId, true);
+  }
+
+  /**
+   * Revokes a previously granted in-app approval for a booking request (REQ-BANK-041).
+   *
+   * @param requestId the request whose approval to revoke
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the caller is not responsible for the request's account
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto revokeOwnerApproval(@NotNull UUID requestId) {
+    return applyOwnerApproval(requestId, false);
+  }
+
+  /**
+   * Loads and locks a request, authorizes the caller as the account's responsible holder (or admin)
+   * — the org-unit-aware half — then delegates the blind mutation + audit to {@link
+   * BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest, boolean)}.
+   *
+   * @param requestId the request
+   * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
+   * @return the updated request
+   */
+  @NotNull
+  private BankBookingRequestDto applyOwnerApproval(@NotNull UUID requestId, boolean granted) {
+    BankBookingRequest request =
+        bankBookingRequestRepository
+            .findByIdForUpdate(requestId)
+            .orElseThrow(() -> new NotFoundException("Booking request not found"));
+    if (!authHelperService.isAdmin() && !isResponsibleHolder(request.getAccount())) {
+      throw new AccessDeniedException("The caller is not responsible for this request's account");
+    }
+    return bankBookingRequestService.applyOwnerApprovalWithinTransaction(request, granted);
+  }
+
+  /**
+   * The ids of the accounts the caller is responsible for (REQ-BANK-034); an admin gets every
+   * account. Backs the "Fremde Anträge" listing and tab visibility.
+   *
+   * @return the responsible account ids, insertion-ordered; possibly empty
+   */
+  @NotNull
+  private Set<UUID> responsibleAccountIds() {
+    boolean admin = authHelperService.isAdmin();
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (BankAccount account : bankAccountRepository.findAll()) {
+      if (admin || isResponsibleHolder(account)) {
+        ids.add(account.getId());
+      }
+    }
+    return ids;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -797,6 +1121,192 @@ public class OrgUnitBankAccessService {
     return canSetTarget(account) || canConfigureVisibility(account);
   }
 
+  /**
+   * {@code true} iff the account accepts booking requests (REQ-BANK-039/-040): an {@code ACTIVE}
+   * account of a request-capable type ({@code ORG_UNIT} / {@code AREA} / {@code CARTEL}).
+   * Sonderkonten and the bank-operating account are never request targets.
+   *
+   * @param account the account
+   * @return whether a booking request may be raised against it
+   */
+  private boolean isRequestCapable(@NotNull BankAccount account) {
+    return account.getStatus() == BankAccountStatus.ACTIVE
+        && BankApprovalLimitService.configurable(account.getType());
+  }
+
+  /**
+   * {@code true} iff the caller may set/clear this account's approval limits (REQ-BANK-041): the
+   * responsible holder, bank management or an admin — never a plain bank employee. Only the
+   * request-capable types carry limits.
+   *
+   * @param account the account
+   * @return whether the caller may configure approval limits
+   */
+  private boolean canConfigureApprovalLimits(@NotNull BankAccount account) {
+    if (!BankApprovalLimitService.configurable(account.getType())) {
+      return false;
+    }
+    return authHelperService.isAdmin()
+        || authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")
+        || isResponsibleHolder(account);
+  }
+
+  /**
+   * Asserts the caller may configure the account's approval limits.
+   *
+   * @param account the account
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   */
+  private void requireCanConfigureApprovalLimits(@NotNull BankAccount account) {
+    if (!canConfigureApprovalLimits(account)) {
+      throw new AccessDeniedException(
+          "The caller may not configure this account's approval limits");
+    }
+  }
+
+  /**
+   * Validates an approval-limit role-bucket code against the account's limit buckets.
+   *
+   * @param account the account
+   * @param roleCode the role code to validate
+   * @throws BadRequestException when the role code is not a valid limit bucket for this account
+   */
+  private void requireValidLimitRoleBucket(@NotNull BankAccount account, @NotNull String roleCode) {
+    if (!BankApprovalLimitService.roleBuckets(account).contains(roleCode)) {
+      throw new BadRequestException(
+          "Unknown approval-limit role bucket for this account: " + roleCode);
+    }
+  }
+
+  /**
+   * Idempotent upsert of one approval-limit row: updates the existing tier row's amount in place
+   * (dirty-checking) or inserts a new one. The partial unique indexes guarantee at most one row per
+   * (account, tier).
+   *
+   * @param account the account
+   * @param kind the tier kind
+   * @param roleCode the role code for a role tier, else {@code null}
+   * @param userId the user for a user tier, else {@code null}
+   * @param amount the new ceiling
+   */
+  private void upsertLimit(
+      @NotNull BankAccount account,
+      @NotNull BankAccountViewGranteeKind kind,
+      @Nullable String roleCode,
+      @Nullable UUID userId,
+      @NotNull BigDecimal amount) {
+    // Serialise concurrent set-limit calls for the same account on its row lock (a plain SELECT FOR
+    // UPDATE that does NOT bump the account @Version) so the find-or-insert below cannot race two
+    // inserts into a V193 partial unique index (uq_bank_appr_limit_*). The lock is released at tx
+    // end.
+    bankAccountRepository.findByIdForUpdate(account.getId());
+    Optional<BankAccountApprovalLimit> existing =
+        switch (kind) {
+          case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
+              approvalLimitRepository.findByAccountIdAndGranteeKindAndRoleCode(
+                  account.getId(), kind, roleCode);
+          case USER ->
+              approvalLimitRepository.findByAccountIdAndGranteeUserId(account.getId(), userId);
+          case ALL_MEMBERS ->
+              approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
+        };
+    BankAccountApprovalLimit limit =
+        existing.orElseGet(
+            () -> {
+              BankAccountApprovalLimit fresh = new BankAccountApprovalLimit();
+              fresh.setAccount(account);
+              fresh.setGranteeKind(kind);
+              fresh.setRoleCode(roleCode);
+              fresh.setGranteeUserId(userId);
+              return fresh;
+            });
+    limit.setLimitAmount(amount);
+    approvalLimitRepository.save(limit);
+  }
+
+  /**
+   * Resolves the current caller's applicable approval limit for an account (REQ-BANK-041), loading
+   * the account's limit rows on demand. See {@link #resolveApplicableLimit(BankAccount, List)}.
+   *
+   * @param account the account
+   * @return the caller's limit, or {@code null} = unlimited (no approval needed)
+   */
+  @Nullable
+  private BigDecimal resolveApplicableLimit(@NotNull BankAccount account) {
+    return resolveApplicableLimit(
+        account, approvalLimitRepository.findByAccountId(account.getId()));
+  }
+
+  /**
+   * Resolves the current caller's applicable approval limit from the given limit rows: an
+   * individual-user limit wins; otherwise the most permissive (maximum) of the limits for the role
+   * tiers the caller holds; otherwise the all-members limit when the caller is a member; otherwise
+   * {@code null} = unlimited. The {@code null} default preserves the pre-feature behaviour.
+   *
+   * @param account the account
+   * @param limits the account's approval-limit rows (possibly empty)
+   * @return the caller's limit, or {@code null} = unlimited
+   */
+  @Nullable
+  private BigDecimal resolveApplicableLimit(
+      @NotNull BankAccount account, @NotNull List<BankAccountApprovalLimit> limits) {
+    if (limits.isEmpty()) {
+      return null;
+    }
+    Optional<UUID> userId = authHelperService.currentUserId();
+    for (BankAccountApprovalLimit limit : limits) {
+      if (limit.getGranteeKind() == BankAccountViewGranteeKind.USER
+          && userId.isPresent()
+          && userId.get().equals(limit.getGranteeUserId())) {
+        return limit.getLimitAmount();
+      }
+    }
+    UUID owner = owningOrgUnitId(account);
+    BigDecimal best = null;
+    for (BankAccountApprovalLimit limit : limits) {
+      boolean matches =
+          switch (limit.getGranteeKind()) {
+            case MEMBERSHIP_ROLE -> {
+              MembershipRole role = parseMembershipRole(limit.getRoleCode());
+              yield owner != null
+                  && role != null
+                  && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
+            }
+            case GLOBAL_ROLE -> authHelperService.hasReachableRole("ROLE_" + limit.getRoleCode());
+            default -> false;
+          };
+      if (matches) {
+        best = best == null ? limit.getLimitAmount() : best.max(limit.getLimitAmount());
+      }
+    }
+    if (best != null) {
+      return best;
+    }
+    for (BankAccountApprovalLimit limit : limits) {
+      if (limit.getGranteeKind() == BankAccountViewGranteeKind.ALL_MEMBERS) {
+        boolean member =
+            owner != null
+                ? ownerScopeService.currentUserIsMemberOfOrgUnit(owner)
+                : authHelperService.isMemberOrAbove();
+        if (member) {
+          return limit.getLimitAmount();
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Renders a whole-aUEC amount for an audit detail without trailing zeros or scientific notation.
+   *
+   * @param amount the amount
+   * @return the plain whole-number string
+   */
+  @NotNull
+  private static String plain(@NotNull BigDecimal amount) {
+    return amount.stripTrailingZeros().toPlainString();
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------------------------
@@ -836,6 +1346,9 @@ public class OrgUnitBankAccessService {
             .map(id -> new OrgUnitBankViewUserDto(id, names.getOrDefault(id, "")))
             .toList();
     OrgUnit orgUnit = account.getOrgUnit();
+    boolean canConfigureApprovalLimits = canConfigureApprovalLimits(account);
+    BankApprovalLimitsDto approvalLimits =
+        bankApprovalLimitService.assemble(account, canConfigureApprovalLimits);
     return new OrgUnitBankAccountSettingsDto(
         account.getId(),
         account.getAccountNo(),
@@ -852,7 +1365,9 @@ public class OrgUnitBankAccessService {
         availableRoleCodes(account),
         grantedRoleCodes,
         allMembersGranted,
-        grantedUsers);
+        grantedUsers,
+        canConfigureApprovalLimits,
+        approvalLimits);
   }
 
   /**
@@ -1098,6 +1613,8 @@ public class OrgUnitBankAccessService {
    * @param delta30d the 30-day net change (signed)
    * @param sparkline the 30 end-of-day balances of the window, oldest first
    * @param canManageSettings whether the caller may open the account's settings
+   * @param approvalLimit the caller's resolved approval limit for this account, or {@code null} =
+   *     unlimited (REQ-BANK-041)
    * @return the balance-card DTO
    */
   @NotNull
@@ -1107,7 +1624,8 @@ public class OrgUnitBankAccessService {
       boolean canRequest,
       @NotNull BigDecimal delta30d,
       @NotNull List<BigDecimal> sparkline,
-      boolean canManageSettings) {
+      boolean canManageSettings,
+      @Nullable BigDecimal approvalLimit) {
     OrgUnit orgUnit = account.getOrgUnit();
     return new OrgUnitBankBalanceDto(
         account.getId(),
@@ -1124,6 +1642,7 @@ public class OrgUnitBankAccessService {
         delta30d,
         sparkline,
         account.getBalanceTarget(),
-        canManageSettings);
+        canManageSettings,
+        approvalLimit);
   }
 }

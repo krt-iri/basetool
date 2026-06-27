@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGrant;
@@ -48,8 +50,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
+import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -88,9 +92,12 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankAccountRepository bankAccountRepository;
   @Mock private BankPostingRepository bankPostingRepository;
   @Mock private BankAccountViewGrantRepository viewGrantRepository;
+  @Mock private BankAccountApprovalLimitRepository approvalLimitRepository;
+  @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private BereichRepository bereichRepository;
   @Mock private UserRepository userRepository;
   @Mock private BankAccountService bankAccountService;
+  @Mock private BankApprovalLimitService bankApprovalLimitService;
   @Mock private BankStatementReportService bankStatementReportService;
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankAuditService bankAuditService;
@@ -102,6 +109,8 @@ class OrgUnitBankAccessServiceTest {
     when(authHelperService.isAdmin()).thenReturn(false);
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
     when(viewGrantRepository.findByAccountId(any())).thenReturn(List.of());
+    when(approvalLimitRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
+    when(approvalLimitRepository.findByAccountId(any())).thenReturn(List.of());
     when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
   }
 
@@ -245,7 +254,9 @@ class OrgUnitBankAccessServiceTest {
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
     assertThat(result).extracting(OrgUnitBankBalanceDto::accountId).containsExactly(accountId);
-    assertThat(result.getFirst().canRequest()).isFalse();
+    // REQ-BANK-039: eligibility = view eligibility, so a member who may view a request-capable
+    // account may now also request against it (previously own-level oversight only).
+    assertThat(result.getFirst().canRequest()).isTrue();
   }
 
   @Test
@@ -406,7 +417,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertThrows(AccessDeniedException.class, () -> service.getViewableAccountDetail(accountId));
-    verify(bankAccountService, never()).getAccountDetail(any(), any());
+    verify(bankAccountService, never()).getAccountDetail(any(), any(), anyBoolean());
   }
 
   @Test
@@ -547,36 +558,123 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void createBookingRequest_withinOwnLevelScope_resolvesAccountAndDelegates() {
+  void createBookingRequest_viewableAccount_resolvesAndDelegates() {
+    // REQ-BANK-039: eligibility = view eligibility — a caller who may view the source account may
+    // request against it; with no limit configured no owner approval is needed.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
-            orgUnitId, BankBookingRequestType.DEPOSIT, new BigDecimal("500"), "from sale");
+            accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("500"), "from sale");
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
-    when(ownerScopeService.currentOwnLevelOversightScope())
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
-    when(bankAccountRepository.findByOrgUnitId(orgUnitId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
-            eq(accountId), eq(BankBookingRequestType.DEPOSIT), eq(new BigDecimal("500")), any()))
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("500")),
+            eq("from sale"),
+            eq(null),
+            eq(false),
+            eq(null)))
         .thenReturn(expected);
 
     assertThat(service.createBookingRequest(request)).isSameAs(expected);
   }
 
   @Test
-  void createBookingRequest_outsideOwnLevelScope_throwsAccessDenied() {
-    UUID orgUnitId = UUID.randomUUID();
+  void createBookingRequest_notViewable_throwsAccessDenied() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
-            orgUnitId, BankBookingRequestType.WITHDRAWAL, new BigDecimal("500"), null);
-    when(ownerScopeService.currentOwnLevelOversightScope())
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertThrows(AccessDeniedException.class, () -> service.createBookingRequest(request));
-    verify(bankAccountRepository, never()).findByOrgUnitId(any());
     verifyNoInteractions(bankBookingRequestService);
+  }
+
+  @Test
+  void createBookingRequest_aboveUserLimit_flagsRequiresOwnerApproval() {
+    // REQ-BANK-041: an individual-user limit below the requested amount flags the request.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID caller = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    BankAccountApprovalLimit limit = new BankAccountApprovalLimit();
+    limit.setGranteeKind(BankAccountViewGranteeKind.USER);
+    limit.setGranteeUserId(caller);
+    limit.setLimitAmount(new BigDecimal("100"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(limit));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100"))))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100")));
+  }
+
+  @Test
+  void createBookingRequest_transfer_passesDestination() {
+    // REQ-BANK-040: a transfer carries its destination account through to the request service.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID destId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.TRANSFER, destId, new BigDecimal("500"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.TRANSFER),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(destId),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.TRANSFER),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(destId),
+            eq(false),
+            eq(null));
   }
 
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {
@@ -599,6 +697,12 @@ class OrgUnitBankAccessServiceTest {
         null,
         null,
         Instant.now(),
+        null,
+        null,
+        false,
+        null,
+        false,
+        null,
         0L);
   }
 }

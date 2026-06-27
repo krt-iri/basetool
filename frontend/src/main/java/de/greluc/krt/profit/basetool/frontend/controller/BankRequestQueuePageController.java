@@ -84,6 +84,13 @@ public class BankRequestQueuePageController {
     model.addAttribute("requests", requests);
     model.addAttribute("status", effectiveStatus);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
+    // Active holders feed the transfer-confirm destination-holder select (REQ-BANK-040): a
+    // destination may only receive money on an active holder.
+    model.addAttribute(
+        "activeHolders",
+        holders == null
+            ? List.<BankHolderDto>of()
+            : holders.stream().filter(BankHolderDto::active).toList());
     if ("requestQueue".equals(fragment)) {
       return "bank-requests :: requestQueue";
     }

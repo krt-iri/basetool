@@ -94,6 +94,13 @@ public class BankConflictException extends RuntimeException {
   public static final String CODE_BANK_ACCOUNT_HAS_PENDING_REQUESTS =
       "BANK_ACCOUNT_HAS_PENDING_REQUESTS";
 
+  /**
+   * Confirmation attempt on a booking request that exceeds the requester's approval limit without
+   * the bank employee attesting that the responsible holder's approval was obtained — the mandatory
+   * over-limit checkbox is missing (REQ-BANK-041).
+   */
+  public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED = "BANK_OWNER_APPROVAL_REQUIRED";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

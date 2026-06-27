@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountDetailDto;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.OrgUnitBalanceTargetRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -288,6 +290,102 @@ public class OrgUnitBankController {
   }
 
   /**
+   * Sets or changes a role-bucket approval limit on an account (REQ-BANK-041). The seam authorizes
+   * the caller (responsible holder / bank management / admin) and validates the role bucket.
+   *
+   * @param id the account
+   * @param roleCode the role bucket
+   * @param request the new whole-aUEC limit (>= 0)
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Set a role-bucket approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull String roleCode,
+      @RequestBody @Valid SetBankApprovalLimitRequest request) {
+    return orgUnitBankAccessService.setRoleApprovalLimit(id, roleCode, request.limit());
+  }
+
+  /**
+   * Clears a role-bucket approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param roleCode the role bucket to clear
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/role/{roleCode}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Clear a role-bucket approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
+    return orgUnitBankAccessService.clearRoleApprovalLimit(id, roleCode);
+  }
+
+  /**
+   * Sets or changes the all-members approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param request the new whole-aUEC limit (>= 0)
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/all-members")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Set the all-members approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankApprovalLimitRequest request) {
+    return orgUnitBankAccessService.setAllMembersApprovalLimit(id, request.limit());
+  }
+
+  /**
+   * Clears the all-members approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/all-members")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Clear the all-members approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(
+      @PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.clearAllMembersApprovalLimit(id);
+  }
+
+  /**
+   * Sets or changes an individual user's approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param userId the user the limit addresses
+   * @param request the new whole-aUEC limit (>= 0)
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Set an individual user's approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Valid SetBankApprovalLimitRequest request) {
+    return orgUnitBankAccessService.setUserApprovalLimit(id, userId, request.limit());
+  }
+
+  /**
+   * Clears an individual user's approval limit on an account (REQ-BANK-041).
+   *
+   * @param id the account
+   * @param userId the user whose limit to clear
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/user/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Clear an individual user's approval limit on an org-unit account")
+  public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return orgUnitBankAccessService.clearUserApprovalLimit(id, userId);
+  }
+
+  /**
    * Raises a confirm-before-post deposit/withdrawal request for an org unit the caller oversees
    * (REQ-BANK-022, F2). The request is recorded as {@code PENDING} and audited, but moves no money
    * until a bank employee confirms it. The service rejects an org unit outside the caller's
@@ -340,6 +438,66 @@ public class OrgUnitBankController {
   public BankBookingRequestDto cancelOwnBookingRequest(
       @PathVariable UUID id, @Valid @RequestBody CancelBankBookingRequest request) {
     return orgUnitBankAccessService.cancelOwnBookingRequest(id, request.version());
+  }
+
+  /**
+   * Lists every booking request raised against the accounts the caller is responsible for — the
+   * "Fremde Anträge" tab (REQ-BANK-041). The seam scopes the result to the caller's responsible
+   * accounts (admins see all).
+   *
+   * @return the requests on the caller's responsible accounts, newest first
+   */
+  @GetMapping("/requests/foreign")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "List booking requests on the accounts the caller is responsible for")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Requests on own accounts")})
+  public List<BankBookingRequestDto> listForeignRequests() {
+    return orgUnitBankAccessService.listRequestsForResponsibleAccounts();
+  }
+
+  /**
+   * Lists all active accounts as transfer-request destinations (REQ-BANK-040): a requester may
+   * transfer from a viewable source account to any active account.
+   *
+   * @return the active accounts as transfer targets
+   */
+  @GetMapping("/transfer-targets")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "List all active accounts as transfer-request destinations")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Active accounts")})
+  public List<BankAccountRefDto> listTransferTargets() {
+    return orgUnitBankAccessService.listTransferTargetAccounts();
+  }
+
+  /**
+   * Grants the responsible holder's in-app approval for an over-limit request (REQ-BANK-041), which
+   * pre-fills the bank employee's confirmation checkbox. The seam authorizes the caller as the
+   * account's responsible holder (or admin).
+   *
+   * @param id the request to approve
+   * @return the updated request
+   */
+  @PostMapping("/requests/{id}/owner-approval")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Grant the responsible holder's in-app approval for a booking request")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval granted")})
+  public BankBookingRequestDto grantOwnerApproval(@PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.grantOwnerApproval(id);
+  }
+
+  /**
+   * Revokes a previously granted in-app approval for a booking request (REQ-BANK-041).
+   *
+   * @param id the request whose approval to revoke
+   * @return the updated request
+   */
+  @DeleteMapping("/requests/{id}/owner-approval")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Revoke the responsible holder's in-app approval for a booking request")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval revoked")})
+  public BankBookingRequestDto revokeOwnerApproval(@PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.revokeOwnerApproval(id);
   }
 
   /**

@@ -79,10 +79,15 @@ class BankRequestControllerTest {
     UUID id = UUID.randomUUID();
     UUID holderId = UUID.randomUUID();
     BankBookingRequestDto dto = requestDto();
-    when(bankBookingRequestService.confirm(eq(id), eq(holderId), eq(2L), any())).thenReturn(dto);
+    when(bankBookingRequestService.confirm(
+            eq(id), eq(holderId), eq(null), eq(false), eq(2L), any()))
+        .thenReturn(dto);
 
-    assertSame(dto, controller.confirm(id, new ConfirmBankBookingRequest(holderId, 2L), null));
-    verify(bankBookingRequestService).confirm(eq(id), eq(holderId), eq(2L), any());
+    assertSame(
+        dto,
+        controller.confirm(id, new ConfirmBankBookingRequest(holderId, null, false, 2L), null));
+    verify(bankBookingRequestService)
+        .confirm(eq(id), eq(holderId), eq(null), eq(false), eq(2L), any());
   }
 
   @Test
@@ -115,6 +120,12 @@ class BankRequestControllerTest {
         null,
         null,
         Instant.now(),
+        null,
+        null,
+        false,
+        null,
+        false,
+        null,
         0L);
   }
 }

@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
+import java.math.BigDecimal;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Frontend mirror of the read-only account detail an org-unit viewer sees (REQ-BANK-038): the
  * shared account detail (with all-false capabilities) plus the org-unit-side affordances.
@@ -29,10 +32,16 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
  * @param canSetTarget whether the caller may set/clear the balance target
  * @param canConfigureVisibility whether the caller may manage who else may view the account
  * @param canRequest whether the caller may raise a booking request against this account
+ * @param canConfigureApprovalLimits whether the caller may set/clear this account's approval limits
+ *     (REQ-BANK-041)
+ * @param applicableLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
+ *     {@code null} = unlimited
  */
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,
     boolean canExportStatement,
     boolean canSetTarget,
     boolean canConfigureVisibility,
-    boolean canRequest) {}
+    boolean canRequest,
+    boolean canConfigureApprovalLimits,
+    @Nullable BigDecimal applicableLimit) {}

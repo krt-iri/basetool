@@ -65,6 +65,9 @@ import org.jetbrains.annotations.Nullable;
  * @param grantedRoleCodes the role buckets currently granted
  * @param allMembersGranted whether the all-members grant is currently set
  * @param grantedUsers the individually granted users, with resolved display names
+ * @param canConfigureApprovalLimits whether the caller may set/clear approval limits (REQ-BANK-041
+ *     — responsible holder, bank management or admin)
+ * @param approvalLimits the account's per-tier approval limits with the org-unit edit affordance
  */
 public record OrgUnitBankAccountSettingsDto(
     UUID accountId,
@@ -82,4 +85,6 @@ public record OrgUnitBankAccountSettingsDto(
     List<String> availableRoleCodes,
     List<String> grantedRoleCodes,
     boolean allMembersGranted,
-    List<OrgUnitBankViewUserDto> grantedUsers) {}
+    List<OrgUnitBankViewUserDto> grantedUsers,
+    boolean canConfigureApprovalLimits,
+    BankApprovalLimitsDto approvalLimits) {}

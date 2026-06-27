@@ -142,5 +142,29 @@ public enum BankAuditEventType {
   BALANCE_VISIBILITY_GRANTED,
 
   /** A balance-visibility grant was removed from an account (REQ-BANK-035). */
-  BALANCE_VISIBILITY_REVOKED
+  BALANCE_VISIBILITY_REVOKED,
+
+  /**
+   * An account's per-tier approval limit was set or changed (REQ-BANK-041); the details payload
+   * carries the tier and the new limit amount — never any free text or PII.
+   */
+  APPROVAL_LIMIT_SET,
+
+  /** An account's per-tier approval limit was cleared (REQ-BANK-041). */
+  APPROVAL_LIMIT_CLEARED,
+
+  /**
+   * The account's responsible holder granted in-app approval for a booking request that exceeds the
+   * requester's limit (REQ-BANK-041); recorded from the "Fremde Anträge" tab.
+   */
+  BOOKING_REQUEST_OWNER_APPROVAL_GRANTED,
+
+  /** The responsible holder revoked a previously granted in-app approval (REQ-BANK-041). */
+  BOOKING_REQUEST_OWNER_APPROVAL_REVOKED,
+
+  /**
+   * A bank employee confirmed, at booking-request confirmation, that the responsible holder's
+   * approval had been obtained (the mandatory checkbox for an over-limit request, REQ-BANK-041).
+   */
+  BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED
 }

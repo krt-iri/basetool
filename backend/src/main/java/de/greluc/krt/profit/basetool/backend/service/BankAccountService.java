@@ -87,6 +87,7 @@ public class BankAccountService {
   private final BankAuditService bankAuditService;
   private final BankBookingRequestService bankBookingRequestService;
   private final BankGrantService bankGrantService;
+  private final BankApprovalLimitService bankApprovalLimitService;
 
   /**
    * Pages over the accounts the caller may see: management/admin get all accounts, employees get
@@ -120,11 +121,16 @@ public class BankAccountService {
    *
    * @param accountId the account
    * @param capabilities the caller's evaluated capabilities on the account
+   * @param canConfigureApprovalLimits whether the caller may edit this account's approval limits on
+   *     the bank surface (bank management / admin), passed in by the controller so this service
+   *     stays free of authentication concerns
    * @return the detail payload
    * @throws NotFoundException when the account does not exist
    */
   public BankAccountDetailDto getAccountDetail(
-      @NotNull UUID accountId, @NotNull BankCapabilitiesDto capabilities) {
+      @NotNull UUID accountId,
+      @NotNull BankCapabilitiesDto capabilities,
+      boolean canConfigureApprovalLimits) {
     BankAccount account = requireAccount(accountId);
     BigDecimal balance = postingRepository.accountBalance(accountId);
     Instant cutoff = Instant.now().minus(DELTA_WINDOW);
@@ -136,7 +142,8 @@ public class BankAccountService {
         bankAccountMapper.toDto(account, balance),
         delta,
         postingRepository.countByAccountId(accountId),
-        capabilities);
+        capabilities,
+        bankApprovalLimitService.assemble(account, canConfigureApprovalLimits));
   }
 
   /**

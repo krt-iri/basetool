@@ -616,6 +616,11 @@ org-unit-blind.
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 
+> **Amended by REQ-BANK-039/-040/-041:** request eligibility is now **view-based** (anyone who may
+> view a request-capable account may request, not just own-level oversight), the movement kinds now
+> include **`TRANSFER`** (REQ-BANK-040), and an over-limit request is flagged for the responsible
+> holder's approval (REQ-BANK-041). The create/cancel off-ledger mechanics below are unchanged.
+
 Officers/leads may raise **deposit/withdrawal requests** against their overseen org unit's
 account (epic #666 F2). A request is recorded **`PENDING`** and **off-ledger** (ADR-0021):
 it is audited on creation (`BOOKING_REQUEST_CREATED`) and visible, but moves **no money** —
@@ -642,6 +647,11 @@ raised against a `CLOSED` account.
 **Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `model/BankBookingRequest`, `db/migration/V159`, frontend `controller/OrgUnitBankProxyController`, `templates/org-unit-bank.html`, `static/js/bank.js` · **Issues:** #666, #670, #672
 
 ### REQ-BANK-023 — Booking-request confirmation/rejection by bank staff
+
+> **Amended by REQ-BANK-040/-041:** confirmation also books a **`TRANSFER`** (recording source +
+> destination holders, via `bookTransfer`), and an **over-limit** request additionally requires the
+> bank employee's mandatory "approval obtained" checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409) before
+> it can be confirmed, audited as `BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`.
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -672,18 +682,19 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 The `bank_booking_request` table is **mutable** (`@Version`) and **off the append-only
 ledger** (ADR-0021): a `PENDING`/`REJECTED`/`CANCELLED` request never has a posting, and a
 `CONFIRMED` request has exactly one linked transaction whose postings reconcile normally
-(V159 `chk_bank_booking_request_confirmed_refs`). The four `BOOKING_REQUEST_*` audit events
-join the existing admin-only audit log (REQ-BANK-012) — requests are auditable from creation,
-before any money moves. The ledger-integrity invariants (REQ-BANK-020) are **unaffected**:
+(V159 `chk_bank_booking_request_confirmed_refs`). The four lifecycle
+`BOOKING_REQUEST_{CREATED,CONFIRMED,REJECTED,CANCELLED}` audit events join the existing admin-only
+audit log (REQ-BANK-012) — requests are auditable from creation, before any money moves; the
+over-limit `BOOKING_REQUEST_OWNER_APPROVAL_*` events (REQ-BANK-041) join the same log + filter. The ledger-integrity invariants (REQ-BANK-020) are **unaffected**:
 off-ledger requests contribute no postings and are intentionally excluded from the integrity
 sweep.
 
 **Acceptance**
 
 - [x] V159 enforces that only a `CONFIRMED` request carries a holder + resulting transaction.
-- [x] The four `BOOKING_REQUEST_*` events are append-only audit rows (no DB CHECK on
+- [x] The lifecycle `BOOKING_REQUEST_*` events are append-only audit rows (no DB CHECK on
   `event_type`, enum is source of truth).
-- [x] Admin audit log surfaces + filters the four new event types (still admin-only): the
+- [x] Admin audit log surfaces + filters these event types (still admin-only): the
   `EVENT_TYPES` filter list + `admin.bank.audit.event.BOOKING_REQUEST_*` i18n labels.
 
 **Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `model/BankBookingRequest`, `model/BankAuditEventType` · **Issues:** #666, #673
@@ -744,7 +755,16 @@ admin-editable at runtime.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequest{Created,Confirmed,Rejected}Event`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161` · **Issues:** #666, #673
 
-### REQ-BANK-027 — Bereich/OL bank access via the OrgUnitBankAccessService seam (cascading view, own-level requests)
+### REQ-BANK-027 — Bereich/OL bank access via the OrgUnitBankAccessService seam (cascading view, view-based requests)
+
+> **Amended by REQ-BANK-039:** booking-request eligibility is no longer own-level only — **any caller
+> who may view a request-capable account (`ORG_UNIT` / `AREA` / `CARTEL`) may now raise a request
+> against it**, so a Bereichsleitung/OL may also request on a subordinate account they can view. The
+> cascading view below is unchanged; the "own-level only" request rule, its subordinate-rejection
+> acceptance criterion and the `currentOwnLevelOversightScope()` implementation note are superseded
+> (the gate is now `canView`, and `canRequest` now means "a request-capable account the caller may
+>
+>> view"). Bank-staff confirmation still gatekeeps every booking.
 
 The org hierarchy (REQ-ORG-014) extends the epic-#666 officer/lead bank function (REQ-BANK-021/022) up
 the new levels, **without** weakening the bank's org-unit-blindness (REQ-BANK-008, ADR-0011): all new
@@ -758,10 +778,11 @@ logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/
   subordinate accounts in their oversight scope (Bereichsleitung → its `AREA` account + every child
   Staffel/SK `ORG_UNIT` account; OL → `CARTEL` + every `AREA` + every `ORG_UNIT`). Strict silo holds —
   no foreign-Bereich account is listed.
-- **Requests are own-level only (asymmetric, by owner decision):** `createBookingRequest()` is permitted
-  only on the caller's **own-level** account (officer → squadron `ORG_UNIT`; Bereich → `AREA`; OL →
-  `CARTEL`). Subordinate accounts reached by drill-down are **view-only**. The confirm-before-post flow,
-  overdraft/holder checks and `ACCOUNT_GRANT` notifications are unchanged; bank staff still confirm.
+- **Requests follow view eligibility (amended by REQ-BANK-039):** `createBookingRequest()` is permitted
+  on **any request-capable account the caller may view** (`ORG_UNIT` / `AREA` / `CARTEL`) — so a
+  Bereichsleitung/OL may request on subordinate accounts they oversee as well as their own-level one
+  (the prior own-level-only rule is superseded). The confirm-before-post flow, overdraft/holder checks
+  and `ACCOUNT_GRANT` notifications are unchanged; bank staff still confirm.
 - The officer flow from REQ-BANK-021/022 is preserved exactly (no regression).
 - **Special accounts & active-only (REQ-BANK-028):** a Bereich/OL overseer additionally sees the
   cartel-wide `SPECIAL` accounts (Sonderkonten) **view-only**, and the page lists only `ACTIVE`
@@ -771,8 +792,8 @@ logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/
 
 - [x] A Bereichsleitung sees its `AREA` balance + all child `ORG_UNIT` balances; the OL sees `CARTEL` +
   all `AREA` + all `ORG_UNIT`; no foreign-Bereich balance leaks.
-- [x] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; a request on a
-  **subordinate** account is rejected (view-only).
+- [x] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; since
+  REQ-BANK-039 a request on a **viewable subordinate** account is also permitted (no longer rejected).
 - [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green;
   the existing officer flow and ledger tests are unchanged.
 
@@ -782,14 +803,14 @@ Bereich/OL are first-class `org_unit` rows (REQ-ORG-014), an `AREA` account poin
 per org unit for free (one `AREA` per Bereich, one `CARTEL` per OL). `V168` only **relaxes the
 `chk_bank_account_owner_ref` CHECK** (no column, no backfill — the legacy `areaName` form stays valid
 during the soak; `BankAccountService` validates `kind = BEREICH`/`ORGANISATIONSLEITUNG` on creation). The
-seam splits the scope: F1 view uses the cascading `OwnerScopeService.currentOversightScope()`,
-F2 request the non-cascading `currentOwnLevelOversightScope()`; the balance DTO carries a `canRequest`
-flag so the UI shows the request affordance only on the own-level account. The bank-management create
+seam uses the cascading `OwnerScopeService.currentOversightScope()` for the F1 view; since REQ-BANK-039
+the F2 request gate is `canView(account)` (request-capable types only), and the balance DTO's
+`canRequest` flag now marks any request-capable account the caller may view. The bank-management create
 form sources its picker from `GET /api/v1/org-units/active-all-kinds` (all four kinds) and filters the
 options by the selected account type.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (cascading view incl. AREA + child accounts and the
-foreign-Bereich exclusion, own-level `canRequest` split, subordinate-request rejection),
+foreign-Bereich exclusion, view-based request eligibility per REQ-BANK-039),
 `OwnerScopeServiceTest` (`CurrentOversightScopeTests` cascade, `CurrentOwnLevelOversightScopeTests`,
 `CanAccessBlueprintOverviewTests` Bereich/OL), `BankAccountServiceTest` (AREA→Bereich / CARTEL→OL
 creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
@@ -1104,6 +1125,76 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 >> `orgUnitBankBookings` swap seams are unchanged.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+
+### REQ-BANK-039 — Booking-request eligibility = view eligibility
+
+Any caller who may **view** a request-capable account (REQ-BANK-035/-037, `canView`) may raise a
+booking request against it — **amending** the prior own-level-oversight gate of REQ-BANK-022/-027.
+The request-capable account types are `ORG_UNIT`, `AREA` and `CARTEL` (active only); `SPECIAL` /
+`CARTEL_BANK` never receive requests. The widening is deliberate (owner decision) so a member the
+responsible holder granted view to (a squadron sub-rank, an all-members grant, a named user) can also
+file requests, gated downstream by the approval limits of REQ-BANK-041 rather than by who may request
+at all. The bank stays org-unit-blind: eligibility is decided in the `OrgUnitBankAccessService` seam
+(`canView`), never in a `Bank*` class.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate replaces own-level on create; a
+view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) ·
+**Code:** `service/OrgUnitBankAccessService#createBookingRequest` / `#isRequestCapable` ·
+**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
+
+### REQ-BANK-040 — User-initiated transfer requests
+
+A requester may raise a `TRANSFER` booking request from a (source) account they may view to **any
+active account** as destination (`bank_booking_request.target_account_id`, V193). The request is
+off-ledger and audited like a deposit/withdrawal request (REQ-BANK-022/-024); on confirmation the
+bank employee records the **source and destination holders** and books a real `TRANSFER` through the
+existing `BankLedgerService.bookTransfer` path (REQ-BANK-011) — the destination-visibility rule
+(`canSee(destination)`), the in-game transfer fee (REQ-BANK-033) and account/holder legs apply
+unchanged. Confirming a transfer additionally requires the bank `can_transfer` capability on the
+source (REQ-BANK-009).
+
+**Enforced by:** `BankBookingRequestServiceTest` (transfer confirm books via `bookTransfer` with
+`destinationVisible`; capability gate), `OrgUnitBankAccessServiceTest` (transfer carries its
+destination) · **Code:** `model/BankBookingRequestType#TRANSFER`,
+`model/BankBookingRequest#targetAccount`, `service/BankBookingRequestService` (`create` / `confirm`),
+`db/migration/V193`, frontend `templates/org-unit-bank.html` + `bank-requests.html` ·
+**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
+
+### REQ-BANK-041 — Per-account approval limits & two-step owner approval
+
+Each request-capable account may carry **per-tier approval limits** (`bank_account_approval_limit`,
+V193): a whole-aUEC ceiling (>= 0) up to which a tier may request **without** the responsible holder's
+explicit approval. The tiers mirror the configurable visibility buckets of REQ-BANK-035 (squadron /
+Bereich sub-ranks, all-members, individual users). A **missing** limit for a requester's tier means
+unlimited — preserving the pre-feature behaviour (no regression). The limit a requester is subject to
+is resolved **at request creation** in the seam: an individual-user limit wins; otherwise the maximum
+of the limits for the role tiers they hold; otherwise the all-members limit; otherwise unlimited. The
+result is **snapshotted** onto the request (`requires_owner_approval`, `applicable_limit`) so the
+org-unit-blind confirm path only reads the boolean.
+
+**Who configures limits:** the account's responsible holder (REQ-BANK-034), **bank management** and
+**admin** — never a plain bank employee. Limits are shown read-only in both account-detail surfaces
+to everyone who may open them. Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` /
+`APPROVAL_LIMIT_CLEARED`).
+
+**Two-step approval.** When a request exceeds the requester's limit it is flagged
+`requires_owner_approval`; the requester sees a live warning that it must be approved first. (1) The
+responsible holder may **grant approval in-app** from the new "Fremde Anträge" tab — the requests
+raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
+who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
+sees an explicit warning in the confirmation dialog and must tick a mandatory
+**"Freigabe durch Kontoverantwortlichen erfolgt"** checkbox (pre-filled when (1) happened) before the
+request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
+flagged request cannot be confirmed without the checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409).
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (limit resolution; `canConfigureApprovalLimits`
+matrix — holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner
+approval), `BankBookingRequestServiceTest` (snapshot at create; confirm gate 409 + audit; pre-fill is
+UI-only), `OrgUnitBankControllerTest` · **Code:** `model/BankAccountApprovalLimit`,
+`repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
+`service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
+`templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` ·
+**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ## Out of scope
 

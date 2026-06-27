@@ -97,6 +97,12 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             null,
             Instant.parse("2026-06-17T14:02:00Z"),
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
             0L);
     PageResponse<BankBookingRequestDto> page =
         new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of());

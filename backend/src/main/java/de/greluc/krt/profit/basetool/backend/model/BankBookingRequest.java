@@ -40,23 +40,37 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A confirm-before-post deposit/withdrawal request raised by an org-unit officer or lead against
- * their org unit's bank account (epic #666 F2, REQ-BANK-022/-023), persisted in the {@code
- * bank_booking_request} table (Flyway V159).
+ * A confirm-before-post deposit / withdrawal / transfer request raised by any caller who may view a
+ * bank account (epic #666 F2, REQ-BANK-022/-023/-039/-040/-041), persisted in the {@code
+ * bank_booking_request} table (Flyway V159, extended by V193).
  *
  * <p>This is the deliberate counterpart to the append-only ledger: unlike {@link BankTransaction} /
  * {@link BankPosting}, a booking request is a <strong>mutable</strong> off-ledger aggregate (it
  * carries the optimistic-locking {@code @Version} from {@link AbstractEntity}) and moves no money
  * while {@code PENDING} (ADR-0021). Only when a bank employee confirms it does the request name the
- * {@link #holder} (the player who received the deposit / paid the withdrawal out), book a real
- * {@link BankTransaction} through {@link BankAccount}'s ledger, link that transaction in {@link
- * #resultingTransaction}, and flip to {@code CONFIRMED}. A {@code REJECTED} / {@code CANCELLED} /
- * {@code PENDING} request never carries a holder or resulting transaction — V159's {@code
- * chk_bank_booking_request_confirmed_refs} constraint pins that invariant.
+ * {@link #holder} (deposit → who received the money; withdrawal → who paid it out; transfer → the
+ * source holder), book a real {@link BankTransaction} through {@link BankAccount}'s ledger, link
+ * that transaction in {@link #resultingTransaction}, and flip to {@code CONFIRMED}. A {@code
+ * REJECTED} / {@code CANCELLED} / {@code PENDING} request never carries a holder or resulting
+ * transaction — V159's {@code chk_bank_booking_request_confirmed_refs} constraint pins that
+ * invariant.
  *
- * <p>The requester and decider are stored as plain {@code app_user} ids ({@code ON DELETE SET
- * NULL}) plus a denormalized effective-name snapshot, mirroring {@link BankAuditEvent} so the row —
- * and the bank-staff queue rendered from it — survives a user deletion.
+ * <p>For a {@code TRANSFER} request the requester also names the {@link #targetAccount} (any active
+ * account, REQ-BANK-040); the destination holder is recorded only on the resulting ledger
+ * transaction at confirmation.
+ *
+ * <p><strong>Two-step owner approval (REQ-BANK-041).</strong> {@link #requiresOwnerApproval} and
+ * {@link #applicableLimit} are <em>snapshotted at creation</em> by the org-unit-aware seam (it
+ * resolves the requester's applicable approval limit); the org-unit-blind confirm path only reads
+ * the boolean to decide whether the bank employee's confirmation checkbox is mandatory. {@link
+ * #ownerApprovalGranted} (with {@link #ownerApprovalGrantedBy} / handle / instant) records the
+ * account's responsible holder granting that approval in-app from the "Fremde Anträge" tab, which
+ * pre-fills the bank employee's checkbox.
+ *
+ * <p>The requester, decider and approving holder are stored as plain {@code app_user} ids ({@code
+ * ON DELETE SET NULL}) plus a denormalized effective-name snapshot, mirroring {@link
+ * BankAuditEvent} so the row — and the bank-staff queue rendered from it — survives a user
+ * deletion.
  */
 @Entity
 @Table(name = "bank_booking_request")
@@ -72,13 +86,26 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** The org-unit account the request targets; immutable. Always an {@code ORG_UNIT} account. */
+  /**
+   * The (source) account the request targets; immutable. An {@code ORG_UNIT}, {@code AREA} or
+   * {@code CARTEL} account (REQ-BANK-039/-040).
+   */
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "account_id", nullable = false, updatable = false)
   @ToString.Exclude
   private BankAccount account;
 
-  /** Whether the request is a deposit or a withdrawal; immutable. */
+  /**
+   * The destination account for a {@code TRANSFER} request (REQ-BANK-040); {@code null} for {@code
+   * DEPOSIT} / {@code WITHDRAWAL}. Immutable; any active account may be chosen.
+   */
+  @Nullable
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "target_account_id", updatable = false)
+  @ToString.Exclude
+  private BankAccount targetAccount;
+
+  /** Whether the request is a deposit, a withdrawal or a transfer; immutable. */
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16, updatable = false)
   private BankBookingRequestType type;
@@ -155,4 +182,49 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "reject_reason", length = 500)
   private String rejectReason;
+
+  /**
+   * Snapshot at creation (REQ-BANK-041): {@code true} iff the requested amount exceeded the
+   * requester's applicable approval limit, so the bank employee's confirmation requires the
+   * explicit "approval by the responsible holder obtained" checkbox. Immutable.
+   */
+  @Column(name = "requires_owner_approval", nullable = false)
+  private boolean requiresOwnerApproval = false;
+
+  /**
+   * The requester's resolved approval limit at creation (REQ-BANK-041); {@code null} = unlimited
+   * (no approval needed). Kept for display/audit. Immutable.
+   */
+  @Nullable
+  @Column(name = "applicable_limit", precision = 19, scale = 4)
+  private BigDecimal applicableLimit;
+
+  /**
+   * {@code true} once the account's responsible holder granted approval in-app from the "Fremde
+   * Anträge" tab (REQ-BANK-041); pre-fills the bank employee's confirmation checkbox. Meaningful
+   * only when {@link #requiresOwnerApproval} is set.
+   */
+  @Column(name = "owner_approval_granted", nullable = false)
+  private boolean ownerApprovalGranted = false;
+
+  /**
+   * The responsible holder's {@code app_user} id who granted in-app approval; {@code null} until
+   * granted. Loose reference ({@code ON DELETE SET NULL}).
+   */
+  @Nullable
+  @Column(name = "owner_approval_granted_by")
+  private UUID ownerApprovalGrantedBy;
+
+  /**
+   * Denormalized effective-name snapshot of the responsible holder who granted approval; {@code
+   * null} until granted.
+   */
+  @Nullable
+  @Column(name = "owner_approval_granted_by_handle")
+  private String ownerApprovalGrantedByHandle;
+
+  /** When the responsible holder granted in-app approval; {@code null} until granted. */
+  @Nullable
+  @Column(name = "owner_approval_granted_at")
+  private Instant ownerApprovalGrantedAt;
 }

@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnitId the owning org unit's id
  * @param orgUnitName the owning org unit's long-form name
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
- * @param type movement enum name ({@code DEPOSIT} / {@code WITHDRAWAL})
+ * @param type movement enum name ({@code DEPOSIT} / {@code WITHDRAWAL} / {@code TRANSFER})
  * @param amount the requested whole-aUEC amount
  * @param note the requester's optional note, or {@code null}
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
@@ -48,6 +48,14 @@ import org.jetbrains.annotations.Nullable;
  * @param rejectReason the rejection reason, or {@code null} unless rejected
  * @param decidedAt when the request reached its terminal state, or {@code null} while pending
  * @param createdAt when the request was raised
+ * @param targetAccountId the destination account id for a {@code TRANSFER}, or {@code null}
+ * @param targetAccountNo the destination account's number for a {@code TRANSFER}, or {@code null}
+ * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
+ *     (REQ-BANK-041)
+ * @param applicableLimit the requester's resolved approval limit, or {@code null} = unlimited
+ * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
+ * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
+ *     {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -69,4 +77,10 @@ public record BankBookingRequestDto(
     @Nullable String rejectReason,
     @Nullable Instant decidedAt,
     Instant createdAt,
+    @Nullable UUID targetAccountId,
+    @Nullable String targetAccountNo,
+    boolean requiresOwnerApproval,
+    @Nullable BigDecimal applicableLimit,
+    boolean ownerApprovalGranted,
+    @Nullable String ownerApprovalGrantedByHandle,
     Long version) {}

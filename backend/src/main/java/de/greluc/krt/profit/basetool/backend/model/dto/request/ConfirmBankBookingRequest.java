@@ -21,13 +21,27 @@ package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023): the holder
- * the employee records as having received the deposit / paid the withdrawal out, plus the echoed
+ * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023/-040/-041):
+ * the holder(s) the employee records, the over-limit owner-approval attestation and the echoed
  * optimistic-locking version to detect a concurrent decision.
  *
- * @param holderId the holder recorded for the booked transaction
+ * <p>For a {@code TRANSFER} request {@link #holderId} is the source holder and {@link
+ * #destinationHolderId} the destination holder (both recorded on the booked transfer); for {@code
+ * DEPOSIT} / {@code WITHDRAWAL} only {@link #holderId} is used. {@link #ownerApprovalConfirmed}
+ * must be {@code true} to confirm a request flagged {@code requiresOwnerApproval} (REQ-BANK-041) —
+ * the "approval by the responsible holder obtained" checkbox — and is ignored otherwise.
+ *
+ * @param holderId the holder recorded for the booked transaction (source holder for a transfer)
+ * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
+ * @param ownerApprovalConfirmed whether the employee attests the responsible holder's approval was
+ *     obtained (required when the request exceeds the requester's limit)
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409
  */
-public record ConfirmBankBookingRequest(@NotNull UUID holderId, @NotNull Long version) {}
+public record ConfirmBankBookingRequest(
+    @NotNull UUID holderId,
+    @Nullable UUID destinationHolderId,
+    boolean ownerApprovalConfirmed,
+    @NotNull Long version) {}

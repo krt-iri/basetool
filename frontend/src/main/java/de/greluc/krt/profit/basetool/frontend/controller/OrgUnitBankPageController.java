@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetailDto;
@@ -88,11 +89,41 @@ public class OrgUnitBankPageController {
     model.addAttribute(
         "ownRequests", ownRequests == null ? List.<BankBookingRequestDto>of() : ownRequests);
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
-    // Drives the single page-level "request" CTA + its modal account selector (REQ-BANK-022): both
-    // are shown iff at least one visible account is the caller's own-level one (canRequest); a page
-    // of view-only / special accounts offers no request affordance at all.
+    // Drives the single page-level "request" CTA + its modal account selector (REQ-BANK-022/-039):
+    // shown iff at least one visible account is request-capable (canRequest = the caller may view a
+    // request-capable account).
+    boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
+    model.addAttribute("anyCanRequest", anyCanRequest);
+    // "Fremde Anträge" tab (REQ-BANK-041): requests on the accounts the caller is responsible for.
+    // The tab is shown whenever the caller manages any account (responsible holder / OL / admin),
+    // even when it currently holds no request.
+    List<BankBookingRequestDto> foreignRequests =
+        backendApiClient.get(
+            "/api/v1/org-units/bank/requests/foreign",
+            new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
     model.addAttribute(
-        "anyCanRequest", safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest));
+        "foreignRequests",
+        foreignRequests == null ? List.<BankBookingRequestDto>of() : foreignRequests);
+    // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
+    // ORG_UNIT/AREA/CARTEL account == its responsible holder). This matches the backend scope of
+    // /requests/foreign (responsibleAccountIds), so the tab is never shown empty to an
+    // OL/management
+    // user who can only configure a SPECIAL account's visibility (SPECIAL is never
+    // request-capable).
+    model.addAttribute(
+        "hasResponsibleAccounts",
+        safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
+    // Transfer-request destination picker (REQ-BANK-040): any active account. Only fetched when the
+    // request modal is shown at all.
+    List<BankAccountRefDto> transferTargets =
+        anyCanRequest
+            ? backendApiClient.get(
+                "/api/v1/org-units/bank/transfer-targets",
+                new ParameterizedTypeReference<List<BankAccountRefDto>>() {})
+            : List.<BankAccountRefDto>of();
+    model.addAttribute(
+        "requestTransferTargets",
+        transferTargets == null ? List.<BankAccountRefDto>of() : transferTargets);
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
@@ -133,7 +164,10 @@ public class OrgUnitBankPageController {
     model.addAttribute("paginationBaseUrl", "/org-unit-bank/accounts/" + id);
 
     boolean canManage =
-        detail != null && (detail.canSetTarget() || detail.canConfigureVisibility());
+        detail != null
+            && (detail.canSetTarget()
+                || detail.canConfigureVisibility()
+                || detail.canConfigureApprovalLimits());
     OrgUnitBankAccountSettingsDto settings = null;
     List<UserReferenceDto> users = List.of();
     if (canManage) {
@@ -141,7 +175,8 @@ public class OrgUnitBankPageController {
           backendApiClient.get(
               "/api/v1/org-units/bank/accounts/" + id + "/settings",
               OrgUnitBankAccountSettingsDto.class);
-      if (detail.canConfigureVisibility()) {
+      // The user dropdown feeds both the individual-visibility and the individual-limit pickers.
+      if (detail.canConfigureVisibility() || detail.canConfigureApprovalLimits()) {
         List<UserReferenceDto> lookup =
             backendApiClient.get(
                 "/api/v1/users/lookup",

@@ -68,6 +68,13 @@
                     <span th:text="#{bank.orgUnit.tab.requests}">Meine Antr&auml;ge</span>
                     <span class="tab-count" th:text="${#lists.size(ownRequests)}">0</span>
                 </button>
+                <!-- "Fremde Anträge" (REQ-BANK-041): only for a caller responsible for any account. -->
+                <button type="button" class="tab" role="tab" aria-selected="false"
+                        id="ou-tab-fremde" aria-controls="ou-panel-fremde" data-tab="fremde"
+                        th:if="${hasResponsibleAccounts}" data-testid="org-unit-bank-tab-foreign">
+                    <span th:text="#{bank.orgUnit.tab.foreignRequests}">Fremde Antr&auml;ge</span>
+                    <span class="tab-count" th:text="${#lists.size(foreignRequests)}">0</span>
+                </button>
             </div>
 
             <!-- KONTEN: dense list, one row per visible account. Newest-first stays server-ordered. -->
@@ -199,6 +206,71 @@
                     </table>
                 </div>
             </div>
+
+            <!-- FREMDE ANTRÄGE: every request raised against the accounts the caller is responsible
+                 for (REQ-BANK-041). Over-limit pending requests carry a "grant approval" action that
+                 pre-fills the bank employee's confirmation checkbox. -->
+            <div class="mt-2" id="ou-panel-fremde" data-tabpanel="fremde" role="tabpanel"
+                 aria-labelledby="ou-tab-fremde" th:if="${hasResponsibleAccounts}" hidden>
+                <div class="empty-state" th:if="${#lists.isEmpty(foreignRequests)}">
+                    <div class="empty-text" data-testid="org-unit-bank-foreign-empty"
+                         th:text="#{bank.orgUnit.foreignRequests.empty}">Keine Antr&auml;ge auf deinen Konten.</div>
+                </div>
+                <div class="table-responsive" th:if="${!#lists.isEmpty(foreignRequests)}">
+                    <table class="data-table" data-testid="org-unit-bank-foreign-requests">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.request.col.account}">Konto</th>
+                            <th th:text="#{bank.request.col.type}">Typ</th>
+                            <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
+                            <th th:text="#{bank.request.col.requester}">Antragsteller</th>
+                            <th th:text="#{bank.request.col.status}">Status</th>
+                            <th th:text="#{bank.approvalLimit.col.approval}">Freigabe</th>
+                            <th th:text="#{bank.request.col.created}">Erstellt</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${foreignRequests}" data-testid="org-unit-bank-foreign-row">
+                            <td>
+                                <span th:text="${r.accountNo()}">KB-0001</span>
+                                <span th:if="${r.type() == 'TRANSFER' and r.targetAccountNo() != null}"
+                                      class="text-muted" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</span>
+                            </td>
+                            <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                            <td class="text-right bank-amount"
+                                th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
+                            <td th:text="${r.requesterHandle()}">greluc</td>
+                            <td>
+                                <span class="chip"
+                                      th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
+                                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                            </td>
+                            <td>
+                                <!-- Approval gate cell (REQ-BANK-041): a grant button only when the request
+                                     is over-limit, still pending and not yet granted; a chip once granted. -->
+                                <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>
+                                <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
+                                      class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
+                                      th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
+                                <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
+                                      class="bank-ajax-form no-track" data-refresh="orgUnitBank"
+                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST"
+                                      style="display:inline;">
+                                    <input type="hidden" name="_id" th:value="${r.id()}">
+                                    <button type="submit" class="btn btn-xs btn-outline"
+                                            data-testid="org-unit-bank-grant-approval-btn"
+                                            th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
+                                    <span class="bank-field-error" data-error-for="_global"></span>
+                                </form>
+                                <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() != 'PENDING'}"
+                                      class="text-muted">&ndash;</span>
+                            </td>
+                            <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -217,22 +289,37 @@
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
-                        <select id="org-unit-request-account" name="orgUnitId" required
-                                data-testid="org-unit-request-account">
+                        <select id="org-unit-request-account" name="sourceAccountId" required
+                                data-role="org-unit-request-account" data-testid="org-unit-request-account">
                             <option th:each="b : ${balances}" th:if="${b.canRequest()}"
-                                    th:value="${b.orgUnitId()}"
+                                    th:value="${b.accountId()}"
+                                    th:attr="data-limit=${b.approvalLimit()}"
                                     th:text="${b.accountName()} + ' (' + ${b.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
                         </select>
                         <span class="bank-field-hint" th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
-                        <span class="bank-field-error" data-error-for="orgUnitId"></span>
+                        <span class="bank-field-error" data-error-for="sourceAccountId"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
-                        <select id="org-unit-request-type" name="type" required data-testid="org-unit-request-type">
+                        <select id="org-unit-request-type" name="type" required
+                                data-role="org-unit-request-type" data-testid="org-unit-request-type">
                             <option value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
                             <option value="WITHDRAWAL" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
+                            <option value="TRANSFER" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
                         </select>
                         <span class="bank-field-error" data-error-for="type"></span>
+                    </div>
+                    <!-- Transfer destination (REQ-BANK-040): any active account; shown only for TRANSFER.
+                         Disabled while hidden so it is omitted from the body for deposit/withdrawal. -->
+                    <div class="bank-form-row" data-request-transfer-only hidden>
+                        <label for="org-unit-request-destination" th:text="#{bank.field.destinationAccount}">Zielkonto</label>
+                        <select id="org-unit-request-destination" name="targetAccountId" disabled
+                                data-testid="org-unit-request-destination">
+                            <option value="" th:text="#{bank.field.destinationAccount.placeholder}">Zielkonto w&auml;hlen &hellip;</option>
+                            <option th:each="t : ${requestTransferTargets}" th:value="${t.id()}"
+                                    th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">KRT (KB-0002)</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="targetAccountId"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
@@ -240,6 +327,12 @@
                                data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
                         <span class="bank-field-error" data-error-for="amount"></span>
+                        <!-- Live over-limit warning (REQ-BANK-041): shown when the amount exceeds the
+                             requester's approval limit for the chosen source account; does NOT block the
+                             request, which is still filed and then flagged for the bank. -->
+                        <p class="bank-limit-warning" data-limit-warning hidden
+                           data-testid="org-unit-request-limit-warning"
+                           th:text="#{bank.approvalLimit.requesterWarning}">Der Betrag &uuml;berschreitet dein Freigabe-Limit.</p>
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>

@@ -197,7 +197,18 @@ class BankPageControllerTest {
     BankAccountDto closedOther = account(UUID.randomUUID(), "KB-0003", "CLOSED", "0");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
-            self, new BigDecimal("100"), 5, new BankCapabilitiesDto(true, true, true, false));
+            self,
+            new BigDecimal("100"),
+            5,
+            new BankCapabilitiesDto(true, true, true, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
 
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
@@ -255,7 +266,15 @@ class BankPageControllerTest {
             account(accountId, "KB-0001", "ACTIVE", "0"),
             BigDecimal.ZERO,
             0,
-            new BankCapabilitiesDto(false, false, false, false));
+            new BankCapabilitiesDto(false, false, false, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
@@ -315,7 +334,18 @@ class BankPageControllerTest {
     BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
-            self, new BigDecimal("10"), 1, new BankCapabilitiesDto(true, true, true, false));
+            self,
+            new BigDecimal("10"),
+            1,
+            new BankCapabilitiesDto(true, true, true, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
