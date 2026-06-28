@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankCapabilitiesDto;
@@ -70,6 +71,7 @@ class OrgUnitBankPageControllerMvcTest {
 
   private static final String BALANCES_URI = "/api/v1/org-units/bank/balances";
   private static final String REQUESTS_URI = "/api/v1/org-units/bank/requests";
+  private static final String TRANSFER_TARGETS_URI = "/api/v1/org-units/bank/transfer-targets";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -86,9 +88,10 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   private void stubData(UUID orgUnitId) {
+    UUID accountId = UUID.randomUUID();
     OrgUnitBankBalanceDto balance =
         new OrgUnitBankBalanceDto(
-            UUID.randomUUID(),
+            accountId,
             "KB-0001",
             "Staffel IRIDIUM",
             "ACTIVE",
@@ -131,11 +134,15 @@ class OrgUnitBankPageControllerMvcTest {
             false,
             null,
             0L);
+    BankAccountRefDto target =
+        new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(balance));
     when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(request));
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(target));
   }
 
   @Test
@@ -153,14 +160,15 @@ class OrgUnitBankPageControllerMvcTest {
         // mirroring the bank dashboard cards (REQ-BANK-016).
         .andExpect(content().string(Matchers.containsString("kpi-delta")))
         .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
-        // The single page-level request CTA shows (an account is requestable) and opens the modal.
+        // The single page-level request CTA shows (an active account exists) and opens the modal.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
-        // The modal's account selector lists the requestable account as an option, keyed by the
-        // account id now that eligibility is view-based (REQ-BANK-039) — and offers the TRANSFER
-        // op.
+        // The merged source selector lists the active account as an option marked debitable
+        // (data-can-debit="true", since it is the caller's request-capable account), and offers the
+        // TRANSFER op (REQ-BANK-039/-042).
         .andExpect(content().string(Matchers.containsString("name=\"sourceAccountId\"")))
         .andExpect(content().string(Matchers.containsString("org-unit-request-account")))
+        .andExpect(content().string(Matchers.containsString("data-can-debit=\"true\"")))
         .andExpect(content().string(Matchers.containsString("name=\"type\"")))
         // REQ-BANK-040: the transfer destination select MUST be named targetAccountId to match the
         // CreateBankBookingRequest DTO field — a mismatch silently 400s every transfer request.
@@ -247,14 +255,15 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"LOGISTICIAN"})
-  void orgUnitBank_specialAccountRendersRowWithoutRequestButton() throws Exception {
-    // REQ-BANK-028: a special account (Sonderkonto) carries no org-unit identity and is not
-    // requestable. A page of only such accounts renders the row but offers NO page-level request
-    // CTA at all (it is gated on at least one requestable account). Pins that the template handles
-    // the null org unit.
+  void orgUnitBank_specialAccountIsDepositTargetWithCta() throws Exception {
+    // REQ-BANK-042: a special account (Sonderkonto) is not withdrawal/transfer-requestable
+    // (canRequest=false), but it IS a valid deposit target — so the page-level request CTA + modal
+    // are shown and the account appears as a (non-debitable) deposit option. Pins that the template
+    // handles the null org unit.
+    UUID specialId = UUID.randomUUID();
     OrgUnitBankBalanceDto special =
         new OrgUnitBankBalanceDto(
-            UUID.randomUUID(),
+            specialId,
             "KB-0042",
             "Event Sonderkonto",
             "ACTIVE",
@@ -270,11 +279,15 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null);
+    BankAccountRefDto target =
+        new BankAccountRefDto(specialId, "KB-0042", "Event Sonderkonto", "SPECIAL");
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(special));
     when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of());
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(target));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -282,11 +295,33 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("Event Sonderkonto")))
         // The account row renders (its testid is unchanged from the former card).
         .andExpect(content().string(Matchers.containsString("org-unit-bank-card")))
-        // No requestable account -> neither the page-level CTA nor the request modal is rendered.
-        .andExpect(
-            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-btn"))))
-        .andExpect(
-            content().string(Matchers.not(Matchers.containsString("org-unit-request-modal"))));
+        // A deposit is possible against the special account -> the CTA + modal render.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
+        .andExpect(content().string(Matchers.containsString("org-unit-request-modal")))
+        // It is offered as a deposit option, marked non-debitable (no withdrawal/transfer from it).
+        .andExpect(content().string(Matchers.containsString("data-can-debit=\"false\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void orgUnitBank_noViewableAccountsStillOffersDepositCta() throws Exception {
+    // REQ-BANK-042: a member who may view no account can still raise a deposit request, so the CTA
+    // +
+    // modal render whenever at least one active account exists (here only via transfer-targets).
+    BankAccountRefDto target = new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "KRT", "CARTEL");
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of());
+    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of());
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(target));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-btn")))
+        .andExpect(content().string(Matchers.containsString("org-unit-request-modal")));
   }
 
   /**
@@ -400,6 +435,13 @@ class OrgUnitBankPageControllerMvcTest {
         // Facts render as the kpi-total grid, target fact included.
         .andExpect(content().string(Matchers.containsString("ou-facts")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
+        // Two tabs (REQ-BANK-038): Buchungshistorie + Verantwortung & Sichtbarkeit, with the
+        // settings
+        // region and the booking history each in their tab panel.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-settings")))
+        .andExpect(content().string(Matchers.containsString("data-tabpanel=\"settings\"")))
+        .andExpect(content().string(Matchers.containsString("data-tabpanel=\"history\"")))
         // Settings region with the quiet per-audience visibility toggles.
         .andExpect(content().string(Matchers.containsString("org-unit-bank-settings")))
         .andExpect(content().string(Matchers.containsString("vis-row")))
@@ -408,6 +450,130 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
         // The always-"Aktiv" status pill was dropped from the header.
         .andExpect(content().string(Matchers.not(Matchers.containsString("status-pill"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryWithoutTabs() throws Exception {
+    // REQ-BANK-038: a viewer who cannot manage and whose account carries no approval limits has no
+    // "Verantwortung & Sichtbarkeit" tab — the booking history renders plainly with its own
+    // heading,
+    // the shared info tiles still on top.
+    UUID accountId = UUID.randomUUID();
+    BankAccountDto account =
+        new BankAccountDto(
+            accountId,
+            "KB-0007",
+            "KRT",
+            "CARTEL",
+            "ACTIVE",
+            null,
+            null,
+            new BigDecimal("50000"),
+            null,
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    BankAccountDetailDto inner =
+        new BankAccountDetailDto(
+            account,
+            BigDecimal.ZERO,
+            3L,
+            new BankCapabilitiesDto(false, false, false, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                java.util.List.of()));
+    OrgUnitBankAccountDetailDto detail =
+        new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null);
+    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+        .thenReturn(detail);
+    when(backendApiClient.get(
+            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/org-unit-bank/accounts/" + accountId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
+        // No settings tab for a plain viewer with no limits — and so no tab nav at all.
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-history"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void orgUnitBankAccount_viewerWithLimits_seesInlineLimitsButNoResponsibilityTab()
+      throws Exception {
+    // REQ-BANK-038/-041: a plain viewer (not the responsible holder) still sees the read-only
+    // approval-limit display inline (it applies to their own requests), but NOT the "Verantwortung
+    // &
+    // Sichtbarkeit" tab — that tab is the responsible holder's alone.
+    UUID accountId = UUID.randomUUID();
+    BankAccountDto account =
+        new BankAccountDto(
+            accountId,
+            "KB-0003",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "ACTIVE",
+            null,
+            null,
+            new BigDecimal("100000"),
+            null,
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    BankAccountDetailDto inner =
+        new BankAccountDetailDto(
+            account,
+            BigDecimal.ZERO,
+            5L,
+            new BankCapabilitiesDto(false, false, false, false),
+            new de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto(
+                false,
+                true,
+                true,
+                java.util.List.of("KOMMANDOLEITER"),
+                java.util.Map.of("KOMMANDOLEITER", new BigDecimal("1000000")),
+                null,
+                java.util.List.of()));
+    OrgUnitBankAccountDetailDto detail =
+        new OrgUnitBankAccountDetailDto(
+            inner, true, false, false, true, false, new BigDecimal("1000000"));
+    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+        .thenReturn(detail);
+    when(backendApiClient.get(
+            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/org-unit-bank/accounts/" + accountId))
+        .andExpect(status().isOk())
+        // The read-only limits display renders for the viewer...
+        .andExpect(content().string(Matchers.containsString("bank-approval-limits-display")))
+        // ...but there is no responsibility tab and no editable settings hud-box (match the exact
+        // testid attribute — the always-present swap container id is
+        // "org-unit-bank-settings-results").
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("data-testid=\"org-unit-bank-settings\""))));
   }
 
   @Test

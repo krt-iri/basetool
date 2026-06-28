@@ -31,7 +31,8 @@
     </div>
 </main>
 
-<main th:if="${detail != null}" th:with="d=${detail.detail()}, acct=${detail.detail().account()}"
+<main th:if="${detail != null}"
+      th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}"
       th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
 
     <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
@@ -57,9 +58,29 @@
         </div>
     </div>
 
-    <!-- Facts + responsibility settings; re-rendered in place after a target/visibility write. -->
+    <!-- Tab row + shared info tiles + the responsibility-settings tab panel; re-rendered in place
+         after a target/visibility write (the facts carry the live balance target). The booking-history
+         tab panel is the separate orgUnitBankBookings swap below, so paging it never re-fetches the
+         settings — and a settings write never resets the history page. -->
     <div id="org-unit-bank-settings-results">
-    <th:block th:fragment="orgUnitBankSettings" th:with="d=${detail.detail()}, acct=${detail.detail().account()}">
+    <th:block th:fragment="orgUnitBankSettings"
+              th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}">
+        <!-- Tab row (REQ-BANK-038): Buchungshistorie | Verantwortung & Sichtbarkeit, above the shared
+             info tiles. Shown only when there is a settings tab (a manager, or a viewer with approval
+             limits to read); otherwise the history panel below renders plainly with its own heading. -->
+        <div class="tab-nav mt-2" role="tablist" th:if="${hasSettingsTab}" th:aria-label="${acct.name()}">
+            <button type="button" class="tab active" role="tab" aria-selected="true"
+                    id="oud-tab-history" aria-controls="oud-panel-history" data-tab="history"
+                    data-testid="org-unit-bank-detail-tab-history">
+                <span th:text="#{bank.detail.history}">Buchungshistorie</span>
+            </button>
+            <button type="button" class="tab" role="tab" aria-selected="false"
+                    id="oud-tab-settings" aria-controls="oud-panel-settings" data-tab="settings"
+                    data-testid="org-unit-bank-detail-tab-settings">
+                <span th:text="#{bank.orgUnit.settings.title}">Verantwortung &amp; Sichtbarkeit</span>
+            </button>
+        </div>
+
         <div class="ou-facts mt-2"
              th:with="hasTarget=${acct.balanceTarget() != null and acct.balanceTarget().signum() > 0},
                       pct=${(acct.balanceTarget() != null and acct.balanceTarget().signum() > 0) ? (acct.balance().doubleValue() / acct.balanceTarget().doubleValue() * 100.0) : 0.0}">
@@ -90,14 +111,22 @@
             </div>
         </div>
 
-        <!-- Approval-limit display (REQ-BANK-041) for viewers who cannot edit; a manager sees the
-             editor in the settings panel below instead (so it is never shown twice). -->
+        <!-- Read-only approval-limit display (REQ-BANK-041): shown to a viewer who is NOT the
+             responsible holder (settings == null) so they still see the limits that apply to their
+             requests. It is deliberately OUTSIDE the responsibility tab — that tab is the responsible
+             holder's alone — and renders as a plain inline section below the info tiles. -->
         <th:block th:if="${settings == null}"
                   th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
 
+        <!-- VERANTWORTUNG & SICHTBARKEIT tab panel: the responsible holder's settings (balance target,
+             configurable visibility, approval limits). Shown ONLY to the responsible holder / manager
+             (settings != null, == hasSettingsTab); hidden by default — Buchungshistorie is the
+             default-active tab and the tab label supplies the heading, so the panel has no h2. -->
+        <div th:if="${hasSettingsTab}" id="oud-panel-settings" data-tabpanel="settings" role="tabpanel"
+             aria-labelledby="oud-tab-settings" hidden>
+
         <!-- Responsibility settings (REQ-BANK-035/-036): only for the holder / OL. -->
         <div class="hud-box mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
-            <h2 th:text="#{bank.orgUnit.settings.title}">Verantwortung &amp; Sichtbarkeit</h2>
 
             <!-- Balance target -->
             <div th:if="${settings.canSetTarget()}" class="mt-2" data-testid="org-unit-bank-target-settings">
@@ -209,12 +238,20 @@
             <th:block
                 th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
         </div>
+        </div>
     </th:block>
     </div>
 
-    <!-- Booking history (Halter redacted, REQ-BANK-038). Paginated in place via krtFetch. -->
-    <div class="bank-panel mt-2" data-testid="org-unit-bank-bookings-panel">
-        <div class="bank-panel-head">
+    <!-- BUCHUNGSHISTORIE tab panel (Halter redacted, REQ-BANK-038). The separate orgUnitBankBookings
+         swap below paginates in place via krtFetch. When a settings tab exists this is the
+         default-active tab panel (data-tabpanel=history, sits below the shared info tiles); otherwise
+         it renders plainly with its own heading. -->
+    <div class="bank-panel mt-2" data-testid="org-unit-bank-bookings-panel"
+         th:attr="id=${hasSettingsTab} ? 'oud-panel-history' : null,
+                  data-tabpanel=${hasSettingsTab} ? 'history' : null,
+                  role=${hasSettingsTab} ? 'tabpanel' : null,
+                  aria-labelledby=${hasSettingsTab} ? 'oud-tab-history' : null">
+        <div class="bank-panel-head" th:unless="${hasSettingsTab}">
             <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
         </div>
         <div class="bank-panel-body">
@@ -327,6 +364,49 @@
     }
     bindOrgUnitBankBookingsPager();
     document.addEventListener('krt:swapped', bindOrgUnitBankBookingsPager);
+
+    // Detail tab controller (REQ-BANK-038): Buchungshistorie | Verantwortung & Sichtbarkeit. The
+    // shared info tiles stay above; only the two panels switch. The active tab is held in a closure so
+    // it survives an in-place swap — a settings write re-renders the orgUnitBankSettings fragment
+    // (incl. the freshly default-active tab nav), so on krt:swapped we re-assert the held tab instead
+    // of bouncing the user back to Buchungshistorie. No #tab= deeplink (it would collide with the
+    // pager's ?page= history); document-delegated so the handlers survive the swap. No inline on*
+    // (CSP).
+    (function () {
+        var active = 'history';
+        function panels() { return document.querySelectorAll('[data-tabpanel]'); }
+        function tabs() { return document.querySelectorAll('.tab-nav .tab[data-tab]'); }
+        function apply(focus) {
+            var ts = Array.prototype.slice.call(tabs());
+            if (!ts.length) { return; }
+            var keys = ts.map(function (t) { return t.getAttribute('data-tab'); });
+            if (keys.indexOf(active) === -1) { active = keys[0]; }
+            ts.forEach(function (t) {
+                var on = t.getAttribute('data-tab') === active;
+                t.classList.toggle('active', on);
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                if (on && focus) { t.focus(); }
+            });
+            panels().forEach(function (p) { p.hidden = p.getAttribute('data-tabpanel') !== active; });
+        }
+        document.addEventListener('click', function (e) {
+            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
+            if (t) { active = t.getAttribute('data-tab'); apply(); }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
+            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
+            if (!t) { return; }
+            e.preventDefault();
+            var ts = Array.prototype.slice.call(tabs());
+            var i = ts.indexOf(t);
+            var n = (i + (e.key === 'ArrowRight' ? 1 : ts.length - 1)) % ts.length;
+            active = ts[n].getAttribute('data-tab');
+            apply(true);
+        });
+        apply();
+        document.addEventListener('krt:swapped', function () { apply(); });
+    })();
 </script>
 </body>
 </html>

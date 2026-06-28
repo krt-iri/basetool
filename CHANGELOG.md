@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bank: Kontoverantwortliche werden über Anträge auf ihrem Konto benachrichtigt.** Der oder die Kontoverantwortliche (Staffelleiter, SK-Leiter, Bereichsleiter, OL-Mitglieder bzw. Profit-Bereichsleiter) erhält jetzt eine Benachrichtigung, wenn auf dem verantworteten Konto ein Buchungsantrag erstellt oder von einem Bankmitarbeiter bestätigt bzw. abgelehnt wird. Wer den Antrag selbst gestellt oder bearbeitet hat, wird nicht über die eigene Aktion benachrichtigt.
+
+### Changed
+
+- **Bank: Einzahlungen kann jeder Nutzer für jedes aktive Konto beantragen — ohne Freigabe-Limit.** Ein Einzahlungsantrag ist jetzt für jedes aktive Konto (auch nicht sichtbare sowie Sonder- und Kartellbankkonten) durch jeden angemeldeten Nutzer möglich und unterliegt keinem Freigabe-Limit; der Bankmitarbeiter gibt ihn wie gewohnt frei, sobald das Geld ingame eingegangen ist. Auszahlungen und Transfers bleiben unverändert auf sichtbare Konten beschränkt und unterliegen weiterhin den Freigabe-Limits.
+
+- **Bank: Konto-Detailseite unter „Bank meiner Org-Einheit" mit Tabs.** Die Detailansicht eines Kontos trennt „Buchungshistorie" und „Verantwortung & Sichtbarkeit" jetzt in zwei Tabs. Die Tableiste sitzt oben; darunter bleiben die Info-Kacheln (Kontosaldo, Zielkontostand, Trend, Buchungen) auf beiden Tabs sichtbar. Den Tab „Verantwortung & Sichtbarkeit" sieht nur der Kontoverantwortliche; reine Betrachter sehen ihre geltenden Freigabe-Limits weiterhin schreibgeschützt direkt unter den Kacheln.
+
 ## [v1.0.0](https://github.com/krt-profit/basetool/releases/tag/v1.0.0) - 2026-06-28
 
 ## [v0.7.17](https://github.com/krt-profit/basetool/releases/tag/v0.7.17) - 2026-06-27

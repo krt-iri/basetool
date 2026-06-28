@@ -386,23 +386,24 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Raises a confirm-before-post deposit/withdrawal request for an org unit the caller oversees
-   * (REQ-BANK-022, F2). The request is recorded as {@code PENDING} and audited, but moves no money
-   * until a bank employee confirms it. The service rejects an org unit outside the caller's
-   * oversight scope.
+   * Raises a confirm-before-post booking request (REQ-BANK-022/-039/-042, F2). The request is
+   * recorded as {@code PENDING} and audited, but moves no money until a bank employee confirms it.
+   * A <em>deposit</em> may target any active account (REQ-BANK-042); a <em>withdrawal /
+   * transfer</em> is gated by view eligibility on the source account (REQ-BANK-039).
    *
-   * @param request the create payload (org unit, type, amount, note)
+   * @param request the create payload (source account, type, amount, optional destination, note)
    * @return the created pending request
    */
   @PostMapping("/requests")
   @PreAuthorize("isAuthenticated()")
   @Operation(
-      summary = "Raise a confirm-before-post booking request for an overseen org unit",
+      summary = "Raise a confirm-before-post booking request",
       description =
-          "Creates a PENDING deposit/withdrawal request against the bank account of an org unit the"
-              + " authenticated officer/lead oversees. The request is audited immediately but moves"
-              + " no money until a bank employee confirms it; no holder is chosen by the"
-              + " requester.")
+          "Creates a PENDING booking request that is audited immediately but moves no money until a"
+              + " bank employee confirms it; no holder is chosen by the requester. A deposit may be"
+              + " requested by any authenticated caller against any active account and is never"
+              + " approval-limited (REQ-BANK-042); a withdrawal/transfer is restricted to an"
+              + " account the caller may view and subject to the per-tier approval limits.")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request created")})
   public BankBookingRequestDto createBookingRequest(
       @Valid @RequestBody CreateBankBookingRequest request) {

@@ -580,8 +580,11 @@ scope covers them itself (as bank staff they are not automatically officer/lead)
 their actual bank work runs through the bank area above. A request moves money only
 at confirmation; overdraft/holder checks then apply as for a direct booking
 (REQ-BANK-023). On creation, Bank Management + the Bank Empl. authorized for the account
-are notified via in-app notification (REQ-BANK-026,
-`ACCOUNT_GRANT` selector). An account with an open request cannot be closed
+are notified via in-app notification (REQ-BANK-026, `ACCOUNT_GRANT` selector); **the account's
+responsible holder is also notified — on creation AND on confirmation/rejection** — via the
+`ACCOUNT_RESPONSIBLE` selector (REQ-BANK-026/-034), with the deciding/creating actor excluded so a
+holder who raised or decided the request is not notified about their own action. An account with an
+open request cannot be closed
 (409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). The audit log stays admin-only. The page shows
 exclusively **active** accounts (REQ-BANK-028).
 
@@ -622,20 +625,22 @@ decides per account what is visible.
 has no dedicated Bank Mgmt. column); `ORG_UNIT`/`AREA` is configured by the responsible holder,
 `CARTEL`/`CARTEL_BANK` are fixed (REQ-BANK-037).
 
-#### 3.11.3 Requesting for all view-eligible users, transfer requests & approval limits (REQ-BANK-039..041)
+#### 3.11.3 Requesting for all view-eligible users, transfer requests, approval limits & unrestricted deposits (REQ-BANK-039..042)
 
 Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` (the bank stays OrgUnit-blind, ADR-0045, both ArchUnit pins green):
 
-- **Request eligibility = view eligibility (REQ-BANK-039):** whoever may **view** a requestable account (`ORG_UNIT` / `AREA` / `CARTEL`, active only) may submit a request on it — no longer only the leadership ranks from 3.11.1. A member made visible via approval (REQ-BANK-035) (sub-rank, all members, individual user) can therefore likewise request. `SPECIAL` / `CARTEL_BANK` never receive requests.
+- **Request eligibility = view eligibility (REQ-BANK-039), for withdrawals/transfers:** whoever may **view** a requestable account (`ORG_UNIT` / `AREA` / `CARTEL`, active only) may submit a withdrawal/transfer request on it — no longer only the leadership ranks from 3.11.1. A member made visible via approval (REQ-BANK-035) (sub-rank, all members, individual user) can therefore likewise request. `SPECIAL` / `CARTEL_BANK` never receive withdrawals/transfers. (Deposits are unrestricted — see REQ-BANK-042 below.)
 - **Transfer requests (REQ-BANK-040):** in addition to deposit/withdrawal, a `TRANSFER` from the (visible) source account to **any active account** as target can be requested. The bank employee books it on confirmation as a real `TRANSFER` (recording source/target holders, in-game fee REQ-BANK-033); requires `can_transfer` on the **source** — a grant on the target is not required.
-- **Approval limits per account/level + two-stage approval (REQ-BANK-041):** per level (Squadron/Bereich sub-ranks, all members, individual user) a limit (>= 0 aUEC) may apply, up to which one may request without approval; a missing limit = unlimited. Above the limit the request is marked `requires_owner_approval`: (1) the **responsible holder** grants the approval in the „Fremde Anträge" tab (audited `BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`), (2) the **bank employee** confirms only after the mandatory checkbox „Freigabe durch Kontoverantwortlichen erfolgt" (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`; without the checkbox 409 `BANK_OWNER_APPROVAL_REQUIRED`). Configuring limits is allowed for the **responsible holder, Bank Management and Admin** — never a plain Bank Empl.; they are read-visible in the account details for all view-eligible users (audited `APPROVAL_LIMIT_SET/CLEARED`).
+- **Approval limits per account/level + two-stage approval (REQ-BANK-041), for withdrawals/transfers:** per level (Squadron/Bereich sub-ranks, all members, individual user) a limit (>= 0 aUEC) may apply, up to which one may request without approval; a missing limit = unlimited. Above the limit the request is marked `requires_owner_approval`: (1) the **responsible holder** grants the approval in the „Fremde Anträge" tab (audited `BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`), (2) the **bank employee** confirms only after the mandatory checkbox „Freigabe durch Kontoverantwortlichen erfolgt" (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`; without the checkbox 409 `BANK_OWNER_APPROVAL_REQUIRED`). Configuring limits is allowed for the **responsible holder, Bank Management and Admin** — never a plain Bank Empl.; they are read-visible in the account details for all view-eligible users (audited `APPROVAL_LIMIT_SET/CLEARED`). Deposits are never approval-limited (REQ-BANK-042).
+- **Unrestricted deposits (REQ-BANK-042):** a **deposit** request is exempt from both the view-eligibility gate and the approval limits above — **any authenticated user** may request a deposit against **any active account** (every type incl. `SPECIAL` / `CARTEL_BANK`, even one they cannot view), and it is never marked `requires_owner_approval`. The bank employee confirms it on in-game receipt as usual; only the account-active guard remains (`BANK_ACCOUNT_CLOSED`).
 
-| Function (gate)                                                                                                                                      | Member (if visible) | Responsible | Bank Empl. | Bank Mgmt. | Admin |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------:|:-----------:|:----------:|:----------:|:-----:|
-| Submit a request (deposit/withdrawal/**transfer**) on a **visible** requestable account (`OrgUnitBankAccessService#createBookingRequest`, `canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
-| Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                                  |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
-| **Approve/revoke** an over-limit request („Fremde Anträge" tab, account in one's own responsibility)                                                 |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
-| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`)                                                 |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
+| Function (gate)                                                                                                                              | Member (if visible) | Responsible | Bank Empl. | Bank Mgmt. | Admin |
+|:---------------------------------------------------------------------------------------------------------------------------------------------|:-------------------:|:-----------:|:----------:|:----------:|:-----:|
+| Submit a **deposit** request on **any active account** (`createBookingRequest`, REQ-BANK-042 — any authenticated user, no limit)             |       ✅ (any)       |      ✅      |     ✅      |     ✅      |   ✅   |
+| Submit a **withdrawal / transfer** request on a **visible** requestable account (`OrgUnitBankAccessService#createBookingRequest`, `canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
+| Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
+| **Approve/revoke** an over-limit request („Fremde Anträge" tab, account in one's own responsibility)                                         |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
+| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`)                                         |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 

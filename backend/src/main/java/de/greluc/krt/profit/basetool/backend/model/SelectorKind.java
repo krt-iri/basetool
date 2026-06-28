@@ -54,5 +54,16 @@ public enum SelectorKind {
    * the officer/lead who raised a booking request, notified when it is confirmed or rejected. Reads
    * no selector columns — the recipient comes from the event.
    */
-  EVENT_RECIPIENT
+  EVENT_RECIPIENT,
+
+  /**
+   * Resolves to the <em>responsible holder(s)</em> (Kontoverantwortliche, REQ-BANK-034) of the bank
+   * account carried by the event ({@link
+   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextAccountId()}) — the
+   * Staffelleiter / SK-Leiter / Bereichsleiter / OL members / Profit-Bereichsleiter derived from
+   * the account's owning org unit. Reads no selector columns — the account comes from the event,
+   * mirroring {@link #ACCOUNT_GRANT}. The org-unit-aware resolution stays inside the {@code
+   * OrgUnitBankAccessService} seam so the bank stays org-unit-blind (REQ-BANK-008, REQ-BANK-026).
+   */
+  ACCOUNT_RESPONSIBLE
 }

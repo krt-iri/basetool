@@ -58,6 +58,24 @@ public enum NotificationType {
   BANK_BOOKING_REQUEST_REJECTED,
 
   /**
+   * A bank employee confirmed a booking request raised against an account the recipient is the
+   * <em>responsible holder</em> of (Kontoverantwortliche, REQ-BANK-026/-034). Distinct from {@link
+   * #BANK_BOOKING_REQUEST_CONFIRMED} so the responsible holder gets account-centric text ("a
+   * request on your account was confirmed") rather than the requester-directed text; the seeded
+   * rule resolves the responsible holder via the {@code ACCOUNT_RESPONSIBLE} selector.
+   */
+  BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED,
+
+  /**
+   * A bank employee rejected a booking request raised against an account the recipient is the
+   * <em>responsible holder</em> of (Kontoverantwortliche, REQ-BANK-026/-034). Distinct from {@link
+   * #BANK_BOOKING_REQUEST_REJECTED} so the responsible holder gets account-centric text (the reason
+   * is rendered); the seeded rule resolves the responsible holder via the {@code
+   * ACCOUNT_RESPONSIBLE} selector.
+   */
+  BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED,
+
+  /**
    * A new Discord user registered and is awaiting admin approval (epic #720, Track 1). The seeded
    * default rule notifies every admin; the frontend renders it under {@code
    * notifications.type.DISCORD_REGISTRATION_PENDING} with the {@code username} render parameter.

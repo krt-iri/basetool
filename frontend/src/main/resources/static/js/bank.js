@@ -494,6 +494,12 @@
         if (!warning || !amountEl || !accountEl) {
             return;
         }
+        // REQ-BANK-042: a deposit is never subject to an approval limit — never warn.
+        const typeEl = form.querySelector('select[data-role="org-unit-request-type"]');
+        if (typeEl && typeEl.value === 'DEPOSIT') {
+            warning.hidden = true;
+            return;
+        }
         const amount = Number(amountEl.value);
         const option = accountEl.options[accountEl.selectedIndex];
         const rawLimit = option ? option.getAttribute('data-limit') : null;
@@ -765,9 +771,14 @@
     }
 
     /**
-     * Org-unit request modal (REQ-BANK-040): the transfer destination row is shown only for a
-     * TRANSFER. Its select is disabled while hidden so it is omitted from the body (and cleared) for
-     * a deposit/withdrawal.
+     * Org-unit request modal (REQ-BANK-039/-040/-042): adapts the modal to the chosen request type.
+     *  - Source picker: a DEPOSIT may target ANY active account (REQ-BANK-042); a WITHDRAWAL/TRANSFER
+     *    only the caller's request-capable accounts (the `data-can-debit` options, REQ-BANK-039).
+     *    Non-eligible options are hidden + disabled and the selection re-points to the first eligible
+     *    one if the current pick fell out (mirrors {@link syncAccountTypeRows}).
+     *  - Account hint follows the type ("any active account" vs. "only accounts you may request for").
+     *  - Transfer destination row: shown/enabled only for a TRANSFER.
+     *  - The over-limit warning is recomputed (and stays hidden for a deposit).
      *
      * @param {HTMLSelectElement} select the request-type select
      */
@@ -776,9 +787,39 @@
         if (!form) {
             return;
         }
-        const isTransfer = select.value === 'TRANSFER';
+        const type = select.value;
+        const isTransfer = type === 'TRANSFER';
+        const isDeposit = type === 'DEPOSIT';
+        const account = form.querySelector('select[data-role="org-unit-request-account"]');
+        if (account) {
+            let currentVisible = false;
+            Array.prototype.forEach.call(account.options, function (option) {
+                const debitable = option.getAttribute('data-can-debit') === 'true';
+                const visible = isDeposit || debitable;
+                option.hidden = !visible;
+                option.disabled = !visible;
+                if (visible && option.value === account.value) {
+                    currentVisible = true;
+                }
+            });
+            if (!currentVisible) {
+                const first = Array.prototype.find.call(account.options, function (o) {
+                    return !o.disabled;
+                });
+                account.value = first ? first.value : '';
+            }
+        }
+        const depositHint = form.querySelector('[data-deposit-hint]');
+        const debitHint = form.querySelector('[data-debit-hint]');
+        if (depositHint) {
+            depositHint.hidden = !isDeposit;
+        }
+        if (debitHint) {
+            debitHint.hidden = isDeposit;
+        }
         const row = form.querySelector('[data-request-transfer-only]');
         toggleTransferOnlyControl(row, isTransfer);
+        updateLimitWarning(form);
     }
 
     document.addEventListener('change', function (event) {

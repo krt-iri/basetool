@@ -24,17 +24,19 @@
 </header>
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
-    <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022). The CTA opens the
-         request modal whose account selector is filled with the caller's requestable accounts; it is
-         shown only when at least one visible account is requestable (anyCanRequest). It sits OUTSIDE
-         the swapped fragment because the requestable set never changes on a request create/cancel. -->
+    <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022/-042). The CTA opens the
+         request modal whose source selector lists every active account for a deposit and the
+         caller's request-capable accounts for a withdrawal/transfer; it is shown whenever a request
+         is possible at all — i.e. at least one active account exists (canRequestAny), since a deposit
+         may target any active account (REQ-BANK-042). It sits OUTSIDE the swapped fragment because
+         the active-account set never changes on a request create/cancel. -->
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
             <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
                th:text="#{bank.orgUnit.subtitle}">Kontostand und Ein-/Auszahlungsantr&auml;ge deiner Org-Einheit.</p>
         </div>
-        <div class="bank-head-actions" th:if="${anyCanRequest}">
+        <div class="bank-head-actions" th:if="${canRequestAny}">
             <button type="button" class="btn btn--cta"
                     data-trigger="open-modal-display" data-modal-id="org-unit-request-modal"
                     data-testid="org-unit-bank-request-btn"
@@ -45,24 +47,33 @@
     <!-- orgUnitBank fragment: tabs (accounts + my-requests) with their counts and both panels;
          swapped in place after a write so the dense account list AND the request count update without
          a reload (REQ-FE-005). Both tab panels live INSIDE the fragment for that reason. -->
-    <div id="org-unit-bank-results" th:fragment="orgUnitBank">
+    <div id="org-unit-bank-results" th:fragment="orgUnitBank"
+         th:with="showKonten=${!#lists.isEmpty(balances)},
+                  showTabs=${!#lists.isEmpty(balances) or !#lists.isEmpty(ownRequests) or hasResponsibleAccounts}">
 
-        <!-- Empty: no visible account at all. -->
-        <div class="empty-state mt-2" th:if="${#lists.isEmpty(balances)}">
+        <!-- Empty: nothing to list. The deposit CTA above still lets any caller file a request
+             (REQ-BANK-042), so this only means the caller currently views no account and has no own
+             or responsible requests yet. -->
+        <div class="empty-state mt-2" th:unless="${showTabs}">
             <div class="empty-text" data-testid="org-unit-bank-empty" th:text="#{bank.orgUnit.empty}">
                 Du beaufsichtigst keine Org-Einheit mit einem Bankkonto.
             </div>
         </div>
 
-        <div th:if="${!#lists.isEmpty(balances)}">
+        <div th:if="${showTabs}">
             <div class="tab-nav mt-2" role="tablist" th:aria-label="#{bank.orgUnit.title}">
+                <!-- KONTEN tab only when the caller may view at least one account; otherwise "Meine
+                     Antr&auml;ge" becomes the default-active tab. -->
                 <button type="button" class="tab active" role="tab" aria-selected="true"
+                        th:if="${showKonten}"
                         id="ou-tab-konten" aria-controls="ou-panel-konten" data-tab="konten"
                         data-testid="org-unit-bank-tab-accounts">
                     <span th:text="#{bank.orgUnit.tab.accounts}">Konten</span>
                     <span class="tab-count" th:text="${#lists.size(balances)}">3</span>
                 </button>
-                <button type="button" class="tab" role="tab" aria-selected="false"
+                <button type="button" class="tab" role="tab"
+                        th:classappend="${!showKonten} ? ' active' : ''"
+                        th:attr="aria-selected=${!showKonten} ? 'true' : 'false'"
                         id="ou-tab-antraege" aria-controls="ou-panel-antraege" data-tab="antraege"
                         data-testid="org-unit-bank-tab-requests">
                     <span th:text="#{bank.orgUnit.tab.requests}">Meine Antr&auml;ge</span>
@@ -79,7 +90,7 @@
 
             <!-- KONTEN: dense list, one row per visible account. Newest-first stays server-ordered. -->
             <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
-                 aria-labelledby="ou-tab-konten">
+                 aria-labelledby="ou-tab-konten" th:if="${showKonten}">
                 <div class="ou-list">
                     <div class="ou-rowhead" aria-hidden="true">
                         <span th:text="#{bank.request.col.account}">Konto</span>
@@ -155,9 +166,11 @@
                 </div>
             </div>
 
-            <!-- MEINE ANTRÄGE: the requester's own requests (per-user isolation, REQ-BANK-022). -->
+            <!-- MEINE ANTRÄGE: the requester's own requests (per-user isolation, REQ-BANK-022).
+                 Hidden when the Konten tab is present (it is the default-active one); the
+                 default-active panel when the caller views no account. -->
             <div class="mt-2" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
-                 aria-labelledby="ou-tab-antraege" hidden>
+                 aria-labelledby="ou-tab-antraege" th:attr="hidden=${showKonten} ? 'hidden' : null">
                 <div class="empty-state" th:if="${#lists.isEmpty(ownRequests)}">
                     <div class="empty-text" data-testid="org-unit-bank-requests-empty"
                          th:text="#{bank.orgUnit.requests.empty}">Noch keine Antr&auml;ge.</div>
@@ -274,10 +287,11 @@
         </div>
     </div>
 
-    <!-- Request modal (outside the swapped fragment). Its account selector lists ONLY the caller's
-         requestable accounts (canRequest); the chosen account's owning org unit is the request
-         target. Shown only when at least one such account exists. -->
-    <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${anyCanRequest}">
+    <!-- Request modal (outside the swapped fragment). Its source selector lists EVERY active account
+         (deposits may target any of them, REQ-BANK-042); the JS narrows it to the caller's
+         request-capable accounts when a withdrawal/transfer is chosen. Shown whenever any active
+         account exists (canRequestAny). -->
+    <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${canRequestAny}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.modal.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.modal.title}">Ein-/Auszahlung beantragen</h3>
@@ -289,23 +303,31 @@
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
+                        <!-- One merged source picker over EVERY active account. Each option is marked
+                             data-can-debit (the caller may withdraw/transfer from it) + its approval
+                             limit; bank.js shows all options for a deposit (REQ-BANK-042) and only
+                             data-can-debit ones for a withdrawal/transfer (REQ-BANK-039). -->
                         <select id="org-unit-request-account" name="sourceAccountId" required
                                 data-role="org-unit-request-account" data-testid="org-unit-request-account">
-                            <option th:each="b : ${balances}" th:if="${b.canRequest()}"
-                                    th:value="${b.accountId()}"
-                                    th:attr="data-limit=${b.approvalLimit()}"
-                                    th:text="${b.accountName()} + ' (' + ${b.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
+                            <option th:each="t : ${requestTransferTargets}"
+                                    th:value="${t.id()}"
+                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())}"
+                                    th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
                         </select>
-                        <span class="bank-field-hint" th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
+                        <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>
+                        <span class="bank-field-hint" data-debit-hint hidden th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
                         <span class="bank-field-error" data-error-for="sourceAccountId"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
+                        <!-- Withdrawal/transfer are offered only when the caller may request against
+                             at least one account they can view (anyCanRequest); a deposit is always
+                             available (REQ-BANK-042). -->
                         <select id="org-unit-request-type" name="type" required
                                 data-role="org-unit-request-type" data-testid="org-unit-request-type">
                             <option value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
-                            <option value="WITHDRAWAL" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
-                            <option value="TRANSFER" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
+                            <option value="WITHDRAWAL" th:if="${anyCanRequest}" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
+                            <option value="TRANSFER" th:if="${anyCanRequest}" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
                         </select>
                         <span class="bank-field-error" data-error-for="type"></span>
                     </div>

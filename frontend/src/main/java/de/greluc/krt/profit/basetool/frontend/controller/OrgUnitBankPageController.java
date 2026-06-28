@@ -29,11 +29,14 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -78,25 +81,32 @@ public class OrgUnitBankPageController {
   @GetMapping("/org-unit-bank")
   @PreAuthorize(MEMBER_OR_ABOVE)
   public String orgUnitBank(@RequestParam(required = false) String fragment, Model model) {
-    // Balances, own-requests and foreign-requests are independent reads; fetch them concurrently
-    // via ParallelPageLoader (which relays the bearer token + active-OrgUnit header to the worker
-    // threads) instead of three serial round-trips. Each helper degrades to an empty list on
-    // failure, so allOf().join() never throws and the page renders exactly as the serial version.
+    // Balances, own-requests, foreign-requests and the all-active-account list are independent
+    // reads; fetch them concurrently via ParallelPageLoader (which relays the bearer token +
+    // active-OrgUnit header to the worker threads) instead of serial round-trips. Each helper
+    // degrades to an empty list on failure, so allOf().join() never throws and the page renders
+    // exactly as the serial version. The all-active list (transfer-targets) is now always fetched:
+    // it is both the transfer destination picker (REQ-BANK-040) AND the deposit source picker
+    // (REQ-BANK-042 — a deposit may target any active account, not just a viewable one).
     CompletableFuture<List<OrgUnitBankBalanceDto>> balancesFuture =
         parallelPageLoader.loadAsync(this::fetchBalances);
     CompletableFuture<List<BankBookingRequestDto>> ownRequestsFuture =
         parallelPageLoader.loadAsync(this::fetchOwnRequests);
     CompletableFuture<List<BankBookingRequestDto>> foreignRequestsFuture =
         parallelPageLoader.loadAsync(this::fetchForeignRequests);
-    CompletableFuture.allOf(balancesFuture, ownRequestsFuture, foreignRequestsFuture).join();
+    CompletableFuture<List<BankAccountRefDto>> transferTargetsFuture =
+        parallelPageLoader.loadAsync(this::fetchTransferTargets);
+    CompletableFuture.allOf(
+            balancesFuture, ownRequestsFuture, foreignRequestsFuture, transferTargetsFuture)
+        .join();
 
     List<OrgUnitBankBalanceDto> safeBalances = balancesFuture.join();
     model.addAttribute("balances", safeBalances);
     model.addAttribute("ownRequests", ownRequestsFuture.join());
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
-    // Drives the single page-level "request" CTA + its modal account selector (REQ-BANK-022/-039):
-    // shown iff at least one visible account is request-capable (canRequest = the caller may view a
-    // request-capable account).
+    // canRequest = the caller may view a REQUEST-CAPABLE account, i.e. may raise a
+    // withdrawal/transfer request against it (REQ-BANK-039). Drives the withdrawal/transfer type
+    // options and which source-account options carry a debit affordance + approval limit.
     boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
     model.addAttribute("anyCanRequest", anyCanRequest);
     // "Fremde Anträge" tab (REQ-BANK-041): requests on the accounts the caller is responsible for.
@@ -112,12 +122,31 @@ public class OrgUnitBankPageController {
     model.addAttribute(
         "hasResponsibleAccounts",
         safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
-    // Transfer-request destination picker (REQ-BANK-040): any active account. Depends on
-    // anyCanRequest (derived from balances), so it stays sequential — and is only fetched when at
-    // least one visible account is request-capable.
-    model.addAttribute(
-        "requestTransferTargets",
-        anyCanRequest ? fetchTransferTargets() : List.<BankAccountRefDto>of());
+    // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042).
+    List<BankAccountRefDto> transferTargets = transferTargetsFuture.join();
+    model.addAttribute("requestTransferTargets", transferTargets);
+    // The request CTA + modal are shown whenever a request is possible at all — since a deposit may
+    // target any active account, that is whenever at least one active account exists
+    // (REQ-BANK-042),
+    // even for a caller who oversees / may view none.
+    model.addAttribute("canRequestAny", !transferTargets.isEmpty());
+    // Per-account debit affordance for the merged source picker: the ids of the caller's
+    // request-capable (withdrawal/transfer) accounts and their resolved approval limits. The
+    // template marks each active-account <option> with these so the JS can show all options for a
+    // deposit but only the debitable ones for a withdrawal/transfer, carrying the limit warning.
+    Set<UUID> debitableAccountIds =
+        safeBalances.stream()
+            .filter(OrgUnitBankBalanceDto::canRequest)
+            .map(OrgUnitBankBalanceDto::accountId)
+            .collect(Collectors.toSet());
+    model.addAttribute("debitableAccountIds", debitableAccountIds);
+    Map<UUID, BigDecimal> requestLimits = new LinkedHashMap<>();
+    for (OrgUnitBankBalanceDto b : safeBalances) {
+      if (b.canRequest() && b.approvalLimit() != null) {
+        requestLimits.put(b.accountId(), b.approvalLimit());
+      }
+    }
+    model.addAttribute("requestLimits", requestLimits);
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
