@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.1](https://github.com/krt-profit/basetool/releases/tag/v1.0.1) - 2026-06-28
+
 ### Added
 
 - **Bank: Kontoverantwortliche werden über Anträge auf ihrem Konto benachrichtigt.** Der oder die Kontoverantwortliche (Staffelleiter, SK-Leiter, Bereichsleiter, OL-Mitglieder bzw. Profit-Bereichsleiter) erhält jetzt eine Benachrichtigung, wenn auf dem verantworteten Konto ein Buchungsantrag erstellt oder von einem Bankmitarbeiter bestätigt bzw. abgelehnt wird. Wer den Antrag selbst gestellt oder bearbeitet hat, wird nicht über die eigene Aktion benachrichtigt.
