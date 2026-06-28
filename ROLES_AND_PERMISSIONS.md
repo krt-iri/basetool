@@ -1,161 +1,164 @@
-# Rollen- und Rechte-Matrix (Profit Basetool)
+# Role and Permission Matrix (Profit Basetool)
 
-> **Stand 2026-06-21 (nach Auftrags-Umbau #340, Operations/Auszahlungen, Material-Claims, Personal-Blueprints, Blueprint-Verfügbarkeit #364, Bereichsleitungs-Operationen + Teilnehmer-Sichtbarkeit #500/#501, Bearbeiter-Notizen #520, Blaupausen-Abdeckung bei Item-Aufträgen #526, Raffinerie-Screenshot-Import #439, Kartellbank #556/#666, Bereichsleitung & Organisationsleitung #692, Discord-Login #720).**
-> Diese Matrix wurde gegen die tatsächliche Implementierung verifiziert:
-> die `@PreAuthorize`-Annotationen aller 69 Backend-Controller, die
-> URL-Matrix in
+> **As of 2026-06-27 (after job-order rebuild #340, operations/payouts, material claims, personal blueprints, blueprint availability #364, Bereichsleitung operations + participant visibility #500/#501, processor notes #520, blueprint coverage for item orders #526, refinery screenshot import #439, Kartellbank #556/#666, Bereichsleitung & Organisationsleitung #692, Discord login #720, unified rank + delegated granting + Leitung page + Kommandogruppen #800/ADR-0042, Kartellbank holder responsibility/visibility/target/transfer requests/approval limits REQ-BANK-034..041, multi-domain activity audit + retention cleanup #795/ADR-0037/0038, promotion audit #844, two Staffeln per member #845, Hangar Org-Einheitsübersicht #847/ADR-0048).**
+>
+> This matrix was verified against the actual implementation:
+> the `@PreAuthorize` annotations of all 69 backend controllers, the
+> URL matrix in
 > [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
-> und
+> and
 > [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfig.java),
-> die Rollen-Seeds in
+> the role seeds in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
-> und der Authority-Konverter
+> and the authority converter
 > [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java).
-> **Bei Abweichungen zwischen diesem Dokument und dem Code zählt immer der
-> Code** (`@PreAuthorize` + `SecurityConfig`).
+> **When this document and the code disagree, the code always wins**
+> (`@PreAuthorize` + `SecurityConfig`).
 
-Dieses Dokument fasst zusammen, **wer was darf** — von völlig anonymen,
-nicht angemeldeten Besuchern bis zum Administrator.
+This document summarizes **who may do what** — from completely anonymous,
+unauthenticated visitors up to the administrator.
 
 ---
 
-## 0. Zwei Durchsetzungsebenen (wichtig zum Lesen der Matrix)
+## 0. Two enforcement layers (important for reading the matrix)
 
-Jeder Request durchläuft **zwei** voneinander unabhängige Gates. Ein Zugriff
-ist nur erlaubt, wenn er **beide** passiert:
+Every request passes through **two** mutually independent gates. An access is
+only permitted if it passes **both**:
 
-1. **URL-Matrix (`SecurityConfig.authorizeHttpRequests`)** — das äußere Tor.
-   Legt pro Pfad fest: `permitAll()` (auch anonym), `authenticated()` oder
-   eine konkrete Rolle. Wird *zuerst* ausgewertet.
-2. **Method-Level `@PreAuthorize`** auf Controller/Service — das innere Tor.
-   Verfeinert über Spring-Security-SpEL, häufig mit den Beans
+1. **URL matrix (`SecurityConfig.authorizeHttpRequests`)** — the outer gate.
+   Defines per path: `permitAll()` (even anonymous), `authenticated()` or
+   a concrete role. Evaluated *first*.
+2. **Method-level `@PreAuthorize`** on controller/service — the inner gate.
+   Refined via Spring Security SpEL, often with the beans
    `@ownerScopeService`, `@missionSecurityService`,
    `@specialCommandSecurityService`.
 
-Die beiden Ebenen können sich nur **verschärfen, nie aufweichen**:
+The two layers can only **tighten, never loosen**:
 
-- URL `authenticated()` schlägt Method `permitAll()` → der Endpunkt ist
-  *nicht* anonym erreichbar, auch wenn die Methode `permitAll()` trägt
-  (z. B. `/api/v1/system/ping`).
-- URL `permitAll()` + Method `isAuthenticated()` → effektiv **angemeldet
-  erforderlich** (z. B. *Mission anlegen*, `POST /api/v1/missions`).
+- URL `authenticated()` beats method `permitAll()` → the endpoint is
+  *not* reachable anonymously, even if the method carries `permitAll()`
+  (e.g. `/api/v1/system/ping`).
+- URL `permitAll()` + method `isAuthenticated()` → effectively **login
+  required** (e.g. *create mission*, `POST /api/v1/missions`).
 
-Wer eine Berechtigung beurteilt, muss daher **beide** Ebenen lesen.
+Whoever judges a permission must therefore read **both** layers.
 
 ---
 
-## 1. Anonyme (nicht angemeldete) Nutzer
+## 1. Anonymous (unauthenticated) users
 
-Das Basetool hat eine bewusst öffentliche Fläche, damit Auftraggeber und
-Gäste **ohne Login** mit der Organisation interagieren können. Im Frontend
-sind dafür die Routen `/`, `/missions/**`, `/operations/**`, `/orders/**`,
-die Rechtsseiten (`/impressum`, `/privacy`, `/terms`) und statische Assets
-auf `permitAll()` gesetzt; im Backend eine explizit aufgezählte Liste von
-`permitAll()`-Endpunkten. Alles andere erfordert eine Anmeldung.
+The Basetool has a deliberately public surface so that job-order requesters and
+guests can interact with the organization **without a login**. In the frontend,
+the routes `/`, `/missions/**`, `/operations/**`, `/orders/**`, the legal pages
+(`/impressum`, `/privacy`, `/terms`) and static assets are set to `permitAll()`;
+in the backend, an explicitly enumerated list of `permitAll()` endpoints. Everything
+else requires authentication.
 
-### 1.1 Was anonyme Nutzer dürfen
+### 1.1 What anonymous users may do
 
-| Fähigkeit                                                                                                                                                                                                                  | Endpunkt(e)                                                                                                                                | Gate                                                                                                                                      |
-|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------|
-| **Stammdaten lesen** (Materialien, Locations, Schiffstypen, Hersteller, Refining-Methoden, Sternensysteme, Job-Typen, Frequenztypen, System-Settings, Staffel-Liste)                                                       | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, kein Method-Gate (Ausnahme: die Location-Subreads `/refineries` und `/home-locations` tragen method-`isAuthenticated()`) |
-| **Aktive Orgeinheiten lesen** (Name, Kürzel, Art, Profit-Flag — füllt die Auswahlfelder des öffentlichen Auftragsformulars)                                                                                                | `GET /api/v1/org-units/active`                                                                                                             | URL `permitAll` + Method `permitAll()`                                                                                                    |
-| **Einsätze (Missionen) durchblättern** — nur **nicht-interne** Missionen, Detailansicht **redigiert** (ohne Beschreibung + PII; Organisation, Teilnehmerliste, Einheiten, Frequenzen, Auszahlungsart sichtbar; siehe §1.3) | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (intern = unsichtbar)                                                                                  |
-| **Warenauftrag anlegen** (Material-Auftrag)                                                                                                                                                                                | `POST /api/v1/orders`                                                                                                                      | `permitAll()`                                                                                                                             |
-| **Item-Auftrag anlegen** (Fertigteil-Bestellung mit auto-abgeleiteten Materialien)                                                                                                                                         | `POST /api/v1/orders/items`                                                                                                                | `permitAll()`                                                                                                                             |
-| **Bestellbaren Item-Katalog durchsuchen**                                                                                                                                                                                  | `GET /api/v1/orders/item-catalog/**`                                                                                                       | `permitAll()`                                                                                                                             |
-| **Sich bei einem (nicht-internen) Einsatz als Gast anmelden** — mit frei wählbarem `guestName`                                                                                                                             | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                                                                                                        |
-| **Ein-/Auschecken** beim Einsatz                                                                                                                                                                                           | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`                                                                                            |
-| **Eigenen Gast-Teilnehmer bearbeiten** (Job-Typ, Schiff, Kommentar, Zeiten)                                                                                                                                                | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                                                                                                    |
-| **Auszahlungsart ändern** (Auszahlungspräferenz, z. B. `DONATE`)                                                                                                                                                           | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                                                                                                    |
-| **Eigenen Gast-Teilnehmer entfernen**                                                                                                                                                                                      | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                                                                                                    |
+| Capability                                                                                                                                                                                                | Endpoint(s)                                                                                                                                | Gate                                                                                                                                    |
+|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------|
+| **Read master data** (materials, locations, ship types, manufacturers, refining methods, star systems, job types, frequency types, system settings, Staffel list)                                         | `GET /api/v1/{materials,locations,ship-types,manufacturers,refining-methods,star-systems,job-types,frequency-types,settings,squadrons}/**` | URL `permitAll`, no method gate (exception: the location subreads `/refineries` and `/home-locations` carry method-`isAuthenticated()`) |
+| **Read active org units** (name, abbreviation, kind, profit flag — fills the selection fields of the public job-order form)                                                                               | `GET /api/v1/org-units/active`                                                                                                             | URL `permitAll` + method `permitAll()`                                                                                                  |
+| **Page through missions** — only **non-internal** missions, detail view **redacted** (without description + PII; organization, participant list, units, frequencies, payout preference visible; see §1.3) | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (internal = invisible)                                                                               |
+| **Create a job order** (material order)                                                                                                                                                                   | `POST /api/v1/orders`                                                                                                                      | `permitAll()`                                                                                                                           |
+| **Create an item order** (finished-part order with auto-derived materials)                                                                                                                                | `POST /api/v1/orders/items`                                                                                                                | `permitAll()`                                                                                                                           |
+| **Search the orderable item catalog**                                                                                                                                                                     | `GET /api/v1/orders/item-catalog/**`                                                                                                       | `permitAll()`                                                                                                                           |
+| **Sign up to a (non-internal) mission as a guest** — with a freely chosen `guestName`                                                                                                                     | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                                                                                                      |
+| **Check in / out** of the mission                                                                                                                                                                         | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`                                                                                          |
+| **Edit own guest participant** (job type, ship, comment, times)                                                                                                                                           | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                                                                                                  |
+| **Change payout preference** (e.g. `DONATE`)                                                                                                                                                              | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                                                                                                  |
+| **Remove own guest participant**                                                                                                                                                                          | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                                                                                                  |
 
-**Warum die Teilnehmer-Endpunkte anonym funktionieren:** Ein **Gast-Teilnehmer
-ist nicht mit einem Benutzerkonto verknüpft** (`participant.user == null`).
+**Why the participant endpoints work anonymously:** A **guest participant is not
+linked to a user account** (`participant.user == null`).
 [`MissionSecurityService.canAccessParticipant`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/MissionSecurityService.java)
-gibt für solche unverknüpften Teilnehmer **`true` für jeden** zurück — das ist
-die bewusste Konstruktionsnaht, die den Anmelde-Flow ohne Login nutzbar macht.
-Sobald ein Teilnehmer mit einem echten User verknüpft ist, dürfen nur noch
-dieser User selbst oder eine erhöhte Rolle (Mission-Manager/Officer/Admin) ihn
-bearbeiten.
+returns **`true` for everyone** for such unlinked participants — this is the
+deliberate construction seam that makes the sign-up flow usable without a login.
+As soon as a participant is linked to a real user, only that user themselves or an
+elevated role (Mission-Manager/Officer/Admin) may edit them.
 
-**Wohin anonyme Aufträge laufen:** Beim Anlegen ohne Login wird der Auftrag
-zwingend auf das konfigurierte **Intake-Spezialkommando** gestempelt
-(System-Setting `job_order.intake_special_command_id`, eingeführt mit V128).
-So landet jeder Gast-Auftrag in einer definierten SK-Warteschlange statt im Nichts.
+**Where anonymous orders go:** When created without a login, the order is
+mandatorily stamped onto the configured **intake Spezialkommando** (system setting
+`job_order.intake_special_command_id`, introduced with V128). This way every guest
+order lands in a defined SK queue instead of nowhere.
 
-### 1.2 Was anonyme Nutzer **nicht** dürfen
+### 1.2 What anonymous users may **not** do
 
-- **Einsätze/Operations anlegen oder verwalten** — `POST /api/v1/missions`
-  ist zwar URL-`permitAll`, aber method-`isAuthenticated()` → Login nötig.
-  Operations (`/api/v1/operations/**`) sind komplett angemeldet.
-- **Die Auftrags-Liste oder Auftrags-Details sehen** — `GET /api/v1/orders`
-  und `/orders/{id}` fallen unter `isAuthenticated()` + `canSeeJobOrder`. Ein
-  Gast kann also einen Auftrag *absenden*, ihn danach aber nicht
-  weiterverfolgen.
-- **Finanz-Einträge eines Einsatzes lesen oder anlegen** — die Finanz-Ledger-Fläche
-  (`GET`/`POST /api/v1/.../finance-entries`) ist die Auszahlungssicht des Einsatzes und
-  verlangt Mitglied-oder-höher (`isMemberOrAbove`). Anonym → `401`, ein eingeloggter
-  **Guest** → `403` (siehe „Anonym ≈ Rolle Guest" unten). Das Anlegen von Finanz-Einträgen
-  ist damit **nicht mehr anonym**.
-- **Die Beschreibung eines Einsatzes sehen** — die Freitext-Beschreibung wird in der
-  öffentlichen Mission-Antwort serverseitig entfernt (§1.3). Organisation, Teilnehmerliste
-  (ohne PII), Einheiten, Frequenzen und Auszahlungsart bleiben dagegen sichtbar.
-- **Teilnehmer-PII sehen** (E-Mail, Realname) — wird in jeder Outsider-Antwort entfernt;
-  sichtbar bleibt nur das öffentliche Callsign (username/displayName/Rang).
-- **Material-Claims, Refinery, Hangar, Lager, Persönliches Inventar/Blueprints,
-  Benutzerverzeichnis, Promotion-System, Admin-Bereich** — alles angemeldet
-  bzw. rollen-gegated.
+- **Create or manage missions/operations** — `POST /api/v1/missions`
+  is indeed URL-`permitAll`, but method-`isAuthenticated()` → login required.
+  Operations (`/api/v1/operations/**`) are fully authenticated.
+- **View the order list or order details** — `GET /api/v1/orders`
+  and `/orders/{id}` fall under `isAuthenticated()` + `canSeeJobOrder`. A
+  guest can therefore *submit* an order but cannot track it
+  afterwards.
+- **Read or create finance entries of a mission** — the finance-ledger surface
+  (`GET`/`POST /api/v1/.../finance-entries`) is the payout view of the mission and
+  requires member-or-above (`isMemberOrAbove`). Anonymous → `401`, a logged-in
+  **Guest** → `403` (see "Anonymous ≈ Guest role" below). Creating finance entries
+  is thus **no longer anonymous**.
+- **View the description of a mission** — the free-text description is stripped
+  server-side from the public mission response (§1.3). Organization, participant list
+  (without PII), units and frequencies remain visible, by contrast; the payout
+  preference and the free-text comment of individual participants, however, are also
+  stripped for outsiders (ADR-0034).
+- **View participant PII** (email, real name) — stripped from every outsider response;
+  only the public callsign (username/displayName/rank) remains visible.
+- **Material claims, refinery, hangar, inventory, personal inventory/blueprints,
+  user directory, promotion system, admin area** — all authenticated
+  or role-gated.
 
-### 1.3 Datenschutz für Outsider (zwei Redaktionsstufen)
+### 1.3 Data redaction for outsiders (two redaction levels)
 
-Mission-Antworten werden serverseitig in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java)
-in **zwei Stufen** bereinigt:
+Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java)
+in **two levels**:
 
-- **Mitglied-Peer** (`cleanupMissionForGuest` / `cleanupParticipantForGuest`) — für ein
-  eingeloggtes Mitglied unterhalb Logistician: Owner/Manager/interne Lager-/Refinery-Bezüge
-  werden geleert und bei Teilnehmern E-Mail, Realname und Rollen entfernt — die Roster-Sicht
-  bleibt aber erhalten.
-- **Outsider** (`cleanupOutsiderMissionForGuest`) — für **anonyme UND Guest**-Aufrufer
-  (`isMemberOrAbove() == false`): wie Mitglied-Peer, **zusätzlich nur die Beschreibung**
-  entfernt. Sichtbar bleiben (auf nicht-internen Einsätzen) Organisation (`owningSquadron`),
-  Teilnehmerliste (PII-bereinigt) inkl. Auszahlungsart, Einheiten und Frequenzen — plus Name,
-  Zeitplan, Status, Kalenderlink, Teilnehmerzähler und Partyleiter. Das Finanz-Ledger
-  (`/finance-entries`) ist eine eigene Fläche und bleibt Mitglied-only. Interne und vergangene
-  (`COMPLETED`/`CANCELLED`) Missionen sind für Outsider gar nicht sichtbar (`403`).
+- **Member peer** (`cleanupMissionForGuest` / `cleanupParticipantForGuest`) — for a
+  logged-in member below Logistician: owner/manager/internal inventory/refinery
+  references are emptied and, for participants, email, real name and roles are stripped
+  — but the roster view stays intact.
+- **Outsider** (`cleanupOutsiderMissionForGuest`) — for **anonymous AND Guest** callers
+  (`isMemberOrAbove() == false`): like member peer, **additionally the description as
+  well as, per participant, the payout preference and the free-text comment** stripped
+  (ADR-0034). What remains visible (on non-internal missions) are organization
+  (`owningSquadron`), participant list (PII-cleaned), units and frequencies — plus name,
+  schedule, status, calendar link, participant count and party lead. The finance ledger
+  (`/finance-entries`) is a separate surface and stays member-only. Internal and past
+  (`COMPLETED`/`CANCELLED`) missions are not visible at all to outsiders (`403`).
 
-**Namen, E-Mails und Tokens landen nie in einer Outsider-Antwort.** Die Namenskonvention
-`cleanup…ForGuest` wird von der ArchUnit-Regel
-`anonymousReadableMissionEndpointsMustRedactGuestPii` strukturell erzwungen.
+**Names, emails and tokens never end up in an outsider response.** The naming
+convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
+`anonymousReadableMissionEndpointsMustRedactGuestPii`.
 
-> **Anonym ≈ Rolle „Guest" bei den Einsätzen.** „Anonym" = gar nicht eingeloggt (kein JWT).
-> Die **Rolle `GUEST`** ist ein *angemeldeter* Keycloak-User ganz ohne Authorities (siehe §2).
-> Beide sind „Mission-Outsider" (`AuthHelperService.isMemberOrAbove() == false`) und werden
-> **auf der Einsatz-Fläche identisch behandelt**: gleiche redigierte Detailsicht (§1.3),
-> dieselben Anmelde-/Gast-Teilnehmer-Rechte und **kein** Zugriff auf das Finanz-Ledger
-> (anonym `401`, Guest `403`). Außerhalb der Einsätze bleibt der Unterschied bestehen: ein
-> Guest passiert `isAuthenticated()`-Gates (sieht also z. B. sein eigenes — leeres —
-> Inventar), scheitert aber an jedem `hasRole(...)`/`hasAuthority(...)`-Check; ein anonymer
-> Aufrufer erreicht nur die `permitAll`-Liste.
+> **Anonymous ≈ "Guest" role on the missions.** "Anonymous" = not logged in at all (no JWT).
+> The **`GUEST` role** is an *authenticated* Keycloak user with no authorities at all (see §2).
+> Both are "mission outsiders" (`AuthHelperService.isMemberOrAbove() == false`) and are
+> **treated identically on the mission surface**: same redacted detail view (§1.3),
+> the same sign-up/guest-participant rights and **no** access to the finance ledger
+> (anonymous `401`, Guest `403`). Outside the missions the difference persists: a
+> Guest passes `isAuthenticated()` gates (so they see, e.g., their own — empty —
+> inventory) but fails every `hasRole(...)`/`hasAuthority(...)` check; an anonymous
+> caller reaches only the `permitAll` list.
 >
-> **Discord-Registrierung `PENDING`/`REJECTED` ≈ noch weniger als Guest.** Eine neue
-> Discord-Anmeldung landet ohne Freigabe in `PENDING` (REQ-SEC-017): die gesamte
-> Authority-Zusammenstellung wird auf die einzige Authority `ROLE_PENDING_APPROVAL` kurzgeschlossen
-> — keine Realm-Rollen, keine Permissions, keine OrgUnit-Rollen, **und kein `ROLE_GUEST`**.
-> Solche Nutzer werden im Frontend auf eine „Freigabe ausstehend“-Seite geleitet, bis
-> ein Admin sie unter `/admin/discord-registrations` freigibt (danach `ACTIVE`) oder ablehnt
-> (`REJECTED`, bleibt ohne Zugriff). Rollen/Einheiten werden nach der Freigabe **manuell** vergeben
+> **Discord registration `PENDING`/`REJECTED` ≈ even less than Guest.** A new
+> Discord sign-up lands without approval in `PENDING` (REQ-SEC-017): the entire
+> authority assembly is short-circuited to the single authority `ROLE_PENDING_APPROVAL`
+> — no realm roles, no permissions, no OrgUnit roles, **and no `ROLE_GUEST`**.
+> Such users are routed in the frontend to an "approval pending" page until
+> an admin approves them under `/admin/discord-registrations` (then `ACTIVE`) or rejects
+> them (`REJECTED`, stays without access). Roles/units are assigned **manually** after approval
 > (Track 1).
 
 ---
 
-## 2. Rollen & Basis-Berechtigungen
+## 2. Roles & base permissions
 
-Rollen werden aus den Keycloak-Realm-Rollen abgeleitet (`ROLE_<GROSS_SNAKE>`)
-und im
-[`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
-mit Authorities geseedet. Zusätzlich gilt eine **Rollen-Hierarchie**.
+Roles are derived from the Keycloak realm roles (`ROLE_<GROSS_SNAKE>`) and seeded
+with authorities in the
+[`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java).
+In addition, a **role hierarchy** applies.
 
-### Rollen-Hierarchie (backend + frontend identisch)
+### Role hierarchy (backend + frontend identical)
 
 ```
 ROLE_ADMIN   > ROLE_LOGISTICIAN
@@ -166,533 +169,593 @@ ROLE_ADMIN           > ROLE_BANK_MANAGEMENT
 ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
 ```
 
-Admins und Officer erfüllen damit automatisch jeden `LOGISTICIAN`- und
-`MISSION_MANAGER`-Check. Admins erfüllen zusätzlich jeden Bank-Check
-(`BANK_MANAGEMENT` und transitiv `BANK_EMPLOYEE`); die Bankleitung erfüllt jeden
-`BANK_EMPLOYEE`-Check (REQ-BANK-007).
+Admins and Officers therefore automatically satisfy every `LOGISTICIAN` and
+`MISSION_MANAGER` check. Admins additionally satisfy every bank check
+(`BANK_MANAGEMENT` and transitively `BANK_EMPLOYEE`); Bank Management satisfies
+every `BANK_EMPLOYEE` check (REQ-BANK-007).
 
-### Geseedete Authorities
+### Seeded authorities
 
-| Rolle               | Authorities (DataInitializer)                                                                                                                                     |
-|:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie) |
-| **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via Hierarchie)                |
-| **KRT Member**      | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                     |
-| **Guest**           | *(keine — leeres Set)*                                                                                                                                            |
-| **Bank Employee**   | *(keine — die Feinrechte sind app-verwaltete Grant-Zeilen, REQ-BANK-009)*                                                                                         |
-| **Bank Management** | *(keine — Sichtbarkeit "alles" kommt aus der Rolle selbst, ADR-0011)*                                                                                             |
+| Role                | Authorities (DataInitializer)                                                                                                                                    |
+|:--------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Admin**           | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE`, `ROLE_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy) |
+| **Officer**         | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`, `MISSION_WRITE`, `MISSION_MANAGE`, `USER_MANAGE` (+ `LOGISTICIAN`/`MISSION_MANAGER` via hierarchy)                |
+| **KRT Member**      | `HANGAR_READ`, `HANGAR_WRITE`, `MISSION_READ`                                                                                                                    |
+| **Guest**           | *(none — empty set)*                                                                                                                                             |
+| **Bank Employee**   | *(none — the fine-grained rights are app-managed grant rows, REQ-BANK-009)*                                                                                      |
+| **Bank Management** | *(none — "see everything" visibility comes from the role itself, ADR-0011)*                                                                                      |
 
-`USER_MANAGE` bleibt aus historischen Gründen im Officer-Set, wird aber von
-keinem Endpunkt mehr geprüft (effektiv inert — alle Member-Management-Endpunkte
-sind seit dem Phase-4-Lockdown `hasRole('ADMIN')`).
+`USER_MANAGE` remains in the Officer set for historical reasons, but is no longer
+checked by any endpoint (effectively inert — all member-management endpoints have
+been `hasRole('ADMIN')` since the Phase-4 lockdown).
 
-### Kontextuelle Rollen aus OrgUnit-Mitgliedschaften
+### Contextual roles from OrgUnit memberships
 
-`LOGISTICIAN` und `MISSION_MANAGER` sind **keine** Keycloak-Rollen, sondern
-**Flags pro OrgUnit-Mitgliedschaft** (`org_unit_membership.is_logistician` /
-`is_mission_manager`). Der
+`LOGISTICIAN` and `MISSION_MANAGER` are **not** Keycloak roles, but **flags per
+OrgUnit membership** (`org_unit_membership.is_logistician` /
+`is_mission_manager`). The
 [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java)
-befördert daraus zwei Authority-Flächen:
+promotes these into two authority surfaces:
 
-- **Flach** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, sobald **irgendeine**
-  Mitgliedschaft (Staffel oder SK) das Flag trägt — damit funktionieren alle
-  bestehenden `hasRole('LOGISTICIAN')`-Gates.
-- **Kontextuell** `ROLE_LOGISTICIAN@<orgUnitId>` pro (Mitgliedschaft, Flag)-Paar
-  — damit das per-OrgUnit-Scoping am `@PreAuthorize`-Aufrufort
-  (`@ownerScopeService.canEdit…`) ohne Service-Roundtrip aufgelöst werden kann.
+- **Flat** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, as soon as **any**
+  membership (Staffel or SK) carries the flag — so all existing
+  `hasRole('LOGISTICIAN')` gates keep working.
+- **Contextual** `ROLE_LOGISTICIAN@<orgUnitId>` per (membership, flag) pair — so
+  that the per-OrgUnit scoping at the `@PreAuthorize` call site
+  (`@ownerScopeService.canEdit…`) can be resolved without a service roundtrip.
 
-> Die **alten** `app_user.is_logistician` / `app_user.is_mission_manager`-Spalten
-> wurden mit **V104** entfernt — Quelle der Wahrheit ist ausschließlich
-> `org_unit_membership`. Mitgliedschaftslose Accounts (Admins, Gäste) tragen
-> kein Logistician-/Mission-Manager-Flag.
+> The **old** `app_user.is_logistician` / `app_user.is_mission_manager` columns
+> were removed with **V104** — the single source of truth is exclusively
+> `org_unit_membership`. Membership-less accounts (admins, guests) carry no
+> Logistician/Mission-Manager flag.
 
-### SK-Lead (Sonderfall)
+### SK-Lead (special case)
 
-Eine Mitgliedschaft mit `is_lead = true` (gibt es per DB-CHECK nur auf
-**Spezialkommando**-Zeilen) macht den User innerhalb *dieses einen SK*
-automatisch **sowohl `LOGISTICIAN` als auch `MISSION_MANAGER`** (flach +
-kontextuell) — der Lead steht über beiden Rollen seines SK, analog dazu, dass
-ein Officer Logistician + Mission-Manager seiner eigenen Staffel ist. Zusätzlich
-darf ein Lead die **Mitglieder seines SK verwalten** (hinzufügen/entfernen/Flags
-`is_logistician`/`is_mission_manager` togglen) über
-`@specialCommandSecurityService.canManageMembers`. Das **Lead-Flag selbst** zu
-setzen bleibt **Admin-only** (Lead kann sich nicht selbst eskalieren). Kein
-Carry-over auf andere SKs.
+A membership with `is_lead = true` (which, per DB CHECK, exists only on
+**Spezialkommando** rows) automatically makes the user **both `LOGISTICIAN` and
+`MISSION_MANAGER`** within *that one SK* (flat + contextual) — the lead stands
+above both roles of their SK, analogous to an Officer being Logistician +
+Mission-Manager of their own Staffel. Additionally, a lead may **manage the
+members of their SK** (add/remove/toggle the `is_logistician`/`is_mission_manager`
+flags) via `@specialCommandSecurityService.canManageMembers`. Setting the
+**lead flag itself** remains **Admin-only** (a lead cannot escalate themselves).
+No carry-over to other SKs.
 
-### Operative OFFICER-Vergabe (Führung & Bank)
+### Functional rank & delegated appointment (`MembershipRole`, ADR-0042)
 
-Die `OFFICER`-Keycloak-Rolle wird **operativ** (manuell, vgl. §1) zusätzlich zur
-OrgUnit-Mitgliedschaft vergeben:
+Since V187, leadership is **one** rank enum `MembershipRole` on
+`org_unit_membership` instead of the five old boolean flags
+(`is_lead`/`is_bereichsleiter`/`is_bereichskoordinator`/`is_bereichsoperator`/`is_ol_member`,
+removed with V187). Values: `MEMBER`, the Staffel ranks `STAFFELLEITER` /
+`KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` / `ENSIGN`, the Bereich ranks
+`BEREICHSLEITER` / `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR`, `OL_MEMBER` and
+`SK_LEAD` (scoped per `OrgUnitKind` via DB CHECK). `is_logistician` /
+`is_mission_manager` remain **orthogonal** flags and are **not** folded into the
+rank. Every Staffel leadership rank grants officer-equivalent reach **only over
+its own Staffel** (contextual `LOGISTICIAN`/`MISSION_MANAGER` like `SK_LEAD`), no
+admin rights, no cascade (REQ-ROLE-002).
 
-- **Alle Angehörigen der Organisationsleitung, der Bereichsleitung und jedes
-  Spezialkommandos erhalten `OFFICER`.** So erfüllen sie die `hasRole('OFFICER')`-Gates
-  des Frontends (z. B. die Seite „Leitung"). Das Backend wertet die Reichweite trotzdem
-  **mitgliedschaftsbasiert** über den `OwnerScopeService` aus (Aufsichtsscope,
-  Verantwortlicher) — `OFFICER` öffnet nur die rollengegateten Oberflächen, **nicht** die
-  kontextuelle Datenreichweite.
-- **Die Bankleitung (`BANK_MANAGEMENT`) hält ebenfalls `OFFICER`.** **Bankmitarbeiter
-  (`BANK_EMPLOYEE`)** haben **mindestens `KRT Member`** (MEMBER), aber **nicht
-  zwingend `OFFICER`** — die Bank-Gates greifen ausschließlich auf `BANK_*` (REQ-BANK-007),
-  nie auf `OFFICER`.
-- **Konsequenz für die Bank:** Weil Offiziere **und** SK-Leads `OFFICER` tragen, entscheidet
-  die Sonderkonto-Auto-Sicht (`SPECIAL`, REQ-BANK-037) **per Mitgliedschaft** (OL-Mitglied
-  bzw. Bereichsleiter), **nie** über die `OFFICER`-Rolle — Offiziere/SK-Leads sehen
-  Sonderkonten daher **nicht** automatisch, sondern nur über eine explizite Freigabe.
+Appointment runs through a **delegated ladder without self-promotion**
+(REQ-ROLE-004), operable on the **Organisation → Leitung** page: Admin →
+OL members; OL → Bereichsleiter; Bereichsleiter → Staffelleiter / SK-Leiter /
+Bereichskoordinatoren / -operatoren (own Bereich); Staffelleiter →
+Kommandoleiter / Stellvertreter / Ensigns + Kommandogruppen (own Staffel, at most
+four Kommandogruppen). To appoint a rank, you must hold a **strictly higher**
+rank — nobody promotes themselves. Every appointment is logged in the audit log
+„Rollen & Mitglieder" and is reflected in the same transaction in the
+account-bound org-chart seat (REQ-ROLE-006).
+
+### Operational OFFICER grant (leadership & bank)
+
+The `OFFICER` Keycloak role is granted **operatively** (manually, cf. §1) in
+addition to the OrgUnit membership:
+
+- **All members of the Organisationsleitung, the Bereichsleitung and every
+  Spezialkommando receive `OFFICER`.** This way they satisfy the frontend's
+  `hasRole('OFFICER')` gates (e.g. the „Leitung" page). The backend still
+  evaluates reach **membership-based** via the `OwnerScopeService` (oversight
+  scope, responsible holder) — `OFFICER` only opens the role-gated surfaces,
+  **not** the contextual data reach.
+- **Bank Management (`BANK_MANAGEMENT`) also holds `OFFICER`.** **Bank Employees
+  (`BANK_EMPLOYEE`)** have **at least `KRT Member`** (MEMBER), but **not
+  necessarily `OFFICER`** — the bank gates rely exclusively on `BANK_*`
+  (REQ-BANK-007), never on `OFFICER`.
+- **Consequence for the bank:** Because Officers **and** SK-Leads carry `OFFICER`,
+  the Sonderkonto auto-visibility (`SPECIAL`, REQ-BANK-037) decides **by
+  membership** (OL member or Bereichsleiter), **never** via the `OFFICER` role —
+  Officers/SK-Leads therefore do **not** see Sonderkonten automatically, only via
+  an explicit approval.
 
 ---
 
-## 3. Zugriffsmatrix nach Funktionsbereich
+## 3. Access matrix by functional area
 
-Spalten: **Anonym** = nicht eingeloggt · **Member** = KRT Member ·
-**Log.** = Member + Logistician-Flag · **MM** = Member + Mission-Manager-Flag ·
+Columns: **Anonymous** = not logged in · **Member** = KRT Member ·
+**Log.** = Member + Logistician flag · **MM** = Member + Mission-Manager flag ·
 **Officer** · **Admin**.
 
-> Logistician/Mission-Manager sind **Zusatz-Flags** auf einem Member: sie erben
-> alle Member-Rechte und addieren ihre flag-spezifische Fähigkeit, **gescopt auf
-> ihre OrgUnit(s)** (`@ownerScopeService.canEdit…`). Officer ⊇ Log.+MM der
-> **eigenen Staffel**; Admin ⊇ alles, staffelübergreifend.
+> Logistician/Mission-Manager are **add-on flags** on a Member: they inherit
+> all Member rights and add their flag-specific capability, **scoped to
+> their OrgUnit(s)** (`@ownerScopeService.canEdit…`). Officer ⊇ Log.+MM of the
+> **own Staffel**; Admin ⊇ everything, cross-Staffel.
 
-### 3.1 Auth / Kontext
+### 3.1 Auth / Context
 
-| Funktion (Gate)                                                                          | Anonym | Member | Log. | MM | Officer | Admin |
-|:-----------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Angemeldet sein (`isAuthenticated()`)                                                    |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Eigenes Profil / `GET /me`, aktiver OrgUnit-Kontext (`/me/active-org-unit`)              |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Benutzerverzeichnis lesen (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Function (gate)                                                                    | Anonymous | Member | Log. | MM | Officer | Admin |
+|:-----------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Be logged in (`isAuthenticated()`)                                                 |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`)            |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
-### 3.2 Hangar & Persönliche Daten
+### 3.2 Hangar & Personal Data
 
-| Funktion (Gate)                                                                                        | Anonym | Member | Log. | MM | Officer | Admin |
-|:-------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Hangar lesen (`HANGAR_READ`)                                                                           |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Eigene Schiffe pflegen / Import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Schiffe anderer Member verwalten (`hasRole('ADMIN')`)                                                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                               |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
-| Persönliches Inventar / Persönliche Blueprints (eigene) (`isAuthenticated()`)                          |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Persönl. Inventar/Blueprints **anderer** verwalten (`/admin/...`, `hasRole('ADMIN')`)                  |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Blueprint-Verfügbarkeit der Orgeinheit lesen (`/blueprint-overview`, `canAccessBlueprintOverview`)     |   ❌    |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |
+| Function (gate)                                                                                    | Anonymous | Member | Log. | MM | Officer | Admin |
+|:---------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read hangar (`HANGAR_READ`)                                                                        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Maintain own ships / import (CCU, HangarXPLOR, Fleetyards, StarJump) (`isAuthenticated()` + Owner) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Manage other members' ships (`hasRole('ADMIN')`)                                                   |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| `resetAllFittedStatus` (`hasAnyRole('ADMIN','OFFICER')`)                                           |     ❌     |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| Read „Org-Einheitsübersicht" (unit overview) in the hangar (`/hangar/squadron`, `HANGAR_READ`)     |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
+| Personal inventory / personal blueprints (own) (`isAuthenticated()`)                               |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Manage personal inventory/blueprints of **others** (`/admin/...`, `hasRole('ADMIN')`)              |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read blueprint availability of the org unit (`/blueprint-overview`, `canAccessBlueprintOverview`)  |     ❌     |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |
 
-¹ SK-Leads sehen die Übersicht zusätzlich **für ihre SK** (über das `is_lead`-Flag, nicht über das reine Logistician-Flag). Officer sehen nur ihre Staffel; Admins ohne Pin alle Orgeinheiten, mit Pin nur die angepinnte.
+¹ SK-Leads additionally view the overview **for their SK** (via the `is_lead` flag, not via the plain Logistician flag). Officers view only their Staffel; Admins without a pin all org units, with a pin only the pinned one.
 
-### 3.3 Lager (Inventory) & Aufträge (Job Orders)
+² The „Org-Einheitsübersicht" (formerly „Staffelübersicht") spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted) stays ADMIN/OFFICER-only — Member/BL/OL see only the counters.
 
-| Funktion (Gate)                                                                                                             | Anonym | Member | Log. | MM  | Officer | Admin |
-|:----------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:---:|:-------:|:-----:|
-| Lager-View ansehen (`/inventory`, Member+)                                                                                  |   ❌    |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
-| Lager bearbeiten / aus-/einbuchen (`isAuthenticated()` + `canEditInventoryItem`, Owner-Scope)                               |   ❌    |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
-| Auftrag **anlegen** (Material- & Item-Auftrag)                                                                              |   ✅    |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
-| Auftrags-Liste / -Detail lesen (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                |   ❌    |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
-| Sich selbst als **Bearbeiter** ein-/austragen, eigene Bearbeiter-Notiz pflegen (`canSeeJobOrder` + selbst-oder-Logistician) |   ❌    |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
-| **Blaupausen-Abdeckung** eines Item-Auftrags lesen (`canSeeJobOrderBlueprintOwners`)                                        |   ❌    |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
-| Auftrag **bearbeiten** (Status, Priorität, Materialien, Handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)            |   ❌    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| Verantwortliche Einheit umsetzen (`PATCH /{id}/responsible-org-unit`)                                                       |   ❌    |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
-| Material-Claims auf SK-Aufträgen eintragen/zurückziehen (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                     |   ❌    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| Auftrag **löschen** (`hasRole('ADMIN')`)                                                                                    |   ❌    |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
+### 3.3 Inventory (Lager) & Job Orders
 
-¹ Nur über das eigene Objekt / die Owner-Scope-Prüfung — nicht generell. Der **Eigentümer** eines
-persönlichen Aggregats (Lagereintrag `inventory_item.user`, Schiff `ship.owner`, Raffinerie-Auftrag
-`refinery_order.owner`) darf sein Objekt **immer** ansehen und bearbeiten, unabhängig vom
-`owning_org_unit_id`-Stempel — auch nach einem OrgUnit-Wechsel oder ohne jede Mitgliedschaft, solange
-das Objekt noch auf eine OrgUnit gebucht ist (REQ-ORG-011). Ein **Nicht**-Eigentümer bleibt an den
-strikten OrgUnit-Scope gebunden.
-² Admin frei; Staffel-Logistiker/-Officer nur **Eskalation** des eigenen
-Staffel-Auftrags an ein SK.
-³ **Nur Mitglieder einer profit-berechtigten Orgeinheit** (`is_profit_eligible`
-auf Staffel oder SK) sind Teil des Auftrags-Workflows: nur sie dürfen Aufträge
-**sehen** (Liste/Detail), **bearbeiten** (Status/Priorität/Materialien/Handover,
-Reassign) und **Material-Claims** setzen/zurückziehen — der Profit-Gate
-(`canViewJobOrders`) ist in `canSeeJobOrder` und `canEditJobOrder` eingefaltet und
-gilt auch für die rollen-only Claim-Endpunkte. Wer ausschließlich in
-nicht-profit-berechtigten Einheiten ist, kann Aufträge **nur anlegen** — sonst
-nichts, analog zu anonymen Gästen. Admins haben immer Zugriff (`canViewJobOrders`
-ist für sie immer wahr). Im Frontend wird der „Aufträge"-Link durch „Auftrag
-anlegen" ersetzt und ein Direktaufruf von `/orders` bzw. `/orders/{id}` auf das
-Anlege-Formular umgeleitet; das Backend liefert für Nicht-Profit-Mitglieder eine
-leere Liste bzw. `403` (auch bei Schreib-/Claim-Endpunkten).
-⁴ Strenger als `canSeeJobOrder` — **kein** SK-Public-Escape: Die Abdeckungssicht
-nennt Mitglieder namentlich samt ihrer Blaupausen und ist deshalb auf Mitglieder
-der **bearbeitenden** (responsible) Orgeinheit beschränkt. Wer den SK-Auftrag nur
-über die öffentliche Warteschlange sieht, bekommt `403`; das Frontend blendet den
-Abschnitt aus. Admins ohne Pin immer, mit Pin nur bei passender Einheit.
-⁵ Selbst-oder-Logistician-Regel (`verifyAssigneeAccess`): Jeder, der den Auftrag
-sieht, darf **sich selbst** ein-/austragen und **seine eigene** Notiz (max. 500
-Zeichen) pflegen; fremde Einträge/Notizen darf nur ein Logistician+ ändern.
-Notizen sind für alle sichtbar, die den Auftrag sehen.
+| Function (gate)                                                                                              | Anonymous | Member | Log. | MM  | Officer | Admin |
+|:-------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:---:|:-------:|:-----:|
+| View inventory view (`/inventory`, Member+)                                                                  |     ❌     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Edit inventory / check items in/out (`isAuthenticated()` + `canEditInventoryItem`, owner scope)              |     ❌     |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
+| **Create** job order (material & item order)                                                                 |     ✅     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                   |     ❌     |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
+| Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician) |     ❌     |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                           |     ❌     |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
+| **Edit** job order (status, priority, materials, handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)    |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                           |     ❌     |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
+| Add/withdraw material claims on SK job orders (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| **Delete** job order (`hasRole('ADMIN')`)                                                                    |     ❌     |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
+
+¹ Only via the own object / the owner-scope check — not in general. The **owner** of a
+personal aggregate (inventory entry `inventory_item.user`, ship `ship.owner`, refinery order
+`refinery_order.owner`) may **always** view and edit their object, independent of the
+`owning_org_unit_id` stamp — even after an OrgUnit change or without any membership, as long as
+the object is still booked to an OrgUnit (REQ-ORG-011). A **non-**owner stays bound to the
+strict OrgUnit scope.
+² Admin unrestricted; Staffel logistician/officer only **escalation** of their own
+Staffel job order to an SK.
+³ **Only members of a profit-eligible org unit** (`is_profit_eligible`
+on Staffel or SK) are part of the job-order workflow: only they may **view** job orders
+(list/detail), **edit** them (status/priority/materials/handover,
+reassign) and set/withdraw **material claims** — the profit gate
+(`canViewJobOrders`) is folded into `canSeeJobOrder` and `canEditJobOrder` and
+also applies to the role-only claim endpoints. Anyone who is exclusively in
+non-profit-eligible units can **only create** job orders — nothing else,
+analogous to anonymous guests. Admins always have access (`canViewJobOrders`
+is always true for them). In the frontend the „Aufträge" link is replaced by „Auftrag
+anlegen", and a direct call to `/orders` or `/orders/{id}` is redirected to the
+create form; the backend returns an empty list or `403` for non-profit members
+(also for write/claim endpoints).
+⁴ Stricter than `canSeeJobOrder` — **no** SK-public escape: the coverage view
+names members by name together with their blueprints and is therefore limited to members
+of the **responsible** org unit. Anyone who sees the SK job order only
+via the public queue gets `403`; the frontend hides the section. Admins without a pin always,
+with a pin only for the matching unit.
+⁵ Self-or-Logistician rule (`verifyAssigneeAccess`): anyone who sees the job order
+may add/remove **themselves** and maintain **their own** note (max. 500
+characters); other people's entries/notes may only be changed by a Logistician+.
+Notes are visible to everyone who sees the job order.
 
 ### 3.4 Refinery
 
-| Funktion (Gate)                                                                                                                        | Anonym | Member | Log. | MM | Officer | Admin |
-|:---------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Eigene Refinery-Orders lesen/anlegen, inkl. Screenshot-Import (`POST /import-extract`) (`isAuthenticated()` [+ `canSeeRefineryOrder`]) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Refinery-Order bearbeiten/löschen/lagern (`isAuthenticated()` + `canEditRefineryOrder`: Owner **oder** Logistician)                    |   ❌    |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
-| Refinery-Orders **für andere** anlegen/verwalten (`/users/{id}`, `hasRole('LOGISTICIAN')`)                                             |   ❌    |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
+| Function (gate)                                                                                                                   | Anonymous | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read/create own refinery orders, incl. screenshot import (`POST /import-extract`) (`isAuthenticated()` [+ `canSeeRefineryOrder`]) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Edit/delete/store refinery order (`isAuthenticated()` + `canEditRefineryOrder`: Owner **or** Logistician)                         |     ❌     |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
+| Create/manage refinery orders **for others** (`/users/{id}`, `hasRole('LOGISTICIAN')`)                                            |     ❌     |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
 
-¹ Nur als Owner der jeweiligen Order.
+¹ Only as owner of the respective order.
 
-### 3.5 Einsätze (Missionen)
+### 3.5 Missions
 
-| Funktion (Gate)                                                                                              | Anonym | Member | Log. | MM | Officer | Admin |
-|:-------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Nicht-interne Missionen lesen (`canSeeMission`; Outsider-redigiert, §1.3)                                    |   ✅⁴   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Mission **anlegen** (`isAuthenticated()`)                                                                    |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Als (Gast-)Teilnehmer anmelden / ein-/auschecken / Auszahlungsart ändern / abmelden (`canAccessParticipant`) |   ✅¹   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Mission **verwalten** (bearbeiten, Teilnehmer/Units/Crew/Frequenzen, Party-Lead) (`canManageMission`)        |   ❌    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
-| Manager / Owner setzen (`canManageManagers` / `canChangeOwner`)                                              |   ❌    |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
-| Mission **löschen** (`hasRole('ADMIN')`)                                                                     |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                                                 | Anonymous | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read non-internal missions (`canSeeMission`; outsider-redacted, §1.3)                                           |    ✅⁴     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Create** mission (`isAuthenticated()`)                                                                        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Register as (guest) participant / check in/out / change payout preference / unregister (`canAccessParticipant`) |    ✅¹     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Manage** mission (edit, participants/units/crew/frequencies, party lead) (`canManageMission`)                 |     ❌     |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
+| Set manager / owner (`canManageManagers` / `canChangeOwner`)                                                    |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
+| **Delete** mission (`hasRole('ADMIN')`)                                                                         |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-¹ Anonym nur auf **unverknüpften Gast-Teilnehmern**; eingeloggte User nur auf
-ihrem eigenen verknüpften Teilnehmer. ² Nur als **Owner/Co-Manager** der Mission.
-³ Mission-Manager/Officer zusätzlich nur im eigenen Staffel-Scope
-(`canEditMission`). ⁴ Outsider (anonym **und** rollenloser Guest, `isMemberOrAbove() == false`)
-sehen die Detailsicht ohne Beschreibung + PII; Organisation, Teilnehmerliste, Einheiten,
-Frequenzen und Auszahlungsart bleiben sichtbar (§1.3). Das Finanz-Ledger bleibt Mitglied-only,
-und ein Guest wird hier wie ein anonymer Besucher behandelt.
+¹ Anonymous only on **unlinked guest participants**; logged-in users only on
+their own linked participant. ² Only as **owner/co-manager** of the mission.
+³ Mission-Manager/Officer additionally only within their own Staffel scope
+(`canEditMission`). ⁴ Outsiders (anonymous **and** roleless guest, `isMemberOrAbove() == false`)
+see the detail view without description + PII; organization, participant list, units,
+frequencies and payout preference remain visible (§1.3). The finance ledger stays member-only,
+and a guest is treated here like an anonymous visitor.
 
-> **Einsatz ohne Orgeinheit (Bereichsleitung).** „Mission anlegen" ist `isAuthenticated()` — das
-> schließt einen angemeldeten Nutzer **ohne** Staffel-/SK-Mitgliedschaft ein (z. B. die den SKs und
-> Staffeln übergeordnete Bereichsleitung). Sein Einsatz wird **ownerless** angelegt
-> (`owning_org_unit_id = NULL`, V144) statt mit `400` abgelehnt und bleibt über `mission.owner_id`
-> zurechenbar. Sichtbarkeit: **nicht intern → für alle sichtbar** (auch anonym); **intern → nur für
-> Mitglieder-oder-höher** (`isMemberOrAbove()`), für Gäste/Anonyme unsichtbar. Bearbeiten folgt dem
-> üblichen Mission-Management-Gate (Owner, Co-Manager, Mission-Manager/Officer, Admins), ohne
-> Staffel-Scope-Einengung. Details: REQ-ORG-009 in
+> **Mission without org unit (Bereichsleitung).** „Mission anlegen" (create mission) is
+> `isAuthenticated()` — that includes a logged-in user **without** Staffel/SK membership (e.g. the
+> Bereichsleitung superordinate to the SKs and Staffeln). Their mission is created **ownerless**
+> (`owning_org_unit_id = NULL`, V144) instead of being rejected with `400`, and stays attributable
+> via `mission.owner_id`. Visibility: **non-internal → visible to everyone** (anonymous too);
+> **internal → only for member-or-above** (`isMemberOrAbove()`), invisible to guests/anonymous.
+> Editing follows the usual mission-management gate (owner, co-manager, Mission-Manager/Officer,
+> admins), without Staffel-scope narrowing. Details: REQ-ORG-009 in
 > [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md).
 
-### 3.6 Operations (Einsatz-Klammer, Finanzen & Auszahlungen)
+### 3.6 Operations (mission bracket, finances & payouts)
 
-| Funktion (Gate)                                                                                   | Anonym | Member | Log. | MM | Officer | Admin |
-|:--------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Operations lesen (Liste/Detail/Finanzen/Auszahlungen) (`isAuthenticated()` [+ `canSeeOperation`]) |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Operation anlegen/bearbeiten (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])                |   ❌    |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| Auszahlung als **paid-out markieren** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)         |   ❌    |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| paid-out **zurücknehmen** (zusätzlich `hasAnyRole('ADMIN','OFFICER')`)                            |   ❌    |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
-| Operation **löschen** (`hasRole('ADMIN')` + `canEditOperation`)                                   |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                            | Anonymous | Member | Log. | MM | Officer | Admin |
+|:-------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read operations (list/detail/finances/payouts) (`isAuthenticated()` [+ `canSeeOperation`]) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])                |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)            |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Revoke** paid-out (additionally `hasAnyRole('ADMIN','OFFICER')`)                         |     ❌     |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                             |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-> Asymmetrie der Auszahlung: jeder Mission-Manager darf `paidOut=true` setzen,
-> aber nur Officer/Admin dürfen ein bestätigtes paid-out wieder auf `false`
-> zurücksetzen.
+> Payout asymmetry: every Mission-Manager may set `paidOut=true`,
+> but only Officer/Admin may reset a confirmed paid-out back to
+> `false`.
 >
-> **Sichtbarkeit (`canSeeOperation`) hat seit #500/#501 drei Pfade** (es genügt einer):
-> **(1)** der normale Staffel-Scope (Operation der eigenen Orgeinheit);
-> **(2)** eine **ownerless Bereichsleitungs-Operation** (`owning_org_unit_id = NULL`,
-> V145, ADR-0005) ist für **alle Mitglieder-oder-höher** sichtbar — Operations haben
-> keinen Public-Escape, für Gäste/Anonyme bleibt sie unsichtbar;
-> **(3)** **Teilnehmer-Sichtbarkeit** (ADR-0006): Wer an einem der verknüpften
-> Einsätze teilgenommen hat, sieht die Operation und seine Auszahlung auch
-> staffelfremd (anonyme Aufrufer nie — kein `currentUserId`).
-> Anlegen einer ownerless Operation steht jedem Mission-Manager **ohne**
-> Orgeinheit offen (Bereichsleitung); bearbeiten darf sie jeder Mission-Manager,
-> löschen jeder Admin (`canEditOperation` ist für ownerless Operationen ein
-> No-op, das Rollen-Gate des Endpunkts trägt die Einschränkung).
+> **Visibility (`canSeeOperation`) has three paths since #500/#501** (one suffices):
+> **(1)** the normal Staffel scope (operation of one's own org unit);
+> **(2)** an **ownerless Bereichsleitung operation** (`owning_org_unit_id = NULL`,
+> V145, ADR-0005) is visible to **all member-or-above** — operations have
+> no public escape, it stays invisible to guests/anonymous;
+> **(3)** **participant visibility** (ADR-0006): whoever took part in one of the linked
+> missions sees the operation and their payout even across Staffeln
+> (anonymous callers never — no `currentUserId`).
+> Creating an ownerless operation is open to any Mission-Manager **without**
+> org unit (Bereichsleitung); editing it is allowed for any Mission-Manager,
+> deleting it for any admin (`canEditOperation` is a no-op for ownerless
+> operations, the endpoint's role gate carries the restriction).
 
-### 3.7 Mission-Finanzen & Profit
+### 3.7 Mission finances & profit
 
-| Funktion (Gate)                                                                         | Anonym | Member | Log. | MM | Officer | Admin |
-|:----------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Finanz-Einträge einer Mission lesen (`isMemberOrAbove` + `canSeeMission`)               |   ❌²   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Finanz-Eintrag **anlegen** (`isMemberOrAbove` + `canSeeMission`)                        |   ❌²   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Finanz-Eintrag bearbeiten/löschen (`canEditFinanceEntry`: Owner **oder** Officer/Admin) |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |    ✅    |   ✅   |
-| Profit-Kalkulation lesen (`hasAnyRole('KRT_MEMBER','OFFICER','ADMIN')`)                 |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Material-Übersicht / Material-Collection eines Auftrags (`isAuthenticated()`)           |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Function (gate)                                                               | Anonymous | Member | Log. | MM | Officer | Admin |
+|:------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read a mission's finance entries (`isMemberOrAbove` + `canSeeMission`)        |    ❌²     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Create** finance entry (`isMemberOrAbove` + `canSeeMission`)                |    ❌²     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Edit/delete finance entry (`canEditFinanceEntry`: owner **or** Officer/Admin) |     ❌     |   ✅¹   |  ✅¹  | ✅¹ |    ✅    |   ✅   |
+| Read profit calculation (`hasAnyRole('KRT_MEMBER','OFFICER','ADMIN')`)        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Material overview / material collection of a job order (`isAuthenticated()`)  |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
-¹ Nur eigener Eintrag und nur solange weiterhin Teilnehmer der Mission.
-² Das Finanz-Ledger ist die Auszahlungssicht und verlangt Mitglied-oder-höher: anonym → `401`,
-rollenloser Guest → `403` (Guest wird bei Einsätzen wie anonym behandelt, §1.3). Aufträge anlegen
-bleibt davon unberührt (für alle möglich).
+¹ Only one's own entry and only while still a participant of the mission.
+² The finance ledger is the payout view and requires member-or-above: anonymous → `401`,
+roleless guest → `403` (a guest is treated like anonymous for missions, §1.3). Creating job orders
+is unaffected by this (possible for everyone).
 
-### 3.8 Promotion-System (Beförderung)
+### 3.8 Promotion system
 
-Alle Promotion-Controller sind class-level `isAuthenticated()`. Das Beförderungssystem
-ist **durchgängig staffel-gescopt**: jede Staffel führt ihr eigenes System
-(Themenbereiche, Kategorien, Level-Inhalte, Rangvoraussetzungen, Bewertungen) und
-sieht ausschließlich die eigenen Daten. Lese- **und** Schreibzugriff werden in der
-Service-Schicht über den aktiven Staffel-Kontext gefiltert
-(`OwnerScopeService.currentSquadronId()` für Listen/Eligibility,
-`canSeeSquadron`/`canEditSquadron(topic.owningSquadron.id)` für Detail und Pflege).
+All promotion controllers are class-level `isAuthenticated()`. The promotion system
+is **Staffel-scoped throughout**: every Staffel runs its own system
+(topic areas, categories, level contents, rank prerequisites, evaluations) and
+sees exclusively its own data. Read **and** write access are filtered in the
+service layer via the active Staffel context
+(`OwnerScopeService.currentSquadronId()` for lists/eligibility,
+`canSeeSquadron`/`canEditSquadron(topic.owningSquadron.id)` for detail and maintenance).
 
-- **Member/Officer** sehen nur das System ihrer Heimat-Staffel.
-- **Admins** sehen das der aktiv angepinnten Staffel; ohne Pin (Alle-Staffeln-Modus)
-  zeigen die Seiten einen „Staffel wählen"-Hinweis statt einer Vermischung aller Staffeln.
-- Ein **Nutzer ohne Staffelzugehörigkeit, der kein Admin ist**, hat kein eigenes
-  Beförderungssystem: der Menüpunkt ist ausgeblendet, jeder Listen-/Eligibility-Read
-  liefert leer und ein direkter Seitenaufruf wird mit 403 blockiert (`hasPromotionReadAccess()`).
-- Die **Bewertungsmatrix** (die Member-Liste der Bewertungsverwaltung) führt ausschließlich die
-  **einfachen Mitglieder** einer Staffel: Wer die Rolle `ADMIN` oder `OFFICER` trägt, erscheint
-  dort **nie** als zu bewertende Zeile — Admins sind staffellos, und Offiziere führen die Bewertung
-  durch, statt selbst bewertet zu werden. Das Beförderungssystem betrachtet nur einfache Member
-  einer Staffel und steht keiner anderen OrgUnit-Art zur Verfügung (#817).
+- **Member/Officer** see only their home Staffel's system.
+- **Admins** see that of the actively pinned Staffel; without a pin (all-Staffeln mode)
+  the pages show a „Staffel wählen" (select Staffel) hint instead of mixing all Staffeln.
+- A **user without Staffel affiliation who is not an admin** has no promotion
+  system of their own: the menu item is hidden, every list/eligibility read
+  returns empty, and a direct page call is blocked with 403 (`hasPromotionReadAccess()`).
+- The **evaluation matrix** (the member list of the evaluation management) lists exclusively the
+  **plain members** of a Staffel: whoever holds the `ADMIN` or `OFFICER` role **never** appears
+  there as a row to be evaluated — admins are Staffel-less, and officers carry out the evaluation
+  instead of being evaluated themselves. The promotion system considers only plain members
+  of a Staffel and is not available to any other OrgUnit kind (#817).
 
-| Funktion (Gate)                                                                                                      | Anonym | Member | Log. | MM | Officer | Admin |
-|:---------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Themenbereiche/Kategorien/Level-Inhalte/Rangvoraussetzungen lesen (`isAuthenticated()`, **nur eigene Staffel**)      |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| …**pflegen** (Service: Admin **oder** Officer der besitzenden Staffel)                                               |   ❌    |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
-| Eigene Bewertungen / Eligibility ansehen (`/my`, JWT-Sub, **eigene Staffel**)                                        |   ❌    |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
-| Bewertungen/Eligibility **anderer** ansehen, Member-Liste (`hasAnyRole('ADMIN','OFFICER')`, Officer staffel-gescopt) |   ❌    |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
-| Promotion-Subsystem je Staffel an-/abschalten (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)        |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                                                 | Anonymous | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read topic areas/categories/level contents/rank prerequisites (`isAuthenticated()`, **own Staffel only**)       |     ❌     |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
+| …**maintain** (service: admin **or** officer of the owning Staffel)                                             |     ❌     |   ❌    |  ❌   | ❌  |   ✅³    |   ✅   |
+| View own evaluations / eligibility (`/my`, JWT sub, **own Staffel**)                                            |     ❌     |   ✅¹   |  ✅¹  | ✅¹ |   ✅¹    |  ✅²   |
+| View **others'** evaluations/eligibility, member list (`hasAnyRole('ADMIN','OFFICER')`, officer Staffel-scoped) |     ❌     |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
+| Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-¹ Nur die **eigene Heimat-Staffel**; ein Nutzer ganz ohne Staffel (und ohne Admin-Rechte) sieht nichts — `hasPromotionReadAccess()` liefert leer, das Menü ist ausgeblendet, Direktaufruf 403.
-² Admin: die aktiv angepinnte Staffel; im Alle-Staffeln-Modus ein „Staffel wählen"-Hinweis statt einer Vermischung.
-³ Nur für die eigene Staffel. **SKs sind vom Promotion-System per DB-CHECK/Trigger + ArchUnit-Regel dauerhaft ausgeschlossen.**
-⁴ Die zu bewertende **Member-Liste** (`GET /api/v1/promotion/evaluations/members`) enthält nur die **einfachen Mitglieder** der Staffel — Träger der Rollen `ADMIN` und `OFFICER` werden herausgefiltert (#817), da sie die Bewertung durchführen, statt selbst bewertet zu werden. Officer/Admin **lesen** die Matrix also, **erscheinen** aber nicht als Zeile darin.
+¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `hasPromotionReadAccess()` returns empty, the menu is hidden, direct call 403.
+² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
+³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
+⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 
-| Funktion (Gate)                                                                                                                                                              | Anonym | Member | Log. | MM | Officer | Admin |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| Staffel-Liste / aktive OrgUnit-Liste (`/org-units/active`) lesen                                                                                                             |   ✅¹   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| SK-Liste lesen (`isAuthenticated()`; inaktive **und** die Detailansicht `GET /special-commands/{id}` nur Admin)                                                              |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Aktiven OrgUnit-Kontext umschalten (Sidebar-Switcher)                                                                                                                        |   ❌    |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
-| Staffel-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`)                                                       |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Staffel-Mitglieds-Flags setzen (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                                   |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| SK-Lifecycle (anlegen/umbenennen/löschen/aktivieren, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                 |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| SK-**Mitgliederliste lesen** & **Mitglieder verwalten** (add/remove/Flags) (`@specialCommandSecurityService.canManageMembers` — gilt auch für das reine `GET /{id}/members`) |   ❌    |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
-| SK-**Lead-Flag** setzen (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`)                                                                              |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                                                                                                     | Anonymous | Member | Log. | MM | Officer | Admin |
+|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |    ✅¹     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read SK list (`isAuthenticated()`; inactive ones **and** the detail view `GET /special-commands/{id}` admin only)                                                   |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Switch the active OrgUnit context (sidebar switcher)                                                                                                                |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
+| Staffel lifecycle (create/rename/delete/activate, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`)                                                      |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |     ❌     |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
+| Set SK **lead flag** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`)                                                                        |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-¹ Stammdaten-Read, anonym erlaubt. ² Nicht-Admins schalten zwischen ihren
-Mitgliedschaften; Admins zusätzlich „Alle Staffeln". ³ SK-Mitgliederverwaltung
-ist **Admin oder SK-Lead dieses SK** — nicht an die globale Officer-Rolle
-gebunden.
+¹ Master-data read, anonymous allowed. ² Non-admins switch between their
+memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
+is **admin or SK-Lead of this SK** — not tied
+to the global Officer role.
 
-### 3.10 Stammdaten, Ankündigungen, System
+### 3.10 Master data, announcements, system
 
-| Funktion (Gate)                                                                                                                                                                                                                                      | Anonym | Member | Log. | MM | Officer | Admin |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:----:|:--:|:-------:|:-----:|
-| **Öffentlich** lesbare Stammdaten (Materialien, Locations, Schiffstypen, Hersteller, Sternensysteme, Refining-Methoden, Frequenz-/Job-Typen, Staffeln, System-Settings)                                                                              |   ✅    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Angemeldet** lesbare Stammdaten (Terminals, Material-Kategorien)                                                                                                                                                                                   |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Admin-only** Stammdaten – auch zum Lesen (Städte, Raumstationen, Outposts, POIs, Material-Aliase, Blueprints) (`hasRole('ADMIN')`)                                                                                                                 |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Stammdaten **schreiben** (anlegen/ändern/löschen/Sichtbarkeit/Overrides) (`hasRole('ADMIN')`)                                                                                                                                                        |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| UEX-Location-Typeahead / Blueprint-Produkt-Suche (`isAuthenticated()`)                                                                                                                                                                               |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Ankündigung **lesen** (`GET /announcement`, `isAuthenticated()`)                                                                                                                                                                                     |   ❌    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Ankündigung **schreiben/löschen** (inkl. Roh-Lesesicht `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                                                                                               |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Sync-Reports lesen/aufräumen (`hasRole('ADMIN')`)                                                                                                                                                                                                    |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| **Audit-Logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung) lesen + Zeitraum-PDF/JSON + Aufbewahrungs-Bereinigung (`/admin/audit-log`, `/api/v1/audit/**`, URL- **und** Methoden-Gate `hasRole('ADMIN')`) |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| System-Setting schreiben (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                                 |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Rollen-/Rechteverwaltung, Member-Attribute/Rang, Flag-Vergabe (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                                                                                                      |   ❌    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                                                                                                                                                                            | Anonymous | Member | Log. | MM | Officer | Admin |
+|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| **Publicly** readable master data (materials, locations, ship types, manufacturers, star systems, refining methods, frequency/job types, Staffeln, system settings)                                                                        |     ✅     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Logged-in** readable master data (terminals, material categories)                                                                                                                                                                        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Admin-only** master data – also to read (cities, space stations, outposts, POIs, material aliases, blueprints) (`hasRole('ADMIN')`)                                                                                                      |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Write** master data (create/change/delete/visibility/overrides) (`hasRole('ADMIN')`)                                                                                                                                                     |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| UEX location typeahead / blueprint product search (`isAuthenticated()`)                                                                                                                                                                    |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Read** announcement (`GET /announcement`, `isAuthenticated()`)                                                                                                                                                                           |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Write/delete** announcement (incl. raw read view `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read/clean up sync reports (`hasRole('ADMIN')`)                                                                                                                                                                                            |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Role/permission management, member attributes/rank, flag granting (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                                                                                        |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-Welche Stammdaten anonym lesbar sind, legt allein die `permitAll`-Liste in
-`SecurityConfig` fest (siehe §1.1) — alles andere ist mindestens angemeldet,
-einige Tabellen (Städte, Stationen, Outposts, POIs, Aliase, Blueprints) sind
-schon zum **Lesen** Admin-only. **Schreiben ist bei allen Stammdaten
-Admin-only.**
+Which master data is anonymously readable is determined solely by the `permitAll`
+list in `SecurityConfig` (see §1.1) — everything else is at least logged-in,
+some tables (cities, stations, outposts, POIs, aliases, blueprints) are
+admin-only already to **read**. **Writing is admin-only for all master
+data.**
 
 ### 3.11 Kartellbank (epic #556)
 
-Die Bank hängt an zwei eigenen Keycloak-Rollen (`Bank Employee` →
+The bank hinges on two dedicated Keycloak roles (`Bank Employee` →
 `ROLE_BANK_EMPLOYEE`, `Bank Management` → `ROLE_BANK_MANAGEMENT`) plus
-app-verwalteten **Grant-Zeilen** pro (Mitarbeiter, Konto)
-(`bank_account_grant`: Zeile = Lese-Recht; Flags = einzahlen / auszahlen /
-transferieren). **Bankmitarbeit ist völlig unabhängig von
-OrgUnit-Mitgliedschaften** (REQ-BANK-008): `BankSecurityService` wertet
-ausschließlich Bankrollen + Grants aus — `OwnerScopeService`, kontextuelle
-Rollen und der Admin-Pin haben keinerlei Einfluss, in beide Richtungen.
-Spalten hier: **Member** = beliebige Org-Rolle ohne Bankrolle · **Bank-MA** =
-`Bank Employee` (mit Grants) · **Bankleitung** = `Bank Management`.
+app-managed **grant rows** per (employee, account)
+(`bank_account_grant`: row = read right; flags = deposit / withdraw /
+transfer). **Bank staffing is entirely independent of
+OrgUnit memberships** (REQ-BANK-008): `BankSecurityService` evaluates
+exclusively bank roles + grants — `OwnerScopeService`, contextual
+roles and the admin pin have no influence whatsoever, in either direction.
+Columns here: **Member** = any org role without a bank role · **Bank Empl.** =
+`Bank Employee` (with grants) · **Bank Mgmt.** = `Bank Management`.
 
-| Funktion (Gate)                                                                                                                                                              | Anonym | Member |  Bank-MA  | Bankleitung | Admin |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:-----------:|:-----:|
-| Bankbereich betreten, Dashboard, Konten **mit Grant-Zeile** sehen (`hasRole('BANK_EMPLOYEE')` + Grant)                                                                       |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
-| **Alle** Konten/Halter/Grants sehen (`hasRole('BANK_MANAGEMENT')`)                                                                                                           |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Einzahlen / Auszahlen / Transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, je Konto-Flag)                                                                        |   ❌    |   ❌    | ✅ je Flag |      ✅      |   ✅   |
-| Bankverwaltung betreten, **Sonderkonto** (`SPECIAL`) anlegen (+ Auto-Grant), Haltermenü + **Halter→Halter-Umbuchung** (`HOLDER_TRANSFER`, `BANK_EMPLOYEE`, kein Konto-Grant) |   ❌    |   ❌    |     ✅     |      ✅      |   ✅   |
-| Konten **(außer Sonderkonto)** anlegen / umbenennen / schließen / wiedereröffnen, **manuelle** Halter-Registry, Grants verwalten                                             |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Storno (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                                                                                               |   ❌    |   ❌    |     ❌     |      ✅      |   ✅   |
-| Kontoauszug-PDF (gesehene Konten) / 3-Monats-Report (`BANK_MANAGEMENT`)                                                                                                      |   ❌    |   ❌    |   ✅ / ❌   |      ✅      |   ✅   |
-| **Audit-Log** lesen + Aufbewahrungs-Bereinigung (`/api/v1/bank/admin/audit`, URL- **und** Methoden-Gate `hasRole('ADMIN')`)                                                  |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
-| **Wipe-Reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                                                                                         |   ❌    |   ❌    |     ❌     |      ❌      |   ✅   |
+| Function (gate)                                                                                                                                                                | Anonymous | Member | Bank Empl. | Bank Mgmt. | Admin |
+|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----------:|:----------:|:-----:|
+| Enter the bank area, dashboard, view accounts **with a grant row** (`hasRole('BANK_EMPLOYEE')` + grant)                                                                        |     ❌     |   ❌    |     ✅      |     ✅      |   ✅   |
+| View **all** accounts/holders/grants (`hasRole('BANK_MANAGEMENT')`)                                                                                                            |     ❌     |   ❌    |     ❌      |     ✅      |   ✅   |
+| Deposit / withdraw / transfer (`@bankSecurityService.canDeposit/Withdraw/Transfer`, per account flag)                                                                          |     ❌     |   ❌    | ✅ per flag |     ✅      |   ✅   |
+| Enter Bankverwaltung, create a **Sonderkonto** (`SPECIAL`) (+ auto-grant), holder menu + **holder-to-holder Umbuchung** (`HOLDER_TRANSFER`, `BANK_EMPLOYEE`, no account grant) |     ❌     |   ❌    |     ✅      |     ✅      |   ✅   |
+| Create / rename / close / reopen accounts **(except Sonderkonto)**, **manual** holder registry, manage grants                                                                  |     ❌     |   ❌    |     ❌      |     ✅      |   ✅   |
+| Reversal (`POST /bank/transactions/{id}/reversal`, `hasRole('BANK_MANAGEMENT')`)                                                                                               |     ❌     |   ❌    |     ❌      |     ✅      |   ✅   |
+| Account statement PDF (viewed accounts) / 3-month report (`BANK_MANAGEMENT`)                                                                                                   |     ❌     |   ❌    |   ✅ / ❌    |     ✅      |   ✅   |
+| Read **audit log** + retention cleanup (`/api/v1/bank/admin/audit`, URL **and** method gate `hasRole('ADMIN')`)                                                                |     ❌     |   ❌    |     ❌      |     ❌      |   ✅   |
+| **Wipe reset** (`/api/v1/bank/admin/wipe-reset`, `hasRole('ADMIN')`)                                                                                                           |     ❌     |   ❌    |     ❌      |     ❌      |   ✅   |
 
-Die Bankleitung sieht das Audit-Log **nicht** — es ist bewusst Admin-only
-(REQ-BANK-012). Grants können nur an Nutzer mit der Rolle `Bank Employee`
-vergeben werden (409 `BANK_GRANTEE_MISSING_ROLE`); ob die Person zusätzlich in
-einer Staffel/einem SK ist, spielt keine Rolle.
+Bank Management does **not** see the audit log — it is deliberately admin-only
+(REQ-BANK-012). Grants can only be assigned to users holding the `Bank Employee`
+role (409 `BANK_GRANTEE_MISSING_ROLE`); whether the person is additionally in a
+Staffel/an SK plays no role.
 
-**Halter sind von den Konten entkoppelt** (ADR-0039, REQ-BANK-003/-006): Der
-Halterbestand ist eine **globale** Größe in einem eigenen Ledger
-(`bank_holder_posting`), nicht kontobezogen, und **darf negativ** werden — ein
-Halter streckt notfalls eigenes Geld vor und wird später per **Halter→Halter-Umbuchung**
-(`HOLDER_TRANSFER`, REQ-BANK-031) ausgeglichen. Nur **Konten** sind hart gegen
-Überziehung geschützt. **Alle Bankmitarbeiter und Bankleitungsmitglieder werden
-automatisch als Halter registriert** (REQ-BANK-029, ADR-0040); verliert jemand alle
-Bankrollen, wird sein rollengetriebener Halter automatisch deaktiviert (Restbestand
-bleibt, muss ausgeglichen werden). Manuell registrierte (Nicht-Staff-)Halter bleiben
-davon unberührt.
+**Holders are decoupled from accounts** (ADR-0039, REQ-BANK-003/-006): the
+holder balance is a **global** quantity in its own ledger
+(`bank_holder_posting`), not account-bound, and **may go negative** — a
+holder fronts their own money if needed and is later settled via a **holder-to-holder Umbuchung**
+(`HOLDER_TRANSFER`, REQ-BANK-031). Only **accounts** are hard-protected against
+overdraft. Because a holder sends the money in-game themselves when withdrawing or doing an Umbuchung,
+the **in-game transfer fee** (default 0.5 %, the same setting `operation.transfer_fee_rate`
+as for the operations payout) is deducted on `WITHDRAWAL`, `HOLDER_TRANSFER` and a
+holder-changing `TRANSFER` — the source is charged gross, the target is credited net;
+`DEPOSIT` and same-holder transfers stay fee-free (REQ-BANK-033, ADR-0041). **All bank
+employees and Bank Management members are
+automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses all
+bank roles, their role-driven holder is automatically deactivated (the remaining balance
+stays and must be settled). Manually registered (non-staff) holders are
+left untouched by this.
 
-#### 3.11.1 Org-Einheits-Zugang für Offiziere/Leads (epic #666)
+#### 3.11.1 Org-unit access for officers/leads (epic #666)
 
-Epic #666 ergänzt **eine einzige, eng umrissene** Org-Einheits-Fähigkeit, **ohne**
-die Unabhängigkeit aus REQ-BANK-008 aufzuweichen: `BankSecurityService` und das
-Hauptbuch bleiben zu 100 % OrgUnit-blind. Die gesamte OrgUnit-Logik liegt in genau
-einem bewusst **nicht** mit `Bank` benannten Seam, `OrgUnitBankAccessService`
-(ADR-0020), der als einziger `OwnerScopeService` und Bank verbinden darf
-(ArchUnit-pinned). Diese Oberfläche liegt **außerhalb** des Bank-URL-/Rollenraums
-unter `/api/v1/org-units/bank/**` und braucht **keine** Bankrolle. „Off./Lead" =
-Offizier der eigenen Staffel bzw. Lead des eigenen Spezialkommandos (Aufsichtsscope
-`currentOversightScope()`); ein einfacher Member sieht weiterhin nichts.
+Epic #666 adds **a single, narrowly scoped** org-unit capability, **without**
+softening the independence from REQ-BANK-008: `BankSecurityService` and the
+ledger stay 100 % OrgUnit-blind. The entire OrgUnit logic lives in exactly
+one seam deliberately **not** named with `Bank`, `OrgUnitBankAccessService`
+(ADR-0020), which is the only one allowed to connect `OwnerScopeService` and the bank
+(ArchUnit-pinned). This surface lies **outside** the bank URL/role space
+under `/api/v1/org-units/bank/**` and needs **no** bank role. „Off./Lead" =
+officer of one's own Staffel or lead of one's own Spezialkommando (oversight scope
+`currentOversightScope()`); a plain member still sees nothing.
 
-| Funktion (Gate)                                                                                                          | Anonym | Member | Off./Lead |  Bank-MA  | Bankleitung | Admin |
-|:-------------------------------------------------------------------------------------------------------------------------|:------:|:------:|:---------:|:---------:|:-----------:|:-----:|
-| **Nur Kontostand** des eigenen OrgUnit-Kontos sehen (`GET /api/v1/org-units/bank/balances`, Aufsichtsscope)              |   ❌    |   ❌    |     ✅     |   (✅)*    |    (✅)*     |   ✅   |
-| Ein-/Auszahlungs**antrag** anlegen / eigene Anträge sehen / eigenen Antrag zurückziehen (`/org-units/bank/requests/**`)  |   ❌    |   ❌    |     ✅     |   (✅)*    |    (✅)*     |   ✅   |
-| Antrag **bestätigen** (bucht, Halter erfassen) / **ablehnen** (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + Konto-Flag) |   ❌    |   ❌    |     ❌     | ✅ je Flag |      ✅      |   ✅   |
+> **Note:** This table shows the **baseline from Epic #666** (officer/lead only).
+> Later stages widen the **Member** column: through configurable visibility
+> (REQ-BANK-035, §3.11.2) and the rule *request eligibility = view eligibility*
+> (REQ-BANK-039, §3.11.3) it is **no longer generally ❌** — a KRT Member made
+> visible via approval may view the balance **and** submit requests.
 
-\* Bank-MA/Bankleitung erreichen die Offiziers-Endpunkte nur, soweit sie selbst der
-Aufsichtsscope abdeckt (sie sind als Bankpersonal nicht automatisch Offizier/Lead) —
-ihre eigentliche Bankarbeit läuft über den Bankbereich oben. Der Antrag bewegt erst
-bei der Bestätigung Geld; Überziehungs-/Halterprüfung greifen dann wie bei einer
-direkten Buchung (REQ-BANK-023). Beim Anlegen werden Bankleitung + die für das Konto
-berechtigten Bank-MA per In-App-Benachrichtigung informiert (REQ-BANK-026,
-`ACCOUNT_GRANT`-Selektor). Ein Konto mit offenem Antrag lässt sich nicht schließen
-(409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). Das Audit-Log bleibt Admin-only. Die Seite zeigt
-ausschließlich **aktive** Konten (REQ-BANK-028).
+| Function (gate)                                                                                                                | Anonymous | Member | Off./Lead | Bank Empl. | Bank Mgmt. | Admin |
+|:-------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:---------:|:----------:|:----------:|:-----:|
+| View **only the balance** of one's own OrgUnit account (`GET /api/v1/org-units/bank/balances`, oversight scope)                |     ❌     |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/org-units/bank/requests/**`) |     ❌     |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| **Confirm** a request (books it, records holders) / **reject** it (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + account flag) |     ❌     |   ❌    |     ❌     | ✅ per flag |     ✅      |   ✅   |
 
-#### 3.11.2 Kontoverantwortung, Sichtbarkeit, Ziel & Read-only-Detail (REQ-BANK-034..038)
+\* Bank Empl./Bank Management reach the officer endpoints only as far as the oversight
+scope covers them itself (as bank staff they are not automatically officer/lead) —
+their actual bank work runs through the bank area above. A request moves money only
+at confirmation; overdraft/holder checks then apply as for a direct booking
+(REQ-BANK-023). On creation, Bank Management + the Bank Empl. authorized for the account
+are notified via in-app notification (REQ-BANK-026,
+`ACCOUNT_GRANT` selector). An account with an open request cannot be closed
+(409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). The audit log stays admin-only. The page shows
+exclusively **active** accounts (REQ-BANK-028).
 
-Aufbauend auf 3.11.1 und weiterhin allein über den Seam `OrgUnitBankAccessService`
-(die Bank bleibt OrgUnit-blind, ADR-0011/0043, beide ArchUnit-Pins grün). Die
-Org-Einheits-Bankseite ist jetzt für **jedes KRT-Mitglied** erreichbar; der Seam
-entscheidet pro Konto, was sichtbar ist.
+#### 3.11.2 Account responsibility, visibility, target & read-only detail (REQ-BANK-034..038)
 
-- **Kontoverantwortliche/r (abgeleitet, REQ-BANK-034):** Staffelkonto → Staffelleiter,
-  SK-Konto → SK-Leiter, Bereichskonto → Bereichsleiter, OL/KRT-Konto (`CARTEL`) → alle
-  OL-Mitglieder, Kartellbankkonto (`CARTEL_BANK`) → Bereichsleiter des Profit-Bereichs;
-  Sonderkonto: keiner. Wird aus der Rolle abgeleitet, nicht zugewiesen.
-- **Sichtbarkeit konfigurieren (REQ-BANK-035):** die/der Verantwortliche gibt zusätzlich
-  Unter-Rollen (je einzeln), alle Mitglieder oder einzelne Nutzer frei. Sonderkonten:
-  globale Rollen / alle Mitglieder / einzelne Nutzer — konfiguriert durch **OL-Mitglieder
-  oder Bankleitung**.
-- **Feste Sichtbarkeit (REQ-BANK-037):** `CARTEL`/KRT-Konto immer für **alle KRT-Mitglieder**;
-  `CARTEL_BANK` nur Verantwortliche/r + Bankpersonal; Sonderkonten automatisch für
-  Bankpersonal **+ alle OL-Mitglieder + alle Bereichsleiter** (Bereichskoordinatoren/-operatoren
-  und Offiziere **nicht** mehr — Verschärfung von REQ-BANK-028).
-- **Kontostandsziel (REQ-BANK-036):** setzt die/der Verantwortliche **und** zugriffsberechtigte
-  Bank-MA (bei Sonderkonten nur Bankpersonal).
-- **Read-only-Detail + Kontoauszug (REQ-BANK-038):** wer ein Konto sehen darf, öffnet die
-  schreibgeschützte Detailansicht **mit Historie** und kann einen **Kontoauszug** abrufen — keine
-  Ein-/Aus-/Umbuchung; die **Halter-Spalte ist redigiert** (in Tabelle und PDF). Bankpersonal
-  behält die volle Ansicht inkl. Halter.
+Building on 3.11.1 and still solely via the seam `OrgUnitBankAccessService`
+(the bank stays OrgUnit-blind, ADR-0011/0043, both ArchUnit pins green). The
+org-unit bank page is now reachable for **every KRT Member**; the seam
+decides per account what is visible.
 
-| Funktion (Gate)                                                                                                    | Member (mit Freigabe) | Verantwortl. | Bank-MA (Zugriff) | Admin |
-|:-------------------------------------------------------------------------------------------------------------------|:---------------------:|:------------:|:-----------------:|:-----:|
-| Kontostand + Read-only-Detail + Kontoauszug sehen (`/api/v1/org-units/bank/accounts/{id}`, Halter redigiert)       |  ✅ (soweit sichtbar)  |      ✅       |   ✅ (Bankseite)   |   ✅   |
-| Sichtbarkeit konfigurieren (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                  |           ❌           |      ✅       | ✅ nur Sonderkonto |   ✅   |
-| Kontostandsziel setzen/entfernen (`…/balance-target` Org-Einheit bzw. `/api/v1/bank/accounts/{id}/balance-target`) |           ❌           |      ✅       |    ✅ (Zugriff)    |   ✅   |
+- **Responsible holder (derived, REQ-BANK-034):** Staffel account → Staffelleiter,
+  SK account → SK-Leiter, Bereich account → Bereichsleiter, OL/KRT account (`CARTEL`) → all
+  OL members, Kartellbank account (`CARTEL_BANK`) → Bereichsleiter of the Profit Bereich;
+  Sonderkonto: none. Derived from the role, not assigned.
+- **Configure visibility (REQ-BANK-035):** the responsible holder additionally grants
+  sub-roles (each individually), all members or individual users. Sonderkonten:
+  global roles / all members / individual users — configured by **OL members
+  or Bank Management**.
+- **Fixed visibility (REQ-BANK-037):** `CARTEL`/KRT account always for **all KRT Members**;
+  `CARTEL_BANK` only the responsible holder + bank staff; Sonderkonten automatically for
+  bank staff **+ all OL members + all Bereichsleiter** (Bereichskoordinatoren/-operatoren
+  and officers **no longer** — tightening of REQ-BANK-028).
+- **Balance target (REQ-BANK-036):** set by the responsible holder **and** access-authorized
+  Bank Empl. (for Sonderkonten only bank staff).
+- **Read-only detail + account statement (REQ-BANK-038):** whoever may view an account opens the
+  read-only detail view **with history** and can retrieve an **account statement** — no
+  deposit/withdrawal/Umbuchung; the **holder column is redacted** (in the table and the PDF). Bank staff
+  keep the full view incl. holders.
+
+| Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
+|:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|
+| View balance + read-only detail + account statement (`/api/v1/org-units/bank/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
+| Configure visibility (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
+| Set/remove balance target (`…/balance-target` org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
+
+† Configuring **Sonderkonto** visibility is restricted to **OL members or Bank Management**
+(REQ-BANK-035/-037, `canConfigureVisibility`) — **not** a plain Bank Empl. (the column
+has no dedicated Bank Mgmt. column); `ORG_UNIT`/`AREA` is configured by the responsible holder,
+`CARTEL`/`CARTEL_BANK` are fixed (REQ-BANK-037).
+
+#### 3.11.3 Requesting for all view-eligible users, transfer requests & approval limits (REQ-BANK-039..041)
+
+Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` (the bank stays OrgUnit-blind, ADR-0045, both ArchUnit pins green):
+
+- **Request eligibility = view eligibility (REQ-BANK-039):** whoever may **view** a requestable account (`ORG_UNIT` / `AREA` / `CARTEL`, active only) may submit a request on it — no longer only the leadership ranks from 3.11.1. A member made visible via approval (REQ-BANK-035) (sub-rank, all members, individual user) can therefore likewise request. `SPECIAL` / `CARTEL_BANK` never receive requests.
+- **Transfer requests (REQ-BANK-040):** in addition to deposit/withdrawal, a `TRANSFER` from the (visible) source account to **any active account** as target can be requested. The bank employee books it on confirmation as a real `TRANSFER` (recording source/target holders, in-game fee REQ-BANK-033); requires `can_transfer` on the **source** — a grant on the target is not required.
+- **Approval limits per account/level + two-stage approval (REQ-BANK-041):** per level (Squadron/Bereich sub-ranks, all members, individual user) a limit (>= 0 aUEC) may apply, up to which one may request without approval; a missing limit = unlimited. Above the limit the request is marked `requires_owner_approval`: (1) the **responsible holder** grants the approval in the „Fremde Anträge" tab (audited `BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`), (2) the **bank employee** confirms only after the mandatory checkbox „Freigabe durch Kontoverantwortlichen erfolgt" (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`; without the checkbox 409 `BANK_OWNER_APPROVAL_REQUIRED`). Configuring limits is allowed for the **responsible holder, Bank Management and Admin** — never a plain Bank Empl.; they are read-visible in the account details for all view-eligible users (audited `APPROVAL_LIMIT_SET/CLEARED`).
+
+| Function (gate)                                                                                                                                      | Member (if visible) | Responsible | Bank Empl. | Bank Mgmt. | Admin |
+|:-----------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------:|:-----------:|:----------:|:----------:|:-----:|
+| Submit a request (deposit/withdrawal/**transfer**) on a **visible** requestable account (`OrgUnitBankAccessService#createBookingRequest`, `canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
+| Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                                  |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
+| **Approve/revoke** an over-limit request („Fremde Anträge" tab, account in one's own responsibility)                                                 |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
+| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`)                                                 |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
+
+\* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
 ---
 
-## 4. Mehr-OrgUnit-Sichtbarkeit (Scoping)
+## 4. Multi-OrgUnit visibility (scoping)
 
-Lese- und Schreibpfade werden über
+Read and write paths are filtered through
 [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
-gefiltert (früher `SquadronScopeService`; deckt heute Staffeln **und**
-Spezialkommandos ab). Grundregel: Nicht-Admins sehen die Vereinigung ihrer
-Mitgliedschaften; Admins ohne aktiven Pin sehen alles, mit Pin dieselbe
-restriktive Sicht wie ein Member.
+(formerly `SquadronScopeService`; today it covers Staffeln **and**
+Spezialkommandos). Baseline rule: non-admins view the union of their
+memberships; admins without an active pin view everything, with a pin the same
+restrictive view as a Member.
 
-- **Strikt staffel-gescopt** (kein Cross-Staffel): `Ship`, `InventoryItem`
-  (Lager-View), `RefineryOrder` — Listen filtern auf
-  `owning_org_unit_id`, Detail-/Schreib-Endpunkte gaten auf
-  `canSee*`/`canEdit*`. Persönliche Zeilen ganz ohne Orgeinheit
-  (`owning_org_unit_id = NULL`, V132 — z. B. das Schiff eines Nutzers ohne
-  Staffel/SK) sind **owner-only**: sichtbar/editierbar nur für den Besitzer
-  selbst und Admins (`canAccessOwnerlessPersonalRow`). **Eigentümer-Escape
-  (REQ-ORG-011):** Der per-User-Besitzer (`ship.owner` / `inventory_item.user` /
-  `refinery_order.owner`) darf seine Zeile **immer** sehen/bearbeiten, unabhängig
-  vom `owning_org_unit_id`-Stempel — `isCurrentUserOwner` greift vor der
-  Scope-Prüfung in allen sechs `canSee*/canEdit*`-Gates. Ein Nicht-Eigentümer
-  bleibt strikt gescopt; die geteilten Listen-Views bleiben unverändert.
-- **Cross-Staffel mit Public-Escape**: `Mission` — für andere OrgUnits sichtbar
-  genau dann, wenn `is_internal = false`; editierbar nur durch die besitzende
-  OrgUnit + Admins. Ownerless Bereichsleitungs-Missionen (V144) folgen
-  REQ-ORG-009 (siehe Kasten in §3.5).
-- **Staffel-gescopt mit zwei Escapes**: `Operation` — kein Public-Escape, aber
-  (a) **ownerless Bereichsleitungs-Operationen** (V145) sind für alle
-  Mitglieder-oder-höher sichtbar und (b) **Teilnehmer** der verknüpften
-  Einsätze sehen die Operation staffelfremd (#500; Details im Kasten in §3.6).
-- **Bedingt staffel-gescopt**: `JobOrder` (+ `JobOrderMaterial` /
-  `JobOrderHandover` / `MaterialClaim`). Ein Auftrag trägt
-  `responsible_org_unit_id` (die **bearbeitende** Einheit — steuert die
-  Sichtbarkeit, nur über `PATCH /{id}/responsible-org-unit` änderbar) und
-  `requesting_org_unit_id` (der **Auftraggeber** — gewährt **keine**
-  Sichtbarkeit). Verantwortlich = **SK** → öffentlich für alle Staffeln
-  (gemeinsame Warteschlange, an die sich Staffeln per Material-Claim melden);
-  verantwortlich = **Staffel** → privat für diese Staffel + Admins. SK-Auftrags-*Edits*
-  laufen über das Rollen-Gate (Logistician+), nicht über das Staffel-Scope.
-- **Oversight-Übersicht** (kein eigenes Aggregat): Die Blueprint-Verfügbarkeit
-  (`/blueprint-overview`) aggregiert die per-Nutzer-`personal_blueprint`-Zeilen über
-  die Mitglieder der Orgeinheiten, die der Aufrufer **beaufsichtigt** — Officer ihre
-  Staffel, SK-Leads ihre SK(s), Admins alle bzw. die angepinnte
-  (`OwnerScopeService.currentOversightScope()`, enger als die
-  Mitgliedschafts-Vereinigung der normalen Listen). Besitzer werden nur als
-  Anzeigename ausgeliefert, nie als Sub/E-Mail.
+- **Strictly staffel-scoped** (no cross-Staffel): `Ship`, `InventoryItem`
+  (inventory view), `RefineryOrder` — lists filter on
+  `owning_org_unit_id`, detail/write endpoints gate on
+  `canSee*`/`canEdit*`. Personal rows with no org unit at all
+  (`owning_org_unit_id = NULL`, V132 — e.g. the ship of a user without
+  Staffel/SK) are **owner-only**: visible/editable only to the owner
+  themselves and to admins (`canAccessOwnerlessPersonalRow`). **Owner escape
+  (REQ-ORG-011):** the per-user owner (`ship.owner` / `inventory_item.user` /
+  `refinery_order.owner`) may **always** view/edit their row, regardless of
+  the `owning_org_unit_id` stamp — `isCurrentUserOwner` takes effect before the
+  scope check in all six `canSee*/canEdit*` gates. A non-owner stays strictly
+  scoped; the shared list views remain unchanged.
+- **Cross-Staffel with public escape**: `Mission` — visible to other OrgUnits
+  exactly when `is_internal = false`; editable only by the owning
+  OrgUnit + admins. Ownerless Bereichsleitung missions (V144) follow
+  REQ-ORG-009 (see the box in §3.5).
+- **Staffel-scoped with two escapes**: `Operation` — no public escape, but
+  (a) **ownerless Bereichsleitung operations** (V145) are visible to all
+  members-or-above and (b) **participants** of the linked
+  missions view the operation across Staffeln (#500; details in the box in §3.6).
+- **Conditionally staffel-scoped**: `JobOrder` (+ `JobOrderMaterial` /
+  `JobOrderHandover` / `MaterialClaim`). A job order carries
+  `responsible_org_unit_id` (the **processing** unit — drives the
+  visibility, changeable only via `PATCH /{id}/responsible-org-unit`) and
+  `requesting_org_unit_id` (the **requester** — grants **no**
+  visibility). Responsible = **SK** → public to all Staffeln
+  (shared queue that Staffeln join via a Material-Claim);
+  responsible = **Staffel** → private to that Staffel + admins. SK job order *edits*
+  run through the role gate (Logistician+), not through the Staffel scope.
+- **Oversight overview** (no aggregate of its own): the blueprint availability
+  (`/blueprint-overview`) aggregates the per-user `personal_blueprint` rows across
+  the members of the org units the caller **oversees** — officers their
+  Staffel, SK-Leads their SK(s), admins all of them or the pinned one
+  (`OwnerScopeService.currentOversightScope()`, narrower than the
+  membership union of the normal lists). Owners are delivered only as a
+  display name, never as sub/email.
 
-### 4.1 Bereichsleitung & Organisationsleitung — kaskadierende Zuständigkeit (epic #692)
+### 4.1 Bereichsleitung & Organisationsleitung — cascading responsibility (epic #692)
 
-> **Status:** umgesetzt — epic #692, Phasen 3–6 ausgeliefert (Kaskade #708, Bereich/OL-Besitz #709,
-> Picker + Organigramm #710, Bank-Zugriff #711); Phase 7 (#700) ist das Security-/Regressions-Gate
-> (kumulative Security-Review ohne Befund, ArchUnit-Härtung, Spec-Abgleich, Sichtbarkeits-Matrix-e2e).
-> Bindende Spezifikation: [REQ-ORG-014..019](docs/specs/org-unit-tenancy.md),
+> **Status:** implemented — epic #692, phases 3–6 shipped (cascade #708, Bereich/OL ownership #709,
+> picker + organigram #710, bank access #711); phase 7 (#700) is the security/regression gate
+> (cumulative security review with no finding, ArchUnit hardening, spec reconciliation, visibility-matrix e2e).
+> Binding specification: [REQ-ORG-014..019](docs/specs/org-unit-tenancy.md),
 > [REQ-SEC-015](docs/specs/security-and-access.md), [REQ-BANK-027](docs/specs/bank.md), ADR-0025..0028.
 
-Über Staffeln und Spezialkommandos kommen zwei neue Ebenen: der **Bereich** (z. B. Profit, Sub-Radar,
-Raumüberlegenheit) und die **Organisationsleitung (OL)** ganz oben. Die Zuständigkeit **kaskadiert**
-analog zu `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
+Above Staffeln and Spezialkommandos come two new levels: the **Bereich** (e.g. Profit, Sub-Radar,
+Raumüberlegenheit) and the **Organisationsleitung (OL)** at the very top. Responsibility **cascades**
+analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 
-- **Bereichsleitung** (`is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator`) hat
-  **offiziersgleiche** Zuständigkeit über **alle Staffeln + SKs ihres Bereichs** und über die eigenen
-  Bereichsdaten.
-- **OL** (`is_ol_member`) hat dieselbe Zuständigkeit über **alles**.
-- **Keine Adminrechte:** Die Reichweite ist eine konkrete `memberOrgUnitIds`-Vereinigung, **nie** der
-  `adminAllScope`-Zweig. Ein OL-/Bereichs-Principal erfüllt **niemals** `isAdmin()`; alle
-  `hasRole('ADMIN')`-Gates (Admin-Bereich, SK-Lifecycle, System-Settings, Stammdaten,
-  Promotion-Topic-Guards, Bank-Admin/Audit) bleiben zu.
-- **Strikte Trennung:** Eine Bereichsleitung sieht/bearbeitet **nur** den eigenen Bereich; **nur** die
-  OL ist bereichsübergreifend.
-- **SK-Leiter bleibt SK-only:** Seine Bereichsleitungs-Zugehörigkeit ist rein organisatorisch (Sitz im
-  Organigramm), erweitert die Rechte **nicht** auf den Bereich.
-- **Eigene Daten + im Auftrag anlegen:** Bereich/OL besitzen eigene Aggregate (Lager, Einsätze,
-  Operationen, Aufträge, Raffinerieaufträge) und können für untergeordnete Einheiten anlegen
-  (z. B. einen Auftrag oder Raffinerieauftrag für eine Staffel ihres Bereichs); gegatet über
-  `canEditOrgUnit(target)`, nicht über Adminschaft (REQ-ORG-016).
-- **Auswahlpicker:** Bereichsleitung/OL erhalten einen admin-ähnlichen Drill-down-Picker, aber nur in
-  **ihnen untergeordnete** Einheiten (Bereichsleitung: Staffeln/SKs ihres Bereichs; OL: alles).
-- **Bank (REQ-BANK-027/-028):** Die Ansicht kaskadiert (eigenes Ebenen-Konto **und** untergeordnete
-  Konten), Ein-/Auszahlungs**anträge** aber **nur auf dem eigenen Ebenen-Konto** (Bereich →
-  `AREA`-Konto, OL → `CARTEL`/Kartell-Konto); untergeordnete Konten sind per Picker nur einsehbar.
-  Bereich/OL (und Admins) sehen auf der Seite `/org-unit-bank` zusätzlich die organisationsweiten
-  **Sonderkonten** (`SPECIAL`) — rein lesend, kein Antrag —; Offiziere/SK-Leads nicht. Die Seite zeigt
-  außerdem **nur aktive Konten**. Die Bank bleibt OrgUnit-blind (Logik nur im
-  `OrgUnitBankAccessService`-Seam).
-- **Mitgliedschaftsregeln (REQ-ORG-017):** bis zu **zwei** Staffeln (auch aus verschiedenen Bereichen)
-  und beliebig viele SKs; SK-Leiter, Bereichsleitung und OL gehören **keiner** Staffel an; SK-Leiter
-  gehören **immer** der Bereichsleitung des Bereichs ihres SK an; OL-Mitglieder dürfen einem Bereich
-  angehören.
+- **Bereichsleitung** (`MembershipRole` `BEREICHSLEITER` / `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR`;
+  the old boolean flags were removed with V187, ADR-0042) has **officer-equivalent** responsibility
+  over **all Staffeln + SKs of their Bereich** and over their own Bereich data.
+- **OL** (`MembershipRole` `OL_MEMBER`) has the same responsibility over **everything**.
+- **No admin rights:** the reach is a concrete `memberOrgUnitIds` union, **never** the
+  `adminAllScope` branch. An OL/Bereich principal **never** satisfies `isAdmin()`; all
+  `hasRole('ADMIN')` gates (admin area, SK lifecycle, system settings, master data,
+  promotion topic guards, bank admin/audit) stay closed.
+- **Strict separation:** a Bereichsleitung views/edits **only** their own Bereich; **only** the
+  OL is cross-Bereich.
+- **SK-Leiter stays SK-only:** their Bereichsleitung membership is purely organizational (a seat in the
+  organigram), it does **not** extend the rights to the Bereich.
+- **Own data + creating on behalf:** Bereich/OL own their own aggregates (inventory, missions,
+  operations, job orders, refinery orders) and can create for subordinate units
+  (e.g. a job order or refinery order for a Staffel of their Bereich); gated via
+  `canEditOrgUnit(target)`, not via adminship (REQ-ORG-016).
+- **Selection picker:** Bereichsleitung/OL get an admin-like drill-down picker, but only into
+  units **subordinate to them** (Bereichsleitung: Staffeln/SKs of their Bereich; OL: everything).
+- **Bank (REQ-BANK-027/-028):** the view cascades (own level account **and** subordinate
+  accounts), but deposit/withdrawal **requests** only **on the own level account** (Bereich →
+  `AREA` account, OL → `CARTEL`/Kartell account); subordinate accounts are only viewable via the picker.
+  On the `/org-unit-bank` page, Bereich/OL (and admins) additionally view the organization-wide
+  **Sonderkonten** (`SPECIAL`) — read-only, no request —; officers/SK-Leads do not. The page also shows
+  **only active accounts**. The bank stays OrgUnit-blind (logic only in the
+  `OrgUnitBankAccessService` seam).
+- **Membership rules (REQ-ORG-017):** up to **two** Staffeln (also from different Bereiche)
+  and any number of SKs; SK-Leiter, Bereichsleitung and OL belong to **no** Staffel; SK-Leiter
+  **always** belong to the Bereichsleitung of the Bereich of their SK; OL members may belong to a Bereich.
 
 ---
 
-## 5. Besonderheiten der Implementierung
+## 5. Implementation specifics
 
-1. **Keycloak-Sync / Fallback:** Lassen sich JWT-Claims (`realm_access.roles`)
-   nicht vollständig synchronisieren, fällt das System auf die reinen
-   Rollen-Namen aus dem Token zurück (Präfix `ROLE_`, Großbuchstaben,
-   Leerzeichen → `_`).
-2. **Default-Rolle:** Wird keine bekannte Rolle übermittelt, erhält der
-   Benutzer **Guest** (keine Authorities).
-3. **Ränge:** Die `UserService`-Logik gibt vor, dass `OFFICER` nur Ränge 1–12,
-   `KRT_MEMBER` Ränge 13–20 erhalten dürfen.
-4. **Logistician-/Mission-Manager-Flags** werden ausschließlich von **Admins**
-   über die Mitgliedschaftsverwaltung (`org_unit_membership`) vergeben
-   (`UserController#patchLogistician` / `#patchMissionManager` und die
-   SquadronMembership-/SpecialCommandMembership-Endpunkte sind `hasRole('ADMIN')`
-   bzw. für SK zusätzlich der SK-Lead über `canManageMembers`). Die alten
-   `app_user`-Flag-Spalten existieren seit V104 nicht mehr.
-5. **Phase-4-Lockdown:** Der gesamte Admin-Bereich (Stammdaten,
-   Member-Management, Ankündigungen, UEX, System-Settings,
-   SK-/Staffel-Lifecycle) ist `hasRole('ADMIN')`. Officer behalten ihre
-   staffel-internen Funktionen (Mission-Management, Hangar-Write inkl.
-   `resetAllFittedStatus`, Refinery, Logistician via Hierarchie, der
-   Auftrags-Workflow und — als einzige Officer-Carve-outs — Promotion-Pflege der
-   eigenen Staffel sowie SK-Mitgliederverwaltung **nur** als SK-Lead).
-6. **Architektur-Guards (ArchUnit):** Jeder `@RestController` trägt mindestens
-   ein `@PreAuthorize`; staffel-gescopte Services müssen `OwnerScopeService` /
-   `AuthHelperService` injizieren; Controller geben nie JPA-Entities zurück. Ein
-   neuer Verstoß bricht den Build (`./gradlew test`).
+1. **Keycloak sync / fallback:** If JWT claims (`realm_access.roles`)
+   cannot be fully synchronised, the system falls back to the plain
+   role names from the token (prefix `ROLE_`, uppercase,
+   spaces → `_`).
+2. **Default role:** If no known role is supplied, the user
+   receives **Guest** (no authorities).
+3. **Ranks:** The `UserService` logic dictates that `OFFICER` may only receive
+   ranks 1–12 and `KRT_MEMBER` ranks 13–20.
+4. **Logistician/Mission-Manager flags** are maintained by admins **per Staffel** on the
+   member-edit page: the (up to two) Staffel slots, each with their own
+   flags, feed into the membership delta `PATCH /api/v1/users/{id}/memberships`
+   and are reconciled in a single transaction (REQ-ORG-017). The old toggle endpoints
+   `UserController#patchLogistician` / `#patchMissionManager` and the member-list switches
+   were removed. For an SK, the SK-Lead still sets the flags via `canManageMembers`.
+   The old `app_user` flag columns have not existed since V104.
+5. **Phase-4 lockdown:** The entire admin area (master data,
+   member management, announcements, UEX, system settings,
+   SK/Staffel lifecycle) is `hasRole('ADMIN')`. Officers retain their
+   Staffel-internal functions (mission management, hangar write incl.
+   `resetAllFittedStatus`, refinery, Logistician via hierarchy, the
+   job-order workflow and — as the only Officer carve-outs — promotion maintenance of
+   their own Staffel as well as SK member management **only** as SK-Lead).
+6. **Architecture guards (ArchUnit):** Every `@RestController` carries at least
+   one `@PreAuthorize`; Staffel-scoped services must inject `OwnerScopeService` /
+   `AuthHelperService`; controllers never return JPA entities. A
+   new violation breaks the build (`./gradlew test`).
 
