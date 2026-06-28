@@ -82,6 +82,9 @@ documents cover everything else:
 | [docs/e2e-test/README.md](docs/e2e-test/README.md)                                                     | End-to-end test use cases — one document per functional flow (actor, preconditions, steps, expected result) linking the Playwright test classes, plus the [role/scope reference](docs/e2e-test/rollen-und-scope.md).                              |
 | [CLAUDE.md](CLAUDE.md)                                                                                 | Project-specific guidance for the Claude Code AI assistant — build / run / test commands, architectural invariants, conventions.                                                                                                                  |
 | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)                                   | The pull-request template that ships with every PR.                                                                                                                                                                                               |
+| [Profit Basetool Wiki](https://github.com/krt-profit/basetool/wiki)                                    | German end-user handbook — one page per feature area (Einsätze, Operationen, Kartellbank, Hangar, Beförderung, Organisation, Leitung, …) for members, officers, bank staff and admins.                                                            |
+| [docs/keycloak/DISCORD_KEYCLOAK_SETUP.md](docs/keycloak/DISCORD_KEYCLOAK_SETUP.md)                     | Keycloak setup for the optional Discord social login and the per-guild nickname capture (`DISCORD_GUILD_ID` + identity-provider mappers).                                                                                                         |
+| [docs/INGEST_KEYCLOAK_SETUP.md](docs/INGEST_KEYCLOAK_SETUP.md)                                         | Keycloak audience setup for the ingest gateway's device-grant token validation (`IRI_INGEST_EXPECTED_AUDIENCES`).                                                                                                                                 |
 
 ---
 
@@ -128,6 +131,9 @@ SERVER_SSL_KEY_STORE_PASSWORD=CHANGE_ME
 IRI_KEYSTORE_HOST_PATH=/var/iri/secrets/keystore.p12
 
 REDIS_PASSWORD=CHANGE_ME
+
+# Host IP for outbound binding (set to the deployment host's IP).
+HOST_IP=CHANGE_ME
 ```
 
 Compose uses `${VAR:?...}` references throughout — if any required variable
@@ -237,15 +243,13 @@ What changed at the data layer:
   `mission` / `operation` / `ship` / `inventory_item` /
   `refinery_order` — gain an `owning_squadron_id` column.
 * `job_order` started cross-squadron with `creating_squadron_id` +
-  `requesting_squadron_id`. **This was later reworked** (parent issue
-
-  # 340): `creating` was dropped in favour of a `responsible_org_unit_id`
-
-  (the *processing* unit, which governs visibility), `requesting`
-  became `requesting_org_unit_id`, the order became conditionally scoped
-  (SK-responsible = public, squadron-responsible = private), and
-  squadrons can now sign up for partial material **claims**
-  (`material_claim`) on the public SK queue. See `CLAUDE.md`.
+  `requesting_squadron_id`. **This was later reworked** (parent issue #340):
+  `creating` was dropped in favour of a `responsible_org_unit_id` (the
+  *processing* unit, which governs visibility), `requesting` became
+  `requesting_org_unit_id`, the order became conditionally scoped
+  (SK-responsible = public, squadron-responsible = private), and squadrons can
+  now sign up for partial material **claims** (`material_claim`) on the public
+  SK queue. See `CLAUDE.md`.
 
 What changed at the authorization layer:
 
@@ -258,17 +262,15 @@ What changed at the authorization layer:
   time, and controllers use it via `@PreAuthorize("@ownerScopeService.canEdit…")`
   on detail-view endpoints.
 * [`MeController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MeController.java)
-  exposes `GET /api/v1/me/active-org-unit` (legacy alias
-  `GET /active-squadron`) for every authenticated caller to **read** the
-  resolved context. **Switching** is a frontend concern:
+  exposes `GET /api/v1/me/active-org-unit` for every authenticated caller to
+  **read** the resolved context. **Switching** is a frontend concern:
   [`MeFrontendController`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/MeFrontendController.java)
   `POST /active-org-unit` updates the Redis-backed session pin and relays it
-  to the backend on every outbound call via the `X-Active-Org-Unit-Id`
-  header (legacy `X-Active-Squadron-Id` mirrored for one release).
+  to the backend on every outbound call via the `X-Active-Org-Unit-Id` header.
 * MDC field `orgUnitId` (sentinels `all` / `none` / `anonymous`) is attached
   by [`CorrelationIdFilter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/logging/CorrelationIdFilter.java)
   so log lines and access-log JSON show which OrgUnit context a request ran
-  under; the legacy `squadronId` field is emitted in parallel for one release.
+  under.
 * ArchUnit rule
   `staffelScopedServicesMustWireOwnerScopeOrAuthHelper` in
   [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
@@ -293,11 +295,13 @@ operations boards), but everything else respects the strict squadron
 filter.
 
 **Status today.** The multi-squadron rollout is long complete and was
-**extended into a multi-OrgUnit model** by the Spezialkommando work: a shared
-`org_unit` table with a `kind` discriminator (`SQUADRON` / `SPECIAL_COMMAND`)
-now backs every owner reference, and the squadron switcher / context badge
-shipped in the frontend. The schema has advanced well past the original
-Phase-7 chain (currently `V174`). The destructive cleanup is done — the
+**extended into a multi-OrgUnit model**: a shared `org_unit` table with a `kind`
+discriminator now backs every owner reference. The Spezialkommando work added the
+`SPECIAL_COMMAND` kind, and the area / leadership hierarchy (epic #692) added the
+`BEREICH` and `ORGANISATIONSLEITUNG` kinds stacked above the Staffeln/SKs; the
+active-OrgUnit switcher shipped in the frontend, and the active unit now shows in
+the application title (no separate context badge). The schema has advanced well
+past the original Phase-7 chain (currently `V193`). The destructive cleanup is done — the
 legacy `owning_squadron_id` mirror columns (`V103`), the per-user
 `app_user.squadron_id` / `is_logistician` / `is_mission_manager` columns
 (`V104`, now sourced from `org_unit_membership`), the legacy `squadron` table
@@ -362,8 +366,8 @@ fast restarts; only the dependencies live in containers.
 variable before running the commands.*
 
 **Database details** (defaults from `.env`):
-* Backend DB `krt_basetool` — user `krt_user`, port `15432`.
-* Keycloak DB `keycloak` — user `krt_keycloak_user`, port `15433`.
+* Backend DB `krt_basetool` (user from `POSTGRES_USER`), port `15432`.
+* Keycloak DB `keycloak` (user from `KC_POSTGRES_USER`), port `15433`.
 
 ### 4.3 Running the full dev stack with Docker Compose
 
@@ -637,7 +641,7 @@ expected result) are documented under [`docs/e2e-test/`](docs/e2e-test/README.md
 * **Build tool** — Gradle 9 with the Kotlin DSL, dependencies via refreshVersions
 * **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate` everywhere)
 * **Session store** — Redis (`spring-session-data-redis`)
-* **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26)
+* **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.6)
 * **Frontend** — Thymeleaf, Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
 * **API documentation** — SpringDoc / OpenAPI; the committed `backend/src/main/resources/api/openapi.json` is the single documentation artifact. No Swagger UI is bundled, and `/v3/api-docs` is disabled in the `prod` profile.
 * **DTO mapping** — MapStruct (`@Mapper(componentModel = "spring")`)
@@ -653,10 +657,12 @@ directories:
 * **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts lives in Redis (Spring Session).
 * **`ingest`** — internet-facing one-click ingest gateway (desktop extractor → basetool). Spring Boot, owns no database, terminates a token-authenticated `POST` and relays it to the backend over the internal network so the backend stays internet-unreachable (see §3.1, [ADR-0018](docs/adr/0018-desktop-ingest-gateway-device-grant.md)).
 * **`keycloak-spi`** — Keycloak provider library (not a Spring Boot app): the Discord social identity provider and the guild / `KRT-Mitglied`-role login gate. Built as a plain JAR and staged into Keycloak's `providers/` directory (epic #720, [ADR-0030](docs/adr/0030-discord-federation-first-login-membership-gate.md)).
-* **`keycloak-theme/krt-theme`** — Custom Keycloak login and account UI theme matching the IRIDIUM corporate design. See [§5.7 Keycloak theme](#57-keycloak-theme).
+* **`keycloak-theme/krt-theme`** — Custom Keycloak login and account UI theme matching the DAS KARTELL (KRT) corporate design. See [§5.7 Keycloak theme](#57-keycloak-theme).
 * **`design`** — Brand font sources. The design system itself (colors, typography, components, the Corporate Design Manual) lives in the [`krt-profit/design-system`](https://github.com/krt-profit/design-system) git submodule mounted at [`.claude/skills/das-kartell-design/`](.claude/skills/das-kartell-design/README.md).
-* **`scripts`** — One-off Python helper scripts for repository maintenance (i18n key sync, umlaut escaping, untranslated-string detection, etc.).
+* **`scripts`** — Server-side operations layer: the GHCR-pull production deploy script (`deploy.sh`, invoked by the `iri-deploy` systemd timer), the weekly `docker-cleanup.sh` and `vpn-restart.sh` maintenance scripts, the `check-flyway-migrations.sh` guard, and their systemd / cron / logrotate units.
 * **`docs`** — Long-form documentation: the binding requirement specs under [`docs/specs/`](docs/specs/INDEX.md), the ADRs under [`docs/adr/`](docs/adr/README.md), the [deployment runbook](docs/deployment.md) and the [E2E use cases](docs/e2e-test/README.md).
+* **`config`** — Static-analysis configuration consumed by the Gradle build: Checkstyle (`config/checkstyle/google_checks.xml`), SpotBugs (`config/spotbugs/exclude.xml`) and the OWASP dependency-check suppressions.
+* **`docker`** — The `docker/maintenance/` branded `503 Service Unavailable` page that nginx-proxy-manager serves during the brief deploy switchover (see §3.2).
 
 The frontend never talks to PostgreSQL or the Keycloak Admin API directly.
 The backend never serves HTML.
@@ -666,19 +672,20 @@ The backend never serves HTML.
 Both modules read configuration from environment variables. The most
 commonly tuned values:
 
-| Variable                                     | Description                                                                                                                         | Default                                          |
-|:---------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------|
-| `KEYCLOAK_ISSUER_URI`                        | The URL of the Keycloak realm.                                                                                                      | `https://keycloak.profit-base.online/realms/iri` |
-| `KEYCLOAK_CLIENT_SECRET`                     | (Frontend only) The secret for the Keycloak client.                                                                                 | `YOUR_CLIENT_SECRET`                             |
-| `BACKEND_URL`                                | (Frontend only) The URL of the backend API.                                                                                         | `http://localhost:11261`                         |
-| `APP_LOGGING_CORRELATION_ID_HEADER`          | HTTP header used for inbound / outbound request correlation (MDC-backed).                                                           | `X-Correlation-Id`                               |
-| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS`      | Threshold (ms) above which a request is logged at `WARN` instead of `INFO`.                                                         | `2000`                                           |
-| `APP_LOGGING_STRUCTURED_ENABLED`             | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile.                                               | `false` (dev / test), `true` (prod)              |
-| `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`.                                            | `1500`                                           |
-| `IRI_BASETOOL_VERSION`                       | Image tag pulled by the production compose stack.                                                                                   | `stable`                                         |
-| `IRI_IMAGE_NAMESPACE`                        | GHCR namespace for the image lookup.                                                                                                | `krt-profit`                                     |
-| `IRI_KEYSTORE_HOST_PATH`                     | Absolute host path of the production `keystore.p12`. Bind-mounted read-only into backend + frontend at `/run/secrets/keystore.p12`. | `/var/iri/secrets/keystore.p12`                  |
-| `REDIS_PASSWORD`                             | Password for the Redis session store.                                                                                               | *(required, no default)*                         |
+| Variable                                     | Description                                                                                                                                                                                                                                  | Default                                                         |
+|:---------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------|
+| `KEYCLOAK_ISSUER_URI`                        | The URL of the Keycloak realm.                                                                                                                                                                                                               | `https://keycloak.profit-base.online/realms/iri`                |
+| `BACKEND_URL`                                | (Frontend only) The URL of the backend API. Override to `http://localhost:11261` when running the frontend from Gradle on the host.                                                                                                          | `https://backend:11261`                                         |
+| `APP_LOGGING_CORRELATION_ID_HEADER`          | HTTP header used for inbound / outbound request correlation (MDC-backed).                                                                                                                                                                    | `X-Correlation-Id`                                              |
+| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS`      | Threshold (ms) above which a request is logged at `WARN` instead of `INFO`.                                                                                                                                                                  | `2000`                                                          |
+| `APP_LOGGING_STRUCTURED_ENABLED`             | Enables the JSON (Logstash) log appender. Automatically `true` in the `prod` profile.                                                                                                                                                        | `false` (dev / test), `true` (prod)                             |
+| `APP_LOGGING_SLOW_BACKEND_CALL_THRESHOLD_MS` | (Frontend only) Threshold (ms) above which an outbound backend call is logged at `WARN`.                                                                                                                                                     | `1500`                                                          |
+| `IRI_BASETOOL_VERSION`                       | Image tag pulled by the production compose stack.                                                                                                                                                                                            | `stable`                                                        |
+| `IRI_IMAGE_NAMESPACE`                        | GHCR namespace for the image lookup.                                                                                                                                                                                                         | `krt-profit`                                                    |
+| `IRI_KEYSTORE_HOST_PATH`                     | Absolute host path of the production `keystore.p12`, bind-mounted read-only into backend + frontend at `/run/secrets/keystore.p12`.                                                                                                          | `./keystore.p12` (prod `.env`: `/var/iri/secrets/keystore.p12`) |
+| `REDIS_PASSWORD`                             | Password for the Redis session store.                                                                                                                                                                                                        | *(required, no default)*                                        |
+| `HOST_IP`                                    | Deployment host IP that the compose stack binds outbound services to.                                                                                                                                                                        | *(required, no default)*                                        |
+| `DISCORD_GUILD_ID`                           | (Optional) DAS KARTELL Discord server (guild) id; enables the per-guild nickname capture in the admin Discord-registration queue. Needs the mappers from [docs/keycloak/DISCORD_KEYCLOAK_SETUP.md](docs/keycloak/DISCORD_KEYCLOAK_SETUP.md). | *(unset → no nickname capture)*                                 |
 
 Relevant `application-*.yml` settings live in `@ConfigurationProperties`
 classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints
