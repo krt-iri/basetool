@@ -33,10 +33,10 @@ single-sign-on via Keycloak and a clear role and permission model.
 ### High-level architecture
 
 ```
-┌──────────────┐         ┌─────────────┐         ┌──────────────┐
-│   Browser    │ ──SSO──►│   Keycloak  │◄────────│   Backend    │
-│              │         │  (OIDC IdP) │  JWT    │ (REST, JPA)  │
-└──────┬───────┘         └─────────────┘         └──────┬───────┘
+┌──────────────┐         ┌─────────────┐         ┌──────────────┐          ┌──────────────┐          ┌───────────────────┐
+│   Browser    │ ──SSO──►│   Keycloak  │◄────────│   Backend    │◄──relay──│    Ingest    │◄──token──│ Desktop Extractor │
+│              │         │  (OIDC IdP) │  JWT    │ (REST, JPA)  │ internal │(edge gateway)│   POST   │    (JSON push)    │
+└──────┬───────┘         └─────────────┘         └──────┬───────┘          └──────────────┘  (HTTPS) └───────────────────┘
        │                                                 │
        │                ┌─────────────┐                  │
        └───HTML/CSS────►│  Frontend   │──WebClient──────►│
@@ -52,8 +52,9 @@ single-sign-on via Keycloak and a clear role and permission model.
 
 - **Backend** — REST API only (`/api/v1/...`), Spring Boot 4 on Java 25, JPA / Flyway / PostgreSQL.
 - **Frontend** — Thymeleaf-rendered UI calling the backend via a centrally-configured WebClient (Resilience4j wrapped). No direct database or Keycloak Admin API access.
-- **Keycloak** — OAuth2 / OIDC identity provider, custom KRT theme.
+- **Keycloak** — OAuth2 / OIDC identity provider, custom KRT theme, with the `keycloak-spi` provider JAR (Discord social login + the guild / `KRT-Mitglied`-role login gate).
 - **Redis** — Spring Session store; sessions survive frontend restarts.
+- **Ingest** — internet-facing one-click gateway for the desktop extractor (refinery / blueprint JSON → basetool); owns no database, terminates a token-authenticated `POST` and relays it to the backend over the internal network so the backend stays internet-unreachable ([ADR-0018](docs/adr/0018-desktop-ingest-gateway-device-grant.md)).
 
 The tenant unit is the **OrgUnit** — a `SQUADRON` (Staffel), a `SPECIAL_COMMAND` (SK), a `BEREICH` (area) or an `ORGANISATIONSLEITUNG` (OL); the latter two are the org-hierarchy layers stacked above the Staffeln/SKs (epic #692). A user belongs to up to two Staffeln and to any number of SKs; the staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` FK that resolves to either kind (nullable for deliberate *ownerless* rows: personal aggregates of members without an org unit, and leadership missions/operations). **Job Orders are scoped differently** (see the Job-Order rework, parent issue #340): they carry a `responsible_org_unit_id` (the *processing* unit — a profit-eligible Squadron or SK, governs visibility) and a `requesting_org_unit_id` (the customer), and are conditionally scoped — an SK-responsible order is public to all squadrons (a shared queue that squadrons sign up for partial material *claims* against), a squadron-responsible order is private to that squadron + admins. The promotion subsystem is permanently restricted to Squadron-owned topics by DB CHECK + trigger + ArchUnit rule, and is itself per-squadron: every read is filtered to the caller's active squadron, so a member or officer sees only their own squadron's system, an admin sees the pinned squadron's (all-squadrons mode shows a "pick a squadron" prompt rather than a cross-staffel merge), and a non-admin without any squadron sees no promotion system at all (menu hidden, list reads empty, direct page access 403). See [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) for the full per-aggregate scope model.
 
