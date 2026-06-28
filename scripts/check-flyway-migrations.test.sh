@@ -95,8 +95,11 @@ record() {
 # assert_exit <expected-rc> <actual-rc> <description>.
 assert_exit() {
   local expected="$1" actual="$2" desc="$3"
-  [[ "$actual" -eq "$expected" ]] && record 1 "${desc} (exit ${expected})" ||
+  if [[ "$actual" -eq "$expected" ]]; then
+    record 1 "${desc} (exit ${expected})"
+  else
     record 0 "${desc} (expected exit ${expected}, got ${actual})"
+  fi
 }
 
 # assert_contains <substring> <description> — fails unless LAST_OUTPUT contains
@@ -105,15 +108,21 @@ assert_exit() {
 # wrong-reason.
 assert_contains() {
   local needle="$1" desc="$2"
-  [[ "$LAST_OUTPUT" == *"$needle"* ]] && record 1 "$desc" ||
+  if [[ "$LAST_OUTPUT" == *"$needle"* ]]; then
+    record 1 "$desc"
+  else
     record 0 "$desc (output missing: '${needle}')"
+  fi
 }
 
 # assert_excludes <substring> <description> — fails if LAST_OUTPUT contains it.
 assert_excludes() {
   local needle="$1" desc="$2"
-  [[ "$LAST_OUTPUT" != *"$needle"* ]] && record 1 "$desc" ||
+  if [[ "$LAST_OUTPUT" != *"$needle"* ]]; then
+    record 1 "$desc"
+  else
     record 0 "$desc (output unexpectedly contained: '${needle}')"
+  fi
 }
 
 # ---------------------------------------------------------------------------
