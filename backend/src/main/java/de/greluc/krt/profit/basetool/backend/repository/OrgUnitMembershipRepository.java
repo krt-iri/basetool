@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -166,4 +167,22 @@ public interface OrgUnitMembershipRepository
       "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND"
           + " m.isMissionManager = true")
   Set<UUID> findMissionManagerUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
+
+  /**
+   * Returns the ids of users who hold exactly the given {@link MembershipRole} on the given org
+   * unit. Backs the org-unit bank seam's reverse resolution of a bank account's <em>responsible
+   * holder(s)</em> (REQ-BANK-034) for the notification engine — the {@code STAFFELLEITER} of a
+   * Staffel, the {@code SK_LEAD} of a Spezialkommando, the {@code BEREICHSLEITER} of a Bereich, the
+   * {@code OL_MEMBER}s of the Organisationsleitung — without a current-principal context (the
+   * after-commit notification thread has none).
+   *
+   * @param orgUnitId the org unit whose role holders to collect; never {@code null}
+   * @param role the membership role to match; never {@code null}
+   * @return the matching user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role ="
+          + " :role")
+  Set<UUID> findUserIdsByOrgUnitAndRole(
+      @Param("orgUnitId") UUID orgUnitId, @Param("role") MembershipRole role);
 }

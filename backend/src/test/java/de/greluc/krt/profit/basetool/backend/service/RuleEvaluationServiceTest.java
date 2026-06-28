@@ -211,7 +211,12 @@ class RuleEvaluationServiceTest {
     rule.addSelector(NotificationRuleSelector.builder().kind(SelectorKind.EVENT_RECIPIENT).build());
     BankBookingRequestConfirmedEvent confirmedEvent =
         new BankBookingRequestConfirmedEvent(
-            UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, decider);
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "KB-0001",
+            new BigDecimal("500"),
+            requester,
+            decider);
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED))
         .thenReturn(List.of(rule));
@@ -221,5 +226,40 @@ class RuleEvaluationServiceTest {
     // The directed recipient is the requester; the deciding actor is not among the recipients.
     assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED))
         .containsExactly(requester);
+  }
+
+  @Test
+  void accountResponsibleSelectorResolvesTheResponsibleHolderOfTheEventsAccount() {
+    // REQ-BANK-026/-034: the ACCOUNT_RESPONSIBLE selector notifies the account's responsible
+    // holder,
+    // resolved (via the org-unit seam) from the account carried by the event. Here on a confirm
+    // decision producing the account-centric RESPONSIBLE_CONFIRMED type; the deciding actor is
+    // excluded.
+    UUID accountId = UUID.fromString("00000000-0000-0000-0000-0000000000c6");
+    UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000a6");
+    UUID responsible = UUID.fromString("00000000-0000-0000-0000-0000000000d6");
+    NotificationRule rule =
+        NotificationRule.builder()
+            .eventType(NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED)
+            .notificationType(NotificationType.BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED)
+            .enabled(true)
+            .excludeActor(true)
+            .build();
+    rule.addSelector(
+        NotificationRuleSelector.builder().kind(SelectorKind.ACCOUNT_RESPONSIBLE).build());
+    BankBookingRequestConfirmedEvent confirmedEvent =
+        new BankBookingRequestConfirmedEvent(
+            UUID.randomUUID(), accountId, "KB-0001", new BigDecimal("500"), requester, ACTOR);
+    when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+            NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED))
+        .thenReturn(List.of(rule));
+    when(recipientResolutionService.resolveAccountResponsibleHolders(accountId))
+        .thenReturn(Set.of(responsible, ACTOR));
+
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(confirmedEvent);
+
+    // The responsible holder is notified; the deciding actor (ACTOR) is excluded.
+    assertThat(result.get(NotificationType.BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED))
+        .containsExactly(responsible);
   }
 }

@@ -296,6 +296,9 @@ class BankBookingRequestServiceTest {
     verify(eventPublisher).publishEvent(event.capture());
     assertThat(event.getValue().contextRecipientSub()).isEqualTo(requester);
     assertThat(event.getValue().actorSub()).isEqualTo(decider);
+    // REQ-BANK-026/-034: the event carries the account id so the ACCOUNT_RESPONSIBLE selector can
+    // notify the account's responsible holder.
+    assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
   }
 
   @Test
@@ -379,6 +382,8 @@ class BankBookingRequestServiceTest {
         ArgumentCaptor.forClass(BankBookingRequestRejectedEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
     assertThat(event.getValue().reason()).isEqualTo("duplicate");
+    // REQ-BANK-026/-034: the event carries the account id for the ACCOUNT_RESPONSIBLE selector.
+    assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
   }
 
   @Test

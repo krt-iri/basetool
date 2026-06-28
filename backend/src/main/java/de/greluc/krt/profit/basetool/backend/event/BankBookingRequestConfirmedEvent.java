@@ -32,10 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * REQ-BANK-026). It is directed at the requesting officer/lead so they learn the outcome: the
  * {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientSub()} (the requester),
  * while the confirming employee is the {@link #actorSub()} (excluded when the rule sets {@code
- * excludeActor}). Carries only scalars so the after-commit listener never touches the managed
- * request.
+ * excludeActor}). It additionally carries the account id ({@link #contextAccountId()}) so the
+ * {@code ACCOUNT_RESPONSIBLE} selector can notify the account's responsible holder (REQ-BANK-034).
+ * Carries only scalars so the after-commit listener never touches the managed request.
  *
  * @param requestId the confirmed request's id (also the notification's loose entity id)
+ * @param accountId the target bank account id ({@code ACCOUNT_RESPONSIBLE} selector input)
  * @param accountNo the target account's human-readable number, for rendering
  * @param amount the requested whole-aUEC amount, for rendering
  * @param requesterSub the requesting officer/lead's sub — the directed recipient
@@ -43,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record BankBookingRequestConfirmedEvent(
     UUID requestId,
+    UUID accountId,
     String accountNo,
     BigDecimal amount,
     @Nullable UUID requesterSub,
@@ -65,6 +68,11 @@ public record BankBookingRequestConfirmedEvent(
   @Override
   public UUID contextRecipientSub() {
     return requesterSub;
+  }
+
+  @Override
+  public UUID contextAccountId() {
+    return accountId;
   }
 
   @Override

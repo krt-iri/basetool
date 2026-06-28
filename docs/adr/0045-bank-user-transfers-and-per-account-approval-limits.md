@@ -1,11 +1,11 @@
 # ADR-0045 — Bank: view-based request eligibility, user-initiated transfers & per-account approval limits
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-06-28 — see *Amendment* below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
-- **Related:** spec REQ-BANK-039 / REQ-BANK-040 / REQ-BANK-041 (amends REQ-BANK-022/-023/-027) ·
-  builds on ADR-0020 (org-unit seam), ADR-0021 (off-ledger requests), ADR-0043 (responsibility &
-  visibility) · concurrency rule in `CLAUDE.md`
+- **Related:** spec REQ-BANK-039 / REQ-BANK-040 / REQ-BANK-041 / REQ-BANK-042 (amends
+  REQ-BANK-022/-023/-027) · builds on ADR-0020 (org-unit seam), ADR-0021 (off-ledger requests),
+  ADR-0043 (responsibility & visibility) · concurrency rule in `CLAUDE.md`
 
 ## Context
 
@@ -74,4 +74,25 @@ static functions so they run identically wherever called and need no org-unit in
 - **A separate `TRANSFER_REQUEST_*` audit/event family** — rejected: a transfer request is the same
   off-ledger aggregate; reusing `BOOKING_REQUEST_*` with the type in the payload avoids a parallel
   lifecycle.
+
+## Amendment (2026-06-28, @greluc) — deposits are unrestricted (REQ-BANK-042)
+
+Decisions (1) and (3) above are scoped to money *leaving* an account. The owner decided that a
+**deposit** request — which only *adds* money and is confirmed by a bank employee on in-game receipt
+— carries no risk that view-gating or limits would mitigate, so it is exempt from both:
+
+- **Eligibility (amends decision 1 / REQ-BANK-039):** a deposit is requestable by **any
+  authenticated user against any `ACTIVE` account** — every type (incl. `SPECIAL` / `CARTEL_BANK`),
+  with no `canView` and no request-capable-type gate. Withdrawals and transfers keep view-based
+  eligibility unchanged.
+- **Approval limits (amends decision 3 / REQ-BANK-041):** a deposit is never flagged
+  `requires_owner_approval` and resolves no `applicable_limit`; the limit rows are not consulted.
+  Limits remain in force for withdrawals and transfers.
+
+The carve-out is a type branch at the top of `OrgUnitBankAccessService.createBookingRequest` — the
+deposit path consults neither `OwnerScopeService` nor the limit rows, so the ArchUnit seam invariant
+and the org-unit-blind confirm path are untouched. The only guard left on a deposit is the
+account-active check in `BankBookingRequestService.create` (`BANK_ACCOUNT_CLOSED`). The org-unit bank
+page shows the request CTA whenever any active account exists and offers a merged source picker (all
+active accounts for a deposit, the caller's request-capable accounts for a withdrawal/transfer).
 

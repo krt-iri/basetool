@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
+import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
@@ -57,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepo
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -96,6 +98,7 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankAccountApprovalLimitRepository approvalLimitRepository;
   @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private BereichRepository bereichRepository;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private UserRepository userRepository;
   @Mock private BankAccountService bankAccountService;
   @Mock private BankApprovalLimitService bankApprovalLimitService;
@@ -129,6 +132,14 @@ class OrgUnitBankAccessServiceTest {
     bereich.setName(name);
     bereich.setShorthand(shorthand);
     return bereich;
+  }
+
+  private static OrgUnit specialCommand(UUID id, String name, String shorthand) {
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(id);
+    sk.setName(name);
+    sk.setShorthand(shorthand);
+    return sk;
   }
 
   private static BankAccount account(UUID id, String accountNo, OrgUnit orgUnit) {
@@ -560,8 +571,8 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_viewableAccount_resolvesAndDelegates() {
-    // REQ-BANK-039: eligibility = view eligibility — a caller who may view the source account may
-    // request against it; with no limit configured no owner approval is needed.
+    // REQ-BANK-042: a deposit delegates straight through with no limit and no owner approval; it
+    // bypasses the view gate entirely (the oversight scope is never consulted for a deposit).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
@@ -570,8 +581,6 @@ class OrgUnitBankAccessServiceTest {
             accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("500"), "from sale");
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(ownerScopeService.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.DEPOSIT),
@@ -583,6 +592,119 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    verifyNoInteractions(ownerScopeService);
+  }
+
+  @Test
+  void createBookingRequest_depositOnUnviewableAccount_succeedsWithoutApprovalOrLimit() {
+    // REQ-BANK-042: a deposit is requestable against ANY active account by ANY user — no view gate,
+    // no oversight consult and never approval-limited (requiresOwnerApproval=false, limit=null).
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Foreign", "FRG"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("500"), "from sale");
+    BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("500")),
+            eq("from sale"),
+            eq(null),
+            eq(false),
+            eq(null)))
+        .thenReturn(expected);
+
+    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    // No view-eligibility check (oversight scope) and no approval-limit lookup for a deposit.
+    verifyNoInteractions(ownerScopeService);
+    verify(approvalLimitRepository, never()).findByAccountId(any());
+  }
+
+  @Test
+  void createBookingRequest_depositOnSpecialAccount_succeeds() {
+    // REQ-BANK-042: a deposit may target a non-request-capable type (SPECIAL / CARTEL_BANK) too —
+    // isRequestCapable is not consulted for a deposit.
+    UUID accountId = UUID.randomUUID();
+    BankAccount special = specialAccount(accountId, "KB-0009", BankAccountStatus.ACTIVE);
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("250"), null);
+    BankBookingRequestDto expected = requestDto(accountId, null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("250")),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null)))
+        .thenReturn(expected);
+
+    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+  }
+
+  @Test
+  void createBookingRequest_depositAboveConfiguredLimit_neverFlagsApproval() {
+    // REQ-BANK-042: even with a user limit far below the amount, a deposit is never flagged and the
+    // limit rows are not consulted.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID caller = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    BankAccountApprovalLimit limit = new BankAccountApprovalLimit();
+    limit.setGranteeKind(BankAccountViewGranteeKind.USER);
+    limit.setGranteeUserId(caller);
+    limit.setLimitAmount(new BigDecimal("100"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("5000"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("5000")),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("5000")),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null));
+    verify(approvalLimitRepository, never()).findByAccountId(any());
+  }
+
+  @Test
+  void createBookingRequest_depositWithDestination_throwsBadRequest() {
+    // REQ-BANK-042/-040: a deposit must not carry a destination account.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId,
+            BankBookingRequestType.DEPOSIT,
+            UUID.randomUUID(),
+            new BigDecimal("10"),
+            null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        () -> service.createBookingRequest(request));
+    verifyNoInteractions(bankBookingRequestService);
   }
 
   @Test
@@ -768,6 +890,94 @@ class OrgUnitBankAccessServiceTest {
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_staffelAccount_returnsStaffelleiter() {
+    // REQ-BANK-034/-026: the reverse resolution for the notification engine — a Staffelkonto's
+    // responsible holders are the STAFFELLEITER of the owning Staffel.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).containsExactly(leiter);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_skAccount_returnsSkLead() {
+    // REQ-BANK-034: an SK-Konto's responsible holder is the SK_LEAD of the owning Spezialkommando.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID skLead = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0002", specialCommand(orgUnitId, "SK", "SK"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(orgUnitId, MembershipRole.SK_LEAD))
+        .thenReturn(Set.of(skLead));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).containsExactly(skLead);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_cartelAccount_returnsAllOlMembers() {
+    // REQ-BANK-034: the CARTEL/KRT account is held collegially by all OL members.
+    UUID olId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID ol1 = UUID.randomUUID();
+    UUID ol2 = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setName("OL");
+    BankAccount cartel = typedAccount(accountId, "KB-0003", BankAccountType.CARTEL, ol);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(olId, MembershipRole.OL_MEMBER))
+        .thenReturn(Set.of(ol1, ol2));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId))
+        .containsExactlyInAnyOrder(ol1, ol2);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_cartelBank_returnsProfitBereichsleiter() {
+    // REQ-BANK-034: the Kartellbankkonto's responsible holder is the BEREICHSLEITER of every PROFIT
+    // Bereich, unioned.
+    UUID profitBereichId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID bl = UUID.randomUUID();
+    Bereich profit = new Bereich();
+    profit.setId(profitBereichId);
+    profit.setName("Profit");
+    BankAccount cartelBank = typedAccount(accountId, "KB-0004", BankAccountType.CARTEL_BANK, null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartelBank));
+    when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            profitBereichId, MembershipRole.BEREICHSLEITER))
+        .thenReturn(Set.of(bl));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).containsExactly(bl);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_specialAccount_returnsEmptyWithoutLookup() {
+    // REQ-BANK-034: a Sonderkonto has no responsible holder — empty, and no membership lookup runs.
+    UUID accountId = UUID.randomUUID();
+    BankAccount special = specialAccount(accountId, "KB-0009", BankAccountStatus.ACTIVE);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).isEmpty();
+    verifyNoInteractions(orgUnitMembershipRepository);
+  }
+
+  @Test
+  void resolveResponsibleHolderUserIds_missingAccount_returnsEmpty() {
+    UUID accountId = UUID.randomUUID();
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.empty());
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).isEmpty();
   }
 
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {

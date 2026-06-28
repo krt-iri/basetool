@@ -94,6 +94,7 @@ public class RuleEvaluationService {
               : recipientResolutionService.resolveByRole(selector.getRoleCode());
       case ORG_RELATIVE_ROLE -> resolveOrgRelative(selector, event);
       case ACCOUNT_GRANT -> resolveAccountGrant(event);
+      case ACCOUNT_RESPONSIBLE -> resolveAccountResponsible(event);
       case EVENT_RECIPIENT -> resolveEventRecipient(event);
     };
   }
@@ -108,6 +109,18 @@ public class RuleEvaluationService {
       return Set.of();
     }
     return recipientResolutionService.resolveAccountGrantHolders(accountId);
+  }
+
+  @NotNull
+  private Set<UUID> resolveAccountResponsible(@NotNull NotificationEvent event) {
+    UUID accountId = event.contextAccountId();
+    if (accountId == null) {
+      log.debug(
+          "Event {} carries no bank account; ACCOUNT_RESPONSIBLE selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveAccountResponsibleHolders(accountId);
   }
 
   @NotNull

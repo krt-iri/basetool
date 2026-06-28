@@ -377,6 +377,11 @@ class BankOrgUnitRequestsE2eTest {
         .first()
         .click(new Locator.ClickOptions().setTimeout(20_000));
     page.locator("[data-testid='org-unit-request-type']").selectOption(type);
+    // The deposit picker lists EVERY active account (REQ-BANK-042) and the stack may hold several,
+    // so pin the IRIDIUM org-unit account explicitly rather than relying on the first option (the
+    // selection is made after the type so the type-driven option filter does not reset it). For a
+    // withdrawal it is the debitable account the officer oversees.
+    page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
     page.locator("[data-testid='org-unit-request-amount']").fill(amount);
     dropFooter(page);
     page.waitForResponse(

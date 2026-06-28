@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepo
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -100,7 +101,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       the balance target — of every account the caller may view ({@link #canView}).
  *   <li><b>The read-only drill-in</b> (REQ-BANK-038): the account detail + history + a
  *       Halter-redacted Kontoauszug for any account the caller may view; no booking actions.
- *   <li><b>Booking requests</b> (F2, REQ-BANK-022): own-level only.
+ *   <li><b>Booking requests</b> (F2): a <em>deposit</em> against any active account by any caller
+ *       (REQ-BANK-042); a <em>withdrawal / transfer</em> only against an account the caller may
+ *       view (REQ-BANK-039), subject to the per-tier approval limits (REQ-BANK-041).
  *   <li><b>The responsibility settings</b> (REQ-BANK-035/-036): the derived responsible holder
  *       (and, for Sonderkonten, the OL) configures who else may view the account and sets the
  *       balance target.
@@ -163,6 +166,7 @@ public class OrgUnitBankAccessService {
   private final BankAccountApprovalLimitRepository approvalLimitRepository;
   private final BankBookingRequestRepository bankBookingRequestRepository;
   private final BereichRepository bereichRepository;
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final UserRepository userRepository;
   private final BankAccountService bankAccountService;
   private final BankApprovalLimitService bankApprovalLimitService;
@@ -724,15 +728,29 @@ public class OrgUnitBankAccessService {
   // ---------------------------------------------------------------------------------------------
 
   /**
-   * Raises a confirm-before-post booking request for the caller's <b>own-level</b> org unit
-   * (REQ-BANK-022, F2). Enforces the org-unit half of the authorization here (own-level oversight
-   * seat) and delegates persistence to the org-unit-blind {@link BankBookingRequestService}.
+   * Raises a confirm-before-post booking request and delegates persistence to the org-unit-blind
+   * {@link BankBookingRequestService}. Eligibility is <b>type-dependent</b>:
    *
-   * @param request the create payload (org unit, type, amount, note)
+   * <ul>
+   *   <li><b>Deposit (REQ-BANK-042):</b> any authenticated caller may request a deposit against
+   *       <em>any active account</em> — every type, regardless of whether the caller may view it —
+   *       and a deposit is <em>never</em> subject to an approval limit ({@code
+   *       requiresOwnerApproval = false}, {@code applicableLimit = null}). Whoever pays money in
+   *       only needs a bank employee to confirm receipt; no {@code canView} / {@code
+   *       isRequestCapable} gate and no limit resolution run. The account-active guard lives in
+   *       {@link BankBookingRequestService#create}.
+   *   <li><b>Withdrawal / transfer (REQ-BANK-039/-040/-041):</b> these debit a balance, so they
+   *       stay gated by view eligibility ({@link #canView}), restricted to the request-capable
+   *       account types ({@link #isRequestCapable}) and subject to the requester's approval limit
+   *       ({@link #resolveApplicableLimit}); the snapshot drives the org-unit-blind confirm path.
+   * </ul>
+   *
+   * @param request the create payload (source account, type, amount, optional destination, note)
    * @return the created pending request
-   * @throws AccessDeniedException when the caller does not hold the named org unit at their own
-   *     level
-   * @throws NotFoundException when the org unit owns no bank account
+   * @throws AccessDeniedException when a withdrawal/transfer caller may not view the source account
+   * @throws BadRequestException when the destination account is missing for a transfer or present
+   *     for a deposit/withdrawal, or the account does not accept withdrawals/transfers
+   * @throws NotFoundException when the (source) account does not exist
    */
   @NotNull
   @Transactional
@@ -741,16 +759,34 @@ public class OrgUnitBankAccessService {
         bankAccountRepository
             .findById(request.sourceAccountId())
             .orElseThrow(() -> new NotFoundException("Bank account not found"));
-    // REQ-BANK-039: booking-request eligibility = view eligibility — anyone who may view the
-    // account may raise a request against it.
+
+    if (request.type() == BankBookingRequestType.DEPOSIT) {
+      // REQ-BANK-042: a deposit is requestable by ANY authenticated caller against ANY active
+      // account (every type) and is NEVER approval-limited — no view gate, no request-capability
+      // gate, no limit resolution. The account-active guard is enforced downstream in
+      // BankBookingRequestService.create.
+      if (request.targetAccountId() != null) {
+        throw new BadRequestException("A deposit request must not carry a destination account");
+      }
+      return bankBookingRequestService.create(
+          account.getId(),
+          BankBookingRequestType.DEPOSIT,
+          request.amount(),
+          request.note(),
+          null,
+          false,
+          null);
+    }
+
+    // REQ-BANK-039: a withdrawal/transfer stays gated by view eligibility — only a caller who may
+    // view the account may debit it.
     if (!canView(account)) {
       throw new AccessDeniedException("The caller may not raise a booking request on this account");
     }
     if (!isRequestCapable(account)) {
       throw new BadRequestException("This account does not accept booking requests");
     }
-    // REQ-BANK-040: a transfer names a destination (any active account); deposit/withdrawal must
-    // not.
+    // REQ-BANK-040: a transfer names a destination (any active account); a withdrawal must not.
     UUID targetAccountId = null;
     if (request.type() == BankBookingRequestType.TRANSFER) {
       if (request.targetAccountId() == null) {
@@ -1068,6 +1104,77 @@ public class OrgUnitBankAccessService {
       case CARTEL_BANK -> isCartelBankHolder();
       case SPECIAL -> false;
     };
+  }
+
+  /**
+   * Resolves the user ids of an account's <em>responsible holder(s)</em> (Kontoverantwortliche,
+   * REQ-BANK-034) — the org-unit-aware reverse of {@link #isResponsibleHolder}, used by the
+   * notification engine to notify the responsible holder when a booking request on their account is
+   * created or decided (REQ-BANK-026). Unlike {@code isResponsibleHolder} it carries no current
+   * principal (it runs on the after-commit notification thread), so it reverse-resolves the holders
+   * via {@link OrgUnitMembershipRepository}. Keeping it here, in the single org-unit-aware seam,
+   * lets the notification resolver reach the responsible holders while the {@code Bank*} classes
+   * stay org-unit-blind (REQ-BANK-008, ArchUnit pins).
+   *
+   * <p>Per account type: a Staffelkonto → its {@code STAFFELLEITER}; an SK-Konto → its {@code
+   * SK_LEAD}; a Bereichskonto → its {@code BEREICHSLEITER}; the {@code CARTEL}/KRT account → all
+   * {@code OL_MEMBER}s; the {@code CARTEL_BANK} → the {@code BEREICHSLEITER} of every {@code
+   * Department.PROFIT} Bereich; a Sonderkonto → none.
+   *
+   * @param accountId the account whose responsible holder(s) to resolve
+   * @return the responsible holders' user ids; never {@code null}, empty for a Sonderkonto, an
+   *     unlinked account or a missing account
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public Set<UUID> resolveResponsibleHolderUserIds(@NotNull UUID accountId) {
+    BankAccount account = bankAccountRepository.findById(accountId).orElse(null);
+    if (account == null) {
+      return Set.of();
+    }
+    UUID owner = owningOrgUnitId(account);
+    return switch (account.getType()) {
+      case ORG_UNIT -> {
+        if (owner == null) {
+          yield Set.of();
+        }
+        MembershipRole holderRole =
+            account.getOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
+                ? MembershipRole.SK_LEAD
+                : MembershipRole.STAFFELLEITER;
+        yield orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(owner, holderRole);
+      }
+      case AREA ->
+          owner == null
+              ? Set.of()
+              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+                  owner, MembershipRole.BEREICHSLEITER);
+      case CARTEL ->
+          owner == null
+              ? Set.of()
+              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+                  owner, MembershipRole.OL_MEMBER);
+      case CARTEL_BANK -> resolveCartelBankResponsibleHolders();
+      case SPECIAL -> Set.of();
+    };
+  }
+
+  /**
+   * Resolves the responsible holders of the {@code CARTEL_BANK} account (REQ-BANK-034): the {@code
+   * BEREICHSLEITER} of every {@code Department.PROFIT} Bereich, unioned. The reverse of {@link
+   * #isCartelBankHolder}.
+   *
+   * @return the Profit-Bereichsleiter user ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  private Set<UUID> resolveCartelBankResponsibleHolders() {
+    Set<UUID> holders = new LinkedHashSet<>();
+    for (Bereich bereich : bereichRepository.findByDepartment(Department.PROFIT)) {
+      holders.addAll(
+          orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+              bereich.getId(), MembershipRole.BEREICHSLEITER));
+    }
+    return holders;
   }
 
   /**

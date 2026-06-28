@@ -310,6 +310,11 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 > and (for OL/Bereichsleiter) Sonderkonten — including a **read-only detail with the transaction
 > history and a Halter-redacted Kontoauszug** (REQ-BANK-035/-037/-038). They still cannot book; player
 > custody is redacted from their view.
+>
+> **Amendment (REQ-BANK-042):** the org-unit surface additionally lets **any authenticated user**
+> raise a **deposit** request against **any active account** (every type, even one they cannot view),
+> with no approval limit — a deposit only adds money and is confirmed by a bank employee on receipt.
+> Withdrawal/transfer requests stay view-gated and limit-gated; the bank-staff surface is unchanged.
 
 **Acceptance**
 
@@ -723,6 +728,19 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 ### REQ-BANK-026 — Notifications on booking-request lifecycle
 
+> **Amended (responsible-holder notifications, REQ-BANK-034, owner request):** the account's
+> **responsible holder** (Kontoverantwortliche) is now also notified when a request on their account
+> is **created or decided**. A new **`ACCOUNT_RESPONSIBLE`** selector resolves the responsible
+> holder(s) from the account carried by the event (`contextAccountId()`), with the org-unit-aware
+> derivation kept inside the `OrgUnitBankAccessService` seam
+> (`resolveResponsibleHolderUserIds`, REQ-BANK-008) so the bank stays org-unit-blind. On **create**
+> the holder joins the existing `BANK_BOOKING_REQUEST_CREATED` rule (its text is account-centric); on
+> **confirm/reject** two new seeded rules (V194) produce the account-centric
+> `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` / `…_REJECTED` notification types (the requester keeps
+> the existing requester-directed text). The confirm/reject events now carry the account id so the
+> selector can resolve. `exclude_actor` still drops the creating/deciding actor, so a holder who is
+> the requester or the decider is not notified about their own action.
+
 The booking-request lifecycle is notified in-app (epic #666; owner-requested addition), reusing
 the data-driven notification engine (REQ-NOTIF-007, ADR-0015) rather than hardcoding recipients:
 
@@ -1123,10 +1141,31 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 >
 >> herunterladen"). Endpoints, methods, optimistic-lock versions and the `orgUnitBankSettings` /
 >> `orgUnitBankBookings` swap seams are unchanged.
+>
+> **Amendment (two-tab layout):** the drill-in body is split into **two tabs** — *Buchungshistorie*
+> (the paginated, Halter-redacted history) and *Verantwortung & Sichtbarkeit* (the responsible
+> holder's target/visibility/approval-limit settings). The shared **info tiles** (`kpi-total` grid:
+> balance, target, ±30-day delta, booking count) sit **above** the tab row and stay visible on both
+> tabs. The *Verantwortung & Sichtbarkeit* tab is shown **only to the account's responsible holder /
+> manager** (the manage-capable caller, `settings != null`) — **not** to a plain viewer. A viewer who
+> is not the responsible holder still sees the **read-only approval-limit display** (REQ-BANK-041
+> requires limits be shown read-only to every viewer), but rendered as a plain inline section below
+> the info tiles, never as the responsibility tab; with no settings tab the history renders untabbed
+> with its own heading. The default-active tab is *Buchungshistorie*. The two swap seams are preserved
+> exactly: the facts + settings stay inside the `orgUnitBankSettings` fragment (so a target change
+> refreshes the tile) and the history stays its own `orgUnitBankBookings` swap (so paging it never
+> re-fetches the settings, and a settings write never resets the history page). A small closure-based
+> tab controller re-asserts the active tab on `krt:swapped` so an in-place settings write does not
+> bounce the user back to the history tab.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-039 — Booking-request eligibility = view eligibility
+
+> **Amended by REQ-BANK-042:** the view-eligibility gate below governs **withdrawal and transfer**
+> requests only. A **deposit** is exempt — any authenticated user may request a deposit against *any*
+> active account (every type, even one they cannot view), with no `canView` / `isRequestCapable`
+> gate.
 
 Any caller who may **view** a request-capable account (REQ-BANK-035/-037, `canView`) may raise a
 booking request against it — **amending** the prior own-level-oversight gate of REQ-BANK-022/-027.
@@ -1169,6 +1208,11 @@ confirmable even when the employee cannot see the destination; capability gate o
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-041 — Per-account approval limits & two-step owner approval
+
+> **Amended by REQ-BANK-042:** approval limits — and the two-step owner approval below — apply to
+> **withdrawal and transfer** requests only (money *leaving* an account). A **deposit** is never
+> subject to an approval limit: `requires_owner_approval` is always `false` and `applicable_limit`
+> always `null` for a deposit, whatever the amount and whoever the requester.
 
 Each request-capable account may carry **per-tier approval limits** (`bank_account_approval_limit`,
 V193): a whole-aUEC ceiling (>= 0) up to which a tier may request **without** the responsible holder's
@@ -1219,6 +1263,54 @@ confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · *
 `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
+
+### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
+
+A **deposit** booking request is the one movement kind a requester cannot abuse — it only *adds*
+money to an account, and nothing moves until a bank employee confirms receipt in-game
+(REQ-BANK-023). It is therefore deliberately unrestricted (owner decision), **amending**
+REQ-BANK-039 and REQ-BANK-041 for deposits only:
+
+- **Any authenticated user** may raise a deposit request against **any `ACTIVE` account** — every
+  type, including `SPECIAL` and `CARTEL_BANK`, and accounts the requester may not even view. The
+  `canView` view-eligibility gate (REQ-BANK-039) and the request-capable-type restriction
+  (`isRequestCapable`) do **not** apply to deposits; only the account-active guard
+  (`BANK_ACCOUNT_CLOSED`) remains, and a deposit must carry no destination account.
+- **No approval limit applies.** A deposit is never flagged `requires_owner_approval` and carries no
+  `applicable_limit`, whatever the amount and whoever the requester — the per-tier limits of
+  REQ-BANK-041 govern only money *leaving* an account (withdrawals/transfers). The limit rows are
+  not even consulted for a deposit.
+
+Withdrawals and transfers are **unchanged**: still gated by `canView` + `isRequestCapable`
+(REQ-BANK-039), restricted to `ORG_UNIT` / `AREA` / `CARTEL`, and subject to the per-tier approval
+limits (REQ-BANK-041). The carve-out lives entirely in the `OrgUnitBankAccessService` seam, so the
+bank stays org-unit-blind (REQ-BANK-008): the deposit branch of `createBookingRequest` consults
+neither `OwnerScopeService` nor the limit rows. The org-unit bank page reflects this — the request
+CTA + modal are shown whenever any active account exists, the (merged) source picker lists every
+active account for a deposit but narrows to the caller's request-capable accounts for a
+withdrawal/transfer, and no approval-limit warning is shown for a deposit.
+
+**Acceptance**
+
+- [x] A deposit request against an account the caller cannot view — including a `SPECIAL` /
+  `CARTEL_BANK` account — succeeds (`PENDING`, audited `BOOKING_REQUEST_CREATED`), while a
+  withdrawal/transfer on the same account is still rejected (`canView` / `isRequestCapable`).
+- [x] A deposit request is never flagged `requires_owner_approval` and resolves no
+  `applicable_limit`, regardless of amount or configured limits; the limit rows are not consulted.
+- [x] A deposit request against a `CLOSED` account is rejected `BANK_ACCOUNT_CLOSED`; a deposit must
+  carry no destination account.
+- [x] The org-unit bank page shows the request CTA whenever an active account exists; the deposit
+  source picker offers every active account and shows no approval-limit warning, while the
+  withdrawal/transfer source picker stays limited to the caller's request-capable accounts.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest` (deposit on unviewable / `SPECIAL` account succeeds
+without consulting oversight scope or the limit rows; deposit never flags approval; destination
+rejected), `OrgUnitBankPageControllerMvcTest` (deposit picker lists all active accounts; CTA shown),
+`ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`), e2e `BankOrgUnitRequestsE2eTest` ·
+**Code:** `service/OrgUnitBankAccessService#createBookingRequest`, `controller/OrgUnitBankController`,
+frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html`, `static/js/bank.js` ·
+**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
+**Issues:** —
 
 ## Out of scope
 

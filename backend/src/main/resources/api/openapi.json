@@ -16523,8 +16523,8 @@
       },
       "post" : {
         "tags" : [ "org-unit-bank-controller" ],
-        "summary" : "Raise a confirm-before-post booking request for an overseen org unit",
-        "description" : "Creates a PENDING deposit/withdrawal request against the bank account of an org unit the authenticated officer/lead oversees. The request is audited immediately but moves no money until a bank employee confirms it; no holder is chosen by the requester.",
+        "summary" : "Raise a confirm-before-post booking request",
+        "description" : "Creates a PENDING booking request that is audited immediately but moves no money until a bank employee confirms it; no holder is chosen by the requester. A deposit may be requested by any authenticated caller against any active account and is never approval-limited (REQ-BANK-042); a withdrawal/transfer is restricted to an account the caller may view and subject to the per-tier approval limits.",
         "operationId" : "createBookingRequest",
         "requestBody" : {
           "content" : {
@@ -48664,7 +48664,7 @@
         "properties" : {
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
           },
           "userSub" : {
             "type" : "string",
@@ -48693,7 +48693,7 @@
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING" ]
           },
           "description" : {
             "type" : "string",
@@ -48732,7 +48732,7 @@
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING" ]
+            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING" ]
           },
           "description" : {
             "type" : "string"
@@ -48772,7 +48772,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
           },
           "userSub" : {
             "type" : "string",

@@ -29,6 +29,16 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   incomplete.
 - **Every architecturally significant or design decision is recorded as an ADR**
   ([`docs/adr/README.md`](docs/adr/README.md)) before or with the change that implements it.
+- **README, the role matrix and the user wiki move with the change.** Whenever a change affects
+  user-facing behaviour, architecture, env vars, the access/permission model, or any feature the
+  handbook documents, keep these in sync **as part of the same unit of work**: the
+  [`README.md`](README.md) overview, the [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)
+  role/permission matrix, and the **German end-user wiki** (the separate `basetool.wiki` repo —
+  one page per feature area: Kartellbank, Benachrichtigungen, Rollen-und-Berechtigungen, …). The
+  README and the role matrix ship in the **same PR** as the code; the wiki, being a separate git
+  repo, is committed and pushed there alongside (German content, English commit messages — see the
+  Git section's wiki carve-out). A change that touches one of these surfaces but leaves the README,
+  the role matrix, or the relevant wiki page stale is **incomplete**.
 - **Requirements must always be honoured.** Code must not silently contradict a
   requirement. If a change *must* violate or override one, it needs **prior approval by the
   repository owner (@greluc)** AND the requirement must be **amended first** — never diverge
@@ -206,7 +216,7 @@ class GuidelinesExampleTest {
 
 - **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
 - **CHANGELOG entries must be short, terse and to the point — only the essentials.** One to three sentences per bullet covering *what* changed and *why it matters to the user*. No multi-paragraph design rationales, no exhaustive file lists, no copy-pasted commit messages, no architectural reasoning that belongs in the PR description or Javadoc. Mention the area affected (controller / migration / config) and the user-visible effect — anything beyond that is noise. If a bullet grows past ~3 sentences, cut it.
-- Keep `README.md` current when architecture or env vars change.
+- Keep `README.md`, the [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) role matrix and the German `basetool.wiki` handbook current whenever a change affects them — this is the binding *"README, the role matrix and the user wiki move with the change"* rule from the Requirements section above, restated here so it is not forgotten at documentation time.
 - **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
 - **Javadoc is gate-enforced.** Missing Javadoc on a new `public`/`protected` member fails the build via Checkstyle's `MissingJavadocType` / `MissingJavadocMethod` checks — there is no warn-only grace period. Same gate covers summary period (`SummaryJavadoc`), placement between annotations and the declaration (`InvalidJavadocPosition`), `<p>` after blank lines (`JavadocParagraph`), and `@param`/`@return`/`@throws` order (`AtclauseOrder`).
 

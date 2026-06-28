@@ -420,6 +420,7 @@ public class BankBookingRequestService {
     eventPublisher.publishEvent(
         new BankBookingRequestConfirmedEvent(
             request.getId(),
+            request.getAccount().getId(),
             request.getAccount().getAccountNo(),
             request.getAmount(),
             request.getRequestedBy(),
@@ -470,6 +471,7 @@ public class BankBookingRequestService {
     eventPublisher.publishEvent(
         new BankBookingRequestRejectedEvent(
             request.getId(),
+            request.getAccount().getId(),
             request.getAccount().getAccountNo(),
             request.getAmount(),
             reason,
