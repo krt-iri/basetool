@@ -100,7 +100,7 @@
         }
         lastTrigger = trigger;
         modal.style.display = 'flex';
-        const modalUser = getModalUser();
+        // Reuse the modalUser resolved above (same open call, the control is not replaced in between).
         if (modalUser) {
             // Focus the visible combobox textbox (the resolved element is the hidden input).
             const box = modalUser.closest ? modalUser.closest('.krt-combobox') : null;
