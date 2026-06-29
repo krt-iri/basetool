@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0051
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0052
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -615,7 +615,7 @@ converted-picker flows now drive the combobox end-to-end (open → pick → subm
 **Code:** `krt-searchable-select.js`
 (`makeItem` + `data-search` local filter, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
 `id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `fragments/head.html`
-(global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0051
+(global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0052
 
 ## Out of scope
 

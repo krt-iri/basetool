@@ -234,3 +234,71 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 > **Track 2 (later):** the Discord **bot** (bot token + `Server Members` privileged intent, read-only
 > invite) and the automated role/unit sync are configured in a separate runbook when Track 2 ships.
 
+---
+
+## 7. Optional: deny a colliding first-login (account-existence precheck, REQ-SEC-022)
+
+Stops a member who already has a Basetool account from creating a duplicate by signing in with
+Discord: a brand-new Discord first-login whose Discord username, per-guild server nickname, or e-mail
+already matches an existing account is denied with a localized "link your existing account instead"
+page (`discordAccountAlreadyExists`). It is the **second stage** of the same first-login gate (after
+the guild/role gate), runs only at first-broker-login, and is **fail-open** — leave it unconfigured
+and nothing changes. It is **HTTPS only**; certificate validation is never disabled.
+
+### 7.1 Shared secret (both services)
+
+Set the **same** value on the backend and the Keycloak SPI:
+
+- `KRT_DISCORD_SPI_SHARED_SECRET` — a long random string. On the backend it guards
+  `POST /internal/discord/account-existence` (blank → endpoint disabled, returns 503); the SPI
+  presents it in the `X-KRT-SPI-Secret` header.
+
+### 7.2 Keycloak SPI env (keycloak container)
+
+- `KRT_BACKEND_PRECHECK_URL` — `https://backend:11261/internal/discord/account-existence` (must be `https://`).
+- `KRT_DISCORD_SPI_SHARED_SECRET` — the same value as on the backend.
+- `KRT_BACKEND_TRUSTSTORE_PATH` — path inside the container to the truststore (see §7.3).
+- `KRT_BACKEND_TRUSTSTORE_PASSWORD` — its password.
+
+### 7.3 Truststore for the backend certificate
+
+The backend serves a self-signed certificate, so the Keycloak container must trust it. Export the
+backend's certificate from the shared keystore into a dedicated trust-only PKCS#12 store:
+
+```bash
+# Export the backend cert (use the alias in your keystore.p12) ...
+keytool -exportcert -rfc \
+  -keystore keystore.p12 -storetype PKCS12 -storepass "$SERVER_SSL_KEY_STORE_PASSWORD" \
+  -alias <backend-cert-alias> -file backend.crt
+
+# ... and import it into a trust-only store the SPI loads.
+keytool -importcert -noprompt \
+  -keystore backend-truststore.p12 -storetype PKCS12 -storepass "$KRT_BACKEND_TRUSTSTORE_PASSWORD" \
+  -alias backend -file backend.crt
+```
+
+Mount it read-only into the keycloak service and point `KRT_BACKEND_TRUSTSTORE_PATH` at it (a compose
+override; the base `docker-compose.yml` plumbs the env vars but deliberately leaves this mount to the
+operator so non-users are unaffected):
+
+```yaml
+services:
+  keycloak:
+    volumes:
+      - /var/iri/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro
+```
+
+If the truststore is missing or wrong, the HTTPS call fails the handshake and the precheck simply
+fails open (the login proceeds to the normal PENDING queue). Rotate the secret by changing it on both
+services; rebuild the truststore when the backend certificate is rotated.
+
+### 7.4 Verify
+
+- A new Discord login whose username / server nickname / e-mail matches an existing account → denied
+  with the "account already exists, link instead" page; no session, no new account.
+- A new, non-colliding Discord login → lands PENDING as before.
+- Unset `KRT_BACKEND_PRECHECK_URL` → the precheck is skipped (fail-open), colliding logins land PENDING.
+- Linking Discord to an existing account from the Account Console still works (the precheck is skipped
+  for an already-authenticated session).
+- Keycloak/SPI logs contain **no** candidate usernames, nicknames, e-mails or Discord ids.
+

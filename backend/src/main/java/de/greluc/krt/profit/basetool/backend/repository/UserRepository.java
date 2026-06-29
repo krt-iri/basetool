@@ -284,6 +284,37 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       String username, String displayName);
 
   /**
+   * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
+   * one of the candidate names — already lower-cased by the caller — as their login {@code
+   * username} <em>or</em> their in-app {@code displayName}? Returns the bare existence fact; never
+   * loads a row, so no PII is materialised. The caller guarantees a non-empty set, so the {@code
+   * IN} clause never degenerates to {@code IN ()}.
+   *
+   * @param lowerNames the lower-cased candidate names (Discord username + server nickname); never
+   *     empty
+   * @return {@code true} iff at least one user matches on username or display name
+   */
+  @Query(
+      "SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.username) IN :lowerNames OR"
+          + " LOWER(u.displayName) IN :lowerNames")
+  boolean existsByLowerUsernameOrDisplayNameIn(
+      @org.springframework.data.repository.query.Param("lowerNames")
+          java.util.Collection<String> lowerNames);
+
+  /**
+   * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
+   * the given e-mail (already lower-cased by the caller)? Case-insensitive counterpart to the
+   * case-sensitive {@link #findByEmail(String)}; returns the bare existence fact so no PII is
+   * materialised.
+   *
+   * @param lowerEmail the lower-cased candidate e-mail; never blank
+   * @return {@code true} iff at least one user has that e-mail
+   */
+  @Query("SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.email) = :lowerEmail")
+  boolean existsByLowerEmail(
+      @org.springframework.data.repository.query.Param("lowerEmail") String lowerEmail);
+
+  /**
    * Derived Spring-Data query - returns entities matching {@code
    * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}. Eagerly fetches the configured
    * relations via {@code @EntityGraph}.

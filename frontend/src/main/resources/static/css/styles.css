@@ -3577,6 +3577,43 @@ details.hud-details[open] > summary::after {
     gap: var(--space-4);
 }
 
+/* Upcoming-mission tiles (home page) — equal-height cards whose CTA sticks to the bottom so the
+   "Einsatz öffnen" buttons align across a row regardless of description length. */
+.mission-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.mission-tile__actions {
+    margin-top: auto;
+}
+
+/* The description label and its clamped body span the full tile width (not the narrow value
+   column), so the three-line preview stays readable in a tile. */
+.mission-tile__desc-label,
+.mission-tile__desc {
+    grid-column: 1 / -1;
+}
+
+/* Clamp the rendered markdown preview to three lines; the full text lives on the mission detail
+   page. Zero the first/last child margins so the clamp height is predictable. */
+.mission-tile__desc {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+.mission-tile__desc > :first-child {
+    margin-top: 0;
+}
+
+.mission-tile__desc > :last-child {
+    margin-bottom: 0;
+}
+
 /* Constrain text width for better readability on ultra-wide screens */
 main p {
     max-width: var(--measure);

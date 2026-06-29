@@ -1,27 +1,35 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** MISSION · **Related ADRs:** none
 
-# Home-page "next mission" banner
+# Home-page upcoming-missions overview
 
 ## Context & goal
 
-The home page (`/`) shows a **next mission** banner: the single upcoming mission whose planned start
-is the soonest still in the future. It is the viewer's at-a-glance "what is _my unit_ coming up
-against". The banner is guest-visible — anonymous visitors see only public missions; authenticated
-members also see internal ones. Alongside name, status and schedule it surfaces the mission's
-**owning org unit** (Staffel/SK/Bereich/OL, or "ownerless"), read from the same `owningSquadron`
-field as the mission list/detail; it is non-PII and shown to guests too.
+The home page (`/`) shows the **upcoming missions of the next seven days** as a tile grid, nearest
+planned start first (REQ-MISSION-012). Each tile carries the same fields as the legacy single "next
+mission" card — name, status, schedule, optional calendar link, the **owning org unit**
+(Staffel/SK/Bereich/OL, or "ownerless", read from the `owningSquadron` field; non-PII, shown to
+guests too) and, for authenticated members, a Markdown description preview clamped to three lines.
+The grid is guest-visible — anonymous visitors see only public `PLANNED`/`ACTIVE` missions;
+authenticated members additionally see their own units' internal ones. It is populated from `GET
+/api/v1/missions/search` and uses the **broad mission-list scope** (the viewer's own org units plus
+every unit's public missions), deliberately wider than the own-unit `/next` lookup described below.
 
-The banner must surface only missions that are still **operationally relevant**. A mission that has
-already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time (e.g. a
-cancelled future plan, or a closed mission whose schedule was never corrected) is not something the
-squadron is heading towards, and showing it as "next mission" is misleading.
+The single-mission `GET /api/v1/missions/next` endpoint (REQ-MISSION-003, REQ-MISSION-008) is
+**retained** as a public API endpoint, but it is no longer what the home page renders; the two
+requirements below still govern its behaviour for API consumers.
 
-The banner must also be **org-unit relevant**. A member should see the next mission of their _own_
-org unit (or, for a Bereich/Organisationsleitung leader, their subordinate units), not the
+The `/next` lookup must surface only missions that are still **operationally relevant**. A mission
+that has already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time
+(e.g. a cancelled future plan, or a closed mission whose schedule was never corrected) is not
+something the squadron is heading towards, and returning it as "next mission" is misleading.
+
+The `/next` lookup must also be **org-unit relevant**. A member should get the next mission of their
+_own_ org unit (or, for a Bereich/Organisationsleitung leader, their subordinate units), not the
 organisation-wide next mission that may belong to a squadron they have nothing to do with. A viewer
 who belongs to no org unit (anonymous guest, brand-new account, admin in "all squadrons" mode) keeps
-the organisation-wide next mission as before.
+the organisation-wide next mission as before. (The home-page grid above deliberately does **not**
+apply this narrowing — it uses the broad mission-list scope per REQ-MISSION-012.)
 
 ## Requirements
 
@@ -52,7 +60,8 @@ strictly after "now" is the next mission.
 **Code:** `MissionService#getNextMission`,
 `MissionRepository#findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc` +
 `#findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc`,
-`MissionController` `/api/v1/missions/next`, `frontend/.../HomeController` + `templates/index.html`.
+`MissionController` `/api/v1/missions/next`. (The home page no longer consumes `/next` — its
+upcoming-missions grid is REQ-MISSION-012.)
 
 ### REQ-MISSION-008 — Next-mission banner is scoped to the viewer's org units
 
@@ -96,6 +105,74 @@ the viewer has any:
 **Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead`,
 `MissionRepository#findNextScopedMission`,
 `OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
+
+### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
+
+The home page (`/`) renders the missions whose `plannedStartTime` falls within the next seven days
+(from "now" to "now + 7 days") as a **tile grid**, ordered by `plannedStartTime` ascending — the
+nearest planned start first. This replaces the former single next-mission banner; the first tile is
+the soonest upcoming mission.
+
+- **Source & scope.** The grid is populated from `GET /api/v1/missions/search` with `start = now`,
+  `end = now + 7d`, `status = PLANNED, ACTIVE`, `sort = plannedStartTime,asc`. It therefore uses the
+  **broad mission-list scope** — the viewer's own org units' missions (internal and public) **plus**
+  every unit's public missions via the cross-staffel public escape ([`org-unit-tenancy.md`](org-unit-tenancy.md)) —
+  deliberately **wider** than the own-unit-only scope of the `/next` lookup (REQ-MISSION-008). This
+  is an explicit, owner-approved product decision: the home overview answers "what is the
+  organisation heading towards in the coming week", not only "my unit".
+- **Own-unit highlight.** Because the scope is broad, a tile whose owning org unit is one the
+  **authenticated** viewer is **directly assigned to** is flagged with a "Meine Einheit" chip
+  (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit
+  kind** — Staffel, Spezialkommando, Bereich (when the viewer is a direct member) and
+  Organisationsleitung (when a direct member) — **not** only Staffeln. The set comes from the
+  kind-agnostic `GET /api/v1/users/me/org-unit-ids` self-endpoint (the caller's direct
+  `org_unit_membership` rows mapped to their org-unit ids), unioned with the Staffel ids already on
+  the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
+  The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
+  (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and guests (no memberships)
+  never see the chip.
+- **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
+  by the status filter). Guest/outsider redaction is unchanged: anonymous and role-less `GUEST`
+  callers see only public (`isInternal = false`) `PLANNED` / `ACTIVE` missions, with the description
+  hidden ([`security-and-access.md`](security-and-access.md)).
+- **Tile content.** Each tile carries the same fields as the legacy next-mission card — name, owning
+  org unit (or "Keine"), status pill, meeting time, planned start, optional calendar link, and — for
+  authenticated members only — a Markdown description **preview clamped to three lines**; the full
+  description is on the mission detail page. The "Einsatz öffnen" link (members only) opens the
+  mission.
+- **Empty state.** When no `PLANNED` / `ACTIVE` mission starts within the next seven days, the
+  section renders its localized empty state (`home.upcoming.empty`); a mission whose planned start is
+  more than seven days out is **not** shown, even if it is the soonest upcoming one.
+- **Layout.** The announcement / information panel above the grid spans the full width and is only as
+  tall as its content (minimal when collapsed); the grid is responsive (auto-fit tiles, single column
+  on touch classes) per the design system ([`ui-design-system.md`](ui-design-system.md), REQ-UI-009).
+
+**Acceptance**
+
+- [ ] The home page lists every `PLANNED`/`ACTIVE` mission with a planned start in `[now, now+7d]` as a tile, nearest planned start first.
+- [ ] A mission starting more than seven days out is not shown; when none qualify, the localized empty state renders.
+- [ ] A guest sees only public `PLANNED`/`ACTIVE` tiles with no description; a member additionally sees own-unit internal missions and the three-line description preview.
+- [ ] Each tile's description preview is truncated to three lines; the full text is visible on the mission detail page.
+- [ ] The information panel spans the full width and collapses to its header height.
+- [ ] An own-unit mission's tile shows the "Meine Einheit" chip for the authenticated member; a foreign mission's tile does not, and a guest never sees it.
+- [ ] The own-unit match covers every direct membership kind — a Spezialkommando, a directly-assigned Bereich and a directly-assigned Organisationsleitung mission are flagged, not only Staffel missions — while a subordinate unit reached only via the leadership cascade is **not**.
+
+**Enforced by:** `HomeControllerMvcTest`
+(`home_ShouldShowOwningOrgUnitName_WhenUpcomingMissionIsOrgOwned`,
+`home_ShouldShowOwnerlessLabel_WhenUpcomingMissionHasNoOrgUnit`,
+`home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersStaffel`,
+`home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand`,
+`home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign`),
+`OrgUnitMembershipServiceTest` (`findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade`,
+`findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
+`UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
+**Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
+`/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
+tile grid + `.mission-tile__desc` clamp + the `myOrgUnitIds` chip gate), `static/css/styles.css`
+(`.mission-tile*`); backend `UserController#getMyOrgUnitIds` +
+`OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
+`MissionController` `/api/v1/missions/search` endpoint; the only new backend surface is the
+kind-agnostic own-membership id lookup.
 
 ## Out of scope
 

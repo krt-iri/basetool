@@ -1,4 +1,4 @@
-# ADR-0051 — Standardize user-selection fields on the shared searchable combobox
+# ADR-0052 — Standardize user-selection fields on the shared searchable combobox
 
 - **Status:** Accepted
 - **Date:** 2026-06-29
