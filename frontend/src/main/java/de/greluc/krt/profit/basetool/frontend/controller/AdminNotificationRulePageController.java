@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.constraints.NotNull;
@@ -62,6 +63,8 @@ public class AdminNotificationRulePageController {
   private static final String BACKEND_BASE = "/api/v1/notification-rules";
   private static final ParameterizedTypeReference<List<NotificationRuleDto>> LIST_TYPE =
       new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USERS_TYPE =
+      new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
 
@@ -80,6 +83,15 @@ public class AdminNotificationRulePageController {
       log.debug("Failed to load notification rules", e);
       model.addAttribute("rules", List.of());
       model.addAttribute("error", "admin.notificationRules.error.load");
+    }
+    // Candidate users for the SPECIFIC_USER selector's searchable picker (REQ-FE-011). Fetched
+    // separately so a lookup failure leaves the rules list intact; the picker then renders empty.
+    try {
+      List<UserReferenceDto> users = backendApiClient.get("/api/v1/users/lookup", USERS_TYPE);
+      model.addAttribute("users", users == null ? List.of() : users);
+    } catch (Exception e) {
+      log.debug("Failed to load users for the notification-rule user picker", e);
+      model.addAttribute("users", List.of());
     }
     return "admin/notification-rules";
   }

@@ -26,6 +26,23 @@
     // Monotonic counter for collision-free ARIA ids across every combobox on a page.
     let comboboxSeq = 0;
 
+    // dataset keys (camelCased) the combobox owns itself and must NOT copy onto the hidden input
+    // during the generic data-* passthrough: the enhancement marker/guard, the text/behaviour
+    // config, and `testid` (which moves to the visible textbox instead). `data-search` lives on the
+    // <option>s, never the <select>, but is listed for safety.
+    const COMBOBOX_DATA_KEYS = [
+        'krtCombobox',
+        'krtComboboxDone',
+        'comboboxNoResults',
+        'comboboxHint',
+        'comboboxInvalid',
+        'comboboxLoading',
+        'comboboxPlaceholder',
+        'comboboxMax',
+        'testid',
+        'search',
+    ];
+
     /**
      * Locates the <label> describing a control: first via an explicit
      * `for="<id>"`, then by falling back to a label inside the same .form-group
@@ -73,6 +90,23 @@
         mark.textContent = label.slice(at, at + query.length);
         el.appendChild(mark);
         el.appendChild(document.createTextNode(label.slice(at + query.length)));
+    }
+
+    /**
+     * Builds a combobox option model. The {@code search} haystack folds the visible label
+     * together with the optional secondary terms (a {@code data-search} attribute on the source
+     * {@code <option>}, e.g. a user's login name when the label shows the display name) so the
+     * local filter matches text the label alone does not surface — the requirement that user
+     * pickers search both username and display name. Highlighting still keys off the label only.
+     *
+     * @param {string} value the option value (submitted via the hidden input)
+     * @param {string} label the visible option label
+     * @param {string} [extra] optional extra search terms not shown in the label
+     * @returns {{value: string, label: string, search: string}} the option model
+     */
+    function makeItem(value, label, extra) {
+        const terms = extra && extra.trim() ? label + ' ' + extra.trim() : label;
+        return { value: value, label: label, search: terms.toLowerCase() };
     }
 
     /**
@@ -127,7 +161,7 @@
                 }
                 return;
             }
-            items.push({ value: option.value, label: option.textContent.trim() });
+            items.push(makeItem(option.value, option.textContent.trim(), option.dataset.search));
         });
 
         const uid = 'krt-cb-' + ++comboboxSeq;
@@ -141,9 +175,21 @@
         if (select.name) {
             hidden.name = select.name;
         }
-        if (data.role) {
-            hidden.dataset.role = data.role;
+        // Carry the original control's id and its generic data-* attributes (data-role,
+        // data-trigger, page-specific hooks, …) onto the hidden input. The hidden input is what
+        // submits the value and what dispatches `change`, so existing page JS that looks the
+        // control up by id (`getElementById`) or that delegates on `data-trigger`/`data-role`
+        // keeps working unchanged after the <select> is replaced. The combobox's own config
+        // attributes and the per-option `data-search` are skipped, and `data-testid` moves to the
+        // visible textbox below so a single element matches a test locator.
+        if (select.id) {
+            hidden.id = select.id;
         }
+        Object.keys(data).forEach(function (key) {
+            if (COMBOBOX_DATA_KEYS.indexOf(key) === -1) {
+                hidden.dataset[key] = data[key];
+            }
+        });
 
         const input = document.createElement('input');
         input.type = 'text';
@@ -172,6 +218,10 @@
         const labelEl = findLabel(select, uid);
         if (labelEl) {
             input.setAttribute('aria-labelledby', labelEl.id);
+            // The original <select> id now lives on the hidden input (see the passthrough above),
+            // so a label bound via for="<select-id>" would focus the hidden field on click.
+            // Repoint it to the visible textbox so clicking the label opens the combobox.
+            labelEl.htmlFor = input.id;
         }
 
         const listbox = document.createElement('ul');
@@ -320,7 +370,7 @@
                 ? items.slice()
                 : q
                   ? items.filter(function (it) {
-                        return it.label.toLowerCase().indexOf(q) !== -1;
+                        return (it.search || it.label.toLowerCase()).indexOf(q) !== -1;
                     })
                   : items.slice();
             const truncated = matches.length > maxResults;
@@ -331,6 +381,9 @@
                 li.className = 'krt-combobox__option';
                 li.setAttribute('role', 'option');
                 li.setAttribute('aria-selected', it.value === hidden.value ? 'true' : 'false');
+                // Expose the option value in the DOM (as a native <option value> did), so callers /
+                // tests can target a specific option without relying on its visible label.
+                li.dataset.value = it.value;
                 appendHighlighted(li, it.label, q);
                 // mousedown keeps focus on the textbox so blur does not pre-empt the
                 // pick; the commit runs on click so a programmatic .click() (tests)
@@ -578,7 +631,87 @@
                 input.setCustomValidity('');
             }, 150);
         });
+
+        /**
+         * Programmatically selects the option with the given value and syncs BOTH the hidden value
+         * and the visible label, WITHOUT firing a `change` event. This is the supported way for page
+         * JS to preselect a combobox after enhancement (e.g. when an edit modal opens and seeds the
+         * current value) — assigning to the hidden input's `.value` directly would update the
+         * submitted value but leave the textbox showing the wrong (or empty) text. An unknown value
+         * clears the selection.
+         *
+         * @param {string} value the option value to select, or empty/unknown to clear
+         */
+        function setValue(value) {
+            const v = value == null ? '' : String(value);
+            let match = null;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].value === v) {
+                    match = items[i];
+                    break;
+                }
+            }
+            hidden.value = match ? match.value : '';
+            committedLabel = match ? match.label : '';
+            input.value = committedLabel;
+            input.setCustomValidity('');
+        }
+
+        // Expose a tiny controller on both the hidden input (what `getElementById` returns) and the
+        // wrapper, so page code can drive the value without reaching into the internals.
+        const controller = { setValue: setValue };
+        hidden.krtCombobox = controller;
+        wrapper.krtCombobox = controller;
     }
 
+    // Builds the config for an auto-initialised combobox: shared i18n defaults from
+    // `window.krtComboboxI18n`, each overridable per-control by a `data-combobox-*` attribute. Keeps
+    // the shared user-picker strings in ONE place (head.html) while still letting a single control
+    // customise its wording. (Backend-backed pickers pass an explicit `remoteSource` via the direct
+    // krtSearchableSelect API instead — e.g. the orders item search.)
+    function autoConfig(select) {
+        const i18n = window.krtComboboxI18n || {};
+        const d = select.dataset;
+        return {
+            placeholder: d.comboboxPlaceholder || i18n.placeholder,
+            noResultsText: d.comboboxNoResults || i18n.noResults,
+            hintText: d.comboboxHint || i18n.hint,
+            invalidText: d.comboboxInvalid || i18n.invalid,
+            loadingText: d.comboboxLoading || i18n.loading,
+        };
+    }
+
+    // Enhances every opted-in `select[data-krt-combobox]` inside a root (the document on load, or a
+    // freshly swapped fragment on `krt:swapped`). krtSearchableSelect is idempotent, so re-running
+    // over already-enhanced controls is a no-op. This is the single global mechanism that powers the
+    // searchable user pickers across the app without per-page wiring.
+    function enhanceWithin(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') {
+            return;
+        }
+        Array.prototype.forEach.call(
+            root.querySelectorAll('select[data-krt-combobox]'),
+            function (select) {
+                krtSearchableSelect(select, autoConfig(select));
+            },
+        );
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            enhanceWithin(document);
+        });
+    } else {
+        enhanceWithin(document);
+    }
+    // Live update (REQ-FE-*): re-enhance user pickers inside any fragment swapped in via krtFetch.
+    document.addEventListener('krt:swapped', function (event) {
+        enhanceWithin((event.detail && event.detail.container) || document);
+    });
+
     window.krtSearchableSelect = krtSearchableSelect;
+    // Enhance every select[data-krt-combobox] within a root. Exposed for pages that build picker DOM
+    // dynamically (e.g. duplicating a row) and need to upgrade the freshly inserted controls without
+    // dispatching a synthetic krt:swapped (which would also trigger unrelated swap listeners).
+    window.krtEnhanceComboboxes = enhanceWithin;
 })();

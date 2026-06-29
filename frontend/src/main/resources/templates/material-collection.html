@@ -50,10 +50,12 @@
                     th:data-amount="${entry.quantity}">
                     <td>
                         <select class="owner-select krt-select"
+                                data-role="owner-select" data-krt-combobox
                                 th:data-inventory-id="${entry.inventoryEntryId}"
                                 style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); padding: 0.4rem 0.5rem;">
                             <option th:each="u : ${users}"
                                     th:value="${u.id}"
+                                    th:attr="data-search=${u.username}"
                                     th:text="${u.effectiveName}"
                                     th:selected="${u.id == entry.ownerId}"></option>
                         </select>
@@ -163,13 +165,20 @@
         row.querySelectorAll('select').forEach(function (s) { s.disabled = false; });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.owner-select').forEach(function (select) {
-            select.addEventListener('change', function () {
-                collectionTransfer(this.getAttribute('data-inventory-id'), { targetUserId: this.value }, MSG_OWNER_UPDATED);
-            });
-        });
+    // The owner picker is upgraded into a searchable combobox by the global enhancer, which replaces
+    // the <select> (so a per-element listener bound on load would be lost). Delegate on the preserved
+    // data-role instead — the combobox copies data-role + data-inventory-id onto its hidden input,
+    // which is what dispatches the change once enhanced (and the plain <select> still matches before
+    // enhancement / no-JS).
+    document.addEventListener('change', function (e) {
+        const el = e.target;
+        if (!el.matches || !el.matches('[data-role="owner-select"]')) {
+            return;
+        }
+        collectionTransfer(el.getAttribute('data-inventory-id'), { targetUserId: el.value }, MSG_OWNER_UPDATED);
+    });
 
+    document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.location-select').forEach(function (select) {
             select.addEventListener('change', function () {
                 collectionTransfer(this.getAttribute('data-inventory-id'), { targetLocationId: this.value }, MSG_LOCATION_UPDATED);

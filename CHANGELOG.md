@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Nutzer-Auswahlfelder sind durchsuchbar (Live-Suche nach Nutzername und Anzeigename).** Überall, wo ein Nutzer ausgewählt wird — u. a. Missions-Besitzer/-Manager/-Verantwortliche und Finanz-Teilnehmer, Auftrags-Zuweisung, Raffinerie-Besitzer und Einlagern, Bank-Halter/-Berechtigungen/-Limits, Inventar-Zuordnung und Umbuchen, Leitung, Spezialkommando, Admin-Inventar/-Blueprints sowie Benachrichtigungsregeln — ist das Dropdown jetzt eine Such-Combobox: Tippen filtert die Liste nach Nutzername **und** Anzeigename, damit lange Nutzerlisten handhabbar bleiben. Bank-Halter-Felder durchsuchen den Handle. Künftig müssen alle Nutzer-Auswahlfelder so gestaltet sein (REQ-FE-011, ADR-0051).
+
 ## [v1.0.4](https://github.com/krt-profit/basetool/releases/tag/v1.0.4) - 2026-06-29
 
 ### Added

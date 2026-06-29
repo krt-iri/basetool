@@ -28,7 +28,6 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -132,12 +131,13 @@ class MissionFinanceEntryE2eTest {
         page.locator("button[data-trigger='open-modal-display'][data-modal-id='finance-modal']")
             .click();
 
-        // Fill an income entry. The participant <select> is `required`; index 0 is the disabled
-        // "- Bitte wählen -" placeholder, so index 1 is the first real (seeded guest) participant.
-        // The type is a segment control mirroring into the hidden type input; INCOME is the
-        // default, the explicit click guards against a changed default.
+        // Fill an income entry. The participant picker is a searchable combobox; its empty-value
+        // placeholder is not a list option, so the first option is the first real (seeded guest)
+        // participant — the equivalent of the former selectOption().setIndex(1). The type is a
+        // segment control mirroring into the hidden type input; INCOME is the default, the explicit
+        // click guards against a changed default.
         Locator modal = page.locator("#finance-modal");
-        modal.locator("select[name='participantId']").selectOption(new SelectOption().setIndex(1));
+        E2eSupport.selectComboboxFirstOption(modal.locator(".krt-combobox__input"));
         modal.locator(".seg button[data-type-value='INCOME']").click();
         modal.locator("input[name='amount']").fill(FINANCE_AMOUNT);
 

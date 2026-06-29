@@ -276,8 +276,9 @@ class BankBookingE2eTest {
     page.locator("[data-testid='bank-deposit-open']")
         .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
     page.locator("[data-testid='bank-deposit-amount']").fill(amount);
-    // The holder select carries the registered holder options; pick the employee's holder.
-    page.locator("[data-testid='bank-deposit-holder']").selectOption(uiHolderId);
+    // The holder picker is a searchable combobox; pick the employee's holder by its value.
+    E2eSupport.selectComboboxByValue(
+        page.locator("[data-testid='bank-deposit-holder']"), uiHolderId);
     page.waitForResponse(
         r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
         // 60 s (above the 30 s default): the deposit's proxied XHR round-trip can outrun 30 s on a

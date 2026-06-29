@@ -246,7 +246,7 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
-                        <select id="bank-deposit-holder" name="holderId" required data-testid="bank-deposit-holder">
+                        <select id="bank-deposit-holder" name="holderId" required data-krt-combobox data-testid="bank-deposit-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>
@@ -298,7 +298,7 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-withdraw-holder" th:text="#{bank.field.holder.payer}">Von Halter</label>
-                        <select id="bank-withdraw-holder" name="holderId" required data-testid="bank-withdraw-holder">
+                        <select id="bank-withdraw-holder" name="holderId" required data-krt-combobox data-testid="bank-withdraw-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
@@ -363,7 +363,7 @@
                     <div class="bank-form-row">
                         <label for="bank-transfer-source-holder" th:text="#{bank.field.holder.source}">Von Halter</label>
                         <select id="bank-transfer-source-holder" name="sourceHolderId" required
-                                data-testid="bank-transfer-source-holder">
+                                data-krt-combobox data-testid="bank-transfer-source-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
@@ -373,7 +373,7 @@
                     <div class="bank-form-row">
                         <label for="bank-transfer-dest-holder" th:text="#{bank.field.holder.target}">An Halter (Zielkonto)</label>
                         <select id="bank-transfer-dest-holder" name="destinationHolderId" required
-                                data-testid="bank-transfer-dest-holder">
+                                data-krt-combobox data-testid="bank-transfer-dest-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>

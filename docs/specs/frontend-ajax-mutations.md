@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-15.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0051
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -562,6 +562,60 @@ path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation 
 / `krt:mission-resync`), `mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync
 receiver with flush-time busy re-check + `overviewSection` fragment + finance-badge `krt:swapped`
 listener), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
+
+### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
+
+As the member base grows, plain `<select>` dropdowns of users become unusable. **Every field that
+lets a user pick a registered user/member must be a searchable combobox** rendered by
+[`krt-searchable-select.js`](../../frontend/src/main/resources/static/js/krt-searchable-select.js),
+filtering on **both** the user's `username` **and** their display name. The control is opted in with
+the `data-krt-combobox` marker; each `<option>` carries the secondary search term in `data-search`
+(the `username`) so a label that shows only the display name still matches the login handle, and vice
+versa. The enhancer is loaded **globally** from `fragments/head.html` and auto-initialises every
+`select[data-krt-combobox]` on `DOMContentLoaded` **and** on `krt:swapped` (so pickers inside swapped
+fragments are upgraded); `window.krtEnhanceComboboxes(root)` upgrades pickers a page builds
+dynamically (cloned modal/selector rows). Shared default labels live once in `window.krtComboboxI18n`
+(`userSelect.search.*`). A new or changed user-selection surface that ships a plain `<select>` or a
+hand-rolled picker is **incomplete**.
+
+The combobox preserves the original control's `name`, `id` and generic `data-*` (incl. `data-role` /
+`data-trigger`) onto its hidden input, so existing `getElementById` lookups, form submission and
+change-delegation keep working unchanged; code that sets a value **after** enhancement (edit modals)
+uses the control's `setValue` API (`getElementById(id).krtCombobox.setValue(v)`) so the visible label
+and the submitted value stay in sync.
+
+**Carve-outs.** (1) Fields that must also accept a free-text **guest** name — the mission
+participant-add and party-lead pickers — keep using the `/users/search`-backed autocomplete, which
+already live-searches both username and display name and must keep accepting non-user names; the
+strict combobox (which forces a pick from the list) does not fit them. (2) **Holder** pickers (bank
+deposit / withdrawal / transfer / booking-confirm) select a bank holder by handle — holders may be
+non-users and carry only a handle — so they are searchable comboboxes that filter the **handle** (no
+separate username/display-name term). Deviation beyond these carve-outs needs prior approval by
+@greluc and a spec amendment first.
+
+**Acceptance**
+
+- [ ] Every field that selects a registered user is a `krt-searchable-select` combobox (carries
+  `data-krt-combobox`); typing a **username** finds a user whose display name differs, and typing a
+  display name finds them too.
+- [ ] The enhancer runs on initial load **and** after `krt:swapped`, so a picker inside a swapped
+  fragment or a dynamically-cloned row (mission unit/finance modals, refinery store split rows,
+  notification-rule selector rows) is searchable and pre-selects its value correctly.
+- [ ] A converted picker submits the same value as the former `<select>` (the hidden input inherits
+  `name`); code that pre-selects a value after enhancement shows the matching label, not a blank box.
+- [ ] Guest-capable mission fields still accept a free-text non-user name; holder pickers filter by
+  handle.
+
+**Enforced by:** `AdminPersonalBlueprintsPageControllerMvcTest`
+(`view_userPicker_isSearchableComboboxWithUsernameSearchTerm` — the rendered picker carries
+`data-krt-combobox` and each option carries the `username` as a `data-search` term) · the
+converted-picker flows now drive the combobox end-to-end (open → pick → submit) in
+`BankBookingE2eTest`, `BankOrgUnitRequestsE2eTest`, `MissionFinanceEntryE2eTest` and
+`RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue` / `selectComboboxFirstOption`) ·
+**Code:** `krt-searchable-select.js`
+(`makeItem` + `data-search` local filter, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
+`id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `fragments/head.html`
+(global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0051
 
 ## Out of scope
 

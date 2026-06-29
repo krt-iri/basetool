@@ -220,9 +220,9 @@
                     <div class="field-row">
                         <div class="bank-form-row grow">
                             <label for="org-unit-vis-user-select" th:text="#{bank.orgUnit.settings.visibility.user.add}">Nutzer freigeben</label>
-                            <select id="org-unit-vis-user-select" name="_userId" required data-testid="org-unit-vis-user-select">
+                            <select id="org-unit-vis-user-select" name="_userId" required data-krt-combobox data-testid="org-unit-vis-user-select">
                                 <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                                <option th:each="usr : ${users}" th:value="${usr.id()}"
+                                <option th:each="usr : ${users}" th:value="${usr.id()}" th:attr="data-search=${usr.username()}"
                                         th:text="${usr.effectiveName() != null ? usr.effectiveName() : usr.username()}">greluc</option>
                             </select>
                             <span class="bank-field-error" data-error-for="_global"></span>

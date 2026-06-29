@@ -32,10 +32,11 @@
     <div class="hud-box krt-personal-inventory mt-2">
         <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform no-track">
             <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form">
+            <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox>
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
                 <option th:each="u : ${users}"
                         th:value="${u.id}"
+                        th:attr="data-search=${u.username}"
                         th:selected="${selectedUserSub != null and selectedUserSub == u.id?.toString()}"
                         th:text="${u.effectiveName != null ? u.effectiveName : u.username}">User</option>
             </select>

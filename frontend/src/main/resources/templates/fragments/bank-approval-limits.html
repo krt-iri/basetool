@@ -129,9 +129,9 @@
             <div class="field-row">
                 <div class="bank-form-row grow">
                     <label for="bank-limit-user-select" th:text="#{bank.approvalLimit.user.add}">Limit f&uuml;r Nutzer</label>
-                    <select id="bank-limit-user-select" name="_userId" required data-testid="bank-limit-user-select">
+                    <select id="bank-limit-user-select" name="_userId" required data-krt-combobox data-testid="bank-limit-user-select">
                         <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                        <option th:each="usr : ${users}" th:value="${usr.id()}"
+                        <option th:each="usr : ${users}" th:value="${usr.id()}" th:attr="data-search=${usr.username()}"
                                 th:text="${usr.effectiveName() != null ? usr.effectiveName() : usr.username()}">greluc</option>
                     </select>
                 </div>
