@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -39,29 +40,58 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Orchestration tests for {@link DiscordGuildRoleGateAuthenticator#authenticate}: the deny-closed
- * branches (missing config, missing brokered token) and the allow/deny dispatch on the {@link
- * DiscordMembershipChecker} result. The brokered-token extraction is overridden per test (it would
- * otherwise need a live first-broker-login session).
+ * Orchestration tests for {@link DiscordGuildRoleGateAuthenticator#authenticate}: the fail-closed
+ * membership branches (missing config, missing brokered token, membership denial) and the fail-open
+ * account-existence precheck (REQ-SEC-022) — deny-on-collision, allow-on-no-collision,
+ * allow-on-uncertain (fail open), and the three skip paths (account linking, unconfigured URL,
+ * non-HTTPS URL). The brokered-identity and environment reads are overridden per test (they would
+ * otherwise need a live first-broker-login session and real environment variables).
  */
 @ExtendWith(MockitoExtension.class)
 class DiscordGuildRoleGateAuthenticatorTest {
 
   @Mock private AuthenticationFlowContext context;
   @Mock private DiscordMembershipChecker checker;
+  @Mock private DiscordGuildNicknameReader nicknameReader;
+  @Mock private BackendAccountChecker backendChecker;
   @Mock private LoginFormsProvider form;
 
   private static final Map<String, String> VALID_CONFIG =
       Map.of("guildId", "123", "krtMitgliedRoleId", "999");
+  private static final String PRECHECK_URL =
+      "https://backend:11261/internal/discord/account-existence";
+  private static final String SECRET = "s3cr3t";
+
+  // Overridable env/identity seams, settable per test before building the authenticator.
+  private String precheckUrl;
+  private String sharedSecret;
+  private boolean accountLinking;
 
   /**
-   * Builds the authenticator with a fixed brokered token, bypassing the live-session extraction.
+   * Builds the authenticator with overridden brokered-identity + environment seams, bypassing the
+   * live session and process environment.
    */
-  private DiscordGuildRoleGateAuthenticator authenticatorWithToken(String token) {
-    return new DiscordGuildRoleGateAuthenticator(checker) {
+  private DiscordGuildRoleGateAuthenticator authenticator(
+      String token, String username, String email) {
+    return new DiscordGuildRoleGateAuthenticator(checker, nicknameReader, backendChecker) {
       @Override
-      String federatedAccessToken(AuthenticationFlowContext ctx) {
-        return token;
+      Brokered brokered(AuthenticationFlowContext ctx) {
+        return token == null ? null : new Brokered(token, username, email);
+      }
+
+      @Override
+      boolean isAccountLinking(AuthenticationFlowContext ctx) {
+        return accountLinking;
+      }
+
+      @Override
+      String backendPrecheckUrl() {
+        return precheckUrl;
+      }
+
+      @Override
+      String backendSharedSecret() {
+        return sharedSecret;
       }
     };
   }
@@ -83,10 +113,10 @@ class DiscordGuildRoleGateAuthenticatorTest {
     when(context.getAuthenticatorConfig()).thenReturn(null);
     stubDenyForm();
 
-    authenticatorWithToken("tok").authenticate(context);
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
-    verifyNoInteractions(checker);
+    verifyNoInteractions(checker, nicknameReader, backendChecker);
   }
 
   @Test
@@ -94,32 +124,129 @@ class DiscordGuildRoleGateAuthenticatorTest {
     stubConfig(VALID_CONFIG);
     stubDenyForm();
 
-    authenticatorWithToken(null).authenticate(context);
+    authenticator(null, null, null).authenticate(context);
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
-    verifyNoInteractions(checker);
+    verifyNoInteractions(checker, nicknameReader, backendChecker);
   }
 
   @Test
-  void succeeds_whenCheckerAllows() {
-    stubConfig(VALID_CONFIG);
-    when(checker.check(any(), eq("123"), eq("999"), eq("tok")))
-        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
-
-    authenticatorWithToken("tok").authenticate(context);
-
-    verify(context).success();
-  }
-
-  @Test
-  void denies_whenCheckerDenies() {
+  void denies_whenMembershipCheckerDenies() {
     stubConfig(VALID_CONFIG);
     stubDenyForm();
     when(checker.check(any(), any(), any(), any()))
         .thenReturn(DiscordMembershipChecker.Result.DENIED_NOT_MEMBER);
 
-    authenticatorWithToken("tok").authenticate(context);
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
+    verify(form).setError(DiscordGuildRoleGateAuthenticator.ERROR_MESSAGE_KEY);
+    verifyNoInteractions(nicknameReader, backendChecker);
+  }
+
+  @Test
+  void succeeds_whenMembershipAllows_andPrecheckUnconfigured() {
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), eq("123"), eq("999"), eq("tok")))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+    verifyNoInteractions(nicknameReader, backendChecker);
+  }
+
+  @Test
+  void deniesAccountExists_whenBackendReportsExists() {
+    precheckUrl = PRECHECK_URL;
+    sharedSecret = SECRET;
+    stubConfig(VALID_CONFIG);
+    stubDenyForm();
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+    when(nicknameReader.readNickname(any(), any(), any())).thenReturn(Optional.of("Mav"));
+    when(backendChecker.check(
+            eq(PRECHECK_URL), eq(SECRET), eq("Maverick"), eq("mav@example.com"), eq("Mav")))
+        .thenReturn(BackendAccountChecker.Result.EXISTS);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
+    verify(form).setError(DiscordGuildRoleGateAuthenticator.ACCOUNT_EXISTS_MESSAGE_KEY);
+  }
+
+  @Test
+  void succeeds_whenBackendReportsNotExists() {
+    precheckUrl = PRECHECK_URL;
+    sharedSecret = SECRET;
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+    when(nicknameReader.readNickname(any(), any(), any())).thenReturn(Optional.empty());
+    when(backendChecker.check(any(), any(), any(), any(), any()))
+        .thenReturn(BackendAccountChecker.Result.NOT_EXISTS);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+  }
+
+  @Test
+  void succeedsFailOpen_whenBackendUnknown() {
+    precheckUrl = PRECHECK_URL;
+    sharedSecret = SECRET;
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+    when(nicknameReader.readNickname(any(), any(), any())).thenReturn(Optional.empty());
+    when(backendChecker.check(any(), any(), any(), any(), any()))
+        .thenReturn(BackendAccountChecker.Result.UNKNOWN);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+  }
+
+  @Test
+  void skipsPrecheck_whenAccountLinking() {
+    precheckUrl = PRECHECK_URL;
+    sharedSecret = SECRET;
+    accountLinking = true;
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+    verifyNoInteractions(nicknameReader, backendChecker);
+  }
+
+  @Test
+  void skipsPrecheck_whenUrlNotConfigured() {
+    precheckUrl = null;
+    sharedSecret = SECRET;
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+    verifyNoInteractions(nicknameReader, backendChecker);
+  }
+
+  @Test
+  void skipsPrecheck_whenUrlNotHttps() {
+    precheckUrl = "http://backend:11261/internal/discord/account-existence";
+    sharedSecret = SECRET;
+    stubConfig(VALID_CONFIG);
+    when(checker.check(any(), any(), any(), any()))
+        .thenReturn(DiscordMembershipChecker.Result.ALLOWED);
+
+    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+    verify(context).success();
+    verifyNoInteractions(nicknameReader, backendChecker);
   }
 }

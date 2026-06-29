@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Discord-Anmeldung: keine doppelten Konten mehr.** Wer sich erstmals über Discord anmeldet und dessen Discord-Benutzername, Server-Nickname oder E-Mail bereits zu einem vorhandenen Konto passt, wird mit einem lokalisierten Hinweis abgewiesen, das vorhandene Konto stattdessen mit Discord zu verknüpfen — statt ein zweites Konto anzulegen. Die Prüfung ist fail-open (sie blockiert nur bei eindeutiger Übereinstimmung und lässt bei Unklarheit normal in die Freigabe-Warteschlange durch) und läuft ausschließlich über HTTPS.
+
 ## [v1.0.4](https://github.com/krt-profit/basetool/releases/tag/v1.0.4) - 2026-06-29
 
 ### Added

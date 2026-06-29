@@ -117,6 +117,12 @@ app:
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
       client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+  discord:
+    spi-precheck:
+      # Shared secret the Keycloak Discord SPI presents (header X-KRT-SPI-Secret) to the internal
+      # /internal/discord/account-existence endpoint (REQ-SEC-022). Blank disables the endpoint; the
+      # SPI then fails open and skips the first-login collision precheck. Never commit a real value.
+      shared-secret: ${KRT_DISCORD_SPI_SHARED_SECRET:}
   bank:
     integrity:
       # Scheduled ledger-integrity sweep (REQ-BANK-020). Disable or retune per environment.

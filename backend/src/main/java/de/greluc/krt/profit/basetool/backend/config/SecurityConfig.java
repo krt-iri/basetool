@@ -241,7 +241,11 @@ public class SecurityConfig {
                       "/api/v1/operations/**",
                       "/api/v1/orders",
                       "/api/v1/orders/items",
-                      "/api/v1/finance-entries"));
+                      "/api/v1/finance-entries",
+                      // Internal machine-to-machine endpoint called by the Keycloak Discord SPI
+                      // (REQ-SEC-022). It carries no browser session/cookie and is guarded by its
+                      // own shared-secret header, so cookie-based CSRF does not apply.
+                      "/internal/**"));
     }
 
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -315,6 +319,15 @@ public class SecurityConfig {
                     // catch-all below). `management.endpoint.health.show-details=never` keeps the
                     // response to `{"status":"UP"}` so no internal details leak.
                     .requestMatchers("/actuator/health", "/actuator/health/**")
+                    .permitAll()
+                    // Internal machine-to-machine endpoints (REQ-SEC-022): the Keycloak Discord SPI
+                    // calls /internal/discord/account-existence during first-broker-login. It bears
+                    // no JWT (Keycloak is outside the resource-server trust boundary), so it must
+                    // be
+                    // permitAll here and bypass the /api/** rate-limiter +
+                    // PendingApprovalAccessFilter;
+                    // the controller enforces its own constant-time shared-secret header instead.
+                    .requestMatchers("/internal/**")
                     .permitAll()
                     .requestMatchers(
                         "/api/v1/frequency-types", "/api/v1/frequency-types/**",
