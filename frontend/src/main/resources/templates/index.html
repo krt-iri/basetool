@@ -61,6 +61,7 @@
         
         <div th:if="${nextMission}" class="mission-info-grid">
              <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${nextMission.name}">Mission Name</span>
+             <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${nextMission.get('owningSquadron') != null ? nextMission.get('owningSquadron').get('name') : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
              <strong sec:authorize="isAuthenticated()" th:text="#{mission.description} + ':'">Beschreibung:</strong>
              <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
                   link protocols. Bean call bound via th:with — th:utext is a restricted expression

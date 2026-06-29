@@ -370,6 +370,7 @@ public class MissionController {
         // Squadron shorthand is not sensitive (MULTI_SQUADRON_PLAN.md section 7) — forward
         // through to guests so the public detail view shows the owning-squadron badge.
         dto.owningSquadron(),
+        dto.owningOrgUnitVersion(),
         // Party lead is a public leadership designation (like the Führungspositionen list) and the
         // UserReferenceDto carries only the callsign tuple
         // (username/displayName/effectiveName/rank)
@@ -459,6 +460,7 @@ public class MissionController {
         peer.checkedInParticipants(),
         peer.registeredParticipants(),
         peer.owningSquadron(), // organisation kept
+        peer.owningOrgUnitVersion(),
         peer.partyLeadUser(),
         peer.partyLeadGuestName(),
         peer.partyLeadVersion(),
@@ -1511,6 +1513,59 @@ public class MissionController {
           de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwnerRequest
               request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
+    return missionMapper.toDto(mission);
+  }
+
+  /**
+   * Reassigns the mission's owning org unit (REQ-ORG-018 / ADR-0050). The request body carries the
+   * target org-unit id (or {@code null} for an ownerless leadership mission) and the expected
+   * {@code owningOrgUnitVersion} (NOT the parent {@code Mission.version}). The caller passes the
+   * same {@code canChangeOwner} gate as the owner change; the service additionally validates the
+   * target against the caller's assignable-org-unit scope. Re-homing does NOT bump {@code
+   * Mission.version}, so other users' open forms on the same mission remain valid (Option A /
+   * multi-user concurrency).
+   *
+   * @param id mission id
+   * @param request reassignment payload (target org-unit id or {@code null} + expected {@code
+   *     owningOrgUnitVersion})
+   * @return the persisted DTO
+   */
+  @PutMapping("/{id}/owning-org-unit")
+  @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
+  @Operation(
+      summary = "Reassign the owning org unit of a mission (version-checked)",
+      description =
+          "Re-homes the mission to a different org unit (Staffel/Spezialkommando/Bereich/OL) or to"
+              + " an ownerless leadership mission (null owningOrgUnitId). The version field in the"
+              + " request body must match the current owningOrgUnitVersion (NOT the parent"
+              + " Mission.version) to prevent lost updates on concurrent reassignments. The target"
+              + " is validated against the caller's assignable-org-unit scope: a non-admin may only"
+              + " pick a unit they belong to or may edit, and may only choose null when"
+              + " membershipless.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Owning org unit updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Validation error or unknown target org unit"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Forbidden (caller may not change owner or may not assign to target)"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Mission not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "owningOrgUnitVersion conflict (application/problem+json)")
+  })
+  public MissionDto updateMissionOwningOrgUnit(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwningOrgUnitRequest
+              request) {
+    var mission =
+        missionService.updateOwningOrgUnit(id, request.owningOrgUnitId(), request.version());
     return missionMapper.toDto(mission);
   }
 

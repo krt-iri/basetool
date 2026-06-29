@@ -997,6 +997,61 @@ public class OwnerScopeService {
   }
 
   /**
+   * Validates and resolves the target org unit for an explicit <b>reassignment</b> of an existing
+   * aggregate's owning org unit (REQ-ORG-018 / ADR-0050 — the mission Verwaltung "Zugeordnete
+   * Einheit" control). Unlike {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)} this
+   * carries <em>no</em> auto-stamp or home-Staffel fallback: the caller picks an explicit target
+   * and it is accepted only when it lies within their assignable scope.
+   *
+   * <p>Permission matrix (the orthogonal second gate on top of the per-aggregate write gate the
+   * controller already enforces, e.g. {@code MissionSecurityService.canChangeOwner}):
+   *
+   * <ul>
+   *   <li><b>Admin</b> — any existing org unit, or {@code null} (ownerless), in any direction.
+   *   <li><b>Non-admin</b> — a non-null target must be one of the caller's DIRECT memberships OR an
+   *       org unit they may edit ({@link #canEditOrgUnit(UUID)}, cascade-aware for a
+   *       Bereichsleitung/OL); the same accepted set as the create-on-behalf picker ({@code
+   *       resolveStampedOrgUnit}). A {@code null} (ownerless) target is allowed only for a
+   *       membershipless leadership caller — mirroring who may <em>create</em> an ownerless mission
+   *       (ADR-0004) — so a plain member cannot silently widen a mission to public-leadership
+   *       scope.
+   * </ul>
+   *
+   * @param targetOrgUnitId the picker-supplied target org-unit id, or {@code null} for ownerless.
+   * @return the resolved managed {@link OrgUnit}, or {@code null} for an ownerless target.
+   * @throws org.springframework.security.access.AccessDeniedException when the caller may not
+   *     assign to the requested target.
+   * @throws BadRequestException when a non-null target id does not resolve to a known org unit.
+   */
+  @org.jetbrains.annotations.Nullable
+  public OrgUnit resolveReassignTargetOrgUnit(
+      @org.jetbrains.annotations.Nullable UUID targetOrgUnitId) {
+    boolean admin = authHelper.isAdmin();
+    if (targetOrgUnitId == null) {
+      // Ownerless target: an admin always, otherwise only a membershipless leadership caller. The
+      // member lookup is short-circuited for admins.
+      if (admin || currentMemberOrgUnitIds().isEmpty()) {
+        return null;
+      }
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Only an admin or a membershipless leadership user may make an aggregate ownerless");
+    }
+    // Non-null target: an admin may assign anywhere; a non-admin only to a direct membership or a
+    // unit within their editable (cascade-aware) scope. The `!admin` short-circuit keeps the admin
+    // path off the member lookup entirely.
+    if (!admin
+        && !currentMemberOrgUnitIds().contains(targetOrgUnitId)
+        && !canEditOrgUnit(targetOrgUnitId)) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Target org unit is neither a membership of the caller nor within their editable scope");
+    }
+    return orgUnitRepository
+        .findById(targetOrgUnitId)
+        .orElseThrow(
+            () -> new BadRequestException("owningOrgUnitId does not resolve to a known org unit"));
+  }
+
+  /**
    * Collects the distinct org-unit ids {@code targetUser} belongs to from the single authoritative
    * {@code org_unit_membership} source (Staffel and SK rows alike). Insertion order is preserved
    * via {@link LinkedHashSet} so the single-membership auto-stamp in {@link #resolveStampedOrgUnit}

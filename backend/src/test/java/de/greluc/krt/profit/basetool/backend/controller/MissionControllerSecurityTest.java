@@ -128,6 +128,37 @@ class MissionControllerSecurityTest {
   }
 
   @Test
+  void updateOwningOrgUnit_WhenCanChangeOwner_ShouldReturn200() throws Exception {
+    UUID missionId = UUID.randomUUID();
+
+    when(missionSecurityService.canChangeOwner(any(UUID.class), any())).thenReturn(true);
+    when(missionService.updateOwningOrgUnit(any(), any(), any())).thenReturn(new Mission());
+
+    mockMvc
+        .perform(
+            put("/api/v1/missions/{id}/owning-org-unit", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"owningOrgUnitId\": \"" + UUID.randomUUID() + "\", \"version\": 0}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void updateOwningOrgUnit_WhenNotAllowed_ShouldReturn403() throws Exception {
+    UUID missionId = UUID.randomUUID();
+
+    // canChangeOwner defaults to false (unstubbed): the owning-org-unit endpoint shares the
+    // owner-change gate, so a plain member is rejected before the service is reached.
+    mockMvc
+        .perform(
+            put("/api/v1/missions/{id}/owning-org-unit", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"owningOrgUnitId\": \"" + UUID.randomUUID() + "\", \"version\": 0}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void addManager_WithMissionManagerRole_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

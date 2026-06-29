@@ -40,6 +40,10 @@ import java.util.UUID;
  * (Partyleiter) — a registered user reference or a free-text handle, mutually exclusive — so the
  * detail template can render and edit it. {@code partyLeadVersion} is the dedicated section-scoped
  * optimistic-lock counter echoed back into the party-lead edit form.
+ *
+ * <p>{@code owningOrgUnitVersion} mirrors the backend's section-scoped optimistic-lock counter for
+ * the owning-org-unit reassignment control in the Verwaltung tab (REQ-ORG-018); the detail template
+ * pins it into the reassignment form so a concurrent change surfaces a 409.
  */
 public record MissionDto(
     UUID id,
@@ -71,6 +75,7 @@ public record MissionDto(
     Integer checkedInParticipants,
     Integer registeredParticipants,
     SquadronReferenceDto owningSquadron,
+    Long owningOrgUnitVersion,
     UserReferenceDto partyLeadUser,
     String partyLeadGuestName,
     Long partyLeadVersion,

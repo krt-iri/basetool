@@ -484,6 +484,9 @@ public class MissionPageController {
         } catch (Exception e) {
           log.warn("Could not load users for manager selection", e);
         }
+        // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
+        // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
+        model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
       }
 
       if (!model.containsAttribute("missionForm")) {
@@ -1416,6 +1419,7 @@ public class MissionPageController {
             null,
             null,
             null,
+            null,
             0L,
             java.util.List.of(),
             0L,
@@ -1894,6 +1898,50 @@ public class MissionPageController {
           userId,
           e.getMessage(),
           e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that reassigns a mission's owning org unit (REQ-ORG-018 / ADR-0050). Forwards the
+   * JSON body ({@code owningOrgUnitId} — possibly {@code null} for an ownerless leadership mission
+   * — plus the expected {@code version}, i.e. the mission's {@code owningOrgUnitVersion}) to the
+   * backend reassignment endpoint and passes the upstream RFC 7807 problem through on a 409 so the
+   * shared {@code krtFetch} conflict UX fires. The mission-detail page re-renders the {@code mgmt}
+   * fragment in place on success (no full reload).
+   *
+   * @param id mission id (path)
+   * @param body reassignment JSON: {@code owningOrgUnitId} (a UUID string, or blank/absent for
+   *     ownerless) plus {@code version}
+   * @return {@code 200} on success, or the upstream RFC 7807 error passed through
+   */
+  @PutMapping(
+      value = "/{id}/owning-org-unit/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> setMissionOwningOrgUnit(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+    try {
+      Map<String, Object> out = new HashMap<>();
+      Object owningOrgUnitId = body.get("owningOrgUnitId");
+      // Forward an explicit null for the ownerless target; a blank/empty string also means "none".
+      out.put(
+          "owningOrgUnitId",
+          (owningOrgUnitId != null && !String.valueOf(owningOrgUnitId).isBlank())
+              ? owningOrgUnitId
+              : null);
+      out.put("version", body.get("version") != null ? body.get("version") : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class, false);
+      MissionDto mission =
+          backendApiClient.get(
+              "/api/v1/missions/" + id, new ParameterizedTypeReference<MissionDto>() {}, false);
+      return org.springframework.http.ResponseEntity.ok(mission);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in setMissionOwningOrgUnit for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

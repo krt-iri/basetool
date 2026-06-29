@@ -8,7 +8,9 @@
 The home page (`/`) shows a **next mission** banner: the single upcoming mission whose planned start
 is the soonest still in the future. It is the viewer's at-a-glance "what is _my unit_ coming up
 against". The banner is guest-visible — anonymous visitors see only public missions; authenticated
-members also see internal ones.
+members also see internal ones. Alongside name, status and schedule it surfaces the mission's
+**owning org unit** (Staffel/SK/Bereich/OL, or "ownerless"), read from the same `owningSquadron`
+field as the mission list/detail; it is non-PII and shown to guests too.
 
 The banner must surface only missions that are still **operationally relevant**. A mission that has
 already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time (e.g. a

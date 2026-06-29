@@ -143,6 +143,17 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Long stepsVersion = 0L;
 
+  /**
+   * Section-scoped optimistic-lock counter for the owning-org-unit reassignment endpoint ({@link
+   * #owningOrgUnit}). Independent of the global {@link AbstractEntity#getVersion()} and marked
+   * {@code @OptimisticLock(excluded = true)} so re-homing the mission to a different org unit never
+   * invalidates another user's open core / schedule / flags form on the same mission. Two managers
+   * racing on the assignment surface a 409 against each other via this counter (REQ-ORG-018).
+   */
+  @Column(name = "owning_org_unit_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long owningOrgUnitVersion = 0L;
+
   @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
   @OptimisticLock(excluded = true)
   private Set<MissionParticipant> participants = new HashSet<>();
@@ -240,8 +251,12 @@ public class Mission extends AbstractEntity<UUID> {
   /**
    * Org-unit owner of this mission, or {@code null} for an <em>ownerless leadership mission</em>.
    * Set at creation time from the caller's active org-unit context (via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}) and immutable afterwards. Gates
-   * read/write access together with {@link #isInternal}:
+   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}). Since REQ-ORG-018 it is no longer
+   * immutable: the Verwaltung tab exposes a reassignment control that re-homes the mission to a
+   * different org unit (or to ownerless) through the dedicated {@code
+   * MissionService.updateOwningOrgUnit} endpoint, guarded by {@link #owningOrgUnitVersion} and the
+   * caller's assignable-org-unit scope. The change retroactively re-scopes read/write visibility
+   * per the gates below — see ADR-0050. Gates read/write access together with {@link #isInternal}:
    *
    * <ul>
    *   <li><b>Org-owned</b> (non-null): non-internal missions are visible across org units, internal

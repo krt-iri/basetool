@@ -200,6 +200,7 @@ public class AdminAuditLogPageController {
               "MISSION_FREQUENCY_CHANGED",
               "MISSION_FREQUENCY_REMOVED",
               "MISSION_OWNER_CHANGED",
+              "MISSION_OWNING_ORG_UNIT_CHANGED",
               "MISSION_PARTY_LEAD_CHANGED",
               "MISSION_MANAGER_ADDED",
               "MISSION_MANAGER_REMOVED",

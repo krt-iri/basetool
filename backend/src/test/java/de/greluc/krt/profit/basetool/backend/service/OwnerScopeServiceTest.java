@@ -70,6 +70,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Mockito unit tests for {@link OwnerScopeService}. Inherits the test scenarios that previously
@@ -2744,6 +2745,82 @@ class OwnerScopeServiceTest {
       ScopePredicate scope = service.currentUnitOverviewScope();
 
       assertTrue(scope.adminAllScope());
+    }
+  }
+
+  /**
+   * Tests for {@link OwnerScopeService#resolveReassignTargetOrgUnit(UUID)} — the assignable-target
+   * gate of the mission owning-org-unit reassignment (REQ-ORG-018 / ADR-0050): an admin assigns
+   * anywhere or to ownerless; a non-admin only to a direct membership / editable-scope unit, and to
+   * ownerless only when membershipless.
+   */
+  @Nested
+  class ResolveReassignTargetOrgUnit {
+
+    @Test
+    void admin_mayAssignToAnyExistingOrgUnit() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
+
+      assertSame(squadronA, service.resolveReassignTargetOrgUnit(SQUADRON_A_ID));
+    }
+
+    @Test
+    void admin_mayAssignOwnerless_returningNull() {
+      when(authHelper.isAdmin()).thenReturn(true);
+
+      assertNull(service.resolveReassignTargetOrgUnit(null));
+    }
+
+    @Test
+    void admin_unknownTarget_throwsBadRequest() {
+      UUID unknown = UUID.randomUUID();
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(orgUnitRepository.findById(unknown)).thenReturn(Optional.empty());
+
+      assertThrows(BadRequestException.class, () -> service.resolveReassignTargetOrgUnit(unknown));
+    }
+
+    @Test
+    void nonAdmin_mayAssignToOwnMembership() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+      when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
+
+      assertSame(squadronA, service.resolveReassignTargetOrgUnit(SQUADRON_A_ID));
+    }
+
+    @Test
+    void nonAdmin_targetOutsideScope_throwsAccessDenied() {
+      // Member of A only; target B is neither a membership nor within the editable (cascade) scope.
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertThrows(
+          AccessDeniedException.class, () -> service.resolveReassignTargetOrgUnit(SQUADRON_B_ID));
+    }
+
+    @Test
+    void nonAdminWithMembership_mayNotMakeOwnerless() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertThrows(AccessDeniedException.class, () -> service.resolveReassignTargetOrgUnit(null));
+    }
+
+    @Test
+    void membershiplessCaller_mayMakeOwnerless_returningNull() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of());
+
+      assertNull(service.resolveReassignTargetOrgUnit(null));
     }
   }
 }
