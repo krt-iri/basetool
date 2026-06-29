@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
@@ -380,6 +381,38 @@ public class InventoryItemController {
       return org.springframework.http.ResponseEntity.noContent().build();
     }
     return org.springframework.http.ResponseEntity.ok(result);
+  }
+
+  /**
+   * Rebooks (Umbuchung) part or all of an inventory row between the owner's personal pool and the
+   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007). The direction is
+   * inferred from the source row's current flag; the moved quantity is always inserted as a new row
+   * (append-only) and returned. Optimistic locking is enforced via the {@code version} field.
+   *
+   * @return the persisted new-row DTO
+   */
+  @Operation(
+      summary = "Rebook personal marker",
+      description =
+          "Splits part or all of an inventory row into a new row with the opposite personal"
+              + " marker (personal <-> shared squadron pool). Append-only; applies optimistic"
+              + " locking via the version field.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Rebooked; the new row is returned"),
+    @ApiResponse(responseCode = "400", description = "Invalid amount or assigned personal target"),
+    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(responseCode = "404", description = "Inventory item not found"),
+    @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
+  })
+  @PostMapping("/{id}/personal-rebook")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  public InventoryItemDto rebookPersonal(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryItemPersonalRebookDto dto) {
+    boolean isLogistician = authHelperService.isLogisticianOrAbove();
+    return inventoryItemService.rebookPersonal(
+        id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
   }
 
   /**

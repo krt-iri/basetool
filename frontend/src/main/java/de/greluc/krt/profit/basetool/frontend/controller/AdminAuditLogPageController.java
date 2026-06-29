@@ -125,6 +125,8 @@ public class AdminAuditLogPageController {
               "INVENTORY_ITEM_CONSUMED",
               "INVENTORY_ITEM_TRANSFERRED",
               "INVENTORY_ITEM_SOLD",
+              "INVENTORY_ITEM_DEPERSONALIZED",
+              "INVENTORY_ITEM_PERSONALIZED",
               "INVENTORY_ITEM_DELIVERY_TOGGLED",
               "INVENTORY_BULK_CHECKED_OUT",
               "INVENTORY_WIPED",

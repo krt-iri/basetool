@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
@@ -1109,6 +1110,135 @@ public class InventoryItemService {
               + " depleted="
               + rowDepleted);
     }
+  }
+
+  /**
+   * Rebooks (Umbuchung) part or all of an inventory row between the owner's personal pool and the
+   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007).
+   *
+   * <p>The direction is derived from the source row's current {@code personal} flag, never from the
+   * caller: a {@code personal = true} source is <em>de-personalized</em> (the moved quantity
+   * becomes shared squadron stock stamped on {@code dto.targetOwningOrgUnitId()}'s pool); a {@code
+   * personal = false} source is <em>personalized</em> (the moved quantity becomes the owner's
+   * private stock, carrying the source row's existing org-unit stamp over). Either way this is an
+   * append-only split mirroring the book-out {@code TRANSFER} branch: the moved {@code amount} is
+   * decremented off the source (the source row is deleted when it depletes below {@link
+   * #QUANTITY_EPSILON}) and inserted as its own new row with the opposite {@code personal} flag —
+   * never folded into an existing stack (REQ-INV-001).
+   *
+   * <p>The personalize direction refuses a source row bound to a job order or mission: a {@code
+   * personal = true} row may never carry either association (the invariant {@link
+   * #createInventoryItem} and {@link #updateInventoryItem} also enforce), and silently dropping the
+   * link would lose the assignment.
+   *
+   * @param id the source inventory row id
+   * @param dto the rebooking payload (amount, version, target org-unit pool)
+   * @param currentUserId the authenticated caller's user id
+   * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
+   * @return the persisted new-row DTO (the moved quantity in its new pool)
+   * @throws NotFoundException when the source row or the picked org unit is unknown
+   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, or
+   *     a personalize would violate the personal/association invariant
+   */
+  @Transactional
+  public InventoryItemDto rebookPersonal(
+      UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
+    InventoryItem item =
+        inventoryItemRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+
+    if (dto.version() != null
+        && item.getVersion() != null
+        && !item.getVersion().equals(dto.version())) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          InventoryItem.class, id);
+    }
+
+    if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
+      throw new AccessDeniedException("You are not allowed to rebook this inventory item");
+    }
+
+    if (dto.amount() == null || dto.amount() <= 0) {
+      throw new BadRequestException("Rebooked amount must be positive");
+    }
+    if (dto.amount() > item.getAmount()) {
+      throw new BadRequestException("Cannot rebook more than the available amount");
+    }
+
+    final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
+    final boolean targetPersonal = !sourcePersonal;
+
+    // Personalize (shared -> personal): a personal row may never carry a job order or mission, so
+    // refuse an assigned source rather than silently dropping the link.
+    if (targetPersonal && (item.getJobOrder() != null || item.getMission() != null)) {
+      throw new BadRequestException(
+          "Stock assigned to a job order or mission cannot be marked personal");
+    }
+
+    // De-personalize stamps the new shared row on the picked org-unit pool (validated against the
+    // owner's memberships); personalize carries the source row's existing stamp over to the private
+    // row (personal visibility is owner-scoped regardless of the stamp).
+    final OrgUnit targetOwningOrgUnit =
+        targetPersonal
+            ? item.getOwningOrgUnit()
+            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+                item.getUser(), dto.targetOwningOrgUnitId());
+
+    final double remainingAmount = roundAmount(item.getAmount() - dto.amount());
+    final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
+
+    // Snapshot the source row's scalar identity before any decrement/delete so the audit row stays
+    // accurate even when the source is depleted to zero and removed.
+    final UUID sourceId = item.getId();
+    final String sourceLabel = inventoryLabel(item);
+    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    final UUID ownerId = item.getUser().getId();
+
+    // Append-only: insert a new row for the moved quantity with the flipped personal flag; the
+    // grouped view collapses rows that share a stack identity for display (group-on-read), so no
+    // duplicate is visible and no read-add-write race exists. A personal target never carries a job
+    // order / mission association.
+    InventoryItem newItem = new InventoryItem();
+    newItem.setUser(item.getUser());
+    newItem.setOwningOrgUnit(targetOwningOrgUnit);
+    newItem.setMaterial(item.getMaterial());
+    newItem.setLocation(item.getLocation());
+    newItem.setQuality(item.getQuality());
+    newItem.setAmount(roundAmount(dto.amount()));
+    newItem.setPersonal(targetPersonal);
+    newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
+    newItem.setMission(targetPersonal ? null : item.getMission());
+    InventoryItem savedNew = inventoryItemRepository.save(newItem);
+
+    if (depleted) {
+      inventoryItemRepository.delete(item);
+    } else {
+      item.setAmount(remainingAmount);
+      // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
+      // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
+      inventoryItemRepository.saveAndFlush(item);
+    }
+
+    auditService.record(
+        targetPersonal
+            ? AuditEventType.INVENTORY_ITEM_PERSONALIZED
+            : AuditEventType.INVENTORY_ITEM_DEPERSONALIZED,
+        sourceId,
+        sourceLabel,
+        ownerId,
+        "material="
+            + materialName
+            + " amount="
+            + dto.amount()
+            + " newRow="
+            + newItem.getId()
+            + " targetOrgUnit="
+            + (targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
+            + " depleted="
+            + depleted);
+
+    return inventoryItemMapper.toDto(savedNew);
   }
 
   /**

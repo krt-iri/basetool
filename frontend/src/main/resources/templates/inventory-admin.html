@@ -322,41 +322,9 @@
                         <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
                     </label>
                     <label class="flex-gap-sm cursor-pointer">
-                        <input type="radio" th:field="*{type}" value="TRANSFER" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.transfer}">Umbuchung</span>
-                    </label>
-                    <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
                     </label>
                     <span id="sellNotPossibleReason" style="display:none; color: var(--color-warning); font-size: 0.8rem; align-self: center;" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
-                </div>
-            </div>
-            
-            <div id="transferFields" style="display:none; margin-bottom: 1rem;" class="form-group">
-                <div class="flex-gap-md">
-                    <div class="flex-1">
-                        <label for="targetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
-                        <select id="targetUserId" th:field="*{targetUserId}" data-trigger="inv-admin-target-user-changed" class="w-full">
-                            <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label for="targetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="targetLocationId" th:field="*{targetLocationId}" class="w-full">
-                            <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
-                        </select>
-                    </div>
-                </div>
-                <!-- R6.b target-OrgUnit picker (mirror of inventory-my.html's R5.d.g block).
-                     Hidden by default; populated dynamically by refreshTargetOwningOrgUnitPicker
-                     which fetches the destination user's memberships from
-                     /api/v1/users/{id}/memberships when the target-user select changes. Without
-                     this picker, an admin transfer to a multi-membership target user would fail
-                     OwnerScopeService's 0/1/>1 matrix with HTTP 400. -->
-                <div id="targetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
-                    <label for="targetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
-                    <select id="targetOwningOrgUnitId" th:field="*{targetOwningOrgUnitId}" class="w-full">
-                        <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
-                    </select>
                 </div>
             </div>
             
@@ -374,12 +342,72 @@
             </div>
             
             <div class="mt-2-flex-gap">
-                <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta" 
+                <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
-                        th:data-text-transfer="#{inventory.bookout.btn.transfer}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
                         th:text="#{inventory.bookout.submit}">Ausbuchen</button>
                 <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Umbuchen (rebooking) modal — the transfer (Ort/Nutzer) mode relocated out of the Ausbuchen
+     dialog so the two share the Lager's Umbuchen concept. The squadron-wide /all view rebooks only
+     between Ort/Nutzer/OrgUnit; the personal<->shared toggle lives on the owner-scoped /my view. -->
+<div id="umbuchenModal" class="modal" style="display:none;">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-admin-close-umbuchen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.rebook.title}">Umbuchen</h2>
+        <form id="umbuchenForm">
+            <input type="hidden" id="umbuchenVersion">
+            <input type="hidden" id="umbuchenMaxAmount">
+
+            <div class="form-group mb-1">
+                <label for="umbuchenTargetAmount" class="form-label">
+                    <span th:text="#{inventory.rebook.targetAmount}">Verbleibend</span>
+                    <th:block th:replace="~{fragments/scu-hint :: scuHint('umbuchen-target-scu-hint', true)}"></th:block>
+                </label>
+                <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="umbuchenTargetAmount" step="0.001" min="0" class="w-full" data-trigger="inv-admin-umbuchen-amount-from-target">
+            </div>
+
+            <div class="form-group mb-1">
+                <label for="umbuchenAmount" class="form-label">
+                    <span th:text="#{inventory.rebook.amount}">Menge umbuchen</span>
+                    <th:block th:replace="~{fragments/scu-hint :: scuHint('umbuchen-amount-scu-hint', true)}"></th:block>
+                </label>
+                <div class="flex-gap-sm">
+                    <input type="text" inputmode="decimal" data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-umbuchen-target-from-amount">
+                    <span id="umbuchenAmountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
+                </div>
+            </div>
+
+            <div id="umbuchenTransferFields" class="form-group" style="margin-bottom: 1rem;">
+                <div class="flex-gap-md">
+                    <div class="flex-1">
+                        <label for="umbuchenTargetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
+                        <select id="umbuchenTargetUserId" data-trigger="inv-admin-umbuchen-target-user-changed" class="w-full">
+                            <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="umbuchenTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
+                        <select id="umbuchenTargetLocationId" class="w-full">
+                            <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div id="umbuchenTargetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
+                    <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
+                    <select id="umbuchenTargetOwningOrgUnitId" class="w-full">
+                        <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-2-flex-gap">
+                <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
@@ -436,6 +464,11 @@
     var bookOutI18n = {
         success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
         error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags'
+    };
+    // Umbuchen (rebooking) modal strings — the /all view rebooks transfer-only.
+    var umbuchenI18n = {
+        success: /*[[#{success.inventory.rebook}]]*/ 'Eintrag erfolgreich umgebucht',
+        error: /*[[#{error.inventory.rebook.failed}]]*/ 'Fehler beim Umbuchen des Eintrags'
     };
 
     var noteI18n = {
@@ -969,77 +1002,11 @@
         }
     }
 
-    /**
-     * R6.b: re-populate the target-OrgUnit picker when the admin changes the destination user.
-     * Fetches the destination user's memberships from {@code GET /api/v1/users/{id}/memberships}
-     * on demand. Hides the picker wrapper when the destination user has ≤1 membership — at
-     * most one membership means there is no choice to offer, and {@code
-     * OwnerScopeService.resolveSquadronForPickerOutput} auto-stamps the single org unit. For
-     * multi-membership target users, surfaces the picker so the admin can pick the destination
-     * org unit (before R6.b this picker was missing, surfacing as a silent regression where
-     * admin transfers always landed in the target's home Staffel even when an SK was meant).
-     */
-    function refreshTargetOwningOrgUnitPicker() {
-        const wrapper = document.getElementById('targetOwningOrgUnitWrapper');
-        const select = document.getElementById('targetOwningOrgUnitId');
-        const userSelect = document.getElementById('targetUserId');
-        if (!wrapper || !select || !userSelect) return;
-        const targetUserId = userSelect.value;
-        while (select.options.length > 1) select.remove(1);
-        select.value = '';
-        if (!targetUserId) {
-            wrapper.style.display = 'none';
-            return;
-        }
-        fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
-            headers: { 'Accept': 'application/json' },
-            credentials: 'same-origin'
-        }).then(function (r) {
-            if (!r.ok) return [];
-            return r.json();
-        }).then(function (memberships) {
-            if (!Array.isArray(memberships) || memberships.length <= 1) {
-                wrapper.style.display = 'none';
-                return;
-            }
-            memberships.forEach(function (opt) {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            wrapper.style.display = 'block';
-        }).catch(function () {
-            wrapper.style.display = 'none';
-        });
-    }
-
     function toggleBookOutTypeFields() {
-        const typeDiscard = document.querySelector('input[name="type"][value="DISCARD"]').checked;
-        const typeTransfer = document.querySelector('input[name="type"][value="TRANSFER"]').checked;
         const typeSell = document.querySelector('input[name="type"][value="SELL"]').checked;
-        
-        const transferFields = document.getElementById('transferFields');
-        const targetUserId = document.getElementById('targetUserId');
-        const targetLocationId = document.getElementById('targetLocationId');
         const sellFields = document.getElementById('sellFields');
         const terminal = document.getElementById('terminal');
         const sellAmount = document.getElementById('sellAmount');
-        
-        if (typeTransfer) {
-            transferFields.style.display = 'block';
-            targetUserId.required = true;
-            targetLocationId.required = true;
-            // R6.b: when the admin flips into TRANSFER mode, refresh the OrgUnit picker against
-            // whatever user is currently selected (the form may have been pre-populated with a
-            // target user via the row's data-user-id attribute on the action button).
-            refreshTargetOwningOrgUnitPicker();
-        } else {
-            transferFields.style.display = 'none';
-            targetUserId.required = false;
-            targetLocationId.required = false;
-        }
-        
         if (typeSell) {
             sellFields.style.display = 'block';
             terminal.required = true;
@@ -1049,17 +1016,128 @@
             terminal.required = false;
             sellAmount.required = false;
         }
-        
         const submitBtn = document.getElementById('bookOutSubmitBtn');
         if (submitBtn) {
-            if (typeDiscard) {
-                submitBtn.textContent = submitBtn.getAttribute('data-text-discard');
-            } else if (typeTransfer) {
-                submitBtn.textContent = submitBtn.getAttribute('data-text-transfer');
-            } else if (typeSell) {
-                submitBtn.textContent = submitBtn.getAttribute('data-text-sell');
+            submitBtn.textContent = submitBtn.getAttribute(
+                typeSell ? 'data-text-sell' : 'data-text-discard');
+        }
+    }
+
+    // ===================== Umbuchen (rebooking) modal — transfer relocated from Ausbuchen =========
+    // The squadron-wide /all view rebooks only between Ort/Nutzer/OrgUnit (the former book-out
+    // TRANSFER); the personal<->shared toggle is owner-scoped and lives on /inventory/my.
+    var umbuchenItemId = null;
+    var umbuchenInFlight = false;
+
+    function updateUmbuchenAmountFromTarget() {
+        const targetEl = document.getElementById('umbuchenTargetAmount');
+        const amountEl = document.getElementById('umbuchenAmount');
+        const maxEl = document.getElementById('umbuchenMaxAmount');
+        if (targetEl && amountEl && maxEl) {
+            const target = window.krtScuInput.parse(targetEl.value);
+            const max = parseFloat(maxEl.value) || 0;
+            if (!isNaN(target)) {
+                amountEl.value = Number(Math.max(0, max - target).toFixed(3));
             }
         }
+    }
+
+    function updateUmbuchenTargetFromAmount() {
+        const targetEl = document.getElementById('umbuchenTargetAmount');
+        const amountEl = document.getElementById('umbuchenAmount');
+        const maxEl = document.getElementById('umbuchenMaxAmount');
+        if (targetEl && amountEl && maxEl) {
+            const amount = window.krtScuInput.parse(amountEl.value);
+            const max = parseFloat(maxEl.value) || 0;
+            if (!isNaN(amount)) {
+                targetEl.value = Number(Math.max(0, max - amount).toFixed(3));
+            }
+        }
+    }
+
+    function refreshUmbuchenTransferOrgUnitPicker() {
+        const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
+        const select = document.getElementById('umbuchenTargetOwningOrgUnitId');
+        const userSelect = document.getElementById('umbuchenTargetUserId');
+        if (!wrapper || !select || !userSelect) return;
+        const targetUserId = userSelect.value;
+        while (select.options.length > 1) select.remove(1);
+        select.value = '';
+        if (!targetUserId) { wrapper.style.display = 'none'; return; }
+        fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
+            headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+        }).then(function (r) { return r.ok ? r.json() : []; }).then(function (memberships) {
+            if (!Array.isArray(memberships) || memberships.length <= 1) { wrapper.style.display = 'none'; return; }
+            memberships.forEach(function (opt) {
+                const o = document.createElement('option');
+                o.value = opt.orgUnitId; o.textContent = opt.orgUnitName;
+                select.appendChild(o);
+            });
+            wrapper.style.display = 'block';
+        }).catch(function () { wrapper.style.display = 'none'; });
+    }
+
+    function openUmbuchenModal(id, amount, version, materialId, userId, locationId, quantityType) {
+        umbuchenItemId = id;
+        const isScu = quantityType !== 'PIECE';
+        const amountEl = document.getElementById('umbuchenAmount');
+        const targetEl = document.getElementById('umbuchenTargetAmount');
+        amountEl.setAttribute('step', isScu ? '0.001' : '1');
+        targetEl.setAttribute('step', isScu ? '0.001' : '1');
+        const targetHint = document.getElementById('umbuchen-target-scu-hint');
+        const amountHint = document.getElementById('umbuchen-amount-scu-hint');
+        if (targetHint) targetHint.style.display = isScu ? '' : 'none';
+        if (amountHint) amountHint.style.display = isScu ? '' : 'none';
+        amountEl.value = amount;
+        amountEl.max = amount;
+        targetEl.value = 0;
+        document.getElementById('umbuchenMaxAmount').value = amount;
+        document.getElementById('umbuchenVersion').value = version;
+        const amountOf = document.getElementById('umbuchenAmountOfText');
+        if (amountOf) amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
+        document.getElementById('umbuchenTargetUserId').value = userId;
+        document.getElementById('umbuchenTargetLocationId').value = locationId;
+        refreshUmbuchenTransferOrgUnitPicker();
+        document.getElementById('umbuchenModal').style.display = 'block';
+    }
+
+    function closeUmbuchenModal() {
+        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+        document.getElementById('umbuchenModal').style.display = 'none';
+    }
+
+    function submitUmbuchen(event) {
+        if (event && event.defaultPrevented) return;
+        if (event) event.preventDefault();
+        if (umbuchenInFlight || !window.krtFetch || !umbuchenItemId) return;
+        const amountEl = document.getElementById('umbuchenAmount');
+        const amount = window.krtScuInput ? window.krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
+        const submitBtn = document.getElementById('umbuchenSubmitBtn');
+        const payload = {
+            amount: amount,
+            type: 'TRANSFER',
+            targetUserId: document.getElementById('umbuchenTargetUserId').value || null,
+            targetLocationId: document.getElementById('umbuchenTargetLocationId').value || null,
+            targetOwningOrgUnitId: document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
+            version: parseInt(document.getElementById('umbuchenVersion').value, 10)
+        };
+        umbuchenInFlight = true;
+        if (submitBtn) submitBtn.disabled = true;
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/inventory/' + umbuchenItemId + '/transfer',
+            payload: payload,
+            successMessage: umbuchenI18n.success,
+            errorMessage: umbuchenI18n.error,
+            conflict: inventoryConflictI18n,
+            onSuccess: function () {
+                closeUmbuchenModal();
+                if (typeof filterInventory === 'function') filterInventory();
+            }
+        }).then(function () {
+            umbuchenInFlight = false;
+            if (submitBtn) submitBtn.disabled = false;
+        });
     }
 
     // The item id the open book-out modal targets; set when the modal opens, read by submitBookOut.
@@ -1090,15 +1168,14 @@
             ? window.krtScuInput.parse(amountEl.value)
             : parseFloat(amountEl.value);
         var sellAmountEl = document.getElementById('sellAmount');
+        // Ausbuchen now only discards or sells — the TRANSFER (Umbuchung) mode moved to the
+        // dedicated Umbuchen modal. The transfer-only fields stay null on the book-out payload.
         var payload = {
             amount: amount,
-            targetUserId: type === 'TRANSFER' ? (document.getElementById('targetUserId').value || null) : null,
-            targetLocationId: type === 'TRANSFER' ? (document.getElementById('targetLocationId').value || null) : null,
             type: type,
             terminal: type === 'SELL' ? (document.getElementById('terminal').value || null) : null,
             sellAmount: type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
-            version: parseInt(document.getElementById('version').value, 10),
-            targetOwningOrgUnitId: type === 'TRANSFER' ? (document.getElementById('targetOwningOrgUnitId').value || null) : null
+            version: parseInt(document.getElementById('version').value, 10)
         };
         var submitBtn = document.getElementById('bookOutSubmitBtn');
         bookOutInFlight = true;
@@ -1154,8 +1231,6 @@
         if (amountOfSpan) {
             amountOfSpan.textContent = amountOfSpan.getAttribute('data-template').replace('{0}', amount);
         }
-        document.getElementById('targetUserId').value = userId;
-        document.getElementById('targetLocationId').value = locationId;
         document.getElementById('version').value = version;
         document.querySelector('input[name="type"][value="DISCARD"]').checked = true;
         toggleBookOutTypeFields();
@@ -1402,13 +1477,26 @@
                 el.getAttribute('data-quantity-type')
             );
         });
+        window.krtEvents.on('click', 'inv-admin-umbuchen', function (el) {
+            openUmbuchenModal(
+                el.getAttribute('data-id'),
+                el.getAttribute('data-amount'),
+                el.getAttribute('data-version'),
+                el.getAttribute('data-material-id'),
+                el.getAttribute('data-user-id'),
+                el.getAttribute('data-location-id'),
+                el.getAttribute('data-quantity-type')
+            );
+        });
         window.krtEvents.on('click', 'inv-admin-open-note', function (el) { openNoteModal(el); });
         window.krtEvents.on('click', 'inv-admin-close-bookout', closeBookOutModal);
         window.krtEvents.on('input', 'inv-admin-amount-from-target', updateAmountFromTarget);
         window.krtEvents.on('input', 'inv-admin-target-from-amount', updateTargetFromAmount);
         window.krtEvents.on('change', 'inv-admin-toggle-bookout-type', toggleBookOutTypeFields);
-        // R6.b: refresh the OrgUnit picker whenever the admin picks a different target user.
-        window.krtEvents.on('change', 'inv-admin-target-user-changed', refreshTargetOwningOrgUnitPicker);
+        window.krtEvents.on('click', 'inv-admin-close-umbuchen', closeUmbuchenModal);
+        window.krtEvents.on('input', 'inv-admin-umbuchen-amount-from-target', updateUmbuchenAmountFromTarget);
+        window.krtEvents.on('input', 'inv-admin-umbuchen-target-from-amount', updateUmbuchenTargetFromAmount);
+        window.krtEvents.on('change', 'inv-admin-umbuchen-target-user-changed', refreshUmbuchenTransferOrgUnitPicker);
         window.krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);
         window.krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
         window.krtEvents.on('click', 'inv-admin-save-note', saveNote);
@@ -1420,6 +1508,10 @@
     var bookOutFormEl = document.getElementById('bookOutForm');
     if (bookOutFormEl) {
         bookOutFormEl.addEventListener('submit', submitBookOut);
+    }
+    var umbuchenFormEl = document.getElementById('umbuchenForm');
+    if (umbuchenFormEl) {
+        umbuchenFormEl.addEventListener('submit', submitUmbuchen);
     }
 </script>
 </body>

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Lager: persönlich markierte Einträge per „Umbuchen" ins gemeinsame Lager buchen (und zurück).** In „Mein Lager" gibt es je Eintrag die neue Aktion „Umbuchen" (Doppelpfeil-Symbol): eine Teilmenge oder der ganze Eintrag lässt sich aus dem persönlichen Bestand ins gemeinsame Staffel-/SK-Lager umbuchen (die Markierung „persönlich" entfällt, die Zielmenge wird einer Org-Einheit zugeordnet) und ebenso wieder als persönlich markieren. Die bisherige „Umbuchung" zu einem anderen Ort/Nutzer ist aus dem Ausbuchen-Dialog in denselben „Umbuchen"-Dialog gewandert; „Ausbuchen" bietet nur noch Einfache Ausbuchung und Verkauf.
+
 ## [v1.0.1](https://github.com/krt-profit/basetool/releases/tag/v1.0.1) - 2026-06-28
 
 ### Added
