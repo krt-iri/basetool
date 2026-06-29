@@ -29,7 +29,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param id the holder row's id
  * @param userId the linked basetool user, or {@code null} after user deletion
- * @param handle the deletion-proof handle snapshot
+ * @param handle the holder's display label — the linked user's live effective name (display name
+ *     preferred, username fallback), falling back to the deletion-proof handle snapshot once the
+ *     user is deleted (REQ-BANK-003)
  * @param active whether the holder accepts new incoming postings
  * @param totalHeld signed global sum the holder physically holds across the whole bank (may be
  *     negative)
