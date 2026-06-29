@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Deployment: Aktualisierungen der Infrastruktur-Container (Redis, NPM) und sonstige Compose-Änderungen werden jetzt automatisch ausgerollt.** Die Compose-Datei samt Wartungsseite und Keycloak-Theme wird als signiertes, versioniertes `basetool-config`-Artefakt zusammen mit den App-Images promotet und vom Server über denselben Pull-Kanal angewendet — kein manuelles Kopieren der Compose-Datei und kein händisches `docker compose up -d` mehr. Änderungen am Postgres- oder Keycloak-Image bleiben bewusst manuell (zustandsbehaftete Upgrades). Details: `docs/deployment.md`, ADR-0049, REQ-OPS-001..006.
+
 ## [v1.0.1](https://github.com/krt-profit/basetool/releases/tag/v1.0.1) - 2026-06-28
 
 ### Added

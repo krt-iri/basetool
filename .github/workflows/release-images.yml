@@ -1,6 +1,9 @@
 name: Release Images
 
-# Build, scan, sign and push the backend + frontend production images to GHCR.
+# Build, scan, sign and push the backend + frontend + ingest production images
+# to GHCR, plus the `basetool-config` host-configuration bundle (the compose
+# file + maintenance page + Keycloak theme) as a signed, promotable artifact the
+# server pulls through the same channel (see docs/deployment.md, ADR-0049).
 #
 # Trigger model:
 #   - push to main           -> rolling :edge tag plus an immutable :sha-<short>
@@ -405,6 +408,136 @@ jobs:
       - name: Sign image (keyless / OIDC)
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.inspect.outputs.digest }}
+        run: |
+          set -eu
+          attempts=5
+          delay=10
+          for i in $(seq 1 "$attempts"); do
+            if cosign sign --yes "$IMAGE"; then
+              exit 0
+            fi
+            if [ "$i" -lt "$attempts" ]; then
+              echo "::warning::cosign sign attempt ${i}/${attempts} failed; retrying in ${delay}s" >&2
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
+          echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
+          exit 1
+
+  # The host-configuration bundle: a `FROM scratch` image (docker/config/Dockerfile)
+  # carrying only the compose file + the bind-mounted maintenance/theme trees. It
+  # is NOT arch-specific (no executables, just files), but is built multi-arch for
+  # parity so `docker create`/`docker cp` on either host architecture resolves a
+  # matching child. No Trivy scan (a scratch image has no OS packages to flag).
+  # Same tag scheme + same cosign keyless signature as the app images, so
+  # promote.yml flips it to :stable through the identical verify-and-retag path.
+  build-config:
+    name: Build & sign config bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata (tags + OCI labels)
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config
+          # Identical tag scheme to the app images (merge job) so a release's
+          # config bundle is addressable as :1.4.3 and promotable to :stable.
+          tags: |
+            type=edge,branch=main
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+          labels: |
+            org.opencontainers.image.title=basetool-config
+            org.opencontainers.image.description=Profit Basetool host configuration bundle (compose + maintenance page + Keycloak theme)
+            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
+            org.opencontainers.image.licenses=GPL-3.0-only
+
+      - name: Build & push config bundle (multi-arch)
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: docker/config/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
+          # Parity with the app images: a max-mode SLSA provenance + SPDX SBOM so
+          # an auditor can prove which commit produced this exact config bundle.
+          provenance: mode=max
+          sbom: true
+
+      # Defence in depth on top of the Dockerfile's COPY allowlist and
+      # .dockerignore: pull the pushed bundle back and FAIL the release if any
+      # secret-shaped file slipped in (e.g. a future Dockerfile edit widening the
+      # COPY). The scratch image has no entrypoint, so `docker create` needs a
+      # placeholder argument; the container is never started.
+      - name: Assert config bundle carries no host secrets
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config:${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          cid=$(docker create "$IMAGE" /bundle)
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          rm -rf /tmp/config-bundle && mkdir -p /tmp/config-bundle
+          docker cp "$cid:/config/." /tmp/config-bundle/
+          if find /tmp/config-bundle \
+               \( -name '.env' -o -name '*.p12' -o -name '*.jks' \
+                  -o -name '*.pem' -o -name '*.key' -o -name 'realm-export.json' \) \
+               -print | grep -q .; then
+            echo "::error::config bundle contains a forbidden secret-shaped file:" >&2
+            find /tmp/config-bundle \
+              \( -name '.env' -o -name '*.p12' -o -name '*.jks' \
+                 -o -name '*.pem' -o -name '*.key' -o -name 'realm-export.json' \) -print >&2
+            exit 1
+          fi
+          test -f /tmp/config-bundle/docker-compose.yml \
+            || { echo "::error::config bundle is missing docker-compose.yml" >&2; exit 1; }
+          echo "config bundle OK: no secrets present, docker-compose.yml present"
+
+      - name: Inspect pushed manifest
+        id: inspect
+        run: |
+          set -eu
+          digest=$(docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config:${{ steps.meta.outputs.version }}" \
+            --format '{{.Manifest.Digest}}')
+          if [ -z "$digest" ]; then
+            echo "::error::could not resolve config manifest digest" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Same keyless signature + retry rationale as the app-image sign step. The
+      # signature is pinned to the manifest digest, so the later :stable
+      # promotion (promote.yml) is covered without a re-sign.
+      - name: Sign config bundle (keyless / OIDC)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config@${{ steps.inspect.outputs.digest }}
         run: |
           set -eu
           attempts=5
