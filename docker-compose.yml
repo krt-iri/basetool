@@ -224,7 +224,7 @@ x-backend: &backend-template
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect redis:8-alpine`.
-  image: redis:8-alpine@sha256:09160599abd229764c0fb44cb6be640294e1d360a54b19985ab4843dcf2d90f1
+  image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
   # Lightweight RDB persistence (re-enabled 2026-06 for the 30-day session
   # goal). M-7 had turned all persistence off (`--save "" --appendonly no`) on
   # the premise that a Redis restart only drops Spring Sessions, which
