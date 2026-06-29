@@ -22,9 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * Frontend mirror of the current in-game transfer-fee rate (ADR-0041, REQ-BANK-033). The bank
- * booking pages fetch it and expose it to {@code bank.js} so the withdraw / transfer / Umbuchung
- * modals show a live "Gebühr / kommt an" preview as the staffer types the amount.
+ * Frontend mirror of the current in-game transfer-fee rate (ADR-0052, REQ-BANK-033). The
+ * account-detail page fetches it and exposes it to {@code bank.js} so the withdraw / transfer
+ * modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited) as the staffer
+ * types the amount; the fee-free holder-to-holder Umbuchung modal has no such preview.
  *
  * @param rate the fee rate as a fraction in {@code [0, 1)} (e.g. {@code 0.005} = 0.5%)
  */

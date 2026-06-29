@@ -140,11 +140,11 @@ public class BankLedgerService {
    * no-overdraft rule at <strong>account</strong> level only (REQ-BANK-006) — the holder may go
    * negative.
    *
-   * <p>The entered amount is the <strong>gross</strong> the holder sends and is debited in full
-   * from the account and the holder's stash; the in-game transfer fee (ADR-0041, REQ-BANK-033) is
-   * carved out and recorded on the header, so the external recipient receives the net (gross −
-   * fee). The holder is thus not out of pocket — the fee is borne by what is paid out, not by their
-   * private money.
+   * <p>The entered amount is what the external recipient must <strong>receive</strong>; the in-game
+   * transfer fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on top and the account and
+   * holder's stash are debited the gross ({@code amount + fee}). The overdraft guard runs against
+   * that gross, so the account may not be driven negative by the fee. The holder is thus not out of
+   * pocket — the fee is borne by the debited account, not by their private money.
    *
    * @param request validated withdrawal payload
    * @return acknowledgement of the created transaction
@@ -156,20 +156,22 @@ public class BankLedgerService {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
-    requireAccountCoverage(account, request.amount());
 
     BigDecimal fee = transferFeeService.feeOn(request.amount());
+    BigDecimal debit = transferFeeService.totalDebit(request.amount());
+    requireAccountCoverage(account, debit);
+
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(BankTransactionType.WITHDRAWAL, request.note(), null, fee, now);
-    persistAccountPosting(tx, account, request.amount().negate(), now);
-    persistHolderPosting(tx, holder, request.amount().negate(), now);
+    persistAccountPosting(tx, account, debit.negate(), now);
+    persistHolderPosting(tx, holder, debit.negate(), now);
     bankAuditService.record(
         BankAuditEventType.WITHDRAWAL_BOOKED,
         account.getId(),
         tx.getId(),
         null,
-        "-" + request.amount().toPlainString() + " aUEC @" + holder.getHandle() + feeDetail(fee));
+        "-" + plain(debit) + " aUEC @" + holder.getHandle() + feeDetail(fee));
     return toDto(tx);
   }
 
@@ -182,11 +184,12 @@ public class BankLedgerService {
    * overdraft; the holder dimension is not (ADR-0039).
    *
    * <p>When the custody actually changes hands (source holder ≠ destination holder), a real in-game
-   * transfer happens, so the in-game fee (ADR-0041, REQ-BANK-033) is carved out: the source account
-   * and holder are debited the full (gross) amount, while the destination account and holder are
-   * credited the net (gross − fee) — the money that actually arrives is smaller. A same-holder
-   * transfer moves no money in-game (the holder merely re-labels which account owns it), so it is
-   * fee-free and both legs net to zero as before.
+   * transfer happens, so the in-game fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on
+   * top: the source account and holder are debited the gross ({@code amount + fee}), while the
+   * destination account and holder are credited the full entered amount — the money that arrives
+   * equals what was requested, the fee is borne by the source. The source overdraft guard runs
+   * against the gross. A same-holder transfer moves no money in-game (the holder merely re-labels
+   * which account owns it), so it is fee-free and both legs net to zero as before.
    *
    * @param request validated transfer payload (source and destination accounts must differ)
    * @param destinationVisible whether the caller may see the destination account (pre-computed by
@@ -225,28 +228,31 @@ public class BankLedgerService {
     final BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
     requireActiveHolder(destinationHolder);
-    requireAccountCoverage(source, request.amount());
 
     // Custody only physically moves — and thus incurs the in-game fee — when source and destination
-    // holders differ; a same-holder transfer is a pure re-label (fee-free, net = gross). The
-    // destination side is credited the net so the money that actually arrives reflects the fee.
+    // holders differ; a same-holder transfer is a pure re-label (fee-free, debit = amount). When
+    // the
+    // holder changes the fee is added on top: the source is debited the gross (amount + fee) while
+    // the destination is credited the full entered amount (ADR-0052). The overdraft guard runs
+    // against the gross so the fee can never drive the source account negative.
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
     BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
-    BigDecimal netToDestination = request.amount().subtract(fee);
+    BigDecimal debit = request.amount().add(fee);
+    requireAccountCoverage(source, debit);
 
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now);
-    persistAccountPosting(tx, source, request.amount().negate(), now);
-    persistAccountPosting(tx, destination, netToDestination, now);
-    persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
-    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    persistAccountPosting(tx, source, debit.negate(), now);
+    persistAccountPosting(tx, destination, request.amount(), now);
+    persistHolderPosting(tx, sourceHolder, debit.negate(), now);
+    persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.TRANSFER_BOOKED,
         source.getId(),
         tx.getId(),
         null,
-        request.amount().toPlainString()
+        plain(debit)
             + " aUEC -> "
             + destination.getAccountNo()
             + " ("
@@ -264,11 +270,13 @@ public class BankLedgerService {
    * staff stay payout-capable. The source holder may go negative; the active flag is ignored in
    * both directions so a deactivated holder's residual can be reconciled to zero.
    *
-   * <p>Because a holder physically sends the money in-game, the in-game fee (ADR-0041,
-   * REQ-BANK-033) is carved out: the source holder is debited the full (gross) amount, the
-   * destination holder is credited the net (gross − fee). The fee is real money lost to the game,
-   * so the two holder legs net to {@code -fee} (REQ-BANK-020 integrity widened accordingly);
-   * neither holder is out of pocket since each books exactly what they physically sent / received.
+   * <p>This Umbuchung is <strong>fee-free</strong> (ADR-0052): the holders are bank staff
+   * reconciling their physically-held stashes among themselves, and they bear any in-game transfer
+   * fee on such an internal move <em>personally</em> — it is not the bank's concern. So the source
+   * holder is debited exactly the entered amount, the destination credited the same, the header
+   * carries no {@code transfer_fee}, and the two holder legs net to zero. The in-game fee on a
+   * customer-facing payout or holder-changing account transfer is modelled there (REQ-BANK-033),
+   * not here.
    *
    * @param request validated holder-transfer payload (source and destination holders must differ)
    * @return acknowledgement of the created transaction
@@ -285,24 +293,22 @@ public class BankLedgerService {
     BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
 
-    BigDecimal fee = transferFeeService.feeOn(request.amount());
-    BigDecimal netToDestination = request.amount().subtract(fee);
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.HOLDER_TRANSFER, request.note(), null, fee, now);
+        persistTransaction(
+            BankTransactionType.HOLDER_TRANSFER, request.note(), null, BigDecimal.ZERO, now);
     persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
-    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.HOLDER_TRANSFER,
         null,
         tx.getId(),
         null,
-        request.amount().toPlainString()
+        plain(request.amount())
             + " aUEC "
             + sourceHolder.getHandle()
             + " -> "
-            + destinationHolder.getHandle()
-            + feeDetail(fee));
+            + destinationHolder.getHandle());
     return toDto(tx);
   }
 
@@ -369,9 +375,12 @@ public class BankLedgerService {
     }
 
     Instant now = Instant.now();
-    // A reversal negates the original's actual recorded legs (the destination leg is already net),
-    // so the pair cancels exactly per account/holder and the reversal itself carries no new fee
-    // (ADR-0041): the in-game money was already moved; this is a bookkeeping correction.
+    // A reversal negates the original's actual recorded legs (source leg = the gross debited,
+    // destination leg = the amount that arrived), so the pair cancels exactly per account/holder
+    // and
+    // the reversal itself carries no new fee (ADR-0052): the in-game money was already moved; this
+    // is
+    // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
         persistTransaction(BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now);
     for (BankCounterLeg leg : accountLegs) {
@@ -586,10 +595,10 @@ public class BankLedgerService {
   }
 
   /**
-   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0041): {@code " (fee N
+   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0052): {@code " (fee N
    * aUEC)"} when the fee is positive, empty otherwise. No PII — only the numeric fee.
    *
-   * @param fee the carved-out transfer fee
+   * @param fee the on-top transfer fee borne by the debited source
    * @return the fee suffix, or an empty string when there is no fee
    */
   private static String feeDetail(@NotNull BigDecimal fee) {
@@ -602,8 +611,8 @@ public class BankLedgerService {
    * @param type the transaction type
    * @param note optional free-text note
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
-   * @param fee the in-game transfer fee carved out of the gross (ADR-0041); {@link BigDecimal#ZERO}
-   *     for non-fee transactions
+   * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
+   *     BigDecimal#ZERO} for non-fee transactions
    * @param now the shared booking instant
    * @return the persisted header
    */

@@ -166,9 +166,9 @@ public class BankPageController {
       users = lookup == null ? List.<UserReferenceDto>of() : lookup;
     }
     model.addAttribute("users", users);
-    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) drives the live "Gebühr / kommt an"
-    // preview in the withdraw/transfer modals (bank.js). It rides on <main>, which survives the
-    // accountBody swap, so it is fetched once on the full-page render.
+    // The in-game transfer-fee rate (ADR-0052, REQ-BANK-033) drives the live "Gebühr / wird
+    // abgebucht" preview in the withdraw/transfer modals (bank.js). It rides on <main>, which
+    // survives the accountBody swap, so it is fetched once on the full-page render.
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("accountBody".equals(fragment)) {
       return "bank-account-detail :: accountBody";
@@ -299,7 +299,7 @@ public class BankPageController {
   }
 
   /**
-   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0041,
+   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0052,
    * REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO} so the page
    * still renders (the preview then simply shows no fee). The authoritative fee is always computed
    * server-side at booking time.

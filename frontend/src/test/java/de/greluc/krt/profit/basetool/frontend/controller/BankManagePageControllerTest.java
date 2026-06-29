@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -30,7 +31,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
@@ -106,9 +106,6 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
     when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
-        .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
 
     // When
     String view =
@@ -117,8 +114,9 @@ class BankManagePageControllerTest {
     // Then
     assertEquals("bank-manage", view);
     assertEquals("konten", model.getAttribute("activeTab"));
-    // The transfer-fee rate feeds the holder→holder Umbuchung modal's live preview (REQ-BANK-033).
-    assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
+    // The holder→holder Umbuchung is fee-free (REQ-BANK-031, ADR-0052), so this page fetches no
+    // transfer-fee rate and exposes no transferFeeRate attribute.
+    assertNull(model.getAttribute("transferFeeRate"));
     List<BankAccountDto> accounts = (List<BankAccountDto>) model.getAttribute("accounts");
     assertNotNull(accounts);
     assertEquals(1, accounts.size());
