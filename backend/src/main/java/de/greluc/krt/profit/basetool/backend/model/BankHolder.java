@@ -33,6 +33,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -97,4 +98,22 @@ public class BankHolder extends AbstractEntity<UUID> {
    */
   @Column(name = "role_managed", nullable = false)
   private boolean roleManaged = false;
+
+  /**
+   * The holder's current display label for every bank surface (REQ-BANK-003): the linked user's
+   * <em>live</em> effective name — their display name, or their username when no display name is
+   * set — while the user still exists, falling back to the frozen {@link #handle} snapshot only
+   * once the user was deleted ({@code user_id} set to NULL). Preferring the live name means the
+   * Halter views, holder selects, custody history and statements always show the user's current
+   * Anzeigename rather than the value captured at registration time, while the deletion-proof
+   * snapshot keeps a deleted user's rows readable. Must be read inside an open persistence context
+   * so the lazy {@link #user} proxy can initialise (callers fetch-join or operate within a
+   * transaction).
+   *
+   * @return the linked user's current effective name, or the {@link #handle} snapshot when the user
+   *     is gone
+   */
+  public @NotNull String getDisplayName() {
+    return user != null ? user.getEffectiveName() : handle;
+  }
 }

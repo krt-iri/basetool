@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -52,6 +53,25 @@ class BankManagePageControllerTest {
   private static Authentication management() {
     return new TestingAuthenticationToken(
         "mgmt", "pw", "ROLE_BANK_EMPLOYEE", "ROLE_BANK_MANAGEMENT");
+  }
+
+  /** A plain bank-employee authentication (no management role) — the self-link perspective. */
+  private static Authentication employee() {
+    return new TestingAuthenticationToken("emp", "pw", "ROLE_BANK_EMPLOYEE");
+  }
+
+  /**
+   * An OIDC principal whose {@code sub} is the given value. The frontend deliberately exposes the
+   * username as {@link Authentication#getName()} (user-name-attribute = preferred_username), so the
+   * holder self-link must read the {@code sub} from the principal, never the authentication name.
+   *
+   * @param sub the Keycloak subject (UUID) to expose via {@link OidcUser#getSubject()}
+   * @return a mock OIDC user returning {@code sub} as its subject
+   */
+  private static OidcUser oidcUser(String sub) {
+    OidcUser principal = mock(OidcUser.class);
+    when(principal.getSubject()).thenReturn(sub);
+    return principal;
   }
 
   @Test
@@ -88,7 +108,8 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
 
     // When
-    String view = controller.manage(null, null, management(), model);
+    String view =
+        controller.manage(null, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -114,7 +135,9 @@ class BankManagePageControllerTest {
         .thenReturn(null);
 
     // When
-    String view = controller.manage("HALTER", null, management(), model);
+    String view =
+        controller.manage(
+            "HALTER", null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -141,7 +164,9 @@ class BankManagePageControllerTest {
         .thenReturn(List.of());
 
     // When
-    String view = controller.manage("halter", "manageBody", management(), model);
+    String view =
+        controller.manage(
+            "halter", "manageBody", management(), oidcUser(UUID.randomUUID().toString()), model);
 
     // Then
     assertEquals("bank-manage :: manageBody", view);
@@ -153,5 +178,33 @@ class BankManagePageControllerTest {
         .get(eq("/api/v1/org-units/active"), any(ParameterizedTypeReference.class));
     verify(backendApiClient, never())
         .get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
+  }
+
+  // Regression for the holder self-link bug (#876 follow-up): a plain bank employee never saw the
+  // link to their own holder because the controller exposed authentication.getName() (the
+  // preferred_username) as selfUserId while the template compares it against the holder's userId
+  // (== app_user.id == the OIDC sub). The selfUserId attribute must carry the principal's sub, not
+  // the username — same carve-out as MissionPageController#authUserId (REQ-BANK-032).
+  @Test
+  void manage_ShouldExposeOidcSubjectAsSelfUserId_NotPreferredUsername() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    String sub = "33333333-3333-3333-3333-333333333333";
+    BankHolderDto ownHolder =
+        new BankHolderDto(
+            UUID.randomUUID(), UUID.fromString(sub), "emp", true, BigDecimal.ZERO, false, 0L);
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(ownHolder));
+
+    // When — the employee's principal carries the sub; getName() ("emp") deliberately differs.
+    controller.manage("halter", null, employee(), oidcUser(sub), model);
+
+    // Then — selfUserId is the sub (matches the holder's userId), never the preferred_username.
+    assertEquals(sub, model.getAttribute("selfUserId"));
   }
 }

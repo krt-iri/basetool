@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,20 +72,25 @@ public class BankHolderService {
   private final BankAuditService bankAuditService;
 
   /**
-   * The full registry, ordered by handle, with the global custody totals joined in from one grouped
-   * statement over the holder ledger (W1 "Halter" tab, no N+1, ADR-0039).
+   * The full registry, ordered by the holders' live display name, with the global custody totals
+   * joined in from one grouped statement over the holder ledger (W1 "Halter" tab, no N+1,
+   * ADR-0039). The linked users are fetch-joined so the mapper resolves each holder's current
+   * display name (display name preferred, username fallback, REQ-BANK-003) without a per-row user
+   * load; the result is sorted on that live name (the stored {@code handle} snapshot order would
+   * drift from what is shown once a user renamed themselves).
    *
-   * @return every holder row as DTO
+   * @return every holder row as DTO, ordered case-insensitively by the shown display name
    */
   public List<BankHolderDto> getHolders() {
     Map<UUID, BigDecimal> totals =
         holderPostingRepository.holderTotals().stream()
             .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
-    return holderRepository.findAllByOrderByHandleAsc().stream()
+    return holderRepository.findAllWithUser().stream()
         .map(
             holder ->
                 bankHolderMapper.toDto(
                     holder, totals.getOrDefault(holder.getId(), BigDecimal.ZERO)))
+        .sorted(Comparator.comparing(BankHolderDto::handle, String.CASE_INSENSITIVE_ORDER))
         .toList();
   }
 

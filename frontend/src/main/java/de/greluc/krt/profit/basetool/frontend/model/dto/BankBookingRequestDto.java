@@ -41,7 +41,8 @@ import org.jetbrains.annotations.Nullable;
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
- * @param holderHandle the recorded holder's handle, or {@code null} while not confirmed
+ * @param holderHandle the recorded holder's display name (live effective name, snapshot fallback
+ *     when the user is gone, REQ-BANK-003), or {@code null} while not confirmed
  * @param resultingTransactionId the booked ledger transaction id, or {@code null} while not
  *     confirmed
  * @param deciderHandle the deciding bank employee's handle, or {@code null} while pending/cancelled

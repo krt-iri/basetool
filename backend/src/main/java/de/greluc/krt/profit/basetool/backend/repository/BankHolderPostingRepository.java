@@ -47,14 +47,21 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   /**
    * Per-holder global totals across the whole bank in one grouped statement — the "Haelt gesamt"
    * column of the holder registry (W1 mockup) and the management report's global holder section,
-   * without an N+1. Holders without any leg produce no row (treat as zero).
+   * without an N+1. The holder label is the linked user's <em>live</em> effective name (display
+   * name preferred, username fallback, resolved via the left-joined user), falling back to the
+   * {@code handle} snapshot once the user is gone (REQ-BANK-003). Holders without any leg produce
+   * no row (treat as zero).
    *
-   * @return per-holder global totals
+   * @return per-holder global totals with the live display label
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance("
-          + "h.id, h.handle, h.active, SUM(p.amount))"
-          + " FROM BankHolderPosting p JOIN p.holder h GROUP BY h.id, h.handle, h.active")
+          + "h.id,"
+          + " CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''"
+          + " THEN u.displayName ELSE COALESCE(u.username, h.handle) END,"
+          + " h.active, SUM(p.amount))"
+          + " FROM BankHolderPosting p JOIN p.holder h LEFT JOIN h.user u"
+          + " GROUP BY h.id, h.active, h.handle, u.displayName, u.username")
   List<BankHolderBalance> holderTotals();
 
   /**
@@ -79,15 +86,22 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   /**
    * The holder legs of the given transactions with their holder labels, batched in one IN-query —
    * the per-booking holder annotation for the account history/statement (matched to the account leg
-   * by amount sign) and the negated holder-side mirror of a reversal (ADR-0039).
+   * by amount sign) and the negated holder-side mirror of a reversal (ADR-0039). The label is the
+   * linked user's <em>live</em> effective name (display name preferred, username fallback, via the
+   * left-joined user), falling back to the {@code handle} snapshot once the user is gone
+   * (REQ-BANK-003).
    *
    * @param transactionIds the batch of transaction ids
-   * @return every holder leg of the given transactions
+   * @return every holder leg of the given transactions with the live display label
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg("
-          + "t.id, h.id, h.handle, p.amount)"
+          + "t.id, h.id,"
+          + " CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''"
+          + " THEN u.displayName ELSE COALESCE(u.username, h.handle) END,"
+          + " p.amount)"
           + " FROM BankHolderPosting p JOIN p.transaction t JOIN p.holder h"
+          + " LEFT JOIN h.user u"
           + " WHERE t.id IN :transactionIds")
   List<BankHolderLeg> findHolderLegsByTransactionIds(
       @Param("transactionIds") Collection<UUID> transactionIds);

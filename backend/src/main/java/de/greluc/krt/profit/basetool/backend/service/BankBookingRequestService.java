@@ -683,7 +683,7 @@ public class BankBookingRequestService {
         request.getStatus(),
         request.getRequesterHandle(),
         holder == null ? null : holder.getId(),
-        holder == null ? null : holder.getHandle(),
+        holder == null ? null : holder.getDisplayName(),
         transaction == null ? null : transaction.getId(),
         request.getDeciderHandle(),
         request.getRejectReason(),

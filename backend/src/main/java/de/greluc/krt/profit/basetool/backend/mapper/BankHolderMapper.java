@@ -36,15 +36,18 @@ public interface BankHolderMapper {
   /**
    * Maps one holder row plus its externally computed global custody total to the response DTO. The
    * {@code userId} resolves through the lazy {@code user} proxy without initialising it (id-only
-   * access); {@code roleManaged} comes straight off the entity.
+   * access); {@code roleManaged} comes straight off the entity. The DTO {@code handle} carries the
+   * holder's <em>live</em> display label ({@link BankHolder#getDisplayName()}: the linked user's
+   * current effective name, snapshot fallback when the user is gone, REQ-BANK-003), so callers must
+   * have the {@code user} proxy available (fetch-join or open transaction) to avoid an N+1.
    *
-   * @param holder the holder entity
+   * @param holder the holder entity, with its {@code user} association reachable
    * @param totalHeld signed global sum the holder physically holds across the whole bank
    * @return the response DTO
    */
   @Mapping(target = "id", source = "holder.id")
   @Mapping(target = "userId", source = "holder.user.id")
-  @Mapping(target = "handle", source = "holder.handle")
+  @Mapping(target = "handle", source = "holder.displayName")
   @Mapping(target = "active", source = "holder.active")
   @Mapping(target = "roleManaged", source = "holder.roleManaged")
   @Mapping(target = "version", source = "holder.version")

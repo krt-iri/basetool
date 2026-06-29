@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -54,11 +55,17 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
   boolean existsByUserId(UUID userId);
 
   /**
-   * The full registry ordered by handle for the management "Halter" tab (W1 mockup).
+   * The full registry with each holder's linked {@code user} fetch-joined in one statement — the
+   * management "Halter" tab (W1 mockup) and every holder-select dropdown. The user is eager-loaded
+   * (LEFT JOIN, {@code null} for a deleted user) so the mapper can resolve the holder's live
+   * display name ({@link BankHolder#getDisplayName()}, REQ-BANK-003) without an N+1; the service
+   * sorts the mapped rows by that live name (the stored {@code handle} order would no longer match
+   * what is shown once a user renamed themselves).
    *
-   * @return every holder row, ordered by handle
+   * @return every holder row with its {@code user} association initialised
    */
-  List<BankHolder> findAllByOrderByHandleAsc();
+  @Query("SELECT h FROM BankHolder h LEFT JOIN FETCH h.user")
+  List<BankHolder> findAllWithUser();
 
   /**
    * The holder rows linked to any of the given users — the batch lookup of the auto-registration
