@@ -55,6 +55,14 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
+  # Infra image pins (redis/postgres/keycloak/npm) in docker-compose.yml. Once a
+  # bump PR is merged and a release is cut + promoted, the new compose ships to
+  # prod automatically as part of the `basetool-config` artifact (no manual
+  # `cp docker-compose.yml` / `docker compose up -d`); deploy.sh recreates the
+  # affected container, except a postgres/Keycloak image change, which stays
+  # operator-gated. See docs/deployment.md and docs/adr/0049-*. The config
+  # bundle's Dockerfile is `FROM scratch` (no base image), so it needs no Docker
+  # ecosystem entry of its own.
   - package-ecosystem: docker-compose
     directory: /
     schedule:

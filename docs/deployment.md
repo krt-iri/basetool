@@ -12,12 +12,13 @@ Production deployment runs as a closed loop between three actors:
 │    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
 │      build  + push           │       │    basetool-frontend:1.4.2 │
 │      scan   (Trivy SARIF)    │       │    basetool-ingest:1.4.2   │
-│      sign   (cosign keyless) │       │      ... :latest, :edge,   │
+│      sign   (cosign keyless) │       │    basetool-config:1.4.2   │
+│                              │       │      ... :latest, :edge,   │
 │                              │       │      :sha-abc1234, :stable │
 │                              │       │                            │
 │  .github/workflows/          │       │                            │
-│    promote.yml      ─────────┼──────►│    (re-tags an existing    │
-│      manual dispatch         │       │     digest to :stable)     │
+│    promote.yml      ─────────┼──────►│    (re-tags app images +   │
+│      manual dispatch         │       │     config to :stable)     │
 └──────────────────────────────┘       └────────────────────┬───────┘
                                                             │
                                                             │ docker pull
@@ -61,6 +62,19 @@ tags (`:1.4.2`, `:latest`, `:edge`, `:sha-abc1234`) on every main push and
 git tag. None of those flips the `:stable` pointer that the server polls.
 That happens only when an operator runs the `promote.yml` workflow with an
 explicit version.
+
+**Host config travels the same channel as the images.** The compose file and
+its bind-mounted asset trees (the NPM maintenance page under `docker/maintenance/`,
+the Keycloak login theme under `keycloak-theme/`) are packaged as the
+`basetool-config` OCI image (`docker/config/Dockerfile`, a `FROM scratch` bundle),
+signed, and promoted to `:stable` **in lock-step** with the app images. So a
+promoted compose change — e.g. a bumped redis/npm image pin — reaches the host
+and is applied automatically, with no manual `cp docker-compose.yml` and no
+hand-run `docker compose up -d`. The one carve-out is a **postgres/Keycloak**
+image change, which stays operator-gated (see *Stateful-infra upgrades* below).
+`deploy.sh` and the systemd units are **not** in the bundle (self-update hazard)
+— they remain the manual bootstrap concern below. Full rationale: [ADR-0049](adr/0049-config-as-promotable-oci-artifact.md),
+binding requirements: [REQ-OPS-001..006](specs/deployment-delivery.md).
 
 ---
 
@@ -126,15 +140,24 @@ sudo install -d -m 0700 -o deploy -g docker /var/lib/iri/.docker
 
 ### 4. Compose file + scripts
 
-Copy from the repository — only these two trees, never the rest:
+Copy from the repository — only these trees, never the rest:
 
 ```bash
 sudo cp docker-compose.yml      /var/iri/code/
 sudo cp -r scripts/             /var/iri/code/
 sudo cp -r keycloak-theme/      /var/iri/code/
+sudo cp -r docker/              /var/iri/code/   # maintenance page assets
 sudo chown -R deploy:docker     /var/iri/code
 sudo chmod 0755                 /var/iri/code/scripts/deploy.sh
 ```
+
+This is a **one-time bootstrap**. After the first `:stable` promotion, the
+compose file, the maintenance page (`docker/maintenance/`) and the Keycloak theme
+(`keycloak-theme/`) are kept in sync automatically: `deploy.sh` pulls the promoted
+`basetool-config` bundle and applies them (see *Infra / host-config bumps* below).
+You only re-copy by hand if you change **`scripts/`** (`deploy.sh` or the systemd
+units) — those are deliberately excluded from the bundle so a promotion can never
+overwrite the running deployer.
 
 `docker-compose.build.yml` does **not** belong on the production host. It
 has no purpose there and removing it eliminates any risk of an accidental
@@ -342,15 +365,23 @@ rebuild. Same digest, two tags.
 
 Within at most 5 minutes (timer interval + RandomizedDelaySec):
 1. `iri-deploy.service` fires.
-2. `deploy.sh` resolves `:stable` → digest, compares with
+2. `deploy.sh` resolves `:stable` → digests for backend + frontend + ingest
+**and** the `basetool-config` bundle, and compares the four-part marker with
 `/var/lib/iri/last-deployed.digests`.
-3. If different: writes `current-digest-pin.yml` with the new digest set
-(backend + frontend + ingest), runs `docker compose pull && docker compose
-up -d --wait`.
-4. On all-healthy: updates `last-deployed.digests`, logs success.
-5. On any-unhealthy within 180 s: restores `previous-digest-pin.yml`,
-re-ups, logs failure, exits non-zero (journald and OnFailure= hooks
-pick it up).
+3. If different: writes `current-digest-pin.yml` with the new app digest set.
+If the **config** digest moved, it also extracts the promoted bundle, asserts it
+carries no secrets, snapshots the live config tree into `config-previous/`, and
+copies the new `docker-compose.yml` + maintenance/theme trees into
+`/var/iri/code`. Then runs `docker compose pull && docker compose up -d --wait`,
+which recreates only the services whose effective spec changed.
+4. On all-healthy: updates `last-deployed.digests`, clears the failed/blocked
+markers, logs success.
+5. On any-unhealthy within 180 s: restores `previous-digest-pin.yml` **and**
+the previous config tree, re-ups, logs failure, exits non-zero (journald and
+OnFailure= hooks pick it up).
+6. If the promoted config changes a **postgres/Keycloak** image pin, step 3 does
+**not** apply it — the run records `config-blocked.marker`, alerts once, then
+skips quietly until a new promotion or a `--force` (see *Stateful-infra upgrades*).
 
 You see the result in `journalctl -u iri-deploy.service -n 100` or in
 `/var/log/iri-deploy.log`.
@@ -363,6 +394,69 @@ sudo systemctl start iri-deploy.service
 
 This is also the runbook step you take after a manual `:stable` promotion
 if you do not want to wait for the next tick.
+
+---
+
+## Infra / host-config bumps (redis, npm, compose edits)
+
+A change to the **general** containers (`redis`, `npm`) or to any other part of
+`docker-compose.yml` / the maintenance page / the Keycloak theme reaches prod
+through the **same** promote-and-pull flow as an app release — no manual file
+copy, no hand-run `docker compose up -d`. Worked example, bumping the pinned
+redis image:
+
+1. Edit the `redis` image pin in `docker-compose.yml` (Dependabot opens this PR
+   for you on its weekly run), get it reviewed, and merge to `main`.
+2. **Cut a release** (`Release · Prepare` → merge the prep PR) — `release-images.yml`
+   then builds `basetool-config:<version>` carrying the new compose, signs it, and
+   pushes it alongside the app images.
+3. **Promote** (`gh workflow run promote.yml -f version=<version>`) — flips the app
+   images **and** `basetool-config` to `:stable` together.
+4. Within ~5 minutes the timer fires: `deploy.sh` sees the config digest moved,
+   stages the new bundle, swaps `docker-compose.yml` into `/var/iri/code`, and
+   `docker compose up -d --wait` recreates **redis** (and any other changed
+   service). A health failure rolls back the compose file *and* the image pin.
+
+You see it in `journalctl -u iri-deploy.service` as `config changed → staging …`
+followed by `config applied` and `deploy successful`. The bundle is content-
+addressed and signed, so what ran is exactly what was promoted.
+
+> A config-only bump still rides a release **promotion** — that is the deliberate
+> human gate (REQ-OPS-002). If you want the redis bump out without waiting for the
+> next feature release, cut+promote a patch release containing just that change.
+
+The state files `deploy.sh` adds for this flow live under `/var/lib/iri/`:
+`config-stage/` (extraction scratch), `config-previous/` (rollback snapshot of the
+config tree) and `config-blocked.marker` (the stateful-infra gate, below).
+
+## Stateful-infra upgrades (operator-gated: postgres, Keycloak)
+
+A **postgres** or **Keycloak** image change is the one carve-out that does **not**
+auto-apply. A Postgres major recreated against the existing `PGDATA` bind mount
+won't start without `pg_upgrade`; a Keycloak major needs host-staged provider JARs
+and a keystore whose SAN carries `dns:keycloak` (see *Keycloak behind NPM* and
+*Keycloak custom providers* above). A blind `up -d` would fail these and the health
+gate would then roll back on a 5-minute loop.
+
+So when a promoted bundle changes a `postgres:` or `quay.io/keycloak/keycloak:`
+pin, `deploy.sh` refuses to apply it: it logs a `CARVE-OUT: …` line, writes
+`/var/lib/iri/config-blocked.marker`, exits non-zero **once** (so journald /
+`OnFailure=` alert you), and then skips that target quietly on subsequent ticks
+until you either promote a different version or force it. To take the upgrade:
+
+1. Perform the documented manual upgrade for that component (the Postgres major
+   `pg_upgrade` runbook, or the Keycloak keystore/provider steps above).
+2. Force the gated deploy through:
+
+   ```bash
+   sudo -u deploy /var/iri/code/scripts/deploy.sh --force
+   ```
+
+   `--force` bypasses the carve-out (and the bad-digest backoff) for the current
+   target; the app images in the same promotion are applied along with it.
+
+redis and npm image bumps are **not** gated — they auto-apply as in the previous
+section.
 
 ---
 
@@ -700,15 +794,17 @@ journalctl -u iri-deploy.service -n 50
 
 ## Troubleshooting
 
-|                         Symptom                          |                       Where to look                       |                                                                                           Common cause                                                                                           |
-|----------------------------------------------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                        | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                    |
-| `docker login` fails                                     | `/var/log/iri-deploy.log`                                 | Expired or revoked PAT. See *Token rotation*.                                                                                                                                                    |
-| Health check times out                                   | `docker compose ps`, `docker logs <service>`              | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                     |
-| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                             | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                |
-| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `ls -la /var/iri/secrets` | Keystore missing or mode too strict. It must be `0644` — the JVM services run as uid 10001 but Keycloak runs as uid 1000, so `0640` denies Keycloak. `chmod 0644 /var/iri/secrets/keystore.p12`. |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                    | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                       |
-| Compose pulls but does not restart                       | journald log                                              | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                           |
+|                         Symptom                          |                        Where to look                        |                                                                                           Common cause                                                                                           |
+|----------------------------------------------------------|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                          | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                    |
+| `docker login` fails                                     | `/var/log/iri-deploy.log`                                   | Expired or revoked PAT. See *Token rotation*.                                                                                                                                                    |
+| Health check times out                                   | `docker compose ps`, `docker logs <service>`                | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                     |
+| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                               | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                |
+| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `ls -la /var/iri/secrets`   | Keystore missing or mode too strict. It must be `0644` — the JVM services run as uid 10001 but Keycloak runs as uid 1000, so `0640` denies Keycloak. `chmod 0644 /var/iri/secrets/keystore.p12`. |
+| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                      | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                       |
+| Compose pulls but does not restart                       | journald log                                                | All target digests match the last-deployed digests — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                           |
+| `CARVE-OUT: postgres/Keycloak image pin changed`         | `journalctl -u iri-deploy.service`, `config-blocked.marker` | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                               |
+| Redis pin bump on `main` never reaches prod              | `journalctl -u iri-deploy.service`                          | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                |
 
 ---
 
@@ -727,9 +823,18 @@ A few decisions worth keeping in mind when you touch any of the pieces:
   the next timer tick.
 - **Health gate + auto-rollback.** `docker compose up --wait
   --wait-timeout 180` exits non-zero if any service is not healthy in
-  three minutes. The script holds the previous digest pin and restores it
-  before exiting non-zero, so a bad release self-heals to the last
-  known-good revision within roughly five minutes.
+  three minutes. The script holds the previous digest pin **and** a snapshot of
+  the previous config tree, and restores both before exiting non-zero, so a bad
+  release self-heals to the last known-good revision within roughly five minutes.
+- **Config rides the image channel, not a side channel.** The compose file and
+  its asset trees ship as the signed, digest-pinned `basetool-config` artifact
+  promoted in lock-step with the images ([ADR-0049](adr/0049-config-as-promotable-oci-artifact.md)).
+  This keeps the host on a single read-only GHCR credential (no git key, no SSH,
+  no new tool), makes the running config content-addressed instead of an untracked
+  manual copy, and folds the config digest into the idempotence marker so a
+  config-only change (a redis pin bump) is detected — closing the gap where the
+  app-only marker silently skipped it. The stateful-infra carve-out keeps a
+  Postgres/Keycloak major from being applied by a blind `up -d`.
 - **No image holds the keystore.** This is checked twice — by
   `.gitignore` (CI's checkout never has the file) and by `.dockerignore`
   (no local `docker build` accidentally bakes it in). The production

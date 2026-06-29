@@ -60,12 +60,14 @@ RestrictNamespaces=true
 RestrictRealtime=true
 LockPersonality=true
 # The script needs to write to:
-#   /var/lib/iri/    — state files (digest pins, last-deployed marker)
+#   /var/lib/iri/    — state files (digest pins, last-deployed marker, and the
+;                      config-stage/ + config-previous/ dirs and the
+;                      config-blocked.marker the config-bundle delivery uses)
 #   /var/log/        — append to iri-deploy.log
 #   /var/lock/       — flock file
-;   /var/iri/        — Docker volume hierarchy (logs etc. are written through
-;                      docker, not directly by the script, but compose touches
-;                      this path during volume init on first run)
+;   /var/iri/        — Docker volume hierarchy AND /var/iri/code, where the
+;                      config bundle is applied (docker-compose.yml + the
+;                      maintenance/theme trees). Already covered by /var/iri.
 ReadWritePaths=/var/lib/iri /var/log /var/lock /var/iri
 
 # Hard memory and CPU caps so a runaway script cannot starve the production
