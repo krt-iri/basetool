@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** UI · **Related ADRs:** none yet · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
@@ -199,6 +199,47 @@ on the chosen side so no option lands off-screen.
 
 **Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
 `static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`).
+
+### REQ-UI-012 — User-facing labels show the display name, never the raw username
+
+Wherever the tool renders a person's identity to a user, it shows that user's **effective name** —
+the **display name** when one is set (non-blank), otherwise the **username** as the fallback. The raw
+username is never the visible label when a display name exists. This is the project-wide
+identity-presentation rule and holds on **every** surface that names a user — table and list rows,
+badges and avatars, detail and profile pages, dropdown / picker option labels, the org chart and
+Leitung views, mission / order / bank / inventory / refinery rows, the audit viewer's actor column,
+notifications, and the generated PDF exports — across all four device classes.
+
+The single source of truth is the backend: `User.getEffectiveName()` returns the display name when
+present and falls back to the username, and the `effectiveName` field carried on `UserDto` /
+`UserReferenceDto` (and every projection derived from them) is what templates bind to. A surface that
+binds the raw `username` for display, or re-derives the fallback itself, is a defect — bind
+`effectiveName`. Any new user-bearing DTO or projection must expose `effectiveName` so the surface has
+it to bind.
+
+**Carve-outs** (the username may legitimately appear):
+
+- **Account administration of the identity itself.** The admin member-edit form, registration
+  approval, and the profile screen show and edit the raw `username` and `displayName` because the
+  username *is* the datum being managed there, not a label standing in for a person.
+- **Search / disambiguation as a secondary term, not the primary label.** The shared searchable user
+  pickers (REQ-FE-011, ADR-0053) display the display name as the option label and fold the username
+  into the filter haystack (`data-search`) so a person is findable by login handle; the username stays
+  a hidden search term, it does not replace the visible name.
+
+**Acceptance**
+
+- [ ] On every user-naming surface, a user with a display name set is shown by that display name, and
+  a user without one falls back to the username.
+- [ ] No display surface binds the raw `username` as the visible person label where an
+  `effectiveName` is available; templates bind `effectiveName`.
+- [ ] The carve-out screens (member-edit, profile, registration approval) still show the raw username
+  as the managed account field; the searchable pickers still match on the username without showing it
+  as the label.
+
+**Enforced by:** code/design review · **Code:** `User.getEffectiveName()`, the `effectiveName` field
+on `UserDto` / `UserReferenceDto` and downstream DTOs, the per-feature Thymeleaf templates ·
+**Related:** REQ-FE-011, ADR-0053.
 
 ## Out of scope
 
