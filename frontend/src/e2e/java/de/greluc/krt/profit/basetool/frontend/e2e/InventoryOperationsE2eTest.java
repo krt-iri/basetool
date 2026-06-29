@@ -65,11 +65,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p><b>Cache-awareness.</b> The create-form material/location dropdowns come from the frontend's
  * 10-minute cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects
  * whatever the dropdown offers and reads the picked id back for verification rather than assuming a
- * freshly-seeded entry is listed. The book-out transfer dropdown is likewise cached, so the
+ * freshly-seeded entry is listed. The Umbuchen modal's transfer dropdown is likewise cached, so the
  * same-location edge case anchors its row at the bootstrap-seeded {@code E2E Refinery Hub} (always
- * cached) to make the modal preselect the source as the transfer target. The job-order and mission
- * lookups are <em>not</em> cached, so freshly seeded ones appear in the association selects at
- * once.
+ * cached) to make the Umbuchen modal preselect the source as the transfer target. The job-order and
+ * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the association selects
+ * at once.
  */
 @Tag("e2e")
 class InventoryOperationsE2eTest {
@@ -283,20 +283,21 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Umbuchen.</em> Transfers 30 of a 100-SCU row to a different location (same user). The
-   * append-only model leaves 70 at the source and inserts a fresh 30 at the destination, so the
-   * material now spans two owned stacks.
+   * <em>Umbuchen.</em> Transfers 30 of a 100-SCU row to a different location (same user) through
+   * the dedicated Umbuchen modal's LOCATION mode (#868 moved the transfer out of the Ausbuchen
+   * dialog). The append-only model leaves 70 at the source and inserts a fresh 30 at the
+   * destination, so the material now spans two owned stacks.
    */
   @Test
   void umbuchenTransfersStockToAnotherLocation() {
     runFlow(
         "inventory-umbuchen",
         page -> {
-          openBookOutModal(page, transferMatId, transferItemId);
-          page.locator("input[name='type'][value='TRANSFER']").check();
-          String destinationLocationId = selectDifferentLocation(page, opsHubLocId);
-          page.locator("#amount").fill("30");
-          submitBookOutInPlace(page);
+          openUmbuchenModal(page, transferMatId, transferItemId);
+          // LOCATION mode is the Umbuchen modal's default; pick a destination distinct from source.
+          String destinationLocationId = selectDifferentUmbuchenLocation(page, opsHubLocId);
+          page.locator("#umbuchenAmount").fill("30");
+          submitUmbuchenInPlace(page);
 
           JsonArray stacks = stacksForMaterial(transferMatId);
           assertEquals(2, stackCount(stacks), "transfer splits the row into source + destination");
@@ -410,20 +411,20 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Edge case: a TRANSFER that changes neither the owner nor the location (the modal's preselected
-   * defaults) is rejected by the backend, so the single 50-SCU stack stays intact.
+   * Edge case: an Umbuchen LOCATION transfer that changes neither the owner nor the location (the
+   * Umbuchen modal's preselected source defaults) is rejected by the backend, so the single 50-SCU
+   * stack stays intact.
    */
   @Test
   void edgeCaseTransferToSameLocationLeavesStockUnchanged() {
     runFlow(
         "inventory-transfer-noop",
         page -> {
-          openBookOutModal(page, sameLocMatId, sameLocItemId);
-          // Leave target user + location at their preselected source values, then submit a
-          // TRANSFER.
-          page.locator("input[name='type'][value='TRANSFER']").check();
-          page.locator("#amount").fill("10");
-          submitBookOutInPlace(page);
+          openUmbuchenModal(page, sameLocMatId, sameLocItemId);
+          // LOCATION mode is the Umbuchen modal's default; leave target user + location at their
+          // preselected source values, then submit a no-op TRANSFER the backend rejects.
+          page.locator("#umbuchenAmount").fill("10");
+          submitUmbuchenInPlace(page);
 
           JsonArray stacks = stacksForMaterial(sameLocMatId);
           assertEquals(1, stackCount(stacks), "a no-op transfer must not split the row");
@@ -552,6 +553,22 @@ class InventoryOperationsE2eTest {
   }
 
   /**
+   * Expands to the row (see {@link #openMyInventoryToEntry}) and clicks its Umbuchen (rebook)
+   * button, which opens the dedicated Umbuchen modal in its default LOCATION (transfer) mode
+   * preloaded with that row's id, amount, version and preselected source user + location (#868
+   * moved the transfer out of the Ausbuchen dialog into this modal).
+   *
+   * @param page the authenticated page
+   * @param materialId the scenario-unique material of the row
+   * @param itemId the seeded inventory item id to rebook
+   */
+  private static void openUmbuchenModal(Page page, String materialId, String itemId) {
+    openMyInventoryToEntry(page, materialId, itemId);
+    page.locator("button[data-trigger='inv-my-umbuchen'][data-id='" + itemId + "']").click();
+    assertThat(page.locator("#umbuchenModal")).isVisible();
+  }
+
+  /**
    * Submits the open book-out modal and waits for its in-place AJAX write to settle (#577 part 2:
    * the book-out posts to {@code /inventory/{id}/transfer} and re-swaps the grouped table on
    * success, or surfaces a toast on a backend rejection — neither path navigates). Sets the {@code
@@ -577,23 +594,49 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Selects, in the book-out modal's transfer-target location dropdown, the first option whose
+   * Submits the open Umbuchen modal in its LOCATION (transfer) mode and waits for the in-place AJAX
+   * write to settle. Like the book-out twin (#577 part 2, consolidated in #868), the transfer posts
+   * to {@code /inventory/{id}/transfer} and re-swaps the grouped table on success, or surfaces a
+   * toast on a backend rejection — neither path navigates. Sets the {@code window.__krtNoReload}
+   * marker and drops the {@code position: fixed} footer out of the way (it can otherwise intercept
+   * the trusted click), then waits on the XHR POST so the backend has provably answered before the
+   * caller reads the stock back. Finally asserts the marker survived, proving the page was never
+   * reloaded.
+   *
+   * @param page the authenticated page with the Umbuchen modal open and filled
+   */
+  private static void submitUmbuchenInPlace(Page page) {
+    page.evaluate("window.__krtNoReload = true;");
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    page.waitForResponse(
+        r -> r.url().contains("/transfer") && "POST".equals(r.request().method()),
+        () -> page.locator("#umbuchenSubmitBtn").click());
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the in-place Umbuchen must not reload the page");
+  }
+
+  /**
+   * Selects, in the Umbuchen modal's transfer-target location dropdown, the first option whose
    * value differs from the source location, and returns that destination id. Robust to whether the
    * source location is itself listed in the (cached) dropdown: a different option always exists
    * because the bootstrap refinery hub is cached and the source here is a separately-created
    * location.
    *
-   * @param page the authenticated page with the transfer fields visible
+   * @param page the authenticated page with the Umbuchen modal's LOCATION fields visible
    * @param sourceLocationId the row's current (source) location id to avoid
    * @return the chosen destination location id
    */
-  private static String selectDifferentLocation(Page page, String sourceLocationId) {
-    Locator options = page.locator("#targetLocationId option");
+  private static String selectDifferentUmbuchenLocation(Page page, String sourceLocationId) {
+    Locator options = page.locator("#umbuchenTargetLocationId option");
     int count = options.count();
     for (int i = 0; i < count; i++) {
       String value = options.nth(i).getAttribute("value");
       if (value != null && !value.isBlank() && !value.equals(sourceLocationId)) {
-        page.locator("#targetLocationId").selectOption(value);
+        page.locator("#umbuchenTargetLocationId").selectOption(value);
         return value;
       }
     }
