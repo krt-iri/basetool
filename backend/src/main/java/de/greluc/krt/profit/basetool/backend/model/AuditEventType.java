@@ -264,6 +264,9 @@ public enum AuditEventType {
   /** A mission's owner was changed. */
   MISSION_OWNER_CHANGED(AuditDomain.MISSION),
 
+  /** A mission's owning org unit (Staffel/SK/Bereich/OL, or ownerless) was reassigned. */
+  MISSION_OWNING_ORG_UNIT_CHANGED(AuditDomain.MISSION),
+
   /** A mission's party lead (Veranstaltungsleiter) was set or cleared. */
   MISSION_PARTY_LEAD_CHANGED(AuditDomain.MISSION),
 

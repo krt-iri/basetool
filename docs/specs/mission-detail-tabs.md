@@ -65,7 +65,11 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    (authenticated + data-present gates unchanged).
 4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. Contains the
    mission details form, organisation (party lead, frequencies), owner & manager administration,
-   and the delete action (ADMIN only).
+   the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes the mission to a
+   different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018), and the delete action (ADMIN only).
+   The reassignment select offers the caller's assignable org units plus "Keine";
+   saving it swaps the `#mission-mgmt-results` panel in place and repaints the sticky-head
+   owning-squadron badge without a reload (REQ-FE-001).
 
 The active tab synchronises with a `?tab=` URL parameter (`ueb|crew|fin|verw`); `?tab=` takes
 precedence over `#tab=`, then a server-side validation-error hint (re-renders land on Verwaltung),

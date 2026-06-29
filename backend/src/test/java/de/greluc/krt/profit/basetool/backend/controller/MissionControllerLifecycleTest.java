@@ -194,6 +194,7 @@ class MissionControllerLifecycleTest {
         null,
         null,
         null,
+        null,
         0L,
         List.of(), // steps
         0L, // stepsVersion

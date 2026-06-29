@@ -277,9 +277,11 @@
         <div class="mission-head">
             <div class="mission-head-title">
                 <h1 th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
-                <span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
+                <!-- Stable slot (display:contents adds no flex gap when empty) so the owning-org-unit
+                     reassignment (REQ-ORG-018) can patch this badge in place without a reload. -->
+                <span id="mission-head-org-badge-slot" style="display: contents;"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
                       th:title="${mission.owningSquadron.name()}"
-                      th:text="${mission.owningSquadron.shorthand()}">IRI</span>
+                      th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
                 <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
                       th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">PLANNED</span>
             </div>
@@ -320,7 +322,9 @@
                            data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
                            data-planned-end-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'},
                            data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'},
-                           data-party-lead=${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))}"></span>
+                           data-party-lead=${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))},
+                           data-owning-org-unit-shorthand=${mission.owningSquadron != null ? mission.owningSquadron.shorthand() : ''},
+                           data-owning-org-unit-name=${mission.owningSquadron != null ? mission.owningSquadron.name() : ''}"></span>
             <!-- Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
                  einen Blick" (Ziel + key facts), separate "Weitere Leads" / "Funk" panels, a
                  participant attendance meter, the read-only Ablauf checklist, a Kalender card and a
@@ -1088,6 +1092,31 @@
                                 </div>
                             </div>
 
+                            <!-- Owning org unit (Verantwortliche Einheit) — REQ-ORG-018 reassignment control.
+                                 Re-homes the mission to a different Staffel/SK/Bereich/OL (or to ownerless).
+                                 Lives in the #mission-mgmt-results swap container so a change re-renders in
+                                 place (krtRefreshMissionSection('mgmt')); the data-owning-org-unit-version
+                                 attribute carries the section-scoped optimistic-lock counter. -->
+                            <div class="form-group">
+                                <label th:text="#{mission.owningOrgUnit}">Verantwortliche Einheit</label>
+                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                                    <div class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;">
+                                        <span th:if="${mission.owningSquadron != null}" th:text="${mission.owningSquadron.name()}">Einheit</span>
+                                        <span th:if="${mission.owningSquadron == null}" th:text="#{mission.owningOrgUnit.none}">Keine</span>
+                                    </div>
+                                    <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owning-org-unit-row" th:attr="data-owning-org-unit-version=${mission.owningOrgUnitVersion}">
+                                        <select id="new-owning-org-unit-id" class="flex-1">
+                                            <!-- Current assignment first: always selectable + preselected even when it
+                                                 is not part of the caller's own pickable set. -->
+                                            <option th:if="${mission.owningSquadron != null}" th:value="${mission.owningSquadron.id()}" th:text="${mission.owningSquadron.name()}" selected></option>
+                                            <option value="" th:text="#{mission.owningOrgUnit.none}" th:selected="${mission.owningSquadron == null}">-- Keine --</option>
+                                            <option th:each="o : ${ownerOptions}" th:if="${mission.owningSquadron == null or mission.owningSquadron.id() != o.orgUnitId()}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}"></option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline" data-trigger="mission-change-owning-org-unit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label th:text="#{mission.managers}">Co-Manager</label>
                                 <div class="chiprow" style="margin-bottom: 1rem;">
@@ -1665,6 +1694,9 @@
     const MSG_SUCCESS_OWNER_CHANGE = /*[[#{mission.owner.success}]]*/ 'Owner changed successfully';
     const MSG_ERROR_OWNER_CHANGE = /*[[#{error.mission.owner.change}]]*/ 'Error changing owner';
     const MSG_CONFIRM_OWNER_CHANGE = /*[[#{mission.confirm.owner.change}]]*/ 'Are you sure you want to change the owner of this mission?';
+    const MSG_SUCCESS_OWNING_ORG_UNIT_CHANGE = /*[[#{mission.owningOrgUnit.success}]]*/ 'Responsible unit changed successfully';
+    const MSG_ERROR_OWNING_ORG_UNIT_CHANGE = /*[[#{error.mission.owningOrgUnit.change}]]*/ 'Error changing responsible unit';
+    const MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE = /*[[#{mission.confirm.owningOrgUnit.change}]]*/ 'Are you sure you want to change the responsible unit of this mission?';
     const MSG_CONFIRM_MANAGER_REMOVE = /*[[#{mission.confirm.manager.remove}]]*/ 'Do you really want to remove this manager?';
     const MSG_ERROR_USER_REQUIRED = /*[[#{error.mission.manager.user_required}]]*/ 'Please select a user';
     // i18n dictionary consumed by the local krtMissionWrite wrapper (#574, defined below) which feeds
@@ -1679,6 +1711,7 @@
         'mission.save.section.frequency': /*[[#{mission.save.section.frequency}]]*/ 'Frequency',
         'mission.save.section.manager': /*[[#{mission.save.section.manager}]]*/ 'Manager',
         'mission.save.section.owner': /*[[#{mission.save.section.owner}]]*/ 'Owner',
+        'mission.save.section.owningOrgUnit': /*[[#{mission.save.section.owningOrgUnit}]]*/ 'Responsible unit',
         'mission.save.section.party_lead': /*[[#{mission.save.section.party_lead}]]*/ 'Party lead',
         'mission.save.section.core': /*[[#{mission.save.section.core}]]*/ 'Core data',
         'mission.save.section.schedule': /*[[#{mission.save.section.schedule}]]*/ 'Schedule',
@@ -1692,6 +1725,7 @@
         'mission.conflict.section.frequency': /*[[#{mission.conflict.section.frequency}]]*/ 'Frequency',
         'mission.conflict.section.manager': /*[[#{mission.conflict.section.manager}]]*/ 'Manager',
         'mission.conflict.section.owner': /*[[#{mission.conflict.section.owner}]]*/ 'Owner',
+        'mission.conflict.section.owningOrgUnit': /*[[#{mission.conflict.section.owningOrgUnit}]]*/ 'Responsible unit',
         'mission.conflict.section.party_lead': /*[[#{mission.conflict.section.party_lead}]]*/ 'Party lead',
         'mission.conflict.section.core': /*[[#{mission.conflict.section.core}]]*/ 'Core data',
         'mission.conflict.section.schedule': /*[[#{mission.conflict.section.schedule}]]*/ 'Schedule',
@@ -1907,6 +1941,22 @@
         const leadEl = document.getElementById('facts-party-lead');
         if (leadEl && lead != null) {
             leadEl.textContent = lead;
+        }
+        // The owning-org-unit badge in the sticky header (outside this fragment) mirrors the owning
+        // squadron — patch it from the fresh shorthand/name the fragment exposes so a peer's
+        // reassignment (REQ-ORG-018) shows in the header too. Empty shorthand = ownerless → cleared.
+        const ouSlot = document.getElementById('mission-head-org-badge-slot');
+        if (ouSlot) {
+            const ouShorthand = meta.getAttribute('data-owning-org-unit-shorthand');
+            const ouName = meta.getAttribute('data-owning-org-unit-name');
+            ouSlot.textContent = '';
+            if (ouShorthand) {
+                const badge = document.createElement('span');
+                badge.className = 'squadron-badge';
+                badge.title = ouName || '';
+                badge.textContent = ouShorthand;
+                ouSlot.appendChild(badge);
+            }
         }
     });
 
@@ -3284,6 +3334,81 @@
         }
     }
 
+    // Repaints the sticky-header owning-org-unit badge in place for the ACTING user after a
+    // reassignment (REQ-ORG-018), straight from the returned DTO so it updates without waiting for a
+    // fragment round-trip. Peers repaint theirs via the overview krt:swapped listener (which reads
+    // #overview-head-meta). The badge sits outside every swap container. Built via DOM APIs (not
+    // innerHTML) so the name/shorthand are inserted as text. Ownerless empties the slot
+    // (display:contents → no leftover gap).
+    function updateMissionHeadOrgBadge(owningSquadron) {
+        const slot = document.getElementById('mission-head-org-badge-slot');
+        if (!slot) {
+            return;
+        }
+        slot.textContent = '';
+        if (owningSquadron && owningSquadron.shorthand) {
+            const badge = document.createElement('span');
+            badge.className = 'squadron-badge';
+            badge.title = owningSquadron.name || '';
+            badge.textContent = owningSquadron.shorthand || '';
+            slot.appendChild(badge);
+        }
+    }
+
+    async function changeMissionOwningOrgUnit() {
+        const select = document.getElementById('new-owning-org-unit-id');
+        const row = document.getElementById('owning-org-unit-row');
+        if (!select || !row) {
+            return;
+        }
+        const rawValue = select.value;
+        // Empty value = the "Keine" option → ownerless target (null).
+        const owningOrgUnitId = (rawValue && rawValue.trim() !== '') ? rawValue.trim() : null;
+        const versionAttr = row.getAttribute('data-owning-org-unit-version');
+        const version = (versionAttr != null && versionAttr !== '') ? parseInt(versionAttr, 10) : 0;
+
+        const confirmed = await window.showKrtConfirm(
+            MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
+            MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) || 'OK',
+            (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) || 'Abbrechen'
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const currentMissionId = window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+            if (!currentMissionId) {
+                console.error('Mission ID not found');
+                showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+                return;
+            }
+            const cleanMissionId = String(currentMissionId).trim();
+
+            const result = await window.krtMissionWrite({
+                method: 'PUT',
+                url: `/missions/${cleanMissionId}/owning-org-unit/ajax`,
+                payload: { owningOrgUnitId: owningOrgUnitId, version: version },
+                sectionKey: 'owningOrgUnit'
+            });
+            if (result.ok) {
+                if (result.body) {
+                    updateMissionHeadOrgBadge(result.body.owningSquadron);
+                }
+                // Re-render the management panel in place (read-only value, dropdown selection, bumped
+                // owningOrgUnitVersion) and broadcast it to peers (REQ-FE-010). The owning-squadron badge
+                // lives in the sticky header outside every swap container: the actor patched it locally
+                // above, so signal peers to re-render the overview fragment, whose krt:swapped listener
+                // repaints their badge from #overview-head-meta.
+                window.krtRefreshMissionSection('mgmt');
+                if (window.krtNotifyMissionChanged) { window.krtNotifyMissionChanged('overview'); }
+            }
+        } catch (err) {
+            showFrontendErrorToast(`${typeof MSG_ERROR_OWNING_ORG_UNIT_CHANGE !== 'undefined' ? MSG_ERROR_OWNING_ORG_UNIT_CHANGE : 'Fehler beim Ändern der verantwortlichen Einheit'} (Error: ${err.message})`);
+        }
+    }
+
     async function removeMissionManager(userId) {
         const removeConfirmed = await window.showKrtConfirm(
             (typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined') ? MSG_CONFIRM_MANAGER_REMOVE : 'Verwalter entfernen?',
@@ -3566,6 +3691,7 @@
             setNowToInput(el.getAttribute('data-input-id'));
         });
         window.krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
+        window.krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
         window.krtEvents.on('click', 'mission-remove-manager', function (el) {
             removeMissionManager(el.getAttribute('data-manager-id'));
         });

@@ -27,13 +27,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -45,10 +51,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit-Tests fuer die Section-Patch-Methoden in {@link MissionService}.
@@ -70,6 +78,8 @@ class MissionServiceSectionPatchTest {
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
 
   @Mock private UserRepository userRepository;
+
+  @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
   @InjectMocks private MissionService missionService;
@@ -381,6 +391,94 @@ class MissionServiceSectionPatchTest {
     long v = missionService.getMissionOwnershipVersion(missionId);
 
     assertEquals(5L, v);
+  }
+
+  // -----------------------------------------------------------------------------------------
+  // Owning org unit reassignment (REQ-ORG-018): section-scoped owningOrgUnitVersion. The target is
+  // resolved/authorised by OwnerScopeService.resolveReassignTargetOrgUnit; updateOwningOrgUnit only
+  // validates+bumps owningOrgUnitVersion (never Mission.version) and audits the change.
+  // -----------------------------------------------------------------------------------------
+
+  @Test
+  void updateOwningOrgUnit_shouldReassignAndBumpOnlyItsCounter_whenVersionMatches() {
+    UUID targetId = UUID.randomUUID();
+    OrgUnit target = mock(OrgUnit.class);
+    when(target.getKind()).thenReturn(OrgUnitKind.SQUADRON);
+    when(target.getId()).thenReturn(targetId);
+    existing.setOwningOrgUnitVersion(2L);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(ownerScopeService.resolveReassignTargetOrgUnit(targetId)).thenReturn(target);
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.updateOwningOrgUnit(missionId, targetId, 2L);
+
+    assertSame(target, result.getOwningOrgUnit());
+    assertEquals(3L, result.getOwningOrgUnitVersion(), "owningOrgUnitVersion must be bumped");
+    assertEquals(7L, result.getVersion(), "global Mission.version must stay untouched");
+    assertEquals(4L, result.getCoreVersion(), "other section counters must stay untouched");
+    ArgumentCaptor<AuditEventType> typeCaptor = ArgumentCaptor.forClass(AuditEventType.class);
+    verify(auditService)
+        .record(typeCaptor.capture(), eq(missionId), any(), isNull(), any(String.class));
+    assertEquals(AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED, typeCaptor.getValue());
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldAllowOwnerlessTarget_whenResolverReturnsNull() {
+    OrgUnit previous = mock(OrgUnit.class);
+    when(previous.getKind()).thenReturn(OrgUnitKind.SQUADRON);
+    when(previous.getId()).thenReturn(UUID.randomUUID());
+    existing.setOwningOrgUnit(previous);
+    existing.setOwningOrgUnitVersion(0L);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(ownerScopeService.resolveReassignTargetOrgUnit(null)).thenReturn(null);
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission result = missionService.updateOwningOrgUnit(missionId, null, 0L);
+
+    assertNull(result.getOwningOrgUnit(), "ownerless target clears owningOrgUnit");
+    assertEquals(1L, result.getOwningOrgUnitVersion());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED),
+            eq(missionId),
+            any(),
+            isNull(),
+            any(String.class));
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldThrow409_whenOwningOrgUnitVersionMismatch() {
+    existing.setOwningOrgUnitVersion(3L);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 2L));
+    // The stale version is rejected before the target is resolved or anything is persisted.
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldPropagateAccessDenied_andNotPersist_whenTargetDisallowed() {
+    UUID targetId = UUID.randomUUID();
+    existing.setOwningOrgUnitVersion(0L);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(ownerScopeService.resolveReassignTargetOrgUnit(targetId))
+        .thenThrow(new AccessDeniedException("not assignable"));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> missionService.updateOwningOrgUnit(missionId, targetId, 0L));
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldThrowNotFound_whenMissionMissing() {
+    when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
+
+    assertThrows(
+        NotFoundException.class,
+        () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 0L));
   }
 
   // -----------------------------------------------------------------------------------------

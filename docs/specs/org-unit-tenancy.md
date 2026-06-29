@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -113,6 +113,11 @@ from system setting `job_order.intake_special_command_id` for guest creations);
 > oversight descendants)` so a Bereichsleitung/OL can create on behalf of a subordinate Staffel/SK and
 > own their own Bereich/OL data; the **auto-stamp** default and the `>1 → force a choice` rule stay keyed
 > on **DIRECT** membership, so ordinary-member stamping is unchanged.
+>
+> **Amended by REQ-ORG-018:** the create-time stamp is no longer the final word for `Mission` — its
+> `owning_org_unit_id` is **reassignable after creation** via the dedicated reassignment endpoint
+> (a separate resolver, `resolveReassignTargetOrgUnit`, with no auto-stamp / home-Staffel fallback).
+> Every other aggregate's owning OrgUnit remains create-time-only.
 
 ### REQ-ORG-005 — Admin area & promotion carve-outs
 
@@ -568,4 +573,56 @@ CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
 > The trigger now pre-empts the kind CHECK for a silo-rank-on-Staffel write (both reject; only the
 > message differs). The kind pairing is now the single `chk_org_unit_membership_role_kind` CHECK
 > (V184). Proven by `OrgHierarchyMigrationTest#v187LeaderExclusionTriggerReadsRole_squadronRanksExempt`.
+
+### REQ-ORG-018 — Mission owning-OrgUnit reassignment
+
+A mission's `owning_org_unit_id` is **no longer immutable after creation** (it is still create-time
+stamped per REQ-ORG-004). The mission Verwaltung tab exposes a "Verantwortliche Einheit" control that
+re-homes an existing mission to a different OrgUnit — Staffel, Spezialkommando, Bereich or
+Organisationsleitung (REQ-ORG-016) — or to **ownerless** (`owning_org_unit_id = NULL`, the
+public-leadership form of REQ-ORG-009). The reassignment is `PUT
+/api/v1/missions/{id}/owning-org-unit` (`UpdateMissionOwningOrgUnitRequest{owningOrgUnitId, version}`),
+served by `MissionService.updateOwningOrgUnit` and recorded as the audited
+`MISSION_OWNING_ORG_UNIT_CHANGED` event (org-unit `kind:id` from/to refs only — no PII, REQ-AUDIT-001).
+
+**Permission — two orthogonal gates.**
+
+1. Per-mission write gate `@missionSecurityService.canChangeOwner` — the same gate as the user-owner
+   change beside it: admin, a scope-officer who may edit the mission, or the mission owner.
+2. Target gate `OwnerScopeService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
+   OrgUnit or to ownerless; a **non-admin** may only pick a target that is one of their direct
+   memberships or within their editable scope (`canEditOrgUnit`, the REQ-ORG-016 cascade), and may
+   pick **ownerless only when membershipless** (mirroring who may create an ownerless mission). An
+   unknown target id is a 400; a disallowed target is a 403.
+
+**Re-scoping semantics.** Re-homing **retroactively** changes who may see/edit the mission via the
+existing `owningOrgUnit` + `is_internal` gates (REQ-ORG-003 and the `canSeeMission` / `canEditMission`
+matrix) — there is no frozen create-time ACL. Moving `NULL → org` *narrows* a public-leadership
+mission to that org (plus the `is_internal = false` cross-staffel escape); `org → NULL` *widens* it to
+the public/members default; `org A → org B` re-points the scope. `is_internal` is **orthogonal** and
+is **not** auto-adjusted — hiding a previously public mission still requires flipping `is_internal`
+separately. The change **does not cascade** to the mission's participants, finance entries, units or
+linked operation, which keep their own ownership.
+
+**Concurrency.** Guarded by the dedicated section-scoped counter `Mission.owningOrgUnitVersion`
+(`@OptimisticLock(excluded = true)`, V195), in the same family as `coreVersion` / `partyLeadVersion` —
+a reassignment never bumps `Mission.version` and never 409s a concurrent edit of an unrelated section;
+two managers racing on the assignment surface a 409 against each other. The frontend control lives in
+the `#mission-mgmt-results` swap container and updates live (no reload), patching the sticky header
+badge in place (REQ-FE-001).
+
+**Acceptance**
+
+- [x] A manager / scope-officer / admin reassigns a mission to an org unit they may assign to; the
+  change is audited and visibility re-scopes per the gates.
+- [x] A non-admin picking a target outside their assignable scope is rejected (403); an unknown target
+  id is 400.
+- [x] A non-admin who holds a membership cannot set the mission ownerless; an admin (or a
+  membershipless leadership caller) can.
+- [x] A stale `owningOrgUnitVersion` yields 409; a concurrent edit of another section (core / schedule)
+  does **not** 409.
+
+**Decided by:** ADR-0050. **Enforced by:** `MissionServiceSectionPatchTest` /
+`MissionServiceLifecycleTest` (happy path, 409, target validation, audit), `OwnerScopeServiceTest`
+(`resolveReassignTargetOrgUnit`), `MissionControllerSecurityTest` (the `canChangeOwner` gate).
 

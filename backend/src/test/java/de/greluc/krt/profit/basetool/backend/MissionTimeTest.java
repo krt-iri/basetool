@@ -139,6 +139,7 @@ class MissionTimeTest {
             null,
             null,
             null,
+            null,
             0L,
             Collections.emptyList(), // steps
             0L, // stepsVersion
@@ -194,6 +195,7 @@ class MissionTimeTest {
             0L,
             0,
             0,
+            null,
             null,
             null,
             null,
@@ -322,6 +324,7 @@ class MissionTimeTest {
             0L,
             0,
             0,
+            null,
             null,
             null,
             null,

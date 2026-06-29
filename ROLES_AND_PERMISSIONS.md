@@ -368,6 +368,7 @@ Notes are visible to everyone who sees the job order.
 | Register as (guest) participant / check in/out / change payout preference / unregister (`canAccessParticipant`) |    ✅¹     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Manage** mission (edit, participants/units/crew/frequencies, party lead) (`canManageMission`)                 |     ❌     |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
 | Set manager / owner (`canManageManagers` / `canChangeOwner`)                                                    |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
+| Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)  |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
 | **Delete** mission (`hasRole('ADMIN')`)                                                                         |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Anonymous only on **unlinked guest participants**; logged-in users only on
@@ -376,7 +377,10 @@ their own linked participant. ² Only as **owner/co-manager** of the mission.
 (`canEditMission`). ⁴ Outsiders (anonymous **and** roleless guest, `isMemberOrAbove() == false`)
 see the detail view without description + PII; organization, participant list, units,
 frequencies and payout preference remain visible (§1.3). The finance ledger stays member-only,
-and a guest is treated here like an anonymous visitor.
+and a guest is treated here like an anonymous visitor. ⁵ The owning-org-unit reassignment shares the
+`canChangeOwner` gate but additionally validates the **target**: an admin may assign to any org unit
+or to ownerless; a non-admin may only pick a direct membership or a unit within their editable scope
+(`canEditOrgUnit`), and may pick ownerless only when membershipless (REQ-ORG-018, ADR-0050).
 
 > **Mission without org unit (Bereichsleitung).** „Mission anlegen" (create mission) is
 > `isAuthenticated()` — that includes a logged-in user **without** Staffel/SK membership (e.g. the

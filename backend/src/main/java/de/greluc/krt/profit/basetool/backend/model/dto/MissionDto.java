@@ -45,6 +45,12 @@ import java.util.UUID;
  * the participant {@code user}/{@code guestName} duo). {@code partyLeadVersion} is the dedicated
  * section-scoped optimistic-lock counter the party-lead endpoint validates, in the same family as
  * {@code coreVersion}/{@code scheduleVersion}/{@code flagsVersion}.
+ *
+ * <p>{@code owningOrgUnitVersion} is the section-scoped optimistic-lock counter for the
+ * owning-org-unit reassignment endpoint (PUT {@code /api/v1/missions/{id}/owning-org-unit},
+ * REQ-ORG-018). The frontend echoes it back on the next reassignment so two managers editing the
+ * same mission surface a 409 instead of silently overwriting; the assigned org unit itself is
+ * carried by {@link #owningSquadron}.
  */
 public record MissionDto(
     UUID id,
@@ -76,6 +82,7 @@ public record MissionDto(
     Integer checkedInParticipants,
     Integer registeredParticipants,
     SquadronReferenceDto owningSquadron,
+    Long owningOrgUnitVersion,
     UserReferenceDto partyLeadUser,
     String partyLeadGuestName,
     Long partyLeadVersion,

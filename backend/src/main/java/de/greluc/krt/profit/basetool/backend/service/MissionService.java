@@ -742,6 +742,39 @@ public class MissionService {
   }
 
   /**
+   * Validates the expected {@code owningOrgUnitVersion} against the mission's current value,
+   * raising a 409 on mismatch so two managers racing on the owning-org-unit reassignment surface a
+   * conflict instead of one silently overwriting the other (REQ-ORG-018).
+   *
+   * @param mission the managed mission whose counter to check.
+   * @param expectedVersion the version the caller echoed back from the rendered page.
+   * @param missionId the mission id, for the conflict exception identifier.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the expected
+   *     version is stale.
+   */
+  private void assertOwningOrgUnitVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    long current =
+        mission.getOwningOrgUnitVersion() == null ? 0L : mission.getOwningOrgUnitVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
+  /**
+   * Increments the mission's dedicated {@code owningOrgUnitVersion} section counter after a
+   * successful reassignment so the next echo from a now-stale form is rejected.
+   *
+   * @param mission the managed mission whose counter to bump.
+   */
+  private void bumpOwningOrgUnitVersion(@NotNull Mission mission) {
+    long current =
+        mission.getOwningOrgUnitVersion() == null ? 0L : mission.getOwningOrgUnitVersion();
+    mission.setOwningOrgUnitVersion(current + 1L);
+  }
+
+  /**
    * Deletes a mission. The cascade unlinks inventory items and refinery orders (rather than
    * deleting them) so individual member contributions survive the mission delete. Mission
    * participants, finance entries, units, crews and frequencies ARE deleted because they only exist
@@ -2161,6 +2194,72 @@ public class MissionService {
     }
     ownership.setOwner(newOwner);
     missionOwnershipRepository.save(ownership);
+  }
+
+  /**
+   * Reassigns the owning org unit of an existing mission (REQ-ORG-018 / ADR-0050). The mission is
+   * re-homed to {@code targetOrgUnitId} (a Staffel, Spezialkommando, Bereich or
+   * Organisationsleitung) or made an ownerless leadership mission when {@code targetOrgUnitId} is
+   * {@code null}. The target is validated against the caller's assignable scope by {@link
+   * OwnerScopeService#resolveReassignTargetOrgUnit(UUID)} — the orthogonal second gate on top of
+   * the per-mission {@code canChangeOwner} gate the controller enforces.
+   *
+   * <p>Versioning: validates and bumps the dedicated {@code owningOrgUnitVersion} counter only. The
+   * association and column are {@code @OptimisticLock(excluded = true)}, so the global {@code
+   * Mission.version} and the other section counters stay untouched and concurrent edits on other
+   * sections of the same mission remain valid (Option A / multi-user concurrency).
+   *
+   * <p>Re-homing retroactively re-scopes who may see/edit the mission (the {@code owningOrgUnit} +
+   * {@code isInternal} visibility gates); it deliberately does NOT cascade to the mission's
+   * participants, finance entries, units or linked operation, which keep their own ownership.
+   *
+   * @param missionId mission to reassign.
+   * @param targetOrgUnitId the target org-unit id, or {@code null} for an ownerless mission.
+   * @param expectedOwningOrgUnitVersion expected value of {@code Mission.owningOrgUnitVersion}.
+   * @return the managed mission with the new owning org unit applied.
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   *     unknown.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedOwningOrgUnitVersion} is stale.
+   * @throws org.springframework.security.access.AccessDeniedException when the caller may not
+   *     assign to the requested target.
+   */
+  @Transactional
+  public Mission updateOwningOrgUnit(
+      @NotNull UUID missionId, UUID targetOrgUnitId, @NotNull Long expectedOwningOrgUnitVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertOwningOrgUnitVersion(mission, expectedOwningOrgUnitVersion, missionId);
+
+    OrgUnit previous = mission.getOwningOrgUnit();
+    OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
+    mission.setOwningOrgUnit(target);
+    bumpOwningOrgUnitVersion(mission);
+    Mission saved = missionRepository.save(mission);
+    // Audit detail carries org-unit identifiers + kinds only — no PII, no user free text (the
+    // mission name is the entity label, handled separately by the audit record).
+    auditService.record(
+        AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "fromOrgUnit=" + formatOrgUnitRef(previous) + " toOrgUnit=" + formatOrgUnitRef(target));
+    return saved;
+  }
+
+  /**
+   * Formats an org unit as a non-PII audit reference ({@code <kind>:<id>}), or {@code "none"} for
+   * an ownerless target. Used in the {@link AuditEventType#MISSION_OWNING_ORG_UNIT_CHANGED} detail
+   * payload, which must carry identifiers and kinds only — never names or other free text.
+   *
+   * @param orgUnit the org unit to format, or {@code null} for an ownerless target.
+   * @return a stable {@code kind:id} reference, or {@code "none"} when {@code orgUnit} is {@code
+   *     null}.
+   */
+  private static String formatOrgUnitRef(OrgUnit orgUnit) {
+    return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
   }
 
   /**

@@ -32,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -161,5 +164,56 @@ class HomeControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(not(containsString(SUCCESS_TOAST_ID))));
+  }
+
+  /**
+   * The "Nächster Einsatz" banner surfaces the mission's owning org unit (mission-next-banner.md):
+   * when the next mission is org-owned, the banner renders the org unit's name. Exercises the
+   * {@code nextMission.owningSquadron.name} Thymeleaf expression over the raw JSON map.
+   */
+  @Test
+  void home_ShouldShowOwningOrgUnitName_WhenNextMissionIsOrgOwned() throws Exception {
+    Map<String, Object> mission = new HashMap<>();
+    mission.put("id", UUID.randomUUID().toString());
+    mission.put("name", "Test Mission");
+    mission.put("status", "PLANNED");
+    // The banner's existing rows access these keys via property style (present-key required).
+    mission.put("meetingTime", null);
+    mission.put("plannedStartTime", null);
+    mission.put(
+        "owningSquadron",
+        Map.of("id", UUID.randomUUID().toString(), "name", "Alpha Staffel", "shorthand", "ALF"));
+    when(backendApiClient.get(
+            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
+        .thenReturn(mission);
+
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Alpha Staffel")));
+  }
+
+  /**
+   * For an ownerless (leadership) next mission the banner falls back to the "Keine" label instead
+   * of omitting the row, mirroring the Verwaltung read-only display.
+   */
+  @Test
+  void home_ShouldShowOwnerlessLabel_WhenNextMissionHasNoOrgUnit() throws Exception {
+    Map<String, Object> mission = new HashMap<>();
+    mission.put("id", UUID.randomUUID().toString());
+    mission.put("name", "Leadership Mission");
+    mission.put("status", "PLANNED");
+    mission.put("meetingTime", null);
+    mission.put("plannedStartTime", null);
+    // owningSquadron present but null → ownerless mission (mirrors the serialized DTO).
+    mission.put("owningSquadron", null);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
+        .thenReturn(mission);
+
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Keine")));
   }
 }
