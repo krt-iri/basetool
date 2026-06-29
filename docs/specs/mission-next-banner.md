@@ -120,12 +120,17 @@ the soonest upcoming mission.
   deliberately **wider** than the own-unit-only scope of the `/next` lookup (REQ-MISSION-008). This
   is an explicit, owner-approved product decision: the home overview answers "what is the
   organisation heading towards in the coming week", not only "my unit".
-- **Own-unit highlight.** Because the scope is broad, a tile whose owning org unit is one of the
-  **authenticated** viewer's own Staffeln is flagged with a "Meine Einheit" chip
-  (`home.upcoming.my_unit`, the square `.chip--primary`). Detection is **frontend-only** — the
-  mission's `owningSquadron.id` is matched against the viewer's direct Staffel memberships
-  (`UserDto.squadron` + `squadrons`); the leadership cascade of the `/next` lookup (REQ-MISSION-008)
-  is intentionally **not** applied, and guests (no memberships) never see the chip.
+- **Own-unit highlight.** Because the scope is broad, a tile whose owning org unit is one the
+  **authenticated** viewer is **directly assigned to** is flagged with a "Meine Einheit" chip
+  (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit
+  kind** — Staffel, Spezialkommando, Bereich (when the viewer is a direct member) and
+  Organisationsleitung (when a direct member) — **not** only Staffeln. The set comes from the
+  kind-agnostic `GET /api/v1/users/me/org-unit-ids` self-endpoint (the caller's direct
+  `org_unit_membership` rows mapped to their org-unit ids), unioned with the Staffel ids already on
+  the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
+  The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
+  (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and guests (no memberships)
+  never see the chip.
 - **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
   by the status filter). Guest/outsider redaction is unchanged: anonymous and role-less `GUEST`
   callers see only public (`isInternal = false`) `PLANNED` / `ACTIVE` missions, with the description
@@ -150,16 +155,24 @@ the soonest upcoming mission.
 - [ ] Each tile's description preview is truncated to three lines; the full text is visible on the mission detail page.
 - [ ] The information panel spans the full width and collapses to its header height.
 - [ ] An own-unit mission's tile shows the "Meine Einheit" chip for the authenticated member; a foreign mission's tile does not, and a guest never sees it.
+- [ ] The own-unit match covers every direct membership kind — a Spezialkommando, a directly-assigned Bereich and a directly-assigned Organisationsleitung mission are flagged, not only Staffel missions — while a subordinate unit reached only via the leadership cascade is **not**.
 
 **Enforced by:** `HomeControllerMvcTest`
 (`home_ShouldShowOwningOrgUnitName_WhenUpcomingMissionIsOrgOwned`,
 `home_ShouldShowOwnerlessLabel_WhenUpcomingMissionHasNoOrgUnit`,
 `home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersStaffel`,
-`home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign`).
-**Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call),
-`templates/index.html` (the `upcomingMissions` tile grid + `.mission-tile__desc` clamp),
-`static/css/styles.css` (`.mission-tile*`). Reuses the existing `MissionController`
-`/api/v1/missions/search` endpoint — no backend change.
+`home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand`,
+`home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign`),
+`OrgUnitMembershipServiceTest` (`findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade`,
+`findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
+`UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
+**Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
+`/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
+tile grid + `.mission-tile__desc` clamp + the `myOrgUnitIds` chip gate), `static/css/styles.css`
+(`.mission-tile*`); backend `UserController#getMyOrgUnitIds` +
+`OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
+`MissionController` `/api/v1/missions/search` endpoint; the only new backend surface is the
+kind-agnostic own-membership id lookup.
 
 ## Out of scope
 

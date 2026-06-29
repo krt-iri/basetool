@@ -124,10 +124,13 @@ public class HomeController {
                 "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
         model.addAttribute("currentUser", currentUser);
 
-        // Collect the viewer's own Staffel ids so the tile grid can flag own-unit missions with a
-        // "Meine Einheit" chip (REQ-MISSION-012). Direct memberships only (squadron + squadrons);
-        // the leadership cascade of the /next banner (REQ-MISSION-008) is intentionally not
-        // applied.
+        // Collect the viewer's own org-unit ids so the tile grid can flag own-unit missions with a
+        // "Meine Einheit" chip (REQ-MISSION-012). These are the caller's DIRECT memberships across
+        // every kind (Staffel / SK / Bereich / OL), with no leadership cascade. The
+        // /me/org-unit-ids endpoint is the authoritative kind-agnostic source; the Staffel ids from
+        // the already-fetched /me record are unioned in as a fallback so a transient failure of
+        // that
+        // call still flags own-Staffel missions.
         Set<UUID> myOrgUnitIds = new HashSet<>();
         if (currentUser.squadrons() != null) {
           for (SquadronReferenceDto su : currentUser.squadrons()) {
@@ -138,6 +141,20 @@ public class HomeController {
         }
         if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
           myOrgUnitIds.add(currentUser.squadron().id());
+        }
+        try {
+          List<UUID> directOrgUnitIds =
+              backendApiClient.get(
+                  "/api/v1/users/me/org-unit-ids", new ParameterizedTypeReference<List<UUID>>() {});
+          if (directOrgUnitIds != null) {
+            for (UUID id : directOrgUnitIds) {
+              if (id != null) {
+                myOrgUnitIds.add(id);
+              }
+            }
+          }
+        } catch (Exception ex) {
+          log.warn("Could not fetch own org-unit memberships for the home highlight", ex);
         }
         model.addAttribute("myOrgUnitIds", myOrgUnitIds);
 

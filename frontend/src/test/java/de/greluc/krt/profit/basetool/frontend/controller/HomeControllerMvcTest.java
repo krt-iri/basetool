@@ -362,4 +362,68 @@ class HomeControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("Meine Einheit"))));
   }
+
+  /**
+   * REQ-MISSION-012: the own-unit highlight covers every org-unit kind, not just Staffeln. A viewer
+   * with no Staffel but a direct Spezialkommando membership (sourced from {@code
+   * /api/v1/users/me/org-unit-ids}) still gets the "Meine Einheit" chip on a mission owned by that
+   * SK. The same path covers a direct Bereich / Organisationsleitung membership.
+   */
+  @Test
+  void home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand()
+      throws Exception {
+    UUID specialCommandId = UUID.randomUUID();
+    // No Staffel on the /me record — the membership comes purely from /me/org-unit-ids.
+    UserDto me =
+        new UserDto(
+            UUID.randomUUID(),
+            "tester",
+            "Tester",
+            "Tester",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            true,
+            null,
+            List.of(),
+            0L,
+            null,
+            null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(me);
+    when(backendApiClient.get(
+            eq("/api/v1/users/me/org-unit-ids"), any(ParameterizedTypeReference.class)))
+        .thenReturn(List.of(specialCommandId));
+
+    MissionListDto skMission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Phantom-Operation",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            new SquadronReferenceDto(specialCommandId, "Phantom SK", "PHA"),
+            0L);
+    when(backendApiClient.get(
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Meine Einheit")));
+  }
 }
