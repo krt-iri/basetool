@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,8 +50,8 @@ import org.springframework.web.context.WebApplicationContext;
  * context resolves.
  *
  * <p>Mirrors {@link HomeControllerMvcTest}'s setup: the two collaborators the index render path
- * touches are mocked, and {@code /api/v1/missions/next} is stubbed to {@code null} (the valid "no
- * upcoming mission" response).
+ * touches are mocked, and the {@code /api/v1/missions/search} next-7-days lookup is stubbed to
+ * {@code null} (the valid "no upcoming missions" response).
  */
 @SpringBootTest
 class AccessibilityAttributesRenderTest {
@@ -71,7 +71,9 @@ class AccessibilityAttributesRenderTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(
-            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
         .thenReturn(null);
   }
 

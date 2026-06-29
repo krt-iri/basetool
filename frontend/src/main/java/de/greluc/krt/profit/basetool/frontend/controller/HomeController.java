@@ -19,10 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.HttpSession;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,11 +44,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 /**
  * Spring MVC controller for the home page.
  *
- * <p>Renders {@code /} for both guests and authenticated users. The page always shows the next
- * mission (a guest-visible endpoint) plus, for authenticated users, the current user record and the
- * active announcement with an unread flag. The first authenticated render in a session also
- * surfaces a transient login-notification toast (session attribute {@code welcomeMessageShown}
- * prevents the toast from re-appearing on every refresh).
+ * <p>Renders {@code /} for both guests and authenticated users. The page shows the missions whose
+ * planned start falls within the next seven days as a tile grid (a guest-visible search, nearest
+ * start first) plus, for authenticated users, the current user record and the active announcement
+ * with an unread flag. The first authenticated render in a session also surfaces a transient
+ * login-notification toast (session attribute {@code welcomeMessageShown} prevents the toast from
+ * re-appearing on every refresh).
  */
 @Controller
 @RequiredArgsConstructor
@@ -53,10 +62,10 @@ public class HomeController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the home page. Pulls the next mission for everyone; for authenticated users also
-   * fetches the {@code /me} user record and the public announcement, computes the unread flag by
-   * comparing the announcement id to {@code lastReadAnnouncementId}, and arms the once-per-session
-   * welcome toast.
+   * Renders the home page. Pulls the upcoming missions (planned start within the next seven days)
+   * for everyone; for authenticated users also fetches the {@code /me} user record and the public
+   * announcement, computes the unread flag by comparing the announcement id to {@code
+   * lastReadAnnouncementId}, and arms the once-per-session welcome toast.
    *
    * @param model Thymeleaf model populated with mission, announcement, username and toast flags
    * @param principal authenticated OIDC user, or {@code null} for guests
@@ -66,24 +75,39 @@ public class HomeController {
   @GetMapping("/")
   public String home(
       Model model, @AuthenticationPrincipal OidcUser principal, HttpSession session) {
-    // Fetch Next Mission
+    // Fetch the missions starting within the next seven days, nearest planned start first
+    // (REQ-MISSION-012). Replaces the former single "next mission" banner with a tile grid. Uses
+    // the broad mission-list scope (the viewer's own org units PLUS every unit's public missions)
+    // via /api/v1/missions/search, which also applies the guest redaction — outsiders only ever see
+    // PLANNED/ACTIVE non-internal missions. The first tile is the soonest upcoming mission.
     try {
-      Map<String, Object> nextMission =
+      Instant now = Instant.now();
+      Instant horizon = now.plus(7, ChronoUnit.DAYS);
+      String searchUri =
+          "/api/v1/missions/search?start="
+              + now
+              + "&end="
+              + horizon
+              + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50";
+      PageResponse<MissionListDto> upcomingPage =
           backendApiClient.get(
-              "/api/v1/missions/next",
-              new ParameterizedTypeReference<Map<String, Object>>() {},
+              searchUri,
+              new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
               principal == null);
-      model.addAttribute("nextMission", nextMission);
-    } catch (BackendServiceException e) {
-      if (e.getStatusCode() != 204) {
-        // Log or handle error if strictly needed, otherwise just no mission
-        log.error("Error fetching missions", e);
-        model.addAttribute("error", "error.mission.fetch");
-      }
+      List<MissionListDto> upcomingMissions =
+          (upcomingPage != null && upcomingPage.content() != null)
+              ? upcomingPage.content()
+              : List.of();
+      model.addAttribute("upcomingMissions", upcomingMissions);
     } catch (Exception e) {
-      log.error("Could not fetch mission details", e);
-      model.addAttribute("error", "error.mission.fetch.details");
+      log.error("Could not fetch upcoming missions", e);
+      model.addAttribute("upcomingMissions", List.of());
+      model.addAttribute("error", "error.mission.fetch");
     }
+
+    // Default to no own-unit ids so the tile grid can flag the viewer's own-unit missions with a
+    // "Meine Einheit" chip (REQ-MISSION-012); populated below for authenticated users.
+    model.addAttribute("myOrgUnitIds", Set.of());
 
     if (principal != null) {
       model.addAttribute("username", principal.getPreferredUsername());
@@ -99,6 +123,23 @@ public class HomeController {
             backendApiClient.get(
                 "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
         model.addAttribute("currentUser", currentUser);
+
+        // Collect the viewer's own Staffel ids so the tile grid can flag own-unit missions with a
+        // "Meine Einheit" chip (REQ-MISSION-012). Direct memberships only (squadron + squadrons);
+        // the leadership cascade of the /next banner (REQ-MISSION-008) is intentionally not
+        // applied.
+        Set<UUID> myOrgUnitIds = new HashSet<>();
+        if (currentUser.squadrons() != null) {
+          for (SquadronReferenceDto su : currentUser.squadrons()) {
+            if (su != null && su.id() != null) {
+              myOrgUnitIds.add(su.id());
+            }
+          }
+        }
+        if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
+          myOrgUnitIds.add(currentUser.squadron().id());
+        }
+        model.addAttribute("myOrgUnitIds", myOrgUnitIds);
 
         // Fetch Public Announcement
         Map<String, Object> announcement =

@@ -24,16 +24,21 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,11 +88,13 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // Anonymous home() path: backendApiClient.get(uri, typeRef, isPublic=true).
-    // Returning null is a valid "no upcoming mission" response and keeps the
-    // template's th:if branches simple.
+    // Anonymous home() path: backendApiClient.get(searchUri, typeRef, isPublic=true) for the
+    // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
+    // response and keeps the template's empty-state branch simple.
     when(backendApiClient.get(
-            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
         .thenReturn(null);
   }
 
@@ -167,25 +174,34 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * The "Nächster Einsatz" banner surfaces the mission's owning org unit (mission-next-banner.md):
-   * when the next mission is org-owned, the banner renders the org unit's name. Exercises the
-   * {@code nextMission.owningSquadron.name} Thymeleaf expression over the raw JSON map.
+   * Each upcoming-mission tile surfaces the mission's owning org unit (mission-next-banner.md,
+   * REQ-MISSION-012): an org-owned mission renders the org unit's name. Exercises the {@code
+   * mission.owningSquadron.name} Thymeleaf expression over a typed {@link MissionListDto} returned
+   * by the next-7-days search.
    */
   @Test
-  void home_ShouldShowOwningOrgUnitName_WhenNextMissionIsOrgOwned() throws Exception {
-    Map<String, Object> mission = new HashMap<>();
-    mission.put("id", UUID.randomUUID().toString());
-    mission.put("name", "Test Mission");
-    mission.put("status", "PLANNED");
-    // The banner's existing rows access these keys via property style (present-key required).
-    mission.put("meetingTime", null);
-    mission.put("plannedStartTime", null);
-    mission.put(
-        "owningSquadron",
-        Map.of("id", UUID.randomUUID().toString(), "name", "Alpha Staffel", "shorthand", "ALF"));
+  void home_ShouldShowOwningOrgUnitName_WhenUpcomingMissionIsOrgOwned() throws Exception {
+    MissionListDto mission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Test Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Staffel", "ALF"),
+            0L);
     when(backendApiClient.get(
-            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
-        .thenReturn(mission);
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
         .perform(get("/"))
@@ -194,26 +210,156 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * For an ownerless (leadership) next mission the banner falls back to the "Keine" label instead
+   * For an ownerless (leadership) upcoming mission the tile falls back to the "Keine" label instead
    * of omitting the row, mirroring the Verwaltung read-only display.
    */
   @Test
-  void home_ShouldShowOwnerlessLabel_WhenNextMissionHasNoOrgUnit() throws Exception {
-    Map<String, Object> mission = new HashMap<>();
-    mission.put("id", UUID.randomUUID().toString());
-    mission.put("name", "Leadership Mission");
-    mission.put("status", "PLANNED");
-    mission.put("meetingTime", null);
-    mission.put("plannedStartTime", null);
-    // owningSquadron present but null → ownerless mission (mirrors the serialized DTO).
-    mission.put("owningSquadron", null);
+  void home_ShouldShowOwnerlessLabel_WhenUpcomingMissionHasNoOrgUnit() throws Exception {
+    MissionListDto mission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Leadership Mission",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            // owningSquadron null → ownerless mission (mirrors the serialized DTO).
+            null,
+            0L);
     when(backendApiClient.get(
-            eq("/api/v1/missions/next"), any(ParameterizedTypeReference.class), anyBoolean()))
-        .thenReturn(mission);
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
         .perform(get("/"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Keine")));
+  }
+
+  /**
+   * REQ-MISSION-012: a tile whose owning org unit is one of the authenticated viewer's own Staffeln
+   * carries the "Meine Einheit" chip. The viewer's Staffel id is fed through {@code
+   * /api/v1/users/me} and matched against the upcoming mission's {@code owningSquadron.id} in the
+   * template.
+   */
+  @Test
+  void home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersStaffel() throws Exception {
+    UUID staffelId = UUID.randomUUID();
+    SquadronReferenceDto myStaffel = new SquadronReferenceDto(staffelId, "Adler Staffel", "ADL");
+    UserDto me =
+        new UserDto(
+            UUID.randomUUID(),
+            "tester",
+            "Tester",
+            "Tester",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            true,
+            null,
+            List.of(myStaffel),
+            0L,
+            null,
+            null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(me);
+
+    MissionListDto ownMission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Erzkonvoi-Eskorte",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            myStaffel,
+            0L);
+    when(backendApiClient.get(
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Meine Einheit")));
+  }
+
+  /**
+   * REQ-MISSION-012: a tile owned by a foreign unit (not one of the viewer's Staffeln) does not get
+   * the "Meine Einheit" chip, even for an authenticated viewer — the broad search scope surfaces
+   * it, but the highlight is reserved for the viewer's own units.
+   */
+  @Test
+  void home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign() throws Exception {
+    SquadronReferenceDto myStaffel =
+        new SquadronReferenceDto(UUID.randomUUID(), "Adler Staffel", "ADL");
+    UserDto me =
+        new UserDto(
+            UUID.randomUUID(),
+            "tester",
+            "Tester",
+            "Tester",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            true,
+            null,
+            List.of(myStaffel),
+            0L,
+            null,
+            null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(me);
+
+    MissionListDto foreignMission =
+        new MissionListDto(
+            UUID.randomUUID(),
+            "Grenzpatrouille Sol",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            new SquadronReferenceDto(UUID.randomUUID(), "Falke Staffel", "FLK"),
+            0L);
+    when(backendApiClient.get(
+            startsWith("/api/v1/missions/search"),
+            any(ParameterizedTypeReference.class),
+            anyBoolean()))
+        .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("Meine Einheit"))));
   }
 }
