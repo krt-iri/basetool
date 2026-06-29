@@ -44,11 +44,11 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   boolean existsByReversedTransactionId(UUID reversedTransactionId);
 
   /**
-   * Integrity check (REQ-BANK-020, ADR-0041): ids of {@code TRANSFER} transactions whose account
+   * Integrity check (REQ-BANK-020, ADR-0052): ids of {@code TRANSFER} transactions whose account
    * legs do not net to {@code -transfer_fee}. A fee-free (same-holder) transfer nets to zero; a
-   * fee-bearing transfer debits the source the gross and credits the destination the net, so its
-   * two account legs net to {@code -transfer_fee} (real money lost to the in-game fee). The holder
-   * side is checked by {@code
+   * fee-bearing holder-changing transfer debits the source the gross (amount + fee) and credits the
+   * destination the full entered amount, so its two account legs net to {@code -transfer_fee} (real
+   * money lost to the in-game fee). The holder side is checked by {@code
    * BankHolderPostingRepository.findHolderMovementTransactionsWithNonZeroSum}.
    *
    * @return the violating transfer transaction ids (empty when sound)

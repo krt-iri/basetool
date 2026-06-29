@@ -142,8 +142,8 @@
                             <span class="bank-amount"
                                   th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
                                   th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                            <!-- In-game fee carved out of an outgoing leg (REQ-BANK-033): the
-                                 destination received amount - fee. -->
+                            <!-- In-game fee added on top (REQ-BANK-033, ADR-0052): the outgoing leg
+                                 is the gross debited, so the destination received |amount| - fee. -->
                             <span class="bank-fee-note text-muted" data-testid="bank-holder-booking-fee"
                                   th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
                                   th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>

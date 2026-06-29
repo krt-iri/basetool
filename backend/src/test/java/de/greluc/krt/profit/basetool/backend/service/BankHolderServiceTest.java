@@ -226,7 +226,7 @@ class BankHolderServiceTest {
             "Ausgleich",
             now,
             null,
-            new BigDecimal("3"));
+            BigDecimal.ZERO);
     when(holderPostingRepository.findHolderBookings(eq(holderId), any()))
         .thenReturn(new PageImpl<>(List.of(deposit, umbuchung)));
 
@@ -262,8 +262,8 @@ class BankHolderServiceTest {
     BankHolderBookingDto umbuchungRow = rows.get(1);
     assertEquals("carol", umbuchungRow.counterHolderHandle());
     assertNull(umbuchungRow.counterAccountNo());
-    assertEquals(
-        0, umbuchungRow.transferFee().compareTo(new BigDecimal("3")), "fee passes through");
+    // The holder→holder Umbuchung is fee-free (REQ-BANK-031, ADR-0052); the zero fee maps through.
+    assertEquals(0, umbuchungRow.transferFee().signum(), "Umbuchung is fee-free");
   }
 
   @Test

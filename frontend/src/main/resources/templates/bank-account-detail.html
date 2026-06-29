@@ -146,8 +146,8 @@
                                 <span class="bank-amount"
                                       th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
                                       th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                                <!-- In-game fee carved out of an outgoing leg (REQ-BANK-033): the
-                                     recipient received amount - fee. -->
+                                <!-- In-game fee added on top (REQ-BANK-033, ADR-0052): the outgoing
+                                     leg is the gross debited, so the recipient received |amount| - fee. -->
                                 <span class="bank-fee-note text-muted" data-testid="bank-booking-fee"
                                       th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
                                       th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
@@ -286,14 +286,15 @@
                         <input type="number" id="bank-withdraw-amount" name="amount" min="1" step="1" required
                                data-testid="bank-withdraw-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- Live fee preview (REQ-BANK-033): the entered amount is the gross sent;
-                             bank.js fills the in-game fee and what actually arrives. -->
+                        <!-- Live fee preview (REQ-BANK-033, ADR-0052): the entered amount is what the
+                             recipient receives; bank.js fills the in-game fee and the gross debited
+                             from the account (amount + fee). -->
                         <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
                            data-testid="bank-withdraw-fee-preview">
                             <span th:text="#{bank.fee.label}">Geb&uuml;hr</span>:
                             <span data-fee-value>0</span> aUEC &middot;
-                            <span th:text="#{bank.fee.net.label}">kommt an</span>:
-                            <span data-fee-net>0</span> aUEC
+                            <span th:text="#{bank.fee.debited.label}">wird abgebucht</span>:
+                            <span data-fee-debit>0</span> aUEC
                         </p>
                     </div>
                     <div class="bank-form-row">
@@ -350,14 +351,17 @@
                         <input type="number" id="bank-transfer-amount" name="amount" min="1" step="1" required
                                data-testid="bank-transfer-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- Live fee preview (REQ-BANK-033). A same-holder transfer is fee-free, so
-                             bank.js hides this while source and destination holder match. -->
+                        <!-- Live fee preview (REQ-BANK-033, ADR-0052): the entered amount is what
+                             arrives at the destination; bank.js fills the in-game fee and the gross
+                             debited from the source (amount + fee). A same-holder transfer is
+                             fee-free, so bank.js hides this while source and destination holder
+                             match. -->
                         <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
                            data-testid="bank-transfer-fee-preview">
                             <span th:text="#{bank.fee.label}">Geb&uuml;hr</span>:
                             <span data-fee-value>0</span> aUEC &middot;
-                            <span th:text="#{bank.fee.net.label}">kommt an</span>:
-                            <span data-fee-net>0</span> aUEC
+                            <span th:text="#{bank.fee.debited.label}">wird abgebucht</span>:
+                            <span data-fee-debit>0</span> aUEC
                         </p>
                     </div>
                     <div class="bank-form-row">
