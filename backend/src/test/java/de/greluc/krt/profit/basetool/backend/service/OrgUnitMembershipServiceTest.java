@@ -60,6 +60,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -166,6 +167,41 @@ class OrgUnitMembershipServiceTest {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(userId, squadronId));
     m.setKind(OrgUnitKind.SQUADRON);
+    return m;
+  }
+
+  @Test
+  void findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade() {
+    UUID staffelId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    UUID olId = UUID.randomUUID();
+    when(membershipRepository.findAllByIdUserId(userId))
+        .thenReturn(
+            List.of(
+                membershipRow(userId, staffelId, OrgUnitKind.SQUADRON),
+                membershipRow(userId, skId, OrgUnitKind.SPECIAL_COMMAND),
+                membershipRow(userId, bereichId, OrgUnitKind.BEREICH),
+                membershipRow(userId, olId, OrgUnitKind.ORGANISATIONSLEITUNG)));
+
+    Set<UUID> ids = membershipService.findDirectMembershipOrgUnitIds(userId);
+
+    // Kind-agnostic: Bereich and OL ids are included, and no cascade expansion is applied.
+    assertEquals(Set.of(staffelId, skId, bereichId, olId), ids);
+  }
+
+  @Test
+  void findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty() {
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+
+    assertTrue(membershipService.findDirectMembershipOrgUnitIds(userId).isEmpty());
+  }
+
+  /** Builds a membership row of the given kind pointing the user at the given org unit. */
+  private static OrgUnitMembership membershipRow(UUID userId, UUID orgUnitId, OrgUnitKind kind) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, orgUnitId));
+    m.setKind(kind);
     return m;
   }
 

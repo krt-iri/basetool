@@ -264,6 +264,26 @@ public class UserController {
   }
 
   /**
+   * Returns the org-unit ids the calling user is a <em>direct</em> member of, across every kind
+   * (Staffel / SK / Bereich / Organisationsleitung), with no leadership cascade. The home-page
+   * upcoming-missions grid uses it to flag a mission whose owning org unit the caller is directly
+   * assigned to with a "Meine Einheit" chip (REQ-MISSION-012). Resolved for the current caller only
+   * (never an arbitrary id), and — unlike {@code GET /{id}/memberships} — open to every
+   * authenticated user: a membership-less account simply gets an empty set rather than a 403. Only
+   * opaque ids leave the API (no name, shorthand or kind), so the response carries no PII.
+   *
+   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the caller's direct org-unit ids across all kinds; never {@code null}, possibly empty.
+   */
+  @GetMapping("/me/org-unit-ids")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public Set<UUID> getMyOrgUnitIds(@AuthenticationPrincipal Jwt jwt) {
+    return orgUnitMembershipService.findDirectMembershipOrgUnitIds(
+        userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
    * Updates the calling user's own description + displayName. The JWT identifies the row — no
    * impersonation possible.
    *

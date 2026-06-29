@@ -31,10 +31,10 @@
     </div>
 
 
-    <div class="grid-auto-cards mt-2">
-    <!-- Info Section -->
-    <div sec:authorize="isAuthenticated()" class="hud-box" th:if="${announcement}">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; cursor: pointer;" id="info-header" data-trigger="index-toggle-info">
+    <!-- Information / announcement: spans the full width and is only as tall as its content —
+         minimal (just the header) when collapsed, expanding to the text height when open. -->
+    <div sec:authorize="isAuthenticated()" class="hud-box mt-2" th:if="${announcement}" id="info-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap: var(--space-4); cursor: pointer;" id="info-header" data-trigger="index-toggle-info">
              <div style="display:flex; align-items:center; gap: 0.5rem;">
                  <span id="info-toggle-icon" th:text="${unreadAnnouncement ? '▼' : '▶'}">▼</span>
                  <h2 th:text="#{info.title}" class="m-0">Information</h2>
@@ -44,8 +44,8 @@
                  <button type="submit" class="btn btn-ghost" th:text="#{info.mark_read}">Als gelesen markieren</button>
              </form>
         </div>
-        
-        <div id="info-body" th:style="${unreadAnnouncement ? 'display:block;' : 'display:none;'}">
+
+        <div id="info-body" class="mt-1" th:style="${unreadAnnouncement ? 'display:block;' : 'display:none;'}">
             <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
                  link protocols. Bean call bound via th:with — th:utext is a restricted expression
                  context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). -->
@@ -55,33 +55,47 @@
         </div>
     </div>
 
-    <!-- Next Mission Section -->
-    <div class="hud-box">
-        <h2 th:text="#{mission.next}">Nächste Mission</h2>
-        
-        <div th:if="${nextMission}" class="mission-info-grid">
-             <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${nextMission.name}">Mission Name</span>
-             <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${nextMission.get('owningSquadron') != null ? nextMission.get('owningSquadron').get('name') : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
-             <strong sec:authorize="isAuthenticated()" th:text="#{mission.description} + ':'">Beschreibung:</strong>
-             <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
-                  link protocols. Bean call bound via th:with — th:utext is a restricted expression
-                  context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). -->
-             <div sec:authorize="isAuthenticated()" class="markdown-content"
-                  th:with="descriptionHtml=${@markdown.render(nextMission.description)}"
-                  th:utext="${descriptionHtml}">Desc</div>
-             
-             <strong th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong> 
-             <span th:if="${nextMission.get('calendarLink') != null and !#strings.isEmpty(nextMission.get('calendarLink'))}"><a th:href="${nextMission.get('calendarLink')}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>
-             <strong th:text="#{mission.status} + ':'">Status:</strong> <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(nextMission.status)}" th:text="${nextMission.status}">Status</span>
-             <strong th:text="#{mission.meeting_time} + ':'">Treffen Teamspeak:</strong> <span class="utc-time" th:text="${nextMission.meetingTime}">Time</span>
-             <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${nextMission.plannedStartTime}">Time</span>
+    <!-- Upcoming missions: every mission whose planned start is within the next 7 days, rendered as
+         tiles with the nearest planned start first (REQ-MISSION-012). Each tile carries the same
+         fields as the former "next mission" card; the description is clamped to three lines and the
+         full text lives on the mission detail page. -->
+    <section class="mt-2">
+        <h2 th:text="#{home.upcoming.title}">Einsätze der nächsten 7 Tage</h2>
+
+        <div th:if="${not #lists.isEmpty(upcomingMissions)}" class="grid-auto-cards mt-1">
+            <div th:each="mission : ${upcomingMissions}" class="hud-box mission-tile">
+                <!-- Flag own-unit missions (owning Staffel in myOrgUnitIds) with the own-unit chip
+                     (REQ-MISSION-012). myOrgUnitIds is empty for guests, so the chip never shows. -->
+                <div th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="mission-tile__badge">
+                    <span class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
+                </div>
+                <div class="mission-info-grid">
+                     <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${mission.name}">Mission Name</span>
+                     <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
+                     <th:block sec:authorize="isAuthenticated()" th:if="${mission.description != null and !#strings.isEmpty(mission.description)}">
+                         <strong class="mission-tile__desc-label" th:text="#{mission.description} + ':'">Beschreibung:</strong>
+                         <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
+                              link protocols. Bean call bound via th:with — th:utext is a restricted expression
+                              context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat).
+                              The rendered markdown is clamped to three lines via .mission-tile__desc. -->
+                         <div class="markdown-content mission-tile__desc"
+                              th:with="descriptionHtml=${@markdown.render(mission.description)}"
+                              th:utext="${descriptionHtml}">Desc</div>
+                     </th:block>
+                     <strong th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong>
+                     <span th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}"><a th:href="${mission.calendarLink}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>
+                     <strong th:text="#{mission.status} + ':'">Status:</strong> <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}" th:text="${mission.status}">Status</span>
+                     <strong th:text="#{mission.meeting_time} + ':'">Treffen Teamspeak:</strong> <span class="utc-time" th:text="${mission.meetingTime}">Time</span>
+                     <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${mission.plannedStartTime}">Time</span>
+                </div>
+                <div sec:authorize="isAuthenticated()" class="mission-tile__actions">
+                    <a th:href="@{/missions/{id}(id=${mission.id})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
+                </div>
+            </div>
         </div>
-        <p th:if="${nextMission == null && error == null}" th:text="#{mission.empty_next}">Keine anstehenden Missionen.</p>
-        <div th:if="${nextMission}" sec:authorize="isAuthenticated()" class="mt-1" style="margin-top: 1rem;">
-            <a th:href="@{/missions/{id}(id=${nextMission.get('id')})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
-        </div>
-    </div>
-    </div>
+
+        <p th:if="${#lists.isEmpty(upcomingMissions)}" th:text="#{home.upcoming.empty}">Keine Einsätze in den nächsten 7 Tagen.</p>
+    </section>
 
 </main>
 <script th:attr="nonce=${cspNonce}">
