@@ -166,12 +166,18 @@ and that the backend's `/api/v1/**` remains unreachable.
 Production hosts do **not** build images locally. The
 [release-images](.github/workflows/release-images.yml) GitHub Actions
 workflow builds, scans (Trivy), signs (Cosign keyless / Sigstore) and
-pushes the backend + frontend images to GHCR on every push to `main` and
-every `v*.*.*` tag. The
+pushes the backend, frontend and ingest images — plus the `basetool-config`
+host-configuration bundle (the compose file + maintenance page + Keycloak
+theme) — to GHCR on every push to `main` and every `v*.*.*` tag. The
 [promote](.github/workflows/promote.yml) workflow re-tags an existing
-digest as `:stable` when an operator decides it should go live. The
-production host polls `:stable` every five minutes via `iri-deploy.timer`
-and applies any new digest with health-check-gated rollback.
+digest as `:stable` (app images **and** config, in lock-step) when an
+operator decides it should go live. The production host polls `:stable`
+every five minutes via `iri-deploy.timer` and applies any new digest with
+health-check-gated rollback — so an infra-image bump in the compose file
+(e.g. redis) ships automatically once promoted, with no manual file copy.
+A postgres/Keycloak image change is the one operator-gated exception. See
+[ADR-0049](docs/adr/0049-config-as-promotable-oci-artifact.md) and
+[REQ-OPS-*](docs/specs/deployment-delivery.md).
 
 The end-to-end runbook lives in [**docs/deployment.md**](docs/deployment.md).
 Summary of the release loop:
@@ -183,10 +189,11 @@ Summary of the release loop:
    `:stable` to the same digest. Still nothing is deployed; the server
    polls the change within five minutes.
 3. **Pull + apply**: `iri-deploy.timer` fires → `scripts/deploy.sh`
-   resolves the new `:stable` digest, pins it in a compose override,
-   runs `docker compose pull && docker compose up -d --wait` with a
-   180 s health-check, and auto-rolls-back to the previous digest if
-   the new images fail to become healthy.
+   resolves the new `:stable` digests (app images + config bundle), pins
+   the images in a compose override, swaps in the promoted compose file
+   if its digest moved, runs `docker compose pull && docker compose up -d
+   --wait` with a 180 s health-check, and auto-rolls-back both the digest
+   pin and the config tree if the new stack fails to become healthy.
 
 During the brief window in step 3 between "old container gone" and "new
 container healthy", `nginx-proxy-manager` intercepts the upstream `502` and

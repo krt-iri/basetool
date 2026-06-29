@@ -5,6 +5,10 @@ name: Promote to stable
 # digest, so the production deploy that follows is by definition identical to
 # what `release-images.yml` validated (built, scanned, signed) earlier.
 #
+# Promotes the three app images (backend/frontend/ingest) AND the
+# `basetool-config` host-configuration bundle together, so the compose file the
+# host applies always matches the app images it references (see ADR-0049).
+#
 # Trigger: workflow_dispatch only. Promotion is an intentional human decision,
 # never automatic from a CI build.
 #
@@ -24,7 +28,7 @@ on:
 
 concurrency:
   # Serialise promotions globally so two simultaneous flips cannot leave the
-  # backend and frontend images on different versions.
+  # app images and the config bundle on different versions.
   group: promote-stable
   cancel-in-progress: false
 
@@ -62,12 +66,16 @@ jobs:
     timeout-minutes: 10
 
     strategy:
-      # If one module promotion fails, do NOT carry on with the other —
-      # otherwise we land in a backend/frontend version skew on the live host
-      # the next time the timer ticks. fail-fast is the correct policy here.
+      # If one promotion fails, do NOT carry on with the others — otherwise we
+      # land in a version skew on the live host the next time the timer ticks
+      # (e.g. new app images against the old compose, or vice-versa). fail-fast
+      # is the correct policy here. `config` is the host-configuration bundle
+      # (docker/config/Dockerfile); it is promoted in lock-step with the app
+      # images so the compose file and the images it references always move
+      # together and the host applies them atomically.
       fail-fast: true
       matrix:
-        module: [backend, frontend, ingest]
+        module: [backend, frontend, ingest, config]
 
     steps:
       - name: Set up Docker Buildx
