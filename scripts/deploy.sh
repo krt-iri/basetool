@@ -162,14 +162,22 @@ require_file() {
 # subtree only. Used to apply the bundled maintenance-page / Keycloak-theme trees
 # without ever touching anything outside them. Prefers rsync; falls back to a
 # clean re-copy when rsync is absent (it is not a hard host dependency).
+#
+# Runs as the unprivileged `deploy` user, so it deliberately does NOT preserve
+# owner/group. `rsync -a` (= -rlptgoD) and `cp -a` (= --preserve=all) both try to
+# `chgrp`/`chown` every entry, which fails ("Operation not permitted") the moment
+# any file in the live tree is owned by someone else — e.g. a root-owned bootstrap
+# copy of keycloak-theme. `rsync -rlpt` / `cp -R` keep recursion, symlinks, perms
+# and times (all the maintenance/theme assets need) without ever touching
+# ownership, so the mirror succeeds as long as the destination dirs are writable.
 mirror_dir() {
   local src="$1" dst="$2"
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "${src}/" "${dst}/"
+    rsync -rlpt --delete "${src}/" "${dst}/"
   else
     rm -rf "${dst}"
     install -d "${dst%/*}"
-    cp -a "${src}" "${dst}"
+    cp -R "${src}" "${dst}"
   fi
 }
 
