@@ -536,6 +536,20 @@ class UserControllerTest {
     assertTrue(result.isEmpty());
   }
 
+  @Test
+  void getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService() {
+    java.util.Set<UUID> ids = java.util.Set.of(UUID.randomUUID(), UUID.randomUUID());
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    when(orgUnitMembershipService.findDirectMembershipOrgUnitIds(CALLER_ID)).thenReturn(ids);
+
+    java.util.Set<UUID> result = controller.getMyOrgUnitIds(jwt);
+
+    // The caller id is taken from the JWT (never an URL path), and the id set is handed through.
+    assertSame(ids, result);
+    verify(userService).getUserIdFromJwt(jwt);
+    verify(orgUnitMembershipService).findDirectMembershipOrgUnitIds(CALLER_ID);
+  }
+
   // ── helpers ─────────────────────────────────────────────────────────────
 
   private static UserDto mockDto(UUID id) {

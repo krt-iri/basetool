@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Startseite: Einsätze der nächsten 7 Tage als Kacheln.** Statt nur des nächsten Einsatzes zeigt die Startseite jetzt alle Einsätze mit geplantem Start in den nächsten 7 Tagen als Kacheln — der nächstgelegene zuerst, danach aufsteigend; jede Kachel enthält dieselben Angaben wie zuvor, die Beschreibung wird nach drei Zeilen abgeschnitten (vollständig auf der Einsatz-Detailseite sichtbar). Der Info-/Ankündigungsbereich darüber nimmt die volle Breite ein und ist nur so hoch wie nötig (eingeklappt minimal). Angezeigt werden eigene Einsätze (inklusive interner) sowie alle öffentlichen Einsätze; Einsätze einer eigenen Einheit sind mit einer „Meine Einheit"-Markierung hervorgehoben.
+
 ## [v1.0.4](https://github.com/krt-profit/basetool/releases/tag/v1.0.4) - 2026-06-29
 
 ### Added

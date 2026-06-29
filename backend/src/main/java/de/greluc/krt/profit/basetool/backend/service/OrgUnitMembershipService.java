@@ -240,6 +240,29 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * Returns the org-unit ids the user is a <em>direct</em> member of, across every kind (Staffel /
+   * SK / Bereich / Organisationsleitung), with no leadership cascade. Unlike {@link
+   * #listOptionsForUser(UUID)} — which materialises only the {@code SQUADRON} / {@code
+   * SPECIAL_COMMAND} options the owner picker renders and deliberately skips {@code BEREICH} /
+   * {@code ORGANISATIONSLEITUNG} rows — this is kind-agnostic: it reads the raw org-unit id off
+   * every membership row, so a direct Bereich or OL assignment is included. It also avoids the
+   * per-row org-unit lookups of the option list, because the home-page "Meine Einheit" highlight
+   * (REQ-MISSION-012) only needs the id set, not the labelled options.
+   *
+   * @param userId the user whose direct memberships to enumerate; never {@code null}.
+   * @return the org-unit ids of the user's direct memberships across all kinds; never {@code null},
+   *     possibly empty.
+   */
+  @NotNull
+  public Set<UUID> findDirectMembershipOrgUnitIds(@NotNull UUID userId) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (OrgUnitMembership row : membershipRepository.findAllByIdUserId(userId)) {
+      ids.add(row.getId().getOrgUnitId());
+    }
+    return ids;
+  }
+
+  /**
    * Picker options for the <em>owning-org-unit</em> drill-down (epic #692 Phase 5, REQ-ORG-016 /
    * REQ-ORG-018): the caller's direct memberships <em>plus</em> the cascading leadership reach
    * (delegated to {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}).
