@@ -59,6 +59,17 @@ jobs:
         # and the merge-base against it.
         run: git fetch --no-tags origin "${{ github.base_ref }}"
 
+      - name: Self-test the migration checker
+        shell: bash
+        # Guards the checker's own logic — in particular that a branch's
+        # migration already merged to the base (squash-merge in flight) is not
+        # flagged as colliding with itself, while genuine duplicates and
+        # out-of-order additions still fail. Self-contained (builds throwaway
+        # git repos); needs no PR migrations or base fetch.
+        run: |
+          chmod +x scripts/check-flyway-migrations.test.sh
+          scripts/check-flyway-migrations.test.sh
+
       - name: Validate Flyway migration numbering
         shell: bash
         env:

@@ -121,8 +121,21 @@ else
   if [[ ${#base_files[@]} -eq 0 ]]; then
     echo "::notice title=Flyway check::Base ref '${BASE_REF}' has no migrations — every added migration is trivially in order."
   else
+    # Basenames present on the base ref. A migration this branch "adds" that is
+    # already here under the *same filename* is the branch's own migration that
+    # has since landed on the base — typically because the PR was squash-merged
+    # while this very run was still in flight. A squash merge creates a fresh
+    # commit on main and does NOT make the branch head an ancestor of it, so
+    # the merge-base never advances and `git diff merge-base..HEAD` keeps
+    # listing the file as "added on the branch". Comparing its version against
+    # max_base — which now includes that very file — would flag the migration
+    # as colliding with itself (e.g. "V194 does not sort after V194"). Skip
+    # those; a *genuine* collision is a different filename sharing the number,
+    # which is still caught below.
+    declare -A base_names=()
     base_versions=()
     for bf in "${base_files[@]}"; do
+      base_names["$bf"]=1
       base_versions+=("$(flyway_version "$bf")")
     done
     max_base=$(printf '%s\n' "${base_versions[@]}" | sort -V | tail -n1)
@@ -140,16 +153,31 @@ else
     if [[ ${#added_files[@]} -eq 0 ]]; then
       echo "::notice title=Flyway check::No new migrations added relative to '${BASE_REF}'."
     else
-      echo "Highest version on '${BASE_REF}': V${max_base}"
+      # Drop additions that already exist verbatim on the base ref (the
+      # squash-merge-in-flight race described above).
+      new_files=()
       for af in "${added_files[@]}"; do
-        av=$(flyway_version "$af")
-        if version_gt "$av" "$max_base"; then
-          echo "  ok: ${af} (V${av}) > V${max_base}"
+        if [[ -n "${base_names[$af]:-}" ]]; then
+          echo "::notice title=Flyway check::'${af}' is already present on '${BASE_REF}' — the branch's own migration has landed on the base (e.g. a squash merge while this run was in flight); not treated as a new addition."
         else
-          echo "::error title=Out-of-order Flyway migration::New migration '${af}' (V${av}) does not sort after the current highest version on '${BASE_REF}' (V${max_base}). Renumber it to a version greater than V${max_base} — rebase onto the latest base and re-pick the next free integer."
-          failed=1
+          new_files+=("$af")
         fi
       done
+
+      if [[ ${#new_files[@]} -eq 0 ]]; then
+        echo "::notice title=Flyway check::No new migrations added relative to '${BASE_REF}' (all additions are already present on the base)."
+      else
+        echo "Highest version on '${BASE_REF}': V${max_base}"
+        for af in "${new_files[@]}"; do
+          av=$(flyway_version "$af")
+          if version_gt "$av" "$max_base"; then
+            echo "  ok: ${af} (V${av}) > V${max_base}"
+          else
+            echo "::error title=Out-of-order Flyway migration::New migration '${af}' (V${av}) does not sort after the current highest version on '${BASE_REF}' (V${max_base}). Renumber it to a version greater than V${max_base} — rebase onto the latest base and re-pick the next free integer."
+            failed=1
+          fi
+        done
+      fi
     fi
   fi
 fi
