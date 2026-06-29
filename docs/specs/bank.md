@@ -140,6 +140,11 @@ themselves **not reversible** (stable code `BANK_NOT_REVERSIBLE`). Account balan
 SQL sum of its `bank_posting` rows and a holder's global balance the SQL sum of its
 `bank_holder_posting` rows, both computed on read (ADR-0010/0039).
 
+> **Amended by REQ-BANK-043:** a **split** `DEPOSIT` is the one deposit that carries **more than one
+> account leg** — one positive leg per credited account (the named remainder + each squadron share)
+> against a **single** positive holder leg over the gross (the money landed once). The legs sum to
+> the gross; deposits stay fee-free. A plain (non-split) deposit keeps the one-account-leg shape.
+
 **Acceptance**
 
 - [x] No service or repository code path issues `UPDATE`/`DELETE` on `bank_transaction`,
@@ -161,6 +166,11 @@ Bank amounts follow the project-wide whole-number-amounts contract
 `@DecimalMin("1")` (a zero-amount booking is meaningless), display rounded HALF_UP to
 whole aUEC via the frontend `MoneyFormat` bean. Amount inputs use
 `<input type="number" step="1" inputmode="numeric">`.
+
+> **Amended by REQ-BANK-043:** a split deposit's percentage is a whole-percent (1–100) and its
+> `slice = round(gross × P / 100)` is whole (HALF_UP); the slice is distributed whole-aUEC across the
+> squadron accounts by the largest-remainder rule so every per-account leg stays whole and the legs
+> sum back to the gross exactly (no aUEC created or lost).
 
 **Acceptance**
 
@@ -548,6 +558,11 @@ balances** — the holder dimension is intentionally allowed to be negative (REQ
 it is **not** checked; an audit row exists for every audited transaction — every type except
 `WIPE_RESET`, which is summarized by one event, not one per generated transaction) and reports
 violations as `ERROR` log events with `correlationId`.
+
+> **Amended by REQ-BANK-043:** a **split** `DEPOSIT` has several positive account legs summing to the
+> gross against one holder leg of the gross. It is a `DEPOSIT`, so the zero-/`−fee`-sum invariants
+> (which apply only to `TRANSFER`/`HOLDER_TRANSFER`) do not constrain it; it still carries exactly one
+> audit row (`DEPOSIT_SPLIT_BOOKED`), so the audit-row-per-transaction sweep is unchanged.
 
 **Acceptance**
 
@@ -1281,6 +1296,11 @@ confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · *
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
+> **Amended by REQ-BANK-043:** a deposit request (like a direct deposit) may additionally carry a
+> split that distributes a percentage of the gross across all active squadron accounts. The
+> percentage is snapshotted on the off-ledger request and resolved into concrete legs at
+> confirmation; it never makes a deposit approval-limited. Withdrawals/transfers never carry a split.
+
 A **deposit** booking request is the one movement kind a requester cannot abuse — it only *adds*
 money to an account, and nothing moves until a bank employee confirms receipt in-game
 (REQ-BANK-023). It is therefore deliberately unrestricted (owner decision), **amending**
@@ -1326,6 +1346,86 @@ rejected), `OrgUnitBankPageControllerMvcTest` (deposit picker lists all active a
 frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html`, `static/js/bank.js` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
 **Issues:** —
+
+### REQ-BANK-043 — Split deposit across squadron accounts
+
+A deposit — both the direct bank-staff booking (REQ-BANK-004) and the confirm-before-post deposit
+request (REQ-BANK-042) — may optionally **distribute a percentage of the gross evenly across all
+active squadron accounts**, crediting the named account only the remainder (owner request). The
+option is a single checkbox plus one whole-percent `P` (1–100); it is **deposit-only** (money
+entering the bank) and never applies to a withdrawal or transfer.
+
+- **Squadron accounts** = `ORG_UNIT` accounts whose owning org unit is a `SQUADRON`
+  (`OrgUnitKind.SQUADRON`), `ACTIVE` only. SK / AREA / CARTEL / CARTEL_BANK / SPECIAL accounts are
+  never split targets. The **named account is excluded** from the distribution set (even when it is
+  itself a squadron account): it only ever receives the remainder. The enumeration reads the
+  `org_unit.kind` via `OrgUnit#getKind()` (an owner *label*, not a scope), so the bank stays
+  org-unit-blind (REQ-BANK-008) — no `OwnerScopeService`, both ArchUnit pins green.
+- **Math (whole-aUEC, REQ-BANK-005).** `slice = round(gross × P / 100)` (HALF_UP, whole). The slice
+  is split across the `N` squadron accounts with the **largest-remainder** rule: `base = floor(slice
+  / N)`, and the leftover `slice − base·N` aUEC go one each to the first accounts by ascending id, so
+  the per-account amounts are as even as possible, stay whole and sum to the slice exactly. The named
+  account is credited `gross − slice`. Every account leg plus the named leg sums to the gross.
+  Zero-amount legs are dropped (a 100 % split books no named leg; a slice smaller than `N` credits
+  only the first `slice` accounts).
+- **Ledger shape (amends REQ-BANK-004).** A split deposit is **one** `DEPOSIT` transaction with
+  **one positive account leg per credited account** (the named remainder + each squadron share) and
+  a **single** positive holder leg over the whole gross — the money physically landed once with one
+  custodian (REQ-BANK-003); the split is a pure account-side allocation. Deposits are fee-free
+  (REQ-BANK-033), so no fee applies. All affected accounts are pessimistically locked in ascending id
+  order (the global lock order, REQ-BANK-006/-011/-013), so the fan-out cannot deadlock.
+- **Authorization (unchanged).** A direct split deposit needs `BANK_EMPLOYEE` + `can_deposit` on the
+  **named** account (REQ-BANK-009) — crediting the squadron accounts needs no further grant, because
+  a deposit only adds money (the same rationale as the unrestricted deposit *request* of
+  REQ-BANK-042). The request variant follows REQ-BANK-042 (any authenticated user, any active
+  account, no approval limit; the split never makes a deposit approval-limited).
+- **Request variant (amends REQ-BANK-042).** A deposit request snapshots `split_enabled` +
+  `split_percent` on the off-ledger row (V196); the concrete per-squadron legs are (re)computed at
+  **confirmation** against the squadron accounts active **then**, exactly like the approval-limit
+  snapshot of REQ-BANK-041. The bank employee sees the split in the confirm modal before booking.
+- **Failures (409).** `BANK_SPLIT_NO_TARGETS` when no active squadron account remains to distribute
+  to (none exists, or the only one is the named account); `BANK_SPLIT_TOO_SMALL` when the slice
+  rounds below 1 aUEC.
+- **Audit (REQ-BANK-012, REQ-AUDIT-001).** One summarizing `DEPOSIT_SPLIT_BOOKED` event per split
+  transaction — the `WIPE_RESET_EXECUTED` precedent (one event for a multi-account transaction, not
+  one per leg); the PII-free details carry the gross, holder handle, percentage and target count
+  (the holder handle is the same datum the plain `DEPOSIT_BOOKED` detail already records).
+- **Integrity (amends REQ-BANK-020).** A split `DEPOSIT` carries `N` positive account legs summing
+  to the gross against one holder leg of the gross; it is a `DEPOSIT`, so the
+  transfer/holder-transfer zero-/`−fee`-sum invariants do not apply, and a reversal mirrors all its
+  legs generically (REQ-BANK-004). It still carries exactly one audit row, so the
+  audit-row-per-transaction sweep is unaffected.
+- **Frontend (REQ-FE-001…010).** The deposit modal (bank staff) and the deposit-request modal
+  (org-unit page) gain the checkbox + percentage + a live "slice / remainder" preview; the bank-staff
+  confirm modal shows the split before booking. The split is submitted through the existing
+  `krtFetch` deposit/request writes; the pages where these actions happen do not display the other
+  squadron accounts' balances, so the standard in-place fragment swap covers every derived UI on the
+  acting page (a separately-open dashboard refreshes on its own next load — cross-page peer sync is
+  Mission-only, REQ-FE-010).
+
+**Acceptance**
+
+- [x] A split deposit books one `DEPOSIT` transaction crediting `gross − slice` to the named account
+  and the slice evenly across the active squadron accounts (largest-remainder), with one holder leg
+  over the gross; the legs sum to the gross.
+- [x] The named account is excluded from the distribution even when it is a squadron account; a
+  100 % split books no named leg.
+- [x] `BANK_SPLIT_NO_TARGETS` / `BANK_SPLIT_TOO_SMALL` are returned (409) for the no-target /
+  rounds-to-zero cases.
+- [x] A deposit request snapshots the percentage and resolves the legs at confirmation; a
+  withdrawal/transfer request rejects a split (DTO + V196 CHECK).
+- [x] One `DEPOSIT_SPLIT_BOOKED` audit row per split transaction; it appears in the admin viewer's
+  Bank event-type filter with DE/EN labels.
+
+**Enforced by:** `BankLedgerSplitDepositTest` (split distribution, largest-remainder, exclude-named,
+100 %, no-targets, too-small, single holder leg), `BankBookingRequestServiceTest` (split request
+snapshot + confirm books a split), `OrgUnitBankAccessServiceTest` (deposit request carries the split)
+· **Code:** `service/BankLedgerService#bookSplitDeposit`,
+`model/dto/request/BankDepositRequest`, `model/dto/request/CreateBankBookingRequest`,
+`model/BankBookingRequest`, `repository/BankAccountRepository#findByTypeAndStatusOrderById`,
+`model/BankAuditEventType#DEPOSIT_SPLIT_BOOKED`, `db/migration/V196`, frontend
+`templates/bank-account-detail.html` / `org-unit-bank.html` / `bank-requests.html`,
+`static/js/bank.js` · **Issues:** —
 
 ## Out of scope
 

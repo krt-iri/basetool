@@ -21,7 +21,7 @@
     'use strict';
 
     /** Form field names serialized as JSON numbers instead of strings. */
-    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit'];
+    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit', 'splitPercent'];
 
     /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
     const BOOLEAN_FIELDS = ['active'];
@@ -37,6 +37,9 @@
         BANK_SELF_TRANSFER: 'destinationAccountId',
         BANK_GRANTEE_MISSING_ROLE: 'userId',
         BANK_HOLDER_INACTIVE: 'holderId',
+        // Split deposit conflicts (REQ-BANK-043): surface at the percentage field.
+        BANK_SPLIT_NO_TARGETS: 'splitPercent',
+        BANK_SPLIT_TOO_SMALL: 'splitPercent',
     };
 
     /**
@@ -219,6 +222,15 @@
                 syncRequestTypeRows(typeSelect);
             }
             updateLimitWarning(form);
+        }
+        // Split deposit (REQ-BANK-043): re-sync the percentage row + preview to the (re)opened modal's
+        // toggle so a reused modal never shows a stale split state. The org-unit request modal's split
+        // visibility is additionally driven by the type via syncRequestTypeRows above.
+        if (form && form.querySelector('[data-split-row]')) {
+            const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
+            if (splitToggle) {
+                toggleSplitRow(splitToggle);
+            }
         }
     }
 
@@ -523,6 +535,100 @@
     }
 
     /**
+     * Shows/hides and enables/disables a deposit form's split-percentage row to match its toggle
+     * checkbox (REQ-BANK-043). The percentage input is disabled while hidden so {@link submitBankForm}
+     * omits it entirely (and the backend's "split off ⇒ no percentage" rule is never tripped). Clears
+     * the value + preview when the split is switched off, then refreshes the preview.
+     *
+     * @param {HTMLInputElement} toggle the split toggle checkbox
+     */
+    function toggleSplitRow(toggle) {
+        const form = toggle.closest('form');
+        if (!form) {
+            return;
+        }
+        const row = form.querySelector('[data-split-row]');
+        const input = form.querySelector('input[name="splitPercent"]');
+        const on = toggle.checked && !toggle.disabled;
+        if (row) {
+            row.hidden = !on;
+        }
+        if (input) {
+            input.disabled = !on;
+            if (!on) {
+                input.value = '';
+            }
+        }
+        updateSplitPreview(form);
+    }
+
+    /**
+     * Live split-deposit preview (REQ-BANK-043): the entered amount is the gross; this fills the
+     * slice distributed across the squadron accounts (`round(gross * percent / 100)`) and the
+     * remainder that stays on the named account (`gross - slice`). Hidden when the split is off or the
+     * inputs are incomplete/out of range. Guidance only — the authoritative split (and the exact
+     * per-account amounts, which depend on how many squadron accounts are active) is computed
+     * server-side at booking time.
+     *
+     * @param {HTMLFormElement} form the deposit/request form carrying a `[data-split-preview]` block
+     */
+    function updateSplitPreview(form) {
+        const preview = form.querySelector('[data-split-preview]');
+        const amountEl = form.querySelector('input[name="amount"]');
+        const percentEl = form.querySelector('input[name="splitPercent"]');
+        if (!preview || !amountEl || !percentEl) {
+            return;
+        }
+        const gross = Number(amountEl.value);
+        const percent = Number(percentEl.value);
+        if (
+            percentEl.disabled ||
+            !Number.isFinite(gross) ||
+            gross <= 0 ||
+            !Number.isFinite(percent) ||
+            percent <= 0 ||
+            percent > 100
+        ) {
+            preview.hidden = true;
+            return;
+        }
+        const slice = Math.round((gross * percent) / 100);
+        if (slice <= 0) {
+            preview.hidden = true;
+            return;
+        }
+        const sliceEl = preview.querySelector('[data-split-slice]');
+        const remainderEl = preview.querySelector('[data-split-remainder]');
+        if (sliceEl) {
+            sliceEl.textContent = slice.toLocaleString('de-DE');
+        }
+        if (remainderEl) {
+            remainderEl.textContent = (gross - slice).toLocaleString('de-DE');
+        }
+        preview.hidden = false;
+    }
+
+    /**
+     * Recomputes the split preview for the form the edited field belongs to (amount or percentage).
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function recomputeSplitPreviewFrom(target) {
+        const form = target && target.closest ? target.closest('form') : null;
+        if (form && form.querySelector('[data-split-preview]')) {
+            updateSplitPreview(form);
+        }
+    }
+
+    /* Split toggle: show/hide the percentage row and refresh the preview as it is ticked/unticked. */
+    document.addEventListener('change', function (event) {
+        const toggle = event.target.closest('[data-role="bank-split-toggle"]');
+        if (toggle) {
+            toggleSplitRow(toggle);
+        }
+    });
+
+    /**
      * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
      * entered current in-game balance and their server-rendered global custody total
      * (`data-reserved`), shows how much is the holder's own private money (`balance − reserved`).
@@ -565,6 +671,7 @@
     function onBankFieldEdit(target) {
         recomputeFeePreviewFrom(target);
         recomputeLimitWarningFrom(target);
+        recomputeSplitPreviewFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
             updateBalanceCalc(target);
         }
@@ -832,6 +939,20 @@
         }
         const row = form.querySelector('[data-request-transfer-only]');
         toggleTransferOnlyControl(row, isTransfer);
+        // Split deposit (REQ-BANK-043): the split is DEPOSIT-only. Show the block only for a deposit,
+        // and disable its toggle otherwise so splitEnabled is omitted from a withdrawal/transfer body.
+        const splitBlock = form.querySelector('[data-split-deposit-only]');
+        if (splitBlock) {
+            splitBlock.hidden = !isDeposit;
+            const splitToggle = splitBlock.querySelector('[data-role="bank-split-toggle"]');
+            if (splitToggle) {
+                splitToggle.disabled = !isDeposit;
+                if (!isDeposit) {
+                    splitToggle.checked = false;
+                }
+                toggleSplitRow(splitToggle);
+            }
+        }
         updateLimitWarning(form);
     }
 
@@ -877,6 +998,22 @@
         }
         if (submit) {
             submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
+        }
+
+        // Split deposit notice (REQ-BANK-043): show the percentage that will be distributed across the
+        // squadron accounts, so the staffer knows what they are confirming.
+        const splitNotice = form.querySelector('[data-split-confirm]');
+        if (splitNotice) {
+            const splitEnabled = trigger.getAttribute('data-field-splitenabled') === 'true';
+            splitNotice.hidden = !splitEnabled;
+            if (splitEnabled) {
+                const percentEl = splitNotice.querySelector('[data-split-confirm-percent]');
+                if (percentEl) {
+                    percentEl.textContent = Math.round(
+                        Number(trigger.getAttribute('data-field-splitpercent')),
+                    ).toLocaleString('de-DE');
+                }
+            }
         }
 
         const destRow = form.querySelector('[data-confirm-destination-holder]');

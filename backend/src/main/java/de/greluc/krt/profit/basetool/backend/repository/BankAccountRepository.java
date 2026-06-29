@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -156,4 +157,20 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
    */
   @EntityGraph(attributePaths = {"orgUnit"})
   List<BankAccount> findAllByOrderByAccountNoAsc();
+
+  /**
+   * Loads every account of one type/status with the owning org unit pre-fetched — backs the split
+   * deposit's squadron-account enumeration (REQ-BANK-043): it reads {@code ORG_UNIT}/{@code ACTIVE}
+   * accounts, then filters them to those whose org unit is a {@code SQUADRON} in Java (the {@code
+   * org_unit.kind} discriminator is read via {@code OrgUnit#getKind()}, not a JPQL attribute, see
+   * {@code OrgUnit}). Unbounded by design — the org holds a handful of accounts. The returned rows
+   * are <strong>not</strong> locked; the split flow re-locks each target via {@link
+   * #findByIdForUpdate(UUID)} in ascending id order before posting.
+   *
+   * @param type the account type to load (e.g. {@code ORG_UNIT})
+   * @param status the account status to load (e.g. {@code ACTIVE})
+   * @return the matching accounts with their org unit fetched, ordered by id
+   */
+  @EntityGraph(attributePaths = {"orgUnit"})
+  List<BankAccount> findByTypeAndStatusOrderById(BankAccountType type, BankAccountStatus status);
 }
