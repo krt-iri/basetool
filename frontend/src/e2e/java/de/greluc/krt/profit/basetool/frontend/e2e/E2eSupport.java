@@ -385,6 +385,36 @@ final class E2eSupport {
   }
 
   /**
+   * Picks an option from a KRT searchable combobox (krt-searchable-select.js) by the option's
+   * value. The enhancer replaces the original {@code <select>} with a filtering text input plus a
+   * {@code role=listbox}, so selecting is no longer {@code selectOption(...)}: this focuses the
+   * textbox to open the popup, then clicks the {@code role=option} carrying the wanted value in its
+   * {@code data-value} (the enhancer mirrors each option's value there). Used wherever a {@code
+   * <select>} was converted into a searchable user/holder picker (REQ-FE-011).
+   *
+   * @param comboInput the visible combobox textbox the enhancer rendered (e.g. located by its
+   *     {@code data-testid})
+   * @param value the option value to select
+   */
+  static void selectComboboxByValue(Locator comboInput, String value) {
+    comboInput.click();
+    comboInput.page().locator("li[role='option'][data-value='" + value + "']").first().click();
+  }
+
+  /**
+   * Picks the first real option of a KRT searchable combobox — the equivalent of a native {@code
+   * selectOption(new SelectOption().setIndex(1))}, since the combobox does not render its
+   * empty-value placeholder as a list option. Opens the popup by focusing the textbox, then clicks
+   * the first {@code role=option}.
+   *
+   * @param comboInput the visible combobox textbox the enhancer rendered
+   */
+  static void selectComboboxFirstOption(Locator comboInput) {
+    comboInput.click();
+    comboInput.page().locator("li[role='option']").first().click();
+  }
+
+  /**
    * Runs a submit action that triggers a full-page form POST and blocks until the resulting
    * navigation — <em>including the redirect the POST triggers</em> — has fully settled, so the
    * submit and the page it lands on cannot be dropped by whatever the test does next.

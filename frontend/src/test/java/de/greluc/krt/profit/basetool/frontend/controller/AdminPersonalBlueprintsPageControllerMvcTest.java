@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -140,6 +141,48 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"bp-results\""))))
         .andExpect(content().string(not(containsString("id=\"krt-bp-edit-modal\""))))
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
+  }
+
+  // covers REQ-FE-011 — the admin user picker is the shared searchable combobox, and each option
+  // carries the username as a secondary search term (data-search) so typing the login name matches
+  // a
+  // user whose display name differs from it.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_userPicker_isSearchableComboboxWithUsernameSearchTerm() throws Exception {
+    UserDto user =
+        new UserDto(
+            UUID.fromString("00000000-0000-0000-0000-000000000009"),
+            "alice_login",
+            "Alice Display",
+            "Alice Display",
+            null,
+            null,
+            null,
+            Set.of(),
+            Set.of(),
+            null,
+            Boolean.FALSE,
+            Boolean.FALSE,
+            Boolean.TRUE,
+            null,
+            null,
+            0L,
+            null,
+            null);
+    // With no userSub the only backend call is the user-list fetch (blueprints default to empty),
+    // so
+    // a single stub safely seeds the picker options without leaking into the blueprint table.
+    PageResponse<UserDto> users = new PageResponse<>(List.of(user), 0, 1000, 1L, 1, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(users);
+
+    mockMvc
+        .perform(get("/admin/personal-blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-krt-combobox")))
+        .andExpect(content().string(containsString("data-search=\"alice_login\"")))
+        .andExpect(content().string(containsString("Alice Display")));
   }
 
   @Test
