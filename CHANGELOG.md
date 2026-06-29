@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.4](https://github.com/krt-profit/basetool/releases/tag/v1.0.4) - 2026-06-29
+
 ### Added
 
 - **Missionen: verantwortliche Einheit eines Einsatzes nachträglich änderbar.** Im Tab „Verwaltung" eines Einsatzes lässt sich die verantwortliche Einheit (Staffel/SK/Bereich/OL) jetzt ändern oder auf „Keine" setzen — bisher war sie nach dem Anlegen fest; die Sichtbarkeit des Einsatzes richtet sich danach neu aus und die Änderung wird im Audit-Log erfasst. Wer den Besitzer wechseln darf, darf auch die Einheit ändern (Admin, zuständiger Offizier oder Einsatz-Besitzer); Nicht-Admins können nur auf eigene oder von ihnen verwaltete Einheiten zuweisen. Die verantwortliche Einheit wird außerdem auf der Startseite im Bereich „Nächster Einsatz" angezeigt.
