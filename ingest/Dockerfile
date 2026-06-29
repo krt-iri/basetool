@@ -1,6 +1,6 @@
 # L-8: pin the base image to its multi-arch index digest (not just the floating tag) so builds are
 # bit-reproducible and the SLSA provenance stays sound. Dependabot bumps the tag + digest together.
-FROM eclipse-temurin:25-jdk-alpine@sha256:30d9f87d702c2c1c601ed0d31e0c88ea1ea474ee7676cda7b7a59e759181c4dd AS build
+FROM eclipse-temurin:25-jdk-alpine@sha256:5ecfde8e5ecde5954ea3721155b345ef56c1d579b940c761318ad4c05959a151 AS build
 WORKDIR /app
 
 # Declared (unused) so the shared CI image matrix can pass --build-arg APP_VERSION=... uniformly.
@@ -53,7 +53,7 @@ WORKDIR /app/extracted
 
 # Final image — Alpine JRE; every native bit we ship is pure Java (Lettuce / Netty are pure-Java).
 # L-8: digest-pinned (see the build stage above).
-FROM eclipse-temurin:25-jre-alpine@sha256:c707c0d18cb9e8556380719f80d96a7529d0746fbb42143893949b98ed2f8943
+FROM eclipse-temurin:25-jre-alpine@sha256:28db6fdf60e38945e43d840c0333aeaec66c15943070104f7586fd3c9d1665b0
 WORKDIR /app
 
 # Non-root runtime user with a fixed UID/GID so host bind mounts can be pre-chowned.
