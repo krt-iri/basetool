@@ -200,9 +200,6 @@ class BankManagePageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
         .thenReturn(List.of(ownHolder));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
-        .thenReturn(new BankTransferFeeRateDto(BigDecimal.ZERO));
 
     // When — the employee's principal carries the sub; getName() ("emp") deliberately differs.
     controller.manage("halter", null, employee(), oidcUser(sub), model);
