@@ -148,6 +148,8 @@ class BankBookingRequestServiceTest {
             "from sale",
             null,
             false,
+            null,
+            false,
             null);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.PENDING);
@@ -170,6 +172,41 @@ class BankBookingRequestServiceTest {
   }
 
   @Test
+  void create_splitDeposit_snapshotsSplitOnRequest() {
+    // REQ-BANK-043: a split deposit request snapshots split_enabled + split_percent on the
+    // off-ledger
+    // row; the concrete per-squadron legs are resolved only at confirmation.
+    UUID accountId = UUID.randomUUID();
+    UUID requesterSub = UUID.randomUUID();
+    BankAccount account = account(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
+    when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
+    ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
+    when(requestRepository.save(saved.capture()))
+        .thenAnswer(
+            invocation -> {
+              BankBookingRequest r = invocation.getArgument(0);
+              r.setId(UUID.randomUUID());
+              return r;
+            });
+
+    service.create(
+        accountId,
+        BankBookingRequestType.DEPOSIT,
+        new BigDecimal("1000"),
+        "from sale",
+        null,
+        false,
+        null,
+        true,
+        new BigDecimal("30"));
+
+    assertThat(saved.getValue().isSplitEnabled()).isTrue();
+    assertThat(saved.getValue().getSplitPercent()).isEqualByComparingTo(new BigDecimal("30"));
+  }
+
+  @Test
   void create_rejectsClosedAccount() {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId);
@@ -185,6 +222,8 @@ class BankBookingRequestServiceTest {
                     BankBookingRequestType.DEPOSIT,
                     new BigDecimal("500"),
                     null,
+                    null,
+                    false,
                     null,
                     false,
                     null));
@@ -294,11 +333,52 @@ class BankBookingRequestServiceTest {
     ArgumentCaptor<BankBookingRequestConfirmedEvent> event =
         ArgumentCaptor.forClass(BankBookingRequestConfirmedEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
+    // The non-split deposit hands a non-split payload to the ledger.
+    assertThat(booked.getValue().splitEnabled()).isFalse();
     assertThat(event.getValue().contextRecipientSub()).isEqualTo(requester);
     assertThat(event.getValue().actorSub()).isEqualTo(decider);
     // REQ-BANK-026/-034: the event carries the account id so the ACCOUNT_RESPONSIBLE selector can
     // notify the account's responsible holder.
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
+  }
+
+  @Test
+  void confirm_splitDeposit_booksWithSplitSnapshot() {
+    // REQ-BANK-043: confirming a split deposit request books via bookDeposit carrying the
+    // snapshotted
+    // percentage; the ledger resolves the concrete legs against the squadron accounts active now.
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID decider = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
+    request.setAmount(new BigDecimal("1000"));
+    request.setSplitEnabled(true);
+    request.setSplitPercent(new BigDecimal("30"));
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(bankSecurityService.canDeposit(eq(accountId), any())).thenReturn(true);
+    when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
+        .thenReturn(new BankTransactionDto(txId, BankTransactionType.DEPOSIT, null, Instant.now()));
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("greluc");
+    holder.setActive(true);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
+    when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
+
+    service.confirm(requestId, holderId, null, false, 0L, null);
+
+    ArgumentCaptor<BankDepositRequest> booked = ArgumentCaptor.forClass(BankDepositRequest.class);
+    verify(bankLedgerService).bookDeposit(booked.capture());
+    assertThat(booked.getValue().splitEnabled()).isTrue();
+    assertThat(booked.getValue().splitPercent()).isEqualByComparingTo(new BigDecimal("30"));
+    assertThat(booked.getValue().accountId()).isEqualTo(accountId);
+    assertThat(booked.getValue().holderId()).isEqualTo(holderId);
   }
 
   @Test

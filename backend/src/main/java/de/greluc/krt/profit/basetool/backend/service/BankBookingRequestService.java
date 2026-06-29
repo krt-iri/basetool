@@ -122,6 +122,10 @@ public class BankBookingRequestService {
    * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
    *     (snapshot)
    * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
+   * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
+   *     confirmation (REQ-BANK-043); always {@code false} for withdrawal/transfer
+   * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
+   *     unless {@code splitEnabled}
    * @return the created request
    * @throws NotFoundException when the (source or destination) account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
@@ -135,7 +139,9 @@ public class BankBookingRequestService {
       String note,
       @Nullable UUID targetAccountId,
       boolean requiresOwnerApproval,
-      @Nullable BigDecimal applicableLimit) {
+      @Nullable BigDecimal applicableLimit,
+      boolean splitEnabled,
+      @Nullable BigDecimal splitPercent) {
     BankAccount account =
         accountRepository
             .findById(accountId)
@@ -173,6 +179,8 @@ public class BankBookingRequestService {
     request.setRequesterHandle(requesterHandle);
     request.setRequiresOwnerApproval(requiresOwnerApproval);
     request.setApplicableLimit(applicableLimit);
+    request.setSplitEnabled(splitEnabled);
+    request.setSplitPercent(splitPercent);
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -349,9 +357,18 @@ public class BankBookingRequestService {
     BankTransactionDto booked =
         switch (request.getType()) {
           case DEPOSIT ->
+              // REQ-BANK-043: a split deposit request carries the snapshotted percentage; the
+              // concrete per-squadron legs are resolved by bookDeposit against the squadron
+              // accounts
+              // active NOW (at confirmation), not at request time.
               bankLedgerService.bookDeposit(
                   new BankDepositRequest(
-                      accountId, holderId, request.getAmount(), request.getNote()));
+                      accountId,
+                      holderId,
+                      request.getAmount(),
+                      request.getNote(),
+                      request.isSplitEnabled(),
+                      request.getSplitPercent()));
           case WITHDRAWAL ->
               bankLedgerService.bookWithdrawal(
                   new BankWithdrawalRequest(
@@ -678,6 +695,8 @@ public class BankBookingRequestService {
         request.getApplicableLimit(),
         request.isOwnerApprovalGranted(),
         request.getOwnerApprovalGrantedByHandle(),
+        request.isSplitEnabled(),
+        request.getSplitPercent(),
         request.getVersion());
   }
 

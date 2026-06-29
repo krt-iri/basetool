@@ -25,12 +25,14 @@ import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.BankHolderPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
@@ -46,11 +48,13 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -103,16 +107,24 @@ public class BankLedgerService {
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
-   * positive holder leg naming the holder who physically received the money.
+   * positive holder leg naming the holder who physically received the money. When the payload opts
+   * into a split (REQ-BANK-043) the booking fans out across the squadron accounts via {@link
+   * #bookSplitDeposit(BankDepositRequest, BankHolder)} instead.
    *
    * @param request validated deposit payload
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when account or holder do not exist
-   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
-   *     BANK_HOLDER_INACTIVE} on a deactivated holder
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account, {@code
+   *     BANK_HOLDER_INACTIVE} on a deactivated holder, or {@code BANK_SPLIT_NO_TARGETS} / {@code
+   *     BANK_SPLIT_TOO_SMALL} when a requested split cannot be honoured
    */
   @Transactional
   public BankTransactionDto bookDeposit(@NotNull BankDepositRequest request) {
+    if (request.splitEnabled()) {
+      BankHolder holder = requireHolder(request.holderId());
+      requireActiveHolder(holder);
+      return bookSplitDeposit(request, holder);
+    }
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
@@ -132,6 +144,150 @@ public class BankLedgerService {
         null,
         "+" + request.amount().toPlainString() + " aUEC @" + holder.getHandle());
     return toDto(tx);
+  }
+
+  /**
+   * Books a <strong>split</strong> deposit (REQ-BANK-043): one {@code DEPOSIT} transaction whose
+   * gross lands once on the named holder's stash (a single positive holder leg, REQ-BANK-003/-004)
+   * but is distributed across several account legs — a percentage slice spread evenly by count over
+   * every active squadron account (excluding the named account), with the named account credited
+   * the remainder. A deposit is fee-free (REQ-BANK-033), so no in-game fee applies.
+   *
+   * <p>The slice is {@code round(gross × percent / 100)} to whole aUEC (HALF_UP). It is split with
+   * the largest-remainder rule: {@code base = floor(slice / N)}, and the leftover {@code slice −
+   * base·N} aUEC go one each to the first accounts by ascending id, so the per-account amounts are
+   * as even as possible, stay whole and sum back to the slice exactly. The named account is
+   * credited {@code gross − slice}, so every account leg plus the named leg sums to the gross —
+   * equal to the single holder leg. Zero-amount legs are dropped (a 100 % split books no named leg;
+   * a slice smaller than the target count credits only the first {@code slice} accounts).
+   *
+   * <p>All affected accounts (named + squadrons) are pessimistically locked in ascending id order —
+   * the same global lock order every other multi-account flow uses (transfer, reversal, wipe) — so
+   * concurrent bookings cannot deadlock. The named account must be active; squadron accounts that
+   * closed in the race window are dropped from the distribution.
+   *
+   * @param request the validated split deposit payload ({@code splitEnabled} set, {@code
+   *     splitPercent} present)
+   * @param holder the already-resolved, active receiving holder
+   * @return acknowledgement of the created transaction
+   * @throws NotFoundException when the named account does not exist
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed named account,
+   *     {@code BANK_SPLIT_TOO_SMALL} when the slice rounds below 1 aUEC, or {@code
+   *     BANK_SPLIT_NO_TARGETS} when no active squadron account remains to distribute to
+   */
+  private BankTransactionDto bookSplitDeposit(
+      @NotNull BankDepositRequest request, @NotNull BankHolder holder) {
+    BigDecimal gross = request.amount();
+    // slice = round(gross * percent / 100) to whole aUEC; the named account keeps gross - slice.
+    BigDecimal slice =
+        gross
+            .multiply(request.splitPercent())
+            .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+    if (slice.signum() <= 0) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_TOO_SMALL,
+          "The split percentage of the amount rounds to less than 1 aUEC",
+          Map.of("amount", plain(gross), "percent", plain(request.splitPercent())));
+    }
+
+    // Enumerate the active squadron accounts (ORG_UNIT + kind SQUADRON), excluding the named
+    // account, then lock the named account and the targets together in ascending id order.
+    List<UUID> squadronIds =
+        accountRepository
+            .findByTypeAndStatusOrderById(BankAccountType.ORG_UNIT, BankAccountStatus.ACTIVE)
+            .stream()
+            .filter(a -> a.getOrgUnit() != null && a.getOrgUnit().getKind() == OrgUnitKind.SQUADRON)
+            .map(BankAccount::getId)
+            .filter(id -> !id.equals(request.accountId()))
+            .toList();
+    if (squadronIds.isEmpty()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_NO_TARGETS,
+          "There is no active squadron account to distribute the split to");
+    }
+
+    TreeSet<UUID> lockOrder = new TreeSet<>(squadronIds);
+    lockOrder.add(request.accountId());
+    Map<UUID, BankAccount> locked = new LinkedHashMap<>();
+    for (UUID id : lockOrder) {
+      locked.put(id, lockAccount(id));
+    }
+    BankAccount named = locked.get(request.accountId());
+    requireActive(named);
+    // Drop any squadron account that closed between the unlocked enumeration and the lock; the
+    // distribution always runs over currently-active targets only.
+    List<UUID> targets =
+        squadronIds.stream()
+            .filter(id -> locked.get(id).getStatus() == BankAccountStatus.ACTIVE)
+            .sorted()
+            .toList();
+    if (targets.isEmpty()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_NO_TARGETS,
+          "There is no active squadron account to distribute the split to");
+    }
+
+    Map<UUID, BigDecimal> shares = distributeEvenly(targets, slice);
+    BigDecimal distributed = shares.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal namedShare = gross.subtract(distributed);
+
+    Instant now = Instant.now();
+    BankTransaction tx =
+        persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now);
+    // The named account keeps the remainder; a 100 % split leaves nothing for it, so its leg is
+    // dropped (a posting is never zero, REQ-BANK-004).
+    if (namedShare.signum() > 0) {
+      persistAccountPosting(tx, named, namedShare, now);
+    }
+    shares.forEach((id, share) -> persistAccountPosting(tx, locked.get(id), share, now));
+    // The money physically landed once with one custodian, so a single holder leg over the gross
+    // (REQ-BANK-003); the split is purely an account-side allocation.
+    persistHolderPosting(tx, holder, gross, now);
+    bankAuditService.record(
+        BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
+        named.getId(),
+        tx.getId(),
+        null,
+        "+"
+            + gross.toPlainString()
+            + " aUEC @"
+            + holder.getHandle()
+            + " split "
+            + plain(request.splitPercent())
+            + "% ("
+            + plain(distributed)
+            + " aUEC -> "
+            + targets.size()
+            + " Staffelkonten)");
+    return toDto(tx);
+  }
+
+  /**
+   * Distributes a whole-aUEC slice as evenly as possible across the given targets with the
+   * largest-remainder rule (REQ-BANK-043): each target gets {@code floor(slice / N)} and the
+   * leftover {@code slice − base·N} aUEC go one each to the first targets in the supplied order.
+   * Zero shares (when {@code base} is 0 and the target is past the remainder cut-off) are omitted,
+   * so the result never carries a zero leg and its values always sum to {@code slice} exactly.
+   *
+   * @param targets the receiving account ids, already ordered deterministically (ascending id)
+   * @param slice the positive whole-aUEC amount to distribute
+   * @return an insertion-ordered map of target id → positive whole-aUEC share
+   */
+  @NotNull
+  private static Map<UUID, BigDecimal> distributeEvenly(
+      @NotNull List<UUID> targets, @NotNull BigDecimal slice) {
+    int n = targets.size();
+    BigDecimal count = BigDecimal.valueOf(n);
+    BigDecimal base = slice.divideToIntegralValue(count);
+    int remainder = slice.subtract(base.multiply(count)).intValueExact();
+    Map<UUID, BigDecimal> shares = new LinkedHashMap<>();
+    for (int i = 0; i < n; i++) {
+      BigDecimal share = i < remainder ? base.add(BigDecimal.ONE) : base;
+      if (share.signum() > 0) {
+        shares.put(targets.get(i), share);
+      }
+    }
+    return shares;
   }
 
   /**

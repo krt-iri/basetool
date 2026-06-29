@@ -244,6 +244,31 @@
                         <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
                         <span class="bank-field-error" data-error-for="amount"></span>
                     </div>
+                    <!-- Split deposit (REQ-BANK-043): distribute splitPercent of the gross evenly across
+                         all active squadron accounts; the named account keeps the remainder. -->
+                    <div class="bank-form-row">
+                        <label class="bank-check-label">
+                            <input type="checkbox" name="splitEnabled" value="true"
+                                   data-role="bank-split-toggle" data-testid="bank-deposit-split-toggle">
+                            <span th:text="#{bank.split.toggle}">Anteil auf alle Staffelkonten verteilen</span>
+                        </label>
+                    </div>
+                    <div class="bank-form-row" data-split-row hidden>
+                        <label for="bank-deposit-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
+                        <input type="number" id="bank-deposit-split-percent" name="splitPercent"
+                               min="1" max="100" step="1" disabled
+                               data-testid="bank-deposit-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>
+                        <p class="bank-field-hint bank-split-preview" data-split-preview hidden
+                           data-testid="bank-deposit-split-preview">
+                            <span th:text="#{bank.split.preview.label}">Aufteilung:</span>
+                            <span data-split-slice>0</span>
+                            <span th:text="#{bank.split.preview.toSquadrons}">aUEC auf die Staffelkonten,</span>
+                            <span data-split-remainder>0</span>
+                            <span th:text="#{bank.split.preview.remainder}">aUEC verbleiben auf dem Zielkonto.</span>
+                        </p>
+                        <span class="bank-field-error" data-error-for="splitPercent"></span>
+                    </div>
                     <div class="bank-form-row">
                         <label for="bank-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
                         <select id="bank-deposit-holder" name="holderId" required data-testid="bank-deposit-holder">
