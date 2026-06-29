@@ -99,7 +99,7 @@
                             <button type="button" class="btn btn--cta btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()}"
                                     th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
@@ -131,6 +131,16 @@
                     <input type="hidden" name="version">
                     <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
 
+                    <!-- Split deposit notice (REQ-BANK-043): shown when the request distributes a
+                         percentage across the squadron accounts, so the staffer sees what they confirm.
+                         State applied per-row by bank.js (applyConfirmModalState). -->
+                    <p class="bank-field-hint bank-split-confirm" data-split-confirm hidden
+                       data-testid="bank-confirm-split">
+                        <span th:text="#{bank.split.confirm.label}">Split-Einzahlung:</span>
+                        <span data-split-confirm-percent>0</span><span>%</span>
+                        <span th:text="#{bank.split.confirm.note}">des Betrags werden gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt.</span>
+                    </p>
+
                     <!-- Over-limit owner-approval gate (REQ-BANK-041): shown only when the request
                          exceeds the requester's limit. The checkbox is pre-ticked when the responsible
                          holder already granted approval in-app; the confirm button stays disabled until
@@ -149,7 +159,7 @@
                         <label for="bank-confirm-holder" data-confirm-holder-label
                                th:attr="data-label-default=#{bank.field.holder},data-label-source=#{bank.field.holder.source}"
                                th:text="#{bank.field.holder}">Halter</label>
-                        <select id="bank-confirm-holder" name="holderId" required data-testid="bank-confirm-holder">
+                        <select id="bank-confirm-holder" name="holderId" required data-krt-combobox data-testid="bank-confirm-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.active()} ? ${h.handle()} : (${h.handle()} + ' ' + #{bank.holder.inactive})">greluc</option>
@@ -162,7 +172,7 @@
                     <div class="bank-form-row" data-confirm-destination-holder hidden>
                         <label for="bank-confirm-destination-holder" th:text="#{bank.field.holder.target}">Ziel-Halter</label>
                         <select id="bank-confirm-destination-holder" name="destinationHolderId" disabled
-                                data-testid="bank-confirm-destination-holder">
+                                data-krt-combobox data-testid="bank-confirm-destination-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>

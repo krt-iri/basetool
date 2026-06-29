@@ -25,12 +25,14 @@ import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.BankHolderPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
@@ -46,11 +48,13 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -103,16 +107,24 @@ public class BankLedgerService {
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
-   * positive holder leg naming the holder who physically received the money.
+   * positive holder leg naming the holder who physically received the money. When the payload opts
+   * into a split (REQ-BANK-043) the booking fans out across the squadron accounts via {@link
+   * #bookSplitDeposit(BankDepositRequest, BankHolder)} instead.
    *
    * @param request validated deposit payload
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when account or holder do not exist
-   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
-   *     BANK_HOLDER_INACTIVE} on a deactivated holder
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account, {@code
+   *     BANK_HOLDER_INACTIVE} on a deactivated holder, or {@code BANK_SPLIT_NO_TARGETS} / {@code
+   *     BANK_SPLIT_TOO_SMALL} when a requested split cannot be honoured
    */
   @Transactional
   public BankTransactionDto bookDeposit(@NotNull BankDepositRequest request) {
+    if (request.splitEnabled()) {
+      BankHolder holder = requireHolder(request.holderId());
+      requireActiveHolder(holder);
+      return bookSplitDeposit(request, holder);
+    }
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
@@ -135,16 +147,160 @@ public class BankLedgerService {
   }
 
   /**
+   * Books a <strong>split</strong> deposit (REQ-BANK-043): one {@code DEPOSIT} transaction whose
+   * gross lands once on the named holder's stash (a single positive holder leg, REQ-BANK-003/-004)
+   * but is distributed across several account legs — a percentage slice spread evenly by count over
+   * every active squadron account (excluding the named account), with the named account credited
+   * the remainder. A deposit is fee-free (REQ-BANK-033), so no in-game fee applies.
+   *
+   * <p>The slice is {@code round(gross × percent / 100)} to whole aUEC (HALF_UP). It is split with
+   * the largest-remainder rule: {@code base = floor(slice / N)}, and the leftover {@code slice −
+   * base·N} aUEC go one each to the first accounts by ascending id, so the per-account amounts are
+   * as even as possible, stay whole and sum back to the slice exactly. The named account is
+   * credited {@code gross − slice}, so every account leg plus the named leg sums to the gross —
+   * equal to the single holder leg. Zero-amount legs are dropped (a 100 % split books no named leg;
+   * a slice smaller than the target count credits only the first {@code slice} accounts).
+   *
+   * <p>All affected accounts (named + squadrons) are pessimistically locked in ascending id order —
+   * the same global lock order every other multi-account flow uses (transfer, reversal, wipe) — so
+   * concurrent bookings cannot deadlock. The named account must be active; squadron accounts that
+   * closed in the race window are dropped from the distribution.
+   *
+   * @param request the validated split deposit payload ({@code splitEnabled} set, {@code
+   *     splitPercent} present)
+   * @param holder the already-resolved, active receiving holder
+   * @return acknowledgement of the created transaction
+   * @throws NotFoundException when the named account does not exist
+   * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed named account,
+   *     {@code BANK_SPLIT_TOO_SMALL} when the slice rounds below 1 aUEC, or {@code
+   *     BANK_SPLIT_NO_TARGETS} when no active squadron account remains to distribute to
+   */
+  private BankTransactionDto bookSplitDeposit(
+      @NotNull BankDepositRequest request, @NotNull BankHolder holder) {
+    BigDecimal gross = request.amount();
+    // slice = round(gross * percent / 100) to whole aUEC; the named account keeps gross - slice.
+    BigDecimal slice =
+        gross
+            .multiply(request.splitPercent())
+            .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+    if (slice.signum() <= 0) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_TOO_SMALL,
+          "The split percentage of the amount rounds to less than 1 aUEC",
+          Map.of("amount", plain(gross), "percent", plain(request.splitPercent())));
+    }
+
+    // Enumerate the active squadron accounts (ORG_UNIT + kind SQUADRON), excluding the named
+    // account, then lock the named account and the targets together in ascending id order.
+    List<UUID> squadronIds =
+        accountRepository
+            .findByTypeAndStatusOrderById(BankAccountType.ORG_UNIT, BankAccountStatus.ACTIVE)
+            .stream()
+            .filter(a -> a.getOrgUnit() != null && a.getOrgUnit().getKind() == OrgUnitKind.SQUADRON)
+            .map(BankAccount::getId)
+            .filter(id -> !id.equals(request.accountId()))
+            .toList();
+    if (squadronIds.isEmpty()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_NO_TARGETS,
+          "There is no active squadron account to distribute the split to");
+    }
+
+    TreeSet<UUID> lockOrder = new TreeSet<>(squadronIds);
+    lockOrder.add(request.accountId());
+    Map<UUID, BankAccount> locked = new LinkedHashMap<>();
+    for (UUID id : lockOrder) {
+      locked.put(id, lockAccount(id));
+    }
+    BankAccount named = locked.get(request.accountId());
+    requireActive(named);
+    // Drop any squadron account that closed between the unlocked enumeration and the lock; the
+    // distribution always runs over currently-active targets only.
+    List<UUID> targets =
+        squadronIds.stream()
+            .filter(id -> locked.get(id).getStatus() == BankAccountStatus.ACTIVE)
+            .sorted()
+            .toList();
+    if (targets.isEmpty()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SPLIT_NO_TARGETS,
+          "There is no active squadron account to distribute the split to");
+    }
+
+    Map<UUID, BigDecimal> shares = distributeEvenly(targets, slice);
+    BigDecimal distributed = shares.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal namedShare = gross.subtract(distributed);
+
+    Instant now = Instant.now();
+    BankTransaction tx =
+        persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now);
+    // The named account keeps the remainder; a 100 % split leaves nothing for it, so its leg is
+    // dropped (a posting is never zero, REQ-BANK-004).
+    if (namedShare.signum() > 0) {
+      persistAccountPosting(tx, named, namedShare, now);
+    }
+    shares.forEach((id, share) -> persistAccountPosting(tx, locked.get(id), share, now));
+    // The money physically landed once with one custodian, so a single holder leg over the gross
+    // (REQ-BANK-003); the split is purely an account-side allocation.
+    persistHolderPosting(tx, holder, gross, now);
+    bankAuditService.record(
+        BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
+        named.getId(),
+        tx.getId(),
+        null,
+        "+"
+            + gross.toPlainString()
+            + " aUEC @"
+            + holder.getHandle()
+            + " split "
+            + plain(request.splitPercent())
+            + "% ("
+            + plain(distributed)
+            + " aUEC -> "
+            + targets.size()
+            + " Staffelkonten)");
+    return toDto(tx);
+  }
+
+  /**
+   * Distributes a whole-aUEC slice as evenly as possible across the given targets with the
+   * largest-remainder rule (REQ-BANK-043): each target gets {@code floor(slice / N)} and the
+   * leftover {@code slice − base·N} aUEC go one each to the first targets in the supplied order.
+   * Zero shares (when {@code base} is 0 and the target is past the remainder cut-off) are omitted,
+   * so the result never carries a zero leg and its values always sum to {@code slice} exactly.
+   *
+   * @param targets the receiving account ids, already ordered deterministically (ascending id)
+   * @param slice the positive whole-aUEC amount to distribute
+   * @return an insertion-ordered map of target id → positive whole-aUEC share
+   */
+  @NotNull
+  private static Map<UUID, BigDecimal> distributeEvenly(
+      @NotNull List<UUID> targets, @NotNull BigDecimal slice) {
+    int n = targets.size();
+    BigDecimal count = BigDecimal.valueOf(n);
+    BigDecimal base = slice.divideToIntegralValue(count);
+    int remainder = slice.subtract(base.multiply(count)).intValueExact();
+    Map<UUID, BigDecimal> shares = new LinkedHashMap<>();
+    for (int i = 0; i < n; i++) {
+      BigDecimal share = i < remainder ? base.add(BigDecimal.ONE) : base;
+      if (share.signum() > 0) {
+        shares.put(targets.get(i), share);
+      }
+    }
+    return shares;
+  }
+
+  /**
    * Books a withdrawal (REQ-BANK-004): one negative account leg on the paying account and one
    * negative holder leg naming the holder who physically paid the money out. Guarded by the
    * no-overdraft rule at <strong>account</strong> level only (REQ-BANK-006) — the holder may go
    * negative.
    *
-   * <p>The entered amount is the <strong>gross</strong> the holder sends and is debited in full
-   * from the account and the holder's stash; the in-game transfer fee (ADR-0041, REQ-BANK-033) is
-   * carved out and recorded on the header, so the external recipient receives the net (gross −
-   * fee). The holder is thus not out of pocket — the fee is borne by what is paid out, not by their
-   * private money.
+   * <p>The entered amount is what the external recipient must <strong>receive</strong>; the in-game
+   * transfer fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on top and the account and
+   * holder's stash are debited the gross ({@code amount + fee}). The overdraft guard runs against
+   * that gross, so the account may not be driven negative by the fee. The holder is thus not out of
+   * pocket — the fee is borne by the debited account, not by their private money.
    *
    * @param request validated withdrawal payload
    * @return acknowledgement of the created transaction
@@ -156,20 +312,22 @@ public class BankLedgerService {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
-    requireAccountCoverage(account, request.amount());
 
     BigDecimal fee = transferFeeService.feeOn(request.amount());
+    BigDecimal debit = transferFeeService.totalDebit(request.amount());
+    requireAccountCoverage(account, debit);
+
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(BankTransactionType.WITHDRAWAL, request.note(), null, fee, now);
-    persistAccountPosting(tx, account, request.amount().negate(), now);
-    persistHolderPosting(tx, holder, request.amount().negate(), now);
+    persistAccountPosting(tx, account, debit.negate(), now);
+    persistHolderPosting(tx, holder, debit.negate(), now);
     bankAuditService.record(
         BankAuditEventType.WITHDRAWAL_BOOKED,
         account.getId(),
         tx.getId(),
         null,
-        "-" + request.amount().toPlainString() + " aUEC @" + holder.getHandle() + feeDetail(fee));
+        "-" + plain(debit) + " aUEC @" + holder.getHandle() + feeDetail(fee));
     return toDto(tx);
   }
 
@@ -182,11 +340,12 @@ public class BankLedgerService {
    * overdraft; the holder dimension is not (ADR-0039).
    *
    * <p>When the custody actually changes hands (source holder ≠ destination holder), a real in-game
-   * transfer happens, so the in-game fee (ADR-0041, REQ-BANK-033) is carved out: the source account
-   * and holder are debited the full (gross) amount, while the destination account and holder are
-   * credited the net (gross − fee) — the money that actually arrives is smaller. A same-holder
-   * transfer moves no money in-game (the holder merely re-labels which account owns it), so it is
-   * fee-free and both legs net to zero as before.
+   * transfer happens, so the in-game fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on
+   * top: the source account and holder are debited the gross ({@code amount + fee}), while the
+   * destination account and holder are credited the full entered amount — the money that arrives
+   * equals what was requested, the fee is borne by the source. The source overdraft guard runs
+   * against the gross. A same-holder transfer moves no money in-game (the holder merely re-labels
+   * which account owns it), so it is fee-free and both legs net to zero as before.
    *
    * @param request validated transfer payload (source and destination accounts must differ)
    * @param destinationVisible whether the caller may see the destination account (pre-computed by
@@ -225,28 +384,31 @@ public class BankLedgerService {
     final BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
     requireActiveHolder(destinationHolder);
-    requireAccountCoverage(source, request.amount());
 
     // Custody only physically moves — and thus incurs the in-game fee — when source and destination
-    // holders differ; a same-holder transfer is a pure re-label (fee-free, net = gross). The
-    // destination side is credited the net so the money that actually arrives reflects the fee.
+    // holders differ; a same-holder transfer is a pure re-label (fee-free, debit = amount). When
+    // the
+    // holder changes the fee is added on top: the source is debited the gross (amount + fee) while
+    // the destination is credited the full entered amount (ADR-0052). The overdraft guard runs
+    // against the gross so the fee can never drive the source account negative.
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
     BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
-    BigDecimal netToDestination = request.amount().subtract(fee);
+    BigDecimal debit = request.amount().add(fee);
+    requireAccountCoverage(source, debit);
 
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now);
-    persistAccountPosting(tx, source, request.amount().negate(), now);
-    persistAccountPosting(tx, destination, netToDestination, now);
-    persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
-    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    persistAccountPosting(tx, source, debit.negate(), now);
+    persistAccountPosting(tx, destination, request.amount(), now);
+    persistHolderPosting(tx, sourceHolder, debit.negate(), now);
+    persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.TRANSFER_BOOKED,
         source.getId(),
         tx.getId(),
         null,
-        request.amount().toPlainString()
+        plain(debit)
             + " aUEC -> "
             + destination.getAccountNo()
             + " ("
@@ -264,11 +426,13 @@ public class BankLedgerService {
    * staff stay payout-capable. The source holder may go negative; the active flag is ignored in
    * both directions so a deactivated holder's residual can be reconciled to zero.
    *
-   * <p>Because a holder physically sends the money in-game, the in-game fee (ADR-0041,
-   * REQ-BANK-033) is carved out: the source holder is debited the full (gross) amount, the
-   * destination holder is credited the net (gross − fee). The fee is real money lost to the game,
-   * so the two holder legs net to {@code -fee} (REQ-BANK-020 integrity widened accordingly);
-   * neither holder is out of pocket since each books exactly what they physically sent / received.
+   * <p>This Umbuchung is <strong>fee-free</strong> (ADR-0052): the holders are bank staff
+   * reconciling their physically-held stashes among themselves, and they bear any in-game transfer
+   * fee on such an internal move <em>personally</em> — it is not the bank's concern. So the source
+   * holder is debited exactly the entered amount, the destination credited the same, the header
+   * carries no {@code transfer_fee}, and the two holder legs net to zero. The in-game fee on a
+   * customer-facing payout or holder-changing account transfer is modelled there (REQ-BANK-033),
+   * not here.
    *
    * @param request validated holder-transfer payload (source and destination holders must differ)
    * @return acknowledgement of the created transaction
@@ -285,24 +449,22 @@ public class BankLedgerService {
     BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
 
-    BigDecimal fee = transferFeeService.feeOn(request.amount());
-    BigDecimal netToDestination = request.amount().subtract(fee);
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.HOLDER_TRANSFER, request.note(), null, fee, now);
+        persistTransaction(
+            BankTransactionType.HOLDER_TRANSFER, request.note(), null, BigDecimal.ZERO, now);
     persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
-    persistHolderPosting(tx, destinationHolder, netToDestination, now);
+    persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.HOLDER_TRANSFER,
         null,
         tx.getId(),
         null,
-        request.amount().toPlainString()
+        plain(request.amount())
             + " aUEC "
             + sourceHolder.getHandle()
             + " -> "
-            + destinationHolder.getHandle()
-            + feeDetail(fee));
+            + destinationHolder.getHandle());
     return toDto(tx);
   }
 
@@ -369,9 +531,12 @@ public class BankLedgerService {
     }
 
     Instant now = Instant.now();
-    // A reversal negates the original's actual recorded legs (the destination leg is already net),
-    // so the pair cancels exactly per account/holder and the reversal itself carries no new fee
-    // (ADR-0041): the in-game money was already moved; this is a bookkeeping correction.
+    // A reversal negates the original's actual recorded legs (source leg = the gross debited,
+    // destination leg = the amount that arrived), so the pair cancels exactly per account/holder
+    // and
+    // the reversal itself carries no new fee (ADR-0052): the in-game money was already moved; this
+    // is
+    // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
         persistTransaction(BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now);
     for (BankCounterLeg leg : accountLegs) {
@@ -586,10 +751,10 @@ public class BankLedgerService {
   }
 
   /**
-   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0041): {@code " (fee N
+   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0052): {@code " (fee N
    * aUEC)"} when the fee is positive, empty otherwise. No PII — only the numeric fee.
    *
-   * @param fee the carved-out transfer fee
+   * @param fee the on-top transfer fee borne by the debited source
    * @return the fee suffix, or an empty string when there is no fee
    */
   private static String feeDetail(@NotNull BigDecimal fee) {
@@ -602,8 +767,8 @@ public class BankLedgerService {
    * @param type the transaction type
    * @param note optional free-text note
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
-   * @param fee the in-game transfer fee carved out of the gross (ADR-0041); {@link BigDecimal#ZERO}
-   *     for non-fee transactions
+   * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
+   *     BigDecimal#ZERO} for non-fee transactions
    * @param now the shared booking instant
    * @return the persisted header
    */

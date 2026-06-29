@@ -21,7 +21,7 @@
     'use strict';
 
     /** Form field names serialized as JSON numbers instead of strings. */
-    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit'];
+    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit', 'splitPercent'];
 
     /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
     const BOOLEAN_FIELDS = ['active'];
@@ -37,6 +37,9 @@
         BANK_SELF_TRANSFER: 'destinationAccountId',
         BANK_GRANTEE_MISSING_ROLE: 'userId',
         BANK_HOLDER_INACTIVE: 'holderId',
+        // Split deposit conflicts (REQ-BANK-043): surface at the percentage field.
+        BANK_SPLIT_NO_TARGETS: 'splitPercent',
+        BANK_SPLIT_TOO_SMALL: 'splitPercent',
     };
 
     /**
@@ -219,6 +222,15 @@
                 syncRequestTypeRows(typeSelect);
             }
             updateLimitWarning(form);
+        }
+        // Split deposit (REQ-BANK-043): re-sync the percentage row + preview to the (re)opened modal's
+        // toggle so a reused modal never shows a stale split state. The org-unit request modal's split
+        // visibility is additionally driven by the type via syncRequestTypeRows above.
+        if (form && form.querySelector('[data-split-row]')) {
+            const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
+            if (splitToggle) {
+                toggleSplitRow(splitToggle);
+            }
         }
     }
 
@@ -437,11 +449,12 @@
     }
 
     /**
-     * Live transfer-fee preview (REQ-BANK-033, ADR-0041): the entered amount is the GROSS the holder
-     * sends, so this fills the carved-out fee (`round(gross * rate)`) and what actually arrives
-     * (`gross - fee`). Hidden when the amount is non-positive, the rate is zero, or — for an
-     * account transfer — the source and destination holder match (a same-holder transfer is
-     * fee-free). Guidance only; the authoritative fee is computed server-side at booking time.
+     * Live transfer-fee preview (REQ-BANK-033, ADR-0052): the entered amount is what must ARRIVE at
+     * the destination, so this fills the on-top fee (`round(amount * rate)`) and the gross actually
+     * debited from the source (`amount + fee`). Hidden when the amount is non-positive, the rate is
+     * zero, or — for an account transfer — the source and destination holder match (a same-holder
+     * transfer is fee-free). Guidance only; the authoritative fee is computed server-side at booking
+     * time.
      *
      * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
      */
@@ -452,22 +465,22 @@
             return;
         }
         const rate = transferFeeRate();
-        const gross = Number(amountEl.value);
+        const amount = Number(amountEl.value);
         const src = form.querySelector('[name="sourceHolderId"]');
         const dst = form.querySelector('[name="destinationHolderId"]');
         const sameHolder = !!(src && dst && src.value && src.value === dst.value);
-        if (!Number.isFinite(gross) || gross <= 0 || rate <= 0 || sameHolder) {
+        if (!Number.isFinite(amount) || amount <= 0 || rate <= 0 || sameHolder) {
             preview.hidden = true;
             return;
         }
-        const fee = Math.round(gross * rate);
+        const fee = Math.round(amount * rate);
         const valueEl = preview.querySelector('[data-fee-value]');
-        const netEl = preview.querySelector('[data-fee-net]');
+        const debitEl = preview.querySelector('[data-fee-debit]');
         if (valueEl) {
             valueEl.textContent = fee.toLocaleString('de-DE');
         }
-        if (netEl) {
-            netEl.textContent = Math.round(gross - fee).toLocaleString('de-DE');
+        if (debitEl) {
+            debitEl.textContent = (amount + fee).toLocaleString('de-DE');
         }
         preview.hidden = false;
     }
@@ -522,6 +535,100 @@
     }
 
     /**
+     * Shows/hides and enables/disables a deposit form's split-percentage row to match its toggle
+     * checkbox (REQ-BANK-043). The percentage input is disabled while hidden so {@link submitBankForm}
+     * omits it entirely (and the backend's "split off ⇒ no percentage" rule is never tripped). Clears
+     * the value + preview when the split is switched off, then refreshes the preview.
+     *
+     * @param {HTMLInputElement} toggle the split toggle checkbox
+     */
+    function toggleSplitRow(toggle) {
+        const form = toggle.closest('form');
+        if (!form) {
+            return;
+        }
+        const row = form.querySelector('[data-split-row]');
+        const input = form.querySelector('input[name="splitPercent"]');
+        const on = toggle.checked && !toggle.disabled;
+        if (row) {
+            row.hidden = !on;
+        }
+        if (input) {
+            input.disabled = !on;
+            if (!on) {
+                input.value = '';
+            }
+        }
+        updateSplitPreview(form);
+    }
+
+    /**
+     * Live split-deposit preview (REQ-BANK-043): the entered amount is the gross; this fills the
+     * slice distributed across the squadron accounts (`round(gross * percent / 100)`) and the
+     * remainder that stays on the named account (`gross - slice`). Hidden when the split is off or the
+     * inputs are incomplete/out of range. Guidance only — the authoritative split (and the exact
+     * per-account amounts, which depend on how many squadron accounts are active) is computed
+     * server-side at booking time.
+     *
+     * @param {HTMLFormElement} form the deposit/request form carrying a `[data-split-preview]` block
+     */
+    function updateSplitPreview(form) {
+        const preview = form.querySelector('[data-split-preview]');
+        const amountEl = form.querySelector('input[name="amount"]');
+        const percentEl = form.querySelector('input[name="splitPercent"]');
+        if (!preview || !amountEl || !percentEl) {
+            return;
+        }
+        const gross = Number(amountEl.value);
+        const percent = Number(percentEl.value);
+        if (
+            percentEl.disabled ||
+            !Number.isFinite(gross) ||
+            gross <= 0 ||
+            !Number.isFinite(percent) ||
+            percent <= 0 ||
+            percent > 100
+        ) {
+            preview.hidden = true;
+            return;
+        }
+        const slice = Math.round((gross * percent) / 100);
+        if (slice <= 0) {
+            preview.hidden = true;
+            return;
+        }
+        const sliceEl = preview.querySelector('[data-split-slice]');
+        const remainderEl = preview.querySelector('[data-split-remainder]');
+        if (sliceEl) {
+            sliceEl.textContent = slice.toLocaleString('de-DE');
+        }
+        if (remainderEl) {
+            remainderEl.textContent = (gross - slice).toLocaleString('de-DE');
+        }
+        preview.hidden = false;
+    }
+
+    /**
+     * Recomputes the split preview for the form the edited field belongs to (amount or percentage).
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function recomputeSplitPreviewFrom(target) {
+        const form = target && target.closest ? target.closest('form') : null;
+        if (form && form.querySelector('[data-split-preview]')) {
+            updateSplitPreview(form);
+        }
+    }
+
+    /* Split toggle: show/hide the percentage row and refresh the preview as it is ticked/unticked. */
+    document.addEventListener('change', function (event) {
+        const toggle = event.target.closest('[data-role="bank-split-toggle"]');
+        if (toggle) {
+            toggleSplitRow(toggle);
+        }
+    });
+
+    /**
      * Live balance-split calculator on the holder detail page (REQ-BANK-032): given the holder's
      * entered current in-game balance and their server-rendered global custody total
      * (`data-reserved`), shows how much is the holder's own private money (`balance − reserved`).
@@ -564,6 +671,7 @@
     function onBankFieldEdit(target) {
         recomputeFeePreviewFrom(target);
         recomputeLimitWarningFrom(target);
+        recomputeSplitPreviewFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
             updateBalanceCalc(target);
         }
@@ -760,12 +868,24 @@
             return;
         }
         row.hidden = !isTransfer;
-        const control = row.querySelector('select');
+        // Native <select> before enhancement / no-JS, or the searchable combobox's hidden input
+        // afterwards (the holder picker is upgraded into a combobox). Disabling the hidden input
+        // keeps it out of the submit for a non-transfer; the visible textbox is disabled to match.
+        const control = row.querySelector('select, .krt-combobox input[type="hidden"]');
         if (control) {
             control.disabled = !isTransfer;
             control.required = isTransfer;
             if (!isTransfer) {
-                control.value = '';
+                if (control.krtCombobox) {
+                    control.krtCombobox.setValue('');
+                } else {
+                    control.value = '';
+                }
+            }
+            const box = control.closest ? control.closest('.krt-combobox') : null;
+            const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+            if (textbox) {
+                textbox.disabled = !isTransfer;
             }
         }
     }
@@ -819,6 +939,20 @@
         }
         const row = form.querySelector('[data-request-transfer-only]');
         toggleTransferOnlyControl(row, isTransfer);
+        // Split deposit (REQ-BANK-043): the split is DEPOSIT-only. Show the block only for a deposit,
+        // and disable its toggle otherwise so splitEnabled is omitted from a withdrawal/transfer body.
+        const splitBlock = form.querySelector('[data-split-deposit-only]');
+        if (splitBlock) {
+            splitBlock.hidden = !isDeposit;
+            const splitToggle = splitBlock.querySelector('[data-role="bank-split-toggle"]');
+            if (splitToggle) {
+                splitToggle.disabled = !isDeposit;
+                if (!isDeposit) {
+                    splitToggle.checked = false;
+                }
+                toggleSplitRow(splitToggle);
+            }
+        }
         updateLimitWarning(form);
     }
 
@@ -866,6 +1000,22 @@
             submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
         }
 
+        // Split deposit notice (REQ-BANK-043): show the percentage that will be distributed across the
+        // squadron accounts, so the staffer knows what they are confirming.
+        const splitNotice = form.querySelector('[data-split-confirm]');
+        if (splitNotice) {
+            const splitEnabled = trigger.getAttribute('data-field-splitenabled') === 'true';
+            splitNotice.hidden = !splitEnabled;
+            if (splitEnabled) {
+                const percentEl = splitNotice.querySelector('[data-split-confirm-percent]');
+                if (percentEl) {
+                    percentEl.textContent = Math.round(
+                        Number(trigger.getAttribute('data-field-splitpercent')),
+                    ).toLocaleString('de-DE');
+                }
+            }
+        }
+
         const destRow = form.querySelector('[data-confirm-destination-holder]');
         toggleTransferOnlyControl(destRow, isTransfer);
         const holderLabel = form.querySelector('[data-confirm-holder-label]');
@@ -892,14 +1042,11 @@
         }
     });
 
-    /* Enhance the user pickers into searchable comboboxes when the helper is loaded. */
-    if (typeof window.krtSearchableSelect === 'function') {
-        document
-            .querySelectorAll('select[data-role="bank-holder-user"]')
-            .forEach(function (select) {
-                window.krtSearchableSelect(select);
-            });
-    }
+    /*
+     * The user pickers (data-role="bank-holder-user") and holder pickers are enhanced into
+     * searchable comboboxes by the global krt-searchable-select.js auto-initialiser (they carry the
+     * data-krt-combobox marker in the templates); no per-page wiring is needed here (REQ-FE-011).
+     */
 
     /**
      * Fetches one bank PDF with CSRF + the browser's IANA zone and saves it as a file.

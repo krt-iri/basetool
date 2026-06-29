@@ -94,6 +94,7 @@ public class AdminAuditLogPageController {
               "GRANT_UPDATED",
               "GRANT_REVOKED",
               "DEPOSIT_BOOKED",
+              "DEPOSIT_SPLIT_BOOKED",
               "WITHDRAWAL_BOOKED",
               "TRANSFER_BOOKED",
               "HOLDER_TRANSFER",

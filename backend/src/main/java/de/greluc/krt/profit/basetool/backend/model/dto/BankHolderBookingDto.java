@@ -45,9 +45,10 @@ import org.jetbrains.annotations.Nullable;
  * @param counterAccountName the matching account's name, like {@code counterAccountNo}
  * @param counterHolderHandle for a {@code HOLDER_TRANSFER} the other holder of the Umbuchung,
  *     {@code null} otherwise
- * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
- *     REQ-BANK-033); {@code 0} for non-fee rows. On an outgoing leg (amount &lt; 0) the destination
- *     received {@code |amount| − transferFee}
+ * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
+ *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
+ *     outgoing leg (amount &lt; 0) the leg is the gross debited, so the destination received {@code
+ *     |amount| − transferFee}
  */
 public record BankHolderBookingDto(
     UUID postingId,

@@ -31,9 +31,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link BankTransferFeeService} (REQ-BANK-033, ADR-0041): the whole-aUEC fee
- * rounding, the net-after-fee derivation, and the runtime-rate resolution with its fallbacks —
- * mirroring the operation payout's rate handling but rounding the fee to whole aUEC.
+ * Unit tests for {@link BankTransferFeeService} (REQ-BANK-033, ADR-0052): the whole-aUEC fee
+ * rounding, the total-debit (amount + fee) derivation borne by the source, and the runtime-rate
+ * resolution with its fallbacks — mirroring the operation payout's rate handling but rounding the
+ * fee to whole aUEC.
  */
 @ExtendWith(MockitoExtension.class)
 class BankTransferFeeServiceTest {
@@ -62,16 +63,22 @@ class BankTransferFeeServiceTest {
   }
 
   @Test
-  void netAfterFee_isGrossMinusFee() {
-    // Given
+  void totalDebit_isAmountPlusFee() {
+    // Given the seeded 0.5% rate
     rate("0.005");
 
-    // When / Then
+    // When / Then: the fee is added on top, so the source is debited amount + fee. The owner's
+    // worked example — a 500 000 transfer at 0.5% — costs the source 502 500 (ADR-0052).
     assertEquals(
         0,
         bankTransferFeeService
-            .netAfterFee(new BigDecimal("1000"))
-            .compareTo(new BigDecimal("995")));
+            .totalDebit(new BigDecimal("1000"))
+            .compareTo(new BigDecimal("1005")));
+    assertEquals(
+        0,
+        bankTransferFeeService
+            .totalDebit(new BigDecimal("500000"))
+            .compareTo(new BigDecimal("502500")));
   }
 
   @Test

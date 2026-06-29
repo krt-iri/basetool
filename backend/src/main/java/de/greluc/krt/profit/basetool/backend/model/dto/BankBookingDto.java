@@ -46,9 +46,10 @@ import org.jetbrains.annotations.Nullable;
  *     non-transfers
  * @param intraAccount {@code true} for holder rebookings (both legs on this account — custody
  *     moved, the balance did not; REQ-BANK-011)
- * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
- *     REQ-BANK-033); {@code 0} for non-fee rows. On an outgoing leg (amount &lt; 0) the recipient
- *     received {@code |amount| − transferFee}
+ * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
+ *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
+ *     outgoing leg (amount &lt; 0) the leg is the gross debited, so the recipient received {@code
+ *     |amount| − transferFee}
  */
 public record BankBookingDto(
     UUID postingId,

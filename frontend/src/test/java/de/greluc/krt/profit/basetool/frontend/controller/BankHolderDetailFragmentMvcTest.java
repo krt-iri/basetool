@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,6 +48,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -91,7 +93,10 @@ class BankHolderDetailFragmentMvcTest {
         BigDecimal.ZERO);
   }
 
-  /** A holder→holder Umbuchung row annotated with the counter holder (negative: paid out). */
+  /**
+   * A holder→holder Umbuchung row annotated with the counter holder (negative: paid out). It is
+   * fee-free (REQ-BANK-031, ADR-0052): the internal Umbuchung carries no transfer fee.
+   */
   private static BankHolderBookingDto umbuchungRow() {
     return new BankHolderBookingDto(
         UUID.randomUUID(),
@@ -104,6 +109,26 @@ class BankHolderDetailFragmentMvcTest {
         null,
         null,
         "carol",
+        BigDecimal.ZERO);
+  }
+
+  /**
+   * A withdrawal's outgoing holder leg carrying a fee (negative: paid out). The fee is added on top
+   * (REQ-BANK-033, ADR-0052), so the leg is the gross debited (500) and the recipient received
+   * {@code 500 - 3 = 497} — the holder history shows that arriving amount.
+   */
+  private static BankHolderBookingDto withdrawalRow() {
+    return new BankHolderBookingDto(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "WITHDRAWAL",
+        new BigDecimal("-500"),
+        "Auszahlung",
+        Instant.parse("2026-06-12T18:30:00Z"),
+        null,
+        "KB-0001",
+        "Staffel IRIDIUM",
+        null,
         new BigDecimal("3"));
   }
 
@@ -120,22 +145,31 @@ class BankHolderDetailFragmentMvcTest {
                 holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L));
     when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
         .thenReturn(
-            new PageResponse<>(List.of(depositRow(), umbuchungRow()), 0, 20, 2L, 1, List.of()));
+            new PageResponse<>(
+                List.of(depositRow(), umbuchungRow(), withdrawalRow()), 0, 20, 3L, 1, List.of()));
 
-    mockMvc
-        .perform(get("/bank/holders/" + holderId))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("greluc")))
-        .andExpect(content().string(containsString("Mission payout")))
-        .andExpect(content().string(containsString("KB-0001")))
-        .andExpect(content().string(containsString("carol")))
-        // The Umbuchung's outgoing leg (-500, fee 3) shows what actually arrives (497).
-        .andExpect(content().string(containsString("497")))
-        .andExpect(content().string(containsString("bank-holder-back-link")))
-        // The balance-split calculator (REQ-BANK-032) is on the page, seeded with the holder's
-        // custody total via data-reserved.
-        .andExpect(content().string(containsString("bank-holder-balance-calc")))
-        .andExpect(content().string(containsString("bank-holder-balance-input")));
+    String body =
+        mockMvc
+            .perform(get("/bank/holders/" + holderId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("greluc")))
+            .andExpect(content().string(containsString("Mission payout")))
+            .andExpect(content().string(containsString("KB-0001")))
+            .andExpect(content().string(containsString("carol")))
+            // The fee-bearing withdrawal leg (-500, fee 3) shows what actually arrived (497).
+            .andExpect(content().string(containsString("497")))
+            .andExpect(content().string(containsString("bank-holder-back-link")))
+            // The balance-split calculator (REQ-BANK-032) is on the page, seeded with the holder's
+            // custody total via data-reserved.
+            .andExpect(content().string(containsString("bank-holder-balance-calc")))
+            .andExpect(content().string(containsString("bank-holder-balance-input")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    // The fee annotation renders exactly once — on the fee-bearing withdrawal leg — and never on
+    // the
+    // fee-free holder Umbuchung leg (REQ-BANK-031/-033, ADR-0052).
+    assertEquals(1, StringUtils.countOccurrencesOf(body, "bank-holder-booking-fee"));
   }
 
   // covers REQ-FE-002 — fragment=holderBookings renders only the history block: the booking row +

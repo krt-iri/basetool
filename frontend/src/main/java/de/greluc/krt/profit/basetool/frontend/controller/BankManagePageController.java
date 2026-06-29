@@ -21,12 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,15 +123,9 @@ public class BankManagePageController {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
       model.addAttribute("users", List.<UserReferenceDto>of());
     }
-    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) feeds the live "Gebühr / kommt an"
-    // preview in the holder→holder Umbuchung modal (open to every bank employee). Only the full
-    // page
-    // renders the modals, so it is fetched only here.
-    BankTransferFeeRateDto feeRate =
-        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
-    model.addAttribute(
-        "transferFeeRate",
-        feeRate == null || feeRate.rate() == null ? BigDecimal.ZERO : feeRate.rate());
+    // No transfer-fee rate is fetched here: the only booking modal on this page is the
+    // holder→holder
+    // Umbuchung, which is fee-free (REQ-BANK-031, ADR-0052), so it needs no live fee preview.
     return "bank-manage";
   }
 

@@ -29,11 +29,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Computes the in-game aUEC transfer fee for the bank's holder-initiated transfers (ADR-0041,
- * REQ-BANK-033). Whenever a holder actively sends money in Star Citizen — a {@code WITHDRAWAL}, an
- * account-to-account {@code TRANSFER} with a holder change, or a holder→holder {@code
- * HOLDER_TRANSFER} — the game skims a small percentage off the transfer, so the entered (gross)
- * amount is debited in full from the source and the destination receives the net.
+ * Computes the in-game aUEC transfer fee for the bank's customer-facing holder-initiated transfers
+ * (ADR-0052 superseding ADR-0041, REQ-BANK-033). It applies to a {@code WITHDRAWAL} and to an
+ * account-to-account {@code TRANSFER} with a holder change — where the bank moves money on a
+ * member's behalf and the game skims a small percentage. A holder→holder {@code HOLDER_TRANSFER}
+ * (the internal Umbuchung at {@code /bank/manage?tab=halter}) is deliberately
+ * <strong>fee-free</strong>: the staff reconciling their stashes bear that in-game fee personally,
+ * so it is not the bank's concern.
+ *
+ * <p><strong>The fee is added on top and borne by the debited source (ADR-0052).</strong> The
+ * entered amount is the amount that must <em>arrive</em> at the destination; the fee is added on
+ * top and the source (account + holder stash) is debited the {@link #totalDebit(BigDecimal) gross}
+ * ({@code amount + fee}), so the destination receives the full entered amount and the bank — not
+ * the staffer — absorbs the fee. This is the inverse of the original carve-out model (ADR-0041),
+ * where the entered amount was the gross sent and the destination received less.
  *
  * <p><strong>Single rate for the whole org.</strong> The rate is the same runtime-editable setting
  * the operation payout uses ({@code operation.transfer_fee_rate} in {@code system_setting}, default
@@ -66,30 +75,35 @@ public class BankTransferFeeService {
   private final SystemSettingService systemSettingService;
 
   /**
-   * The in-game transfer fee carved out of a gross sent amount: {@code round(gross × rate)} to
-   * whole aUEC (HALF_UP). Returns {@link BigDecimal#ZERO} for a non-positive gross (defensive —
-   * callers pass validated positive amounts).
+   * The in-game transfer fee charged on delivering {@code amount} to a destination: {@code
+   * round(amount × rate)} to whole aUEC (HALF_UP). Under the fee-on-top model (ADR-0052) this fee
+   * is added on top of {@code amount} and borne by the source, so a 0.5% rate turns a 500 000
+   * transfer into a 2 500 fee. Returns {@link BigDecimal#ZERO} for a non-positive amount (defensive
+   * — callers pass validated positive amounts).
    *
-   * @param gross the gross amount the holder sends (and that is debited from the source)
+   * @param amount the amount that must arrive at the destination
    * @return the whole-aUEC fee, never {@code null} and never negative
    */
   @NotNull
-  public BigDecimal feeOn(@NotNull BigDecimal gross) {
-    if (gross.signum() <= 0) {
+  public BigDecimal feeOn(@NotNull BigDecimal amount) {
+    if (amount.signum() <= 0) {
       return BigDecimal.ZERO;
     }
-    return gross.multiply(resolveTransferFeeRate()).setScale(0, RoundingMode.HALF_UP);
+    return amount.multiply(resolveTransferFeeRate()).setScale(0, RoundingMode.HALF_UP);
   }
 
   /**
-   * The net amount that actually arrives at the destination: {@code gross − feeOn(gross)}.
+   * The gross amount debited from the source so that {@code amount} arrives at the destination:
+   * {@code amount + feeOn(amount)} (ADR-0052). With the seeded 0.5% rate, {@code
+   * totalDebit(500000)} is {@code 502500}. This is what the source account and holder stash are
+   * charged; it must be covered by the source account (REQ-BANK-006) or the booking is refused.
    *
-   * @param gross the gross amount the holder sends
-   * @return the net amount the destination receives, never {@code null}
+   * @param amount the amount that must arrive at the destination
+   * @return the gross to debit from the source, never {@code null}
    */
   @NotNull
-  public BigDecimal netAfterFee(@NotNull BigDecimal gross) {
-    return gross.subtract(feeOn(gross));
+  public BigDecimal totalDebit(@NotNull BigDecimal amount) {
+    return amount.add(feeOn(amount));
   }
 
   /**
