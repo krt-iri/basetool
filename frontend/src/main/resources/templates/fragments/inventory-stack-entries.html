@@ -103,6 +103,20 @@
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-material-id="${entry.material.id}"
+                        th:data-quantity-type="${entry.material.quantityType}"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        th:data-personal="${entry.personal}"
+                        th:data-has-assoc="${entry.jobOrderId != null or entry.missionId != null}"
+                        data-trigger="inv-my-umbuchen"
+                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
+                </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
                         th:data-id="${entry.id}"
@@ -231,6 +245,18 @@
                         data-trigger="inv-admin-bookout"
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
+                </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-material-id="${entry.material.id}"
+                        th:data-quantity-type="${entry.material.quantityType}"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        data-trigger="inv-admin-umbuchen"
+                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"

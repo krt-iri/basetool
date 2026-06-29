@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -950,6 +951,36 @@ public class InventoryPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to transfer inventory item", e);
+      return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that proxies a personal-marker rebooking (Umbuchung, REQ-INV-007) to the backend.
+   * Drives the PERSONAL mode of the Umbuchen modal: the source row's quantity is split and the
+   * moved amount inserted as a new row with the opposite {@code personal} flag. Always returns the
+   * new row (the source row may have been depleted), so the page re-swaps the grouped table on
+   * success.
+   *
+   * @param id the source inventory row id
+   * @param dto the rebooking payload (amount, version, optional target org unit)
+   * @return {@code 200} with the new row, or the propagated backend error
+   */
+  @PostMapping("/{id}/personal-rebook")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> rebookPersonalInventoryItem(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemPersonalRebookDto dto) {
+    try {
+      InventoryItemDto result =
+          backendApiClient.post(
+              "/api/v1/inventory/" + id + "/personal-rebook", dto, InventoryItemDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.error(
+          "Failed to rebook inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to rebook inventory item", e);
       return org.springframework.http.ResponseEntity.status(500).build();
     }
   }

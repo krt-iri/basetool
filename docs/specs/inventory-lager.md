@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-19.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** INV · **Related ADRs:** ADR-0003
 
 # Inventory Lager — append-only entries & group-on-read
@@ -85,9 +85,9 @@ per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchange
 
 ### REQ-INV-003 — Actions operate per entry
 
-Every mutating Lager action — book-out (consume / transfer / sell), note edit, delivered
-toggle, association change, bulk check-out — targets a single `InventoryItem` by id and
-`version`. The grouped stack row is display-and-expand only; it carries no aggregate
+Every mutating Lager action — book-out (consume / transfer / sell), personal-marker rebooking
+(Umbuchung, REQ-INV-007), note edit, delivered toggle, association change, bulk check-out — targets
+a single `InventoryItem` by id and `version`. The grouped stack row is display-and-expand only; it carries no aggregate
 mutation. Optimistic locking and the frontend `data-version` DOM-sync therefore continue to
 work unchanged at the entry level.
 
@@ -183,6 +183,54 @@ the owner-scoped `/my` view — there is no equivalent on the squadron-wide `/al
 **Code:** `InventoryItemRepository#findUserStacks`,
 `InventoryItemService#getMyAggregatedInventory`, `InventoryItemController#getMyGroupedInventory`,
 `InventoryPageController#viewMyInventory`, `inventory-my.html` · **Issues:** #466
+
+### REQ-INV-007 — Personal-marker rebooking (Umbuchung) is an append-only split
+
+A user may **rebook** (Umbuchung) part or all of one of their inventory rows between their personal
+pool and the shared squadron pool by toggling its `personal` marker. The direction is derived from
+the source row's current flag, never from the client:
+
+- **personal → shared** (entpersonalisieren): the moved quantity becomes shared squadron stock
+  (`personal = false`) stamped on an org-unit pool resolved through
+  `OwnerScopeService.resolveOrgUnitForPickerOutputNullable` — the same create-time stamping matrix as
+  [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-004 (the owner picks the pool when they belong
+  to more than one org unit; a sole membership auto-stamps; a membershipless owner yields an
+  ownerless shared row the reconciler promotes later, REQ-INV-004).
+- **shared → personal** (personalisieren): the moved quantity becomes the owner's private stock
+  (`personal = true`), carrying the source row's existing `owningOrgUnit` over. A source row bound to
+  a job order or mission is **refused** (HTTP 400) — a personal row may never carry either
+  association.
+
+The operation is an **append-only split** (REQ-INV-001), structurally identical to the book-out
+`TRANSFER` branch: the moved `amount` is decremented off the source row (the source row is deleted
+when it depletes below the quantity epsilon) and inserted as its own new row with the opposite
+`personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-003), guarded
+by optimistic locking on the source row's `version`, and owner-scoped (`@ownerScopeService.canEditInventoryItem`;
+an admin/logistician may act within scope). Every rebooking records its own audit event
+(`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
+
+In the UI the action is the per-entry **Umbuchen** row action (`krt-icon-rebook`) on `/inventory/my`;
+its modal also hosts the relocated location/user transfer (the former book-out `TRANSFER` mode), so
+**Ausbuchen** is now consume/sell only and **Umbuchen** owns every rebooking. The squadron-wide
+`/inventory/all` view exposes the Umbuchen action for the location/user transfer only (the
+personal↔shared toggle is owner-scoped and lives on `/my`).
+
+**Acceptance**
+
+- [ ] Rebooking part of a personal row decrements the source and inserts a new `personal = false`
+  row for the moved quantity; the source's other contributions are unchanged (append-only).
+- [ ] Rebooking the whole row deletes the depleted source and leaves exactly the new row.
+- [ ] A de-personalize stamps the new shared row on the picked org-unit pool (or the owner's sole
+  membership, or `null` when membershipless), consistent with REQ-ORG-004.
+- [ ] A personalize carries the source row's `owningOrgUnit` over and refuses a source bound to a
+  job order or mission with HTTP 400.
+- [ ] A stale `version` yields HTTP 409; a non-owner without an admin/logistician grant yields 403.
+- [ ] Each direction records its own audit event; the unified viewer's Lager filter lists both.
+
+**Enforced by:** `InventoryItemServicePersonalRebookTest`, `InventoryItemControllerTest` ·
+**Code:** `InventoryItemService#rebookPersonal`, `InventoryItemController#rebookPersonal`,
+`InventoryItemPersonalRebookDto`, `inventory-my.html`, `inventory-admin.html`,
+`fragments/inventory-stack-entries.html` · **Issues:** —
 
 ## Out of scope
 

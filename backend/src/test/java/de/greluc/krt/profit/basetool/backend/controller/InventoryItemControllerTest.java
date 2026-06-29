@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
@@ -418,6 +419,52 @@ class InventoryItemControllerTest {
     // animation contract, which keys off the status code, not the body.
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
+  }
+
+  // ── POST /inventory/{id}/personal-rebook (Umbuchung) ─────────────────
+
+  @Test
+  void rebookPersonal_logisticianBranch_passesTrueToService_andReturnsServiceDto() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItemPersonalRebookDto rebookDto =
+        new InventoryItemPersonalRebookDto(4.0, 1L, UUID.randomUUID());
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryItemService.rebookPersonal(itemId, rebookDto, ownerId, true))
+        .thenReturn(persisted);
+
+    InventoryItemDto result = controller.rebookPersonal(jwt, itemId, rebookDto);
+
+    // The role flag from the HTTP boundary reaches the service as the isAdmin arg, the owner id is
+    // the JWT-derived id, and the controller returns the service DTO directly (no 200/204 split).
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).rebookPersonal(itemId, rebookDto, ownerId, true);
+  }
+
+  @Test
+  void rebookPersonal_nonLogisticianBranch_passesFalseToService_withJwtDerivedOwner() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItemPersonalRebookDto rebookDto = new InventoryItemPersonalRebookDto(2.0, 3L, null);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryItemService.rebookPersonal(itemId, rebookDto, ownerId, false))
+        .thenReturn(persisted);
+
+    InventoryItemDto result = controller.rebookPersonal(jwt, itemId, rebookDto);
+
+    // Non-logistician path — the boolean flows through unchanged; the captured service arguments
+    // pin that the owner id is the JWT-derived id and the isAdmin flag is false.
+    assertThat(result).isSameAs(persisted);
+    ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
+    verify(inventoryItemService)
+        .rebookPersonal(eq(itemId), eq(rebookDto), ownerCaptor.capture(), eq(false));
+    assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
   }
 
   // ── PUT /inventory/{id}/note ─────────────────────────────────────────

@@ -49,6 +49,20 @@ public enum AuditEventType {
   /** Stock was sold, creating a mission finance entry (book-out type {@code SELL}). */
   INVENTORY_ITEM_SOLD(AuditDomain.INVENTORY),
 
+  /**
+   * Personal stock was rebooked into the shared squadron pool (Umbuchung): the source {@code
+   * personal = true} row was split and the moved quantity inserted as a new {@code personal =
+   * false} row stamped onto an org-unit pool.
+   */
+  INVENTORY_ITEM_DEPERSONALIZED(AuditDomain.INVENTORY),
+
+  /**
+   * Shared squadron stock was rebooked into the owner's personal pool (Umbuchung): the source
+   * {@code personal = false} row was split and the moved quantity inserted as a new {@code personal
+   * = true} row owned solely by that user.
+   */
+  INVENTORY_ITEM_PERSONALIZED(AuditDomain.INVENTORY),
+
   /** A material-collection row's delivered flag was toggled. */
   INVENTORY_ITEM_DELIVERY_TOGGLED(AuditDomain.INVENTORY),
 

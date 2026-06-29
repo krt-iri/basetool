@@ -138,19 +138,25 @@ class InventoryPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void viewAllInventory_ShouldRenderBookOutButtonWithDynamicLabels() throws Exception {
+  void viewAllInventory_ShouldRenderBookOutAndUmbuchenControls() throws Exception {
     when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
         .thenReturn(Collections.emptyList());
 
+    // REQ-INV-007 consolidation: the TRANSFER (Umbuchung) mode moved out of the Ausbuchen dialog
+    // into the dedicated Umbuchen modal, so the book-out button only carries discard/sell labels
+    // and
+    // the Umbuchen modal is rendered alongside it.
     mockMvc
         .perform(get("/inventory/all"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"bookOutSubmitBtn\"")))
         .andExpect(content().string(containsString("data-text-discard=\"Ausbuchen\"")))
-        .andExpect(content().string(containsString("data-text-transfer=\"Umbuchen\"")))
-        .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")));
+        .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")))
+        .andExpect(content().string(not(containsString("data-text-transfer"))))
+        .andExpect(content().string(containsString("id=\"umbuchenModal\"")))
+        .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")));
   }
 
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
