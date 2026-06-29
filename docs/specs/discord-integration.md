@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-22.
-> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); role/unit sync (planned — Track 2)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); role/unit sync (planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
 
@@ -53,6 +53,11 @@ all credential-only users coexist.
   no account-link or privilege inheritance, and the PENDING gate (REQ-SEC-017) can never be bypassed
   that way. Surfacing the link claim on an existing user's login does not re-trigger the PENDING gate:
   the "new registration" decision keys off `created` (no row by subject), which an existing user is not.
+  This subject-only rule governs how a returning Discord login is **matched onto** a row (to link or
+  inherit); it does **not** preclude a username / server-nickname / e-mail comparison made purely to
+  **reject** a brand-new first-login that collides with an existing account and redirect it to manual
+  linking (REQ-SEC-022). That comparison never links and never inherits, so the no-silent-inheritance
+  guarantee is preserved — and strengthened.
 
 **Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · `UserServiceSyncTest` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724 · **Decision:** ADR-0036
 
@@ -111,6 +116,54 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
   sidebar. Requires the `discord` IdP's "Hide on login page" = OFF.
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
+
+### REQ-SEC-022 — Deny a colliding Discord first-login & redirect to account linking (fail-open)
+
+A **brand-new** Discord first-broker-login MUST be denied — and the user pointed at linking their
+existing account — when the incoming Discord identity collides with an account that already exists:
+the Discord **username** or the **per-guild server nickname** matches (case-insensitively) an
+existing account's login **username** or in-app **display name**, or the Discord **e-mail** matches
+an existing account's e-mail. This stops a member who already has a Basetool/credential account from
+silently creating a duplicate `PENDING` registration; instead they are told to link Discord to their
+existing account (Account Console → Linked accounts → Discord, ADR-0036).
+
+The check runs as the **second stage** of the first-broker-login gate
+(`DiscordGuildRoleGateAuthenticator`), **after** the fail-closed membership gate (REQ-SEC-016) admits
+the user and **before** the Keycloak user is created. Because the in-app display name lives only in
+the backend, the gate asks the backend over an internal **HTTPS** endpoint (`POST
+/internal/discord/account-existence`, guarded by a shared secret in the `X-KRT-SPI-Secret` header)
+whether a match exists; only the boolean fact crosses the wire — no account data — and the candidate
+names/e-mail are **never logged** (REQ-OBS). On a confident match the gate renders the localized
+`discordAccountAlreadyExists` error page and ends the flow with `ACCESS_DENIED` (no session, no
+`app_user` row). It matches **only to reject** — never to link or inherit, which REQ-DATA-006 still
+forbids — so it strengthens, not weakens, the anti-impersonation posture.
+
+**Fail-open by design (the inverse of REQ-SEC-016).** This is a duplicate-account guard, not a
+security boundary, so any ambiguity lets the registration proceed to the normal PENDING queue rather
+than blocking a legitimate new member: the precheck is **skipped** when the feature is unconfigured
+(no `KRT_BACKEND_PRECHECK_URL` / `KRT_DISCORD_SPI_SHARED_SECRET`), when the URL is not `https://`
+(HTTPS only — never HTTP), or when the flow is an **account-linking** flow (an already-authenticated
+session, ADR-0036, so the precheck never denies the very account being linked); and a backend error,
+timeout, TLS failure, or unparseable answer is treated as "unknown" → allow. Certificate validation
+is **never** disabled — the SPI trusts the backend's self-signed certificate via a configured PKCS#12
+truststore, and a TLS failure simply fails open.
+
+**Acceptance**
+
+- [x] A new Discord first-login whose username / server nickname matches an existing account's
+  username or display name, or whose e-mail matches an existing e-mail, is denied with the
+  `discordAccountAlreadyExists` page; no session is issued and no `app_user` row is created.
+- [x] The match is case-insensitive and the backend returns only `{ "exists": <bool> }` — never any
+  account data; the candidate names/e-mail are never logged.
+- [x] The precheck is skipped (fail-open allow) when unconfigured, when the URL is not HTTPS, when
+  the backend answers non-200 / errors / times out, or when the answer is unparseable.
+- [x] The precheck is skipped during an account-linking flow (already-authenticated session,
+  ADR-0036), so linking Discord to an existing account is never denied against that account.
+- [x] The SPI calls the backend over HTTPS only, trusting it via a configured PKCS#12 truststore;
+  certificate validation is never disabled. A blank backend shared secret disables the endpoint (503).
+- [x] The two krt-theme login bundles (de/en) carry `discordAccountAlreadyExists`.
+
+**Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 

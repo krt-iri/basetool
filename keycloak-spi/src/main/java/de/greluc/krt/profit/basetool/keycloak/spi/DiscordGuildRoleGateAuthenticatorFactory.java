@@ -54,6 +54,19 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   /** Config key — the Discord API base URL (override only for tests). */
   public static final String CONFIG_API_BASE_URL = "apiBaseUrl";
 
+  /**
+   * Environment variable: filesystem path to a PKCS#12 truststore that trusts the backend's
+   * certificate, used by the fail-open account-existence precheck (REQ-SEC-022). Unset disables the
+   * pinned trust (the precheck then fails the TLS handshake and fails open).
+   */
+  public static final String BACKEND_TRUSTSTORE_PATH_ENV = "KRT_BACKEND_TRUSTSTORE_PATH";
+
+  /**
+   * Environment variable: password for the backend truststore ({@link
+   * #BACKEND_TRUSTSTORE_PATH_ENV}).
+   */
+  public static final String BACKEND_TRUSTSTORE_PASSWORD_ENV = "KRT_BACKEND_TRUSTSTORE_PASSWORD";
+
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
   private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(10);
 
@@ -65,8 +78,27 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
           HTTP_TIMEOUT,
           2,
           Duration.ofSeconds(2));
+
+  // Best-effort per-guild server-nickname reader: one of the account-existence candidates. Uses a
+  // default client — it talks to the public Discord API (publicly-trusted CA), not the backend.
+  private static final DiscordGuildNicknameReader NICKNAME_READER =
+      new DiscordGuildNicknameReader(
+          HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build(), HTTP_TIMEOUT);
+
+  // Fail-open backend account-existence client (REQ-SEC-022). Its HTTPS client trusts the backend's
+  // (self-signed) certificate via the configured PKCS#12 truststore; never trust-all. A missing or
+  // broken truststore degrades to default trust, so the HTTPS call fails the handshake and the
+  // precheck fails open rather than skipping certificate verification.
+  private static final BackendAccountChecker BACKEND_CHECKER =
+      new BackendAccountChecker(
+          BackendTrustSupport.httpClient(
+              HTTP_TIMEOUT,
+              System.getenv(BACKEND_TRUSTSTORE_PATH_ENV),
+              System.getenv(BACKEND_TRUSTSTORE_PASSWORD_ENV)),
+          HTTP_TIMEOUT);
+
   private static final DiscordGuildRoleGateAuthenticator INSTANCE =
-      new DiscordGuildRoleGateAuthenticator(CHECKER);
+      new DiscordGuildRoleGateAuthenticator(CHECKER, NICKNAME_READER, BACKEND_CHECKER);
 
   private static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
     AuthenticationExecutionModel.Requirement.REQUIRED,
@@ -126,8 +158,11 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   @Override
   public String getHelpText() {
     return "Denies first-broker login unless the federated Discord user is a member of the "
-        + "configured guild and holds the configured KRT-Mitglied role (matched by numeric id). "
-        + "Fails closed on any error or ambiguity.";
+        + "configured guild and holds the configured KRT-Mitglied role (matched by numeric id); "
+        + "fails closed on any error or ambiguity. When configured (KRT_BACKEND_PRECHECK_URL + "
+        + "KRT_DISCORD_SPI_SHARED_SECRET env), it then fails open and denies a NEW Discord login "
+        + "whose username/server-nickname/e-mail already matches a Basetool account, directing the "
+        + "user to link their existing account instead (REQ-SEC-022).";
   }
 
   @Override
