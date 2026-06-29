@@ -35,6 +35,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,6 +67,9 @@ public class BankManagePageController {
    *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
    *     the modals live outside the swapped region
    * @param authentication the caller's authentication, used to detect the management perspective
+   * @param principal the authenticated OIDC user, used to read the caller's {@code sub} (Keycloak
+   *     UUID) so the holder tab can link the caller's own holder row; {@code null} for a non-OIDC
+   *     principal (e.g. a {@code @WithMockUser} test), in which case no self-link is rendered
    * @param model Spring MVC model
    * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
@@ -74,6 +79,7 @@ public class BankManagePageController {
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String fragment,
       Authentication authentication,
+      @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, "ROLE_BANK_MANAGEMENT");
     PageResponse<BankAccountDto> accounts =
@@ -89,7 +95,12 @@ public class BankManagePageController {
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
     // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
     // server-side (canSeeHolder) — this only governs which links the UI renders.
-    model.addAttribute("selfUserId", authentication != null ? authentication.getName() : null);
+    // NOTE: authentication.getName() returns the preferred_username (the frontend OAuth2
+    // user-name-attribute), NOT the Keycloak sub — comparing it against the holder's userId
+    // (== app_user.id == sub) never matched, so a plain bank employee never saw the link to their
+    // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
+    // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
+    model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
     model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";

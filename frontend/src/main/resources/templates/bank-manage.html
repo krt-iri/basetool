@@ -386,7 +386,7 @@
             <form class="bank-ajax-form no-track" data-refresh="manageBody"
                   data-endpoint="/api/proxy/bank/holders" data-method="POST">
                 <div class="krt-modal-body">
-                    <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Das Handle wird beim Registrieren eingefroren.</p>
+                    <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Angezeigt wird immer der aktuelle Anzeigename des Nutzers; der bei der Registrierung erfasste Name dient nur als R&uuml;ckfall nach einer Nutzerl&ouml;schung.</p>
                     <div class="bank-form-row">
                         <label for="bank-holder-user" th:text="#{bank.field.user}">Nutzer</label>
                         <select id="bank-holder-user" name="userId" required data-role="bank-holder-user"

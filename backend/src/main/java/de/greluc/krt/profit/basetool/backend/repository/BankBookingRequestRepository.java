@@ -71,6 +71,7 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "account.orgUnit",
         "targetAccount",
         "holder",
+        "holder.user",
         "resultingTransaction"
       })
   List<BankBookingRequest> findByRequestedByOrderByCreatedAtDesc(UUID requestedBy);
@@ -89,6 +90,7 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "account.orgUnit",
         "targetAccount",
         "holder",
+        "holder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByStatus(BankBookingRequestStatus status, Pageable pageable);
@@ -109,6 +111,7 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "account.orgUnit",
         "targetAccount",
         "holder",
+        "holder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByStatusAndAccountIdIn(
@@ -128,6 +131,7 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "account.orgUnit",
         "targetAccount",
         "holder",
+        "holder.user",
         "resultingTransaction"
       })
   List<BankBookingRequest> findByAccountIdInOrderByCreatedAtDesc(Collection<UUID> accountIds);

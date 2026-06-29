@@ -10,6 +10,12 @@
 
 - **Startseite: Einsätze der nächsten 7 Tage als Kacheln.** Statt nur des nächsten Einsatzes zeigt die Startseite jetzt alle Einsätze mit geplantem Start in den nächsten 7 Tagen als Kacheln — der nächstgelegene zuerst, danach aufsteigend; jede Kachel enthält dieselben Angaben wie zuvor, die Beschreibung wird nach drei Zeilen abgeschnitten (vollständig auf der Einsatz-Detailseite sichtbar). Der Info-/Ankündigungsbereich darüber nimmt die volle Breite ein und ist nur so hoch wie nötig (eingeklappt minimal). Angezeigt werden eigene Einsätze (inklusive interner) sowie alle öffentlichen Einsätze; Einsätze einer eigenen Einheit sind mit einer „Meine Einheit"-Markierung hervorgehoben.
 
+- **Bank: Halter werden überall mit ihrem aktuellen Anzeigenamen angezeigt.** In der gesamten Bank (Halter-Tab, Halter-Detailseite, alle Halter-Auswahllisten, Buchungshistorie sowie Kontoauszug- und Management-Report-PDF) erscheint jetzt der aktuelle Anzeigename des verknüpften Nutzers — der Benutzername nur noch, wenn kein Anzeigename gesetzt ist. Eine Namensänderung wirkt sofort überall; der bei der Registrierung eingefrorene Name dient nur noch als Rückfall, wenn der Nutzer gelöscht wurde. Das Audit-Log und die Buchungsnotizen halten den Namen weiterhin so fest, wie er zum Zeitpunkt der Aktion lautete.
+
+### Fixed
+
+- **Bank: Bankmitarbeiter können ihren eigenen Halter-Eintrag wieder öffnen.** Im Tab „Halter" der Bank-Verwaltung war der eigene Name für reine Bankmitarbeiter (ohne Bankleitung) nicht anklickbar, sodass sie ihre eigene Halter-Übersicht nicht aufrufen konnten; jetzt ist der eigene Eintrag wie vorgesehen verlinkt (fremde Einträge bleiben wie bisher nur für die Bankleitung verlinkt).
+
 ## [v1.0.4](https://github.com/krt-profit/basetool/releases/tag/v1.0.4) - 2026-06-29
 
 ### Added

@@ -30,7 +30,9 @@ import java.util.UUID;
  *
  * @param transactionId the owning transaction's id (the batch key)
  * @param holderId the holder whose stash the leg changes
- * @param handle the holder's deletion-proof handle snapshot
+ * @param handle the holder's live display name — the linked user's current effective name (display
+ *     name preferred, username fallback), falling back to the deletion-proof handle snapshot when
+ *     the user is gone (REQ-BANK-003)
  * @param amount the leg's signed amount
  */
 public record BankHolderLeg(UUID transactionId, UUID holderId, String handle, BigDecimal amount) {}

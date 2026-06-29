@@ -110,6 +110,20 @@ never hard-deleted while ledger rows reference them. Management may still **manu
 register any tool user as a custodian; in addition, **all bank staff are auto-registered**
 as holders (REQ-BANK-029).
 
+**Displayed name (live, not the snapshot).** Everywhere a holder is shown across the bank — the
+*Halter* registry tab, the holder detail header, every holder-select dropdown (Umbuchung,
+Ein-/Auszahlung, Anträge), the booking history, the account statement and the management report PDF
+— the label is the linked user's **live effective name**: their **display name** when set,
+otherwise their **username**. The denormalized `handle` snapshot is **only** a deletion fallback —
+it is shown solely once the linked user is gone (`user_id` set to NULL), keeping the ledger
+readable. So changing a display name is reflected immediately across the whole bank, and the
+registry is ordered by that live name. The resolution lives in `BankHolder.getDisplayName()` for the
+entity surfaces and in a `CASE` over the left-joined user in the holder-ledger projections
+(`holderTotals`, `findHolderLegsByTransactionIds`) for the history/report surfaces; the holder
+read fetch-joins the user to stay N+1-free. The append-only ledger **notes** and the **audit log**
+keep the name as recorded at the time of the action (they record what happened, not the current
+identity).
+
 **Acceptance**
 
 - [x] A deposit/withdrawal records exactly one holder leg; an account↔account transfer two
@@ -119,8 +133,11 @@ as holders (REQ-BANK-029).
   holder distribution.
 - [x] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
   history.
+- [x] Every bank surface shows the holder's **live** effective name (display name preferred,
+  username fallback); renaming a user is reflected immediately in the registry, dropdowns, history
+  and statements, while a deleted user's rows fall back to the frozen handle snapshot.
 
-**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest` · **Code:** `model/BankHolder`, `model/BankHolderPosting`, `repository/BankHolderPostingRepository`, `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest`, `BankHolderLiveDisplayNameTest` (live name preferred + rename reflected + deleted-user snapshot fallback, registry & statement), `BankReportServiceTest` (holder column on statements) · **Code:** `model/BankHolder` (`getDisplayName`), `model/BankHolderPosting`, `mapper/BankHolderMapper`, `repository/BankHolderRepository` (`findAllWithUser`), `repository/BankHolderPostingRepository` (`holderTotals` / `findHolderLegsByTransactionIds` live `CASE`), `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
@@ -982,7 +999,10 @@ it mutates nothing, so it logs no audit event. It stays org-unit-blind like ever
 
 In the holder menu (`/bank/manage`, tab *Halter*) the handle links to the holder detail page
 (`/bank/holders/{id}`) when the caller may view it (their own row, or any row for management); other
-rows render the handle as plain text. The detail page is read-only (no booking actions).
+rows render the handle as plain text. The detail page is read-only (no booking actions). The
+own-row match keys on the caller's OIDC `sub` (== `app_user.id` == the holder's `userId`), read from
+the authenticated principal — **not** the `preferred_username` that the frontend exposes as the
+authentication name — so a plain bank employee always sees the link to their own holder.
 
 The detail page also carries a **balance-split calculator**: the holder enters their current
 in-game account balance and the page shows — **purely client-side, nothing is stored** — how much
@@ -998,13 +1018,16 @@ bank owes them, so their own money exceeds the entered balance.
   rejected (403), even via a forged request.
 - [x] Bank management opens any holder's history; the page is paged newest-first and reuses the
   shared pager (AJAX swap, no reload).
+- [x] On the *Halter* tab a plain bank employee sees the link to their own holder row (keyed on the
+  OIDC `sub`, not the `preferred_username`) and reaches their own custody history; every other
+  holder's handle stays plain text.
 - [x] The history is read-only and writes no audit event; the gate ignores org-unit scope and the
   active-org-unit pin (REQ-BANK-008).
 - [x] The balance-split calculator shows, for an entered current balance, the bank-reserved amount
   (= the custody total) and the own private money (= balance − custody total) live and client-side;
   nothing is persisted.
 
-**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest`, `BankManagePageControllerTest` (selfUserId = OIDC sub, not preferred_username), `BankHolderSelfLinkRenderMvcTest` (employee links own holder only) · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `controller/BankManagePageController` (holder self-link selfUserId), `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
 
