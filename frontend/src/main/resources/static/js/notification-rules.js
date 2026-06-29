@@ -79,6 +79,12 @@
         container.appendChild(row);
         const appended = container.lastElementChild;
         toggleRow(appended);
+        // Upgrade the freshly cloned SPECIFIC_USER picker into a searchable combobox: the row comes
+        // from an inert <template>, so its <select data-krt-combobox> arrives un-enhanced. The value
+        // set above (edit mode) is seeded by the enhancer. Idempotent; safe if the helper is absent.
+        if (window.krtEnhanceComboboxes) {
+            window.krtEnhanceComboboxes(appended);
+        }
         return appended;
     }
 

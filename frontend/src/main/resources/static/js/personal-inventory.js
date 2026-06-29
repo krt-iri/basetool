@@ -257,7 +257,10 @@
         // legacy data-trigger="submit-form" full reload (removed from that <select>).
         document.addEventListener('change', function (e) {
             const sel = e.target;
-            if (!sel.matches || !sel.matches('form.krt-pi-userform select[name="userSub"]')) {
+            // Match the member control by name (not tag): the global searchable-combobox enhancer
+            // replaces the <select> with a hidden <input name="userSub">, which is what dispatches
+            // the change once enhanced; the plain <select> still matches before enhancement / no-JS.
+            if (!sel.matches || !sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 return;
             }
             swapFromForm(sel.form);

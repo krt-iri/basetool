@@ -390,9 +390,9 @@
                     <div class="bank-form-row">
                         <label for="bank-holder-user" th:text="#{bank.field.user}">Nutzer</label>
                         <select id="bank-holder-user" name="userId" required data-role="bank-holder-user"
-                                data-testid="bank-holder-user">
+                                data-krt-combobox data-testid="bank-holder-user">
                             <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                            <option th:each="u : ${users}" th:value="${u.id()}"
+                            <option th:each="u : ${users}" th:value="${u.id()}" th:attr="data-search=${u.username()}"
                                     th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="userId"></span>
@@ -479,7 +479,7 @@
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-source" th:text="#{bank.field.holderSource}">Von Halter</label>
                         <select id="bank-holder-transfer-source" name="sourceHolderId" required
-                                data-role="bank-holder-select" data-testid="bank-holder-transfer-source">
+                                data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-source">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>
@@ -488,7 +488,7 @@
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-dest" th:text="#{bank.field.holderDestination}">An Halter</label>
                         <select id="bank-holder-transfer-dest" name="destinationHolderId" required
-                                data-role="bank-holder-select" data-testid="bank-holder-transfer-dest">
+                                data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-dest">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">carol</option>
                         </select>
@@ -522,7 +522,6 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

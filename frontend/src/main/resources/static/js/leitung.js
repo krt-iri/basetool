@@ -51,8 +51,15 @@
 
     const modal = document.getElementById('leitung-modal');
     const modalUnit = document.getElementById('leitung-modal-unit');
-    const modalUser = document.getElementById('leitung-modal-user');
     const modalRoleGroup = document.getElementById('leitung-modal-role-group');
+
+    // The user picker is upgraded into a searchable combobox by the global krt-searchable-select.js
+    // auto-initialiser (the <select> carries data-krt-combobox). Enhancement moves the original id
+    // onto the combobox's hidden input, so always resolve the control LIVE — a reference captured
+    // before enhancement would point at the detached original <select> and read a stale value.
+    function getModalUser() {
+        return document.getElementById('leitung-modal-user');
+    }
     const modalRole = document.getElementById('leitung-modal-role');
     let modalContext = null;
     let lastTrigger = null;
@@ -70,8 +77,13 @@
         if (modalUnit) {
             modalUnit.textContent = trigger.getAttribute('data-unit-name') || '';
         }
+        const modalUser = getModalUser();
         if (modalUser) {
-            modalUser.value = '';
+            if (modalUser.krtCombobox) {
+                modalUser.krtCombobox.setValue('');
+            } else {
+                modalUser.value = '';
+            }
         }
         if (action === 'add-bereich') {
             modalRoleGroup.style.display = '';
@@ -88,8 +100,14 @@
         }
         lastTrigger = trigger;
         modal.style.display = 'flex';
+        // Reuse the modalUser resolved above (same open call, the control is not replaced in between).
         if (modalUser) {
-            modalUser.focus();
+            // Focus the visible combobox textbox (the resolved element is the hidden input).
+            const box = modalUser.closest ? modalUser.closest('.krt-combobox') : null;
+            const focusTarget = box ? box.querySelector('.krt-combobox__input') : modalUser;
+            if (focusTarget) {
+                focusTarget.focus();
+            }
         }
     }
 
@@ -108,6 +126,7 @@
         if (!modalContext) {
             return;
         }
+        const modalUser = getModalUser();
         const userId = modalUser ? modalUser.value : '';
         if (!userId) {
             return;
@@ -161,9 +180,6 @@
                 closeModal();
             }
         });
-        if (window.krtSearchableSelect && modalUser) {
-            window.krtSearchableSelect(modalUser, {});
-        }
     }
 
     // ------------------------------------------------ delegated in-fragment actions --

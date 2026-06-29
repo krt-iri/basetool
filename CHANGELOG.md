@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Nutzer-Auswahlfelder sind durchsuchbar (Live-Suche nach Nutzername und Anzeigename).** Überall, wo ein Nutzer ausgewählt wird — u. a. Missions-Besitzer/-Manager/-Verantwortliche und Finanz-Teilnehmer, Auftrags-Zuweisung, Raffinerie-Besitzer und Einlagern, Bank-Halter/-Berechtigungen/-Limits, Inventar-Zuordnung und Umbuchen, Leitung, Spezialkommando, Admin-Inventar/-Blueprints sowie Benachrichtigungsregeln — ist das Dropdown jetzt eine Such-Combobox: Tippen filtert die Liste nach Nutzername **und** Anzeigename, damit lange Nutzerlisten handhabbar bleiben. Bank-Halter-Felder durchsuchen den Handle. Künftig müssen alle Nutzer-Auswahlfelder so gestaltet sein (REQ-FE-011, ADR-0053).
 - **Discord-Anmeldung: keine doppelten Konten mehr.** Wer sich erstmals über Discord anmeldet und dessen Discord-Benutzername, Server-Nickname oder E-Mail bereits zu einem vorhandenen Konto passt, wird mit einem lokalisierten Hinweis abgewiesen, das vorhandene Konto stattdessen mit Discord zu verknüpfen — statt ein zweites Konto anzulegen. Die Prüfung ist fail-open (sie blockiert nur bei eindeutiger Übereinstimmung und lässt bei Unklarheit normal in die Freigabe-Warteschlange durch) und läuft ausschließlich über HTTPS.
 
 ### Changed
