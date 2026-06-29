@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-transfer-fee-rate=${transferFeeRate}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
@@ -499,15 +499,8 @@
                         <input type="number" id="bank-holder-transfer-amount" name="amount" step="1" min="1"
                                inputmode="numeric" required data-testid="bank-holder-transfer-amount">
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- Live fee preview (REQ-BANK-033): the entered amount is what the source
-                             holder sends; bank.js fills the in-game fee and what arrives at the target. -->
-                        <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
-                           data-testid="bank-holder-transfer-fee-preview">
-                            <span th:text="#{bank.fee.label}">Geb&uuml;hr</span>:
-                            <span data-fee-value>0</span> aUEC &middot;
-                            <span th:text="#{bank.fee.net.label}">kommt an</span>:
-                            <span data-fee-net>0</span> aUEC
-                        </p>
+                        <!-- No fee preview here: the holder→holder Umbuchung is fee-free
+                             (REQ-BANK-031, ADR-0052) — the staff bear any in-game fee personally. -->
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-note" th:text="#{bank.field.note}">Notiz</label>

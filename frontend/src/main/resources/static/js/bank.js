@@ -437,11 +437,12 @@
     }
 
     /**
-     * Live transfer-fee preview (REQ-BANK-033, ADR-0041): the entered amount is the GROSS the holder
-     * sends, so this fills the carved-out fee (`round(gross * rate)`) and what actually arrives
-     * (`gross - fee`). Hidden when the amount is non-positive, the rate is zero, or — for an
-     * account transfer — the source and destination holder match (a same-holder transfer is
-     * fee-free). Guidance only; the authoritative fee is computed server-side at booking time.
+     * Live transfer-fee preview (REQ-BANK-033, ADR-0052): the entered amount is what must ARRIVE at
+     * the destination, so this fills the on-top fee (`round(amount * rate)`) and the gross actually
+     * debited from the source (`amount + fee`). Hidden when the amount is non-positive, the rate is
+     * zero, or — for an account transfer — the source and destination holder match (a same-holder
+     * transfer is fee-free). Guidance only; the authoritative fee is computed server-side at booking
+     * time.
      *
      * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
      */
@@ -452,22 +453,22 @@
             return;
         }
         const rate = transferFeeRate();
-        const gross = Number(amountEl.value);
+        const amount = Number(amountEl.value);
         const src = form.querySelector('[name="sourceHolderId"]');
         const dst = form.querySelector('[name="destinationHolderId"]');
         const sameHolder = !!(src && dst && src.value && src.value === dst.value);
-        if (!Number.isFinite(gross) || gross <= 0 || rate <= 0 || sameHolder) {
+        if (!Number.isFinite(amount) || amount <= 0 || rate <= 0 || sameHolder) {
             preview.hidden = true;
             return;
         }
-        const fee = Math.round(gross * rate);
+        const fee = Math.round(amount * rate);
         const valueEl = preview.querySelector('[data-fee-value]');
-        const netEl = preview.querySelector('[data-fee-net]');
+        const debitEl = preview.querySelector('[data-fee-debit]');
         if (valueEl) {
             valueEl.textContent = fee.toLocaleString('de-DE');
         }
-        if (netEl) {
-            netEl.textContent = Math.round(gross - fee).toLocaleString('de-DE');
+        if (debitEl) {
+            debitEl.textContent = (amount + fee).toLocaleString('de-DE');
         }
         preview.hidden = false;
     }

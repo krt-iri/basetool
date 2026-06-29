@@ -41,8 +41,8 @@ import java.util.UUID;
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
- * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
- *     REQ-BANK-033); {@code 0} for non-fee transactions
+ * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
+ *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee transactions
  */
 public record BankHolderBookingRow(
     UUID postingId,
