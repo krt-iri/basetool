@@ -62,6 +62,10 @@ import org.jetbrains.annotations.Nullable;
  *     the bank employee's confirmation checkbox)
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}
+ * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
+ *     confirmation (REQ-BANK-043)
+ * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
+ *     null} when not a split
  * @param version the optimistic-locking version the client echoes on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -89,4 +93,6 @@ public record BankBookingRequestDto(
     @Nullable BigDecimal applicableLimit,
     boolean ownerApprovalGranted,
     @Nullable String ownerApprovalGrantedByHandle,
+    boolean splitEnabled,
+    @Nullable BigDecimal splitPercent,
     Long version) {}

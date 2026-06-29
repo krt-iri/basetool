@@ -121,6 +121,25 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Column(length = 500, updatable = false)
   private String note;
 
+  /**
+   * Snapshot at creation (REQ-BANK-043): whether this {@code DEPOSIT} request distributes {@link
+   * #splitPercent} of the gross evenly across all active squadron accounts on confirmation (the
+   * named account is credited the remainder). DEPOSIT-only and immutable; always {@code false} for
+   * a withdrawal/transfer.
+   */
+  @Column(name = "split_enabled", nullable = false, updatable = false)
+  private boolean splitEnabled = false;
+
+  /**
+   * The whole-percent (1–100) of the gross distributed across squadron accounts on confirmation
+   * (REQ-BANK-043); {@code null} unless {@link #splitEnabled}. Snapshotted at creation — the
+   * concrete per-account legs are resolved against the squadron-account set active at confirmation.
+   * Immutable.
+   */
+  @Nullable
+  @Column(name = "split_percent", precision = 5, scale = 2, updatable = false)
+  private BigDecimal splitPercent;
+
   /** Lifecycle state; starts {@code PENDING} and reaches exactly one terminal state. */
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
