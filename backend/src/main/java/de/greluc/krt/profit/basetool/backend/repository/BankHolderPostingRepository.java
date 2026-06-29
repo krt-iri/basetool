@@ -112,10 +112,13 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
       @Param("holderId") UUID holderId, Pageable pageable);
 
   /**
-   * Integrity check (REQ-BANK-020, ADR-0041): ids of {@code TRANSFER} / {@code HOLDER_TRANSFER}
-   * transactions whose holder legs do not net to {@code -transfer_fee}. A fee-free movement nets to
-   * zero; a fee-bearing one debits the source the gross and credits the destination the net, so its
-   * two holder legs net to {@code -transfer_fee} (real money lost to the in-game fee).
+   * Integrity check (REQ-BANK-020, ADR-0052): ids of {@code TRANSFER} / {@code HOLDER_TRANSFER}
+   * transactions whose holder legs do not net to {@code -transfer_fee}. The internal {@code
+   * HOLDER_TRANSFER} Umbuchung is fee-free and nets to zero; a fee-bearing holder-changing {@code
+   * TRANSFER} debits the source the gross (amount + fee) and credits the destination the full
+   * entered amount, so its two holder legs net to {@code -transfer_fee} (real money lost to the
+   * in-game fee). Historical fee-bearing Umbuchung rows booked under ADR-0041 still satisfy the
+   * same check.
    *
    * @return the violating transaction ids (empty when sound)
    */

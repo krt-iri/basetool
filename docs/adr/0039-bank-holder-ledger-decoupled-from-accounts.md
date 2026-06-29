@@ -64,9 +64,14 @@ Both tables are insert-only; corrections are `REVERSAL` transactions. The invari
 `Σ account balances = Σ holder balances` holds by construction (deposit/withdrawal move both
 dimensions equally; account→account transfers and holder→holder transfers are internal to
 their own dimension and net to zero). **Amended by
-[ADR-0041](0041-bank-in-game-transfer-fee.md):** once the in-game transfer fee is carved out of
-holder-initiated sends, a `HOLDER_TRANSFER` reduces the holder total without touching any
-account, so the account total then exceeds the holder total by the cumulative Umbuchung fees.
+[ADR-0041](0041-bank-in-game-transfer-fee.md), then restored by
+[ADR-0052](0052-bank-transfer-fee-borne-by-debited-account.md):** ADR-0041's fee-bearing
+`HOLDER_TRANSFER` temporarily broke this (it reduced the holder total without touching any account,
+so the account total exceeded the holder total by the cumulative Umbuchung fees). ADR-0052 makes the
+internal `HOLDER_TRANSFER` Umbuchung **fee-free** again — and books a customer-facing
+withdrawal/transfer's fee equally on both the account and holder dimensions — so the invariant holds
+by construction once more for every type. (Historical fee-bearing Umbuchung rows booked under
+ADR-0041 keep their recorded fee on the append-only ledger.)
 
 ## Consequences
 
