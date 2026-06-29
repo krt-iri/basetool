@@ -341,9 +341,9 @@ A `TRANSFER` (Konto→Konto-Umbuchung, e.g. Staffel → SK, area → cartel) mov
 **two different accounts**: two account legs **and** two holder legs — the physical custody
 moves with the booked money (a source and a destination holder; they may be the same player).
 When the holder **changes**, the source physically sends the money in-game, so the **transfer
-fee is carved out** (REQ-BANK-033, ADR-0041): the source is debited the full gross, the
-destination credited the net, and both leg pairs net to `−fee`; a **same-holder** transfer is a
-fee-free re-label and nets to zero. The employee needs `can_transfer` on the **source**
+fee is added on top** (REQ-BANK-033, ADR-0052): the source is debited the gross (`amount + fee`),
+the destination credited the full entered amount, and both leg pairs net to `−fee`; a
+**same-holder** transfer is a fee-free re-label and nets to zero. The employee needs `can_transfer` on the **source**
 account; the **destination** must be an account the employee can see (any grant row). Bank
 management and admins are unrestricted. The source account is guarded against overdraft
 (REQ-BANK-006); the holder dimension is not. The **intra-account holder rebooking** of the
@@ -964,10 +964,12 @@ zero (REQ-BANK-006). It is gated `hasRole('BANK_EMPLOYEE')`, needs **no** per-ac
 (it touches no account), and **ignores the holder `active` flag in both directions** so a
 deactivated holder's residual (positive or negative) can be reconciled. Source and destination
 holder must differ. Every Umbuchung is audited (`HOLDER_TRANSFER`, REQ-BANK-012) and recorded
-in the unified activity audit (REQ-AUDIT-001). Because the source holder physically sends the
-money in-game, the **in-game transfer fee is carved out** (REQ-BANK-033, ADR-0041): the source
-is debited the full gross, the destination credited the net, so the two holder legs net to
-`−fee`.
+in the unified activity audit (REQ-AUDIT-001). The Umbuchung is **fee-free** (ADR-0052): although a
+holder physically sends the money in-game, this internal reconciliation runs among bank staff who
+bear that fee **personally** — it is not the bank's concern — so the source is debited exactly the
+entered amount, the destination credited the same, no `transfer_fee` is recorded, and the two holder
+legs net to zero (in contrast to a customer-facing payout/transfer, where the fee is added on top,
+REQ-BANK-033).
 
 **Acceptance**
 
@@ -1025,38 +1027,51 @@ bank owes them, so their own money exceeds the entered balance.
 
 Star Citizen charges an in-game fee on every aUEC transfer a holder actively initiates, so the
 bank factors that fee in wherever a holder physically sends money — and **only** there — so the
-bank staff are never out of pocket (ADR-0041):
+bank staff are never out of pocket and the requested amount still arrives in full (ADR-0052,
+superseding the carve-out model of ADR-0041):
 
-- **Where it applies:** `WITHDRAWAL`, a `HOLDER_TRANSFER` (Umbuchung), and an account-to-account
-  `TRANSFER` **when the holder changes** (a same-holder transfer is a pure re-label and stays
-  fee-free). **`DEPOSIT` is exempt** — whoever pays money *in* bears their own fee.
-- **Semantics:** the entered amount is the **gross** the holder sends and is **debited in full**
-  from the source (account + holder stash). The fee `= round(gross × rate)` (whole aUEC, HALF_UP)
-  is **carved out** and recorded on `bank_transaction.transfer_fee`; the **destination is credited
-  the net** (`gross − fee`), so the amount that actually arrives is smaller. The fee and the
-  arriving amount are shown explicitly — a live preview in the booking modals (fed by `GET
-  /api/v1/bank/transfer-fee-rate`) and on every outgoing leg of the account/holder history.
+- **Where it applies:** `WITHDRAWAL` and an account-to-account `TRANSFER` **when the holder
+  changes** (a same-holder transfer is a pure re-label and stays fee-free) — the customer-facing
+  moves the bank makes on a member's behalf. **`DEPOSIT` is exempt** (whoever pays money *in* bears
+  their own fee) and so is the internal **`HOLDER_TRANSFER`** (Umbuchung at
+  `/bank/manage?tab=halter`): that reconciliation runs among bank staff, who bear its in-game fee
+  **personally**, so the bank does not model it (REQ-BANK-031).
+- **Semantics:** the entered amount is the amount that must **arrive** at the destination. The fee
+  `= round(amount × rate)` (whole aUEC, HALF_UP) is **added on top** and recorded on
+  `bank_transaction.transfer_fee`; the source (account + holder stash) is **debited the gross**
+  (`amount + fee`), so the **destination receives the full entered amount** and the **debited
+  account bears the fee**. A 500 000 transfer at 0.5% therefore costs the source 502 500. The fee
+  and the gross debited are shown explicitly — a live preview in the booking modals (fed by `GET
+  /api/v1/bank/transfer-fee-rate`) and, on every outgoing leg of the account/holder history, the
+  fee plus the amount that arrived (`|leg| − fee`).
 - **Rate:** the same runtime-editable setting the operation payout uses
   (`operation.transfer_fee_rate`, default 0.5%, editable at `/admin/settings`) — one rate for the
   whole org.
-- **Ledger consequence (amends REQ-BANK-020):** a fee-bearing `TRANSFER` / `HOLDER_TRANSFER` no
-  longer nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the
-  game), so the integrity sweep expects `SUM(legs) = −transfer_fee` for those types. The
-  `REVERSAL` mirror invariant is unchanged (a reversal negates the actual recorded legs). The
-  no-overdraft guard stays **account-only** (REQ-BANK-006); the holder dimension may still go
-  negative.
+- **Overdraft (REQ-BANK-006):** the source-account no-overdraft guard runs against the **gross**
+  (`amount + fee`) — a booking whose account cannot cover the amount **plus** its fee is refused
+  (`BANK_OVERDRAFT`), so the fee can never drive an account negative. The holder dimension may
+  still go negative (ADR-0039).
+- **Ledger consequence (amends REQ-BANK-020):** a fee-bearing holder-changing `TRANSFER` no longer
+  nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the game), so
+  the integrity sweep expects `SUM(legs) = −transfer_fee` for it (source `−(amount + fee)`,
+  destination `+amount`). The fee-free `HOLDER_TRANSFER` carries `transfer_fee = 0` and nets to zero
+  as before — the same `SUM(legs) = −transfer_fee` check holds with a zero fee, so no integrity
+  change is needed. The `REVERSAL` mirror invariant is unchanged (a reversal negates the actual
+  recorded legs, restoring the gross to the source).
 
 **Acceptance**
 
-- [x] A withdrawal of `G` debits the account and the holder `G`, records `fee = round(G × rate)`,
-  and the history shows the fee plus the arriving amount `G − fee`; the holder is not out of pocket.
-- [x] A holder→holder Umbuchung and a holder-changing account transfer credit the destination
-  `G − fee`; their legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer and
-  a deposit record no fee and net to zero / move the full amount.
-- [x] The booking modals show a live "Gebühr / kommt an" preview as the amount is typed; the rate
-  is the shared `operation.transfer_fee_rate`.
+- [x] A withdrawal of `A` records `fee = round(A × rate)`, debits the account and the holder the
+  gross `A + fee`, and is refused when the account cannot cover `A + fee`; the recipient effectively
+  receives the full `A` and the holder is not out of pocket.
+- [x] A holder-changing account transfer credits the destination the full `A` and debits the source
+  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer, a
+  deposit and an internal holder→holder Umbuchung record no fee and net to zero / move the full
+  amount.
+- [x] The booking modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited)
+  as the amount is typed; the rate is the shared `operation.transfer_fee_rate`.
 
-**Enforced by:** `BankLedgerServiceTest` (fee carve-out, net to destination, same-holder fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService`, `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (fee added on top, full amount to destination, overdraft against the gross, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 

@@ -544,11 +544,15 @@ holder balance is a **global** quantity in its own ledger
 (`bank_holder_posting`), not account-bound, and **may go negative** — a
 holder fronts their own money if needed and is later settled via a **holder-to-holder Umbuchung**
 (`HOLDER_TRANSFER`, REQ-BANK-031). Only **accounts** are hard-protected against
-overdraft. Because a holder sends the money in-game themselves when withdrawing or doing an Umbuchung,
-the **in-game transfer fee** (default 0.5 %, the same setting `operation.transfer_fee_rate`
-as for the operations payout) is deducted on `WITHDRAWAL`, `HOLDER_TRANSFER` and a
-holder-changing `TRANSFER` — the source is charged gross, the target is credited net;
-`DEPOSIT` and same-holder transfers stay fee-free (REQ-BANK-033, ADR-0041). **All bank
+overdraft. When the bank sends money in-game on a member's behalf, the **in-game transfer fee**
+(default 0.5 %, the same setting `operation.transfer_fee_rate` as for the operations payout) is added
+**on top** and borne by the debited account: it applies to `WITHDRAWAL` and a holder-changing
+`TRANSFER` — the source is debited the gross (amount + fee), the destination/recipient gets the
+**full** entered amount, and the account-overdraft guard runs against the gross (a booking that
+cannot cover amount + fee is refused, so a fee never drives an account negative). `DEPOSIT`,
+same-holder transfers and the internal holder-to-holder Umbuchung (`HOLDER_TRANSFER`) are
+**fee-free** — for the Umbuchung the bank staff bear the in-game fee personally
+(REQ-BANK-033, ADR-0052). **All bank
 employees and Bank Management members are
 automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses all
 bank roles, their role-driven holder is automatically deactivated (the remaining balance
