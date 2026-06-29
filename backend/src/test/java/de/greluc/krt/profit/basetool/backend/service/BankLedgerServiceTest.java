@@ -21,16 +21,24 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
+import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankHolderTransferRequest;
@@ -44,6 +52,9 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -57,6 +68,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -82,6 +94,9 @@ class BankLedgerServiceTest {
   @Autowired private BankPostingRepository postingRepository;
   @Autowired private BankHolderPostingRepository holderPostingRepository;
   @Autowired private BankAuditEventRepository auditEventRepository;
+  @Autowired private UserRepository userRepository;
+  @Autowired private SquadronRepository squadronRepository;
+  @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   private BankAccount account;
   private BankAccount otherAccount;
@@ -553,6 +568,98 @@ class BankLedgerServiceTest {
     assertEquals(before + 4, auditEventRepository.count(), "one audit row per successful booking");
   }
 
+  @Test
+  void bookDeposit_recordsCounterpartyUserHandleAndOrgUnitSnapshotAndAuditTarget() {
+    // Given (REQ-BANK-043): an Einzahler who belongs to one Staffel
+    User depositor = newUser("einzahler");
+    Squadron staffel = newSquadron("Staffel " + UUID.randomUUID());
+    linkMembership(depositor, staffel);
+
+    // When: the deposit names the counterparty user and their org unit
+    BankTransactionDto tx =
+        bankLedgerService.bookDeposit(
+            new BankDepositRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("500"),
+                null,
+                depositor.getId(),
+                staffel.getId()));
+
+    // Then: the header carries the user + handle + org-unit snapshots (deletion-proof)
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertEquals(depositor.getId(), stored.getCounterpartyUserId());
+    assertEquals(depositor.getEffectiveName(), stored.getCounterpartyHandle());
+    assertEquals(staffel.getId(), stored.getCounterpartyOrgUnitId());
+    assertEquals(staffel.getName(), stored.getCounterpartyOrgUnitName());
+    // And the DEPOSIT_BOOKED audit row points at the counterparty and names them in its detail
+    BankAuditEvent audit = auditForTransaction(account.getId(), tx.id());
+    assertEquals(depositor.getId(), audit.getTargetUserId());
+    assertTrue(audit.getDetails().contains(depositor.getEffectiveName()));
+    assertTrue(audit.getDetails().contains(staffel.getName()));
+  }
+
+  @Test
+  void bookWithdrawal_recordsCounterpartyUserWithoutOrgUnitAndAuditTarget() {
+    // Given (REQ-BANK-043): a payout to a recorded Empfänger, no org unit chosen
+    deposit(account, holderA, "500");
+    User recipient = newUser("empfaenger");
+
+    // When
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("100"),
+                null,
+                recipient.getId(),
+                null));
+
+    // Then: the user + handle are snapshotted, the org unit stays empty
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertEquals(recipient.getId(), stored.getCounterpartyUserId());
+    assertEquals(recipient.getEffectiveName(), stored.getCounterpartyHandle());
+    assertNull(stored.getCounterpartyOrgUnitId());
+    assertNull(stored.getCounterpartyOrgUnitName());
+    assertEquals(
+        recipient.getId(), auditForTransaction(account.getId(), tx.id()).getTargetUserId());
+  }
+
+  @Test
+  void bookDeposit_rejectsCounterpartyOrgUnitThatIsNotAMembership() {
+    // Given (REQ-BANK-043): a user who is NOT a member of the chosen org unit
+    User depositor = newUser("fremd");
+    Squadron unrelated = newSquadron("Fremd " + UUID.randomUUID());
+
+    // When / Then: the org unit must be one of the counterparty's own memberships
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankLedgerService.bookDeposit(
+                new BankDepositRequest(
+                    account.getId(),
+                    holderA.getId(),
+                    new BigDecimal("10"),
+                    null,
+                    depositor.getId(),
+                    unrelated.getId())));
+  }
+
+  @Test
+  void bookDeposit_withoutCounterparty_leavesHeaderFieldsAndAuditTargetNull() {
+    // Given / When: a plain deposit records no counterparty (the optional default)
+    BankTransactionDto tx = deposit(account, holderA, "200");
+
+    // Then: every counterparty column is null and the audit row has no target user
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertNull(stored.getCounterpartyUserId());
+    assertNull(stored.getCounterpartyHandle());
+    assertNull(stored.getCounterpartyOrgUnitId());
+    assertNull(stored.getCounterpartyOrgUnitName());
+    assertNull(auditForTransaction(account.getId(), tx.id()).getTargetUserId());
+  }
+
   /** Books a deposit through the service (the canonical seeding path). */
   private BankTransactionDto deposit(BankAccount target, BankHolder holder, String amount) {
     return bankLedgerService.bookDeposit(
@@ -592,5 +699,47 @@ class BankLedgerServiceTest {
     h.setHandle(handle);
     h.setActive(true);
     return holderRepository.save(h);
+  }
+
+  /**
+   * Resolves the account-scoped audit row for one booking transaction (the account is freshly
+   * seeded per test, so the filter is unambiguous).
+   */
+  private BankAuditEvent auditForTransaction(UUID accountId, UUID transactionId) {
+    return auditEventRepository
+        .findFiltered(null, null, null, accountId, null, PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .filter(event -> transactionId.equals(event.getTransactionId()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  /** Creates a minimal persisted tool user; its username doubles as the effective-name handle. */
+  private User newUser(String prefix) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(prefix + "-" + UUID.randomUUID());
+    user.setRank(1);
+    user.setInKeycloak(true);
+    return userRepository.save(user);
+  }
+
+  /** Creates a persisted Staffel — an {@code org_unit} row, so it satisfies the counterparty FK. */
+  private Squadron newSquadron(String name) {
+    Squadron squadron = new Squadron();
+    squadron.setName(name);
+    squadron.setShorthand("S" + UUID.randomUUID().toString().substring(0, 8));
+    return squadronRepository.save(squadron);
+  }
+
+  /** Links a user to a Staffel as a plain member (the {@code kind} column is trigger-managed). */
+  private void linkMembership(User user, Squadron squadron) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(user.getId(), squadron.getId()));
+    membership.setUser(user);
+    membership.setKind(OrgUnitKind.SQUADRON);
+    membership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(membership);
   }
 }

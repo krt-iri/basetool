@@ -23,10 +23,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -70,5 +72,34 @@ public class UserProxyController {
         backendApiClient.get(
             uri, new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
     return response != null && response.content() != null ? response.content() : List.of();
+  }
+
+  /**
+   * Forwards the per-user membership lookup to the backend so the bank booking form's counterparty
+   * org-unit picker (REQ-BANK-043) can populate its dependent {@code <select>} from the chosen
+   * counterparty's memberships. Returns the raw option maps ({@code orgUnitId}, {@code
+   * orgUnitName}, {@code orgUnitShorthand}, {@code kind}); an empty list on backend failure so the
+   * picker degrades to "no org unit" rather than surfacing an error. The {@link UUID} path type
+   * rejects a malformed id before any backend call.
+   *
+   * @param userId the counterparty user whose org-unit memberships to list
+   * @param allKinds when {@code true} forwards {@code allKinds=true} so the response spans all four
+   *     org-unit kinds (the bank counterparty picker; REQ-BANK-043), else the default Staffel/SK
+   *     set
+   * @return the user's membership options (raw JSON maps), never {@code null}
+   */
+  @GetMapping("/{userId}/memberships")
+  @PreAuthorize("isAuthenticated()")
+  public List<Map<String, Object>> userMemberships(
+      @PathVariable UUID userId,
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/users/" + userId + "/memberships")
+            .queryParam("allKinds", allKinds)
+            .toUriString();
+    List<Map<String, Object>> memberships =
+        backendApiClient.get(uri, new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    return memberships != null ? memberships : List.of();
   }
 }

@@ -41,6 +41,10 @@ import java.util.UUID;
  *     {@code null}
  * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
  *     REQ-BANK-033); {@code 0} for non-fee transactions and same-holder transfers
+ * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
+ *     handle snapshot (REQ-BANK-043), else {@code null}
+ * @param counterpartyOrgUnitName the counterparty's org-unit name snapshot, or {@code null} when no
+ *     counterparty or no org unit was recorded
  */
 public record BankBookingRow(
     UUID postingId,
@@ -50,4 +54,6 @@ public record BankBookingRow(
     String note,
     Instant createdAt,
     UUID reversedTransactionId,
-    BigDecimal transferFee) {}
+    BigDecimal transferFee,
+    String counterpartyHandle,
+    String counterpartyOrgUnitName) {}

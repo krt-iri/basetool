@@ -49,6 +49,11 @@ import org.jetbrains.annotations.Nullable;
  * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
  *     REQ-BANK-033); {@code 0} for non-fee rows. On an outgoing leg (amount &lt; 0) the recipient
  *     received {@code |amount| − transferFee}
+ * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
+ *     handle — the Einzahler / Empf&auml;nger on the far side (REQ-BANK-043), {@code null}
+ *     otherwise or when none was recorded
+ * @param counterpartyOrgUnitName the counterparty's org-unit name, or {@code null} when no
+ *     counterparty or no org unit was recorded
  */
 public record BankBookingDto(
     UUID postingId,
@@ -63,4 +68,6 @@ public record BankBookingDto(
     @Nullable String counterAccountName,
     @Nullable String counterHolderHandle,
     boolean intraAccount,
-    BigDecimal transferFee) {}
+    BigDecimal transferFee,
+    @Nullable String counterpartyHandle,
+    @Nullable String counterpartyOrgUnitName) {}

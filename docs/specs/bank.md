@@ -1,7 +1,8 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
 > **Status:** Implemented — epic
-> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
+> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5); latest addition
+> REQ-BANK-043 (deposit/withdrawal counterparty). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
 > tests; subsequent behaviour changes keep this spec in sync in the same PR.
 
@@ -1311,6 +1312,75 @@ rejected), `OrgUnitBankPageControllerMvcTest` (deposit picker lists all active a
 frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html`, `static/js/bank.js` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
 **Issues:** —
+
+### REQ-BANK-043 — Deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
+
+A deposit and a withdrawal each record only the **holder** — the bank custodian who physically
+received the money in (deposit) or paid it out (withdrawal). They do **not** record the *external
+party* on the far side: who handed the money in (the **Einzahler**) or who received the payout (the
+**Empfänger**), and which org unit they belong to. This requirement adds an optional
+**counterparty** to deposits and withdrawals so the account history, the Kontoauszug PDF and the
+admin audit log answer "von wem / an wen" the payment went. The counterparty is a distinct dimension
+from the holder (a custodian receives a member's deposit; the depositing member is the counterparty)
+and is captured on the **transaction header** (V196: `counterparty_user_id` FK `app_user`
+`ON DELETE SET NULL`, plus deletion-proof `counterparty_handle` / `counterparty_org_unit_name`
+snapshots and a `counterparty_org_unit_id` FK `org_unit`), set once at insert — the append-only
+ledger contract (REQ-BANK-004) is unaffected.
+
+Design (owner-confirmed): the counterparty is a **tool user** (no free-text), selected from the
+shared `GET /api/v1/users/lookup` picker; its **org unit is picked at booking** from the user's own
+direct memberships across **all four kinds** (Staffel + SK + Bereich + OL —
+`GET /api/v1/users/{id}/memberships?allKinds=true`), auto-preselected when the user has exactly one,
+blank when none — membership is multi, so it must be chosen. Both fields are **optional**. The
+backend validates the chosen org unit is one of the counterparty's memberships (else 400) and
+snapshots its name via the `OrgUnitMembershipService.listDirectMembershipOptions` seam (kind-safe, no
+polymorphic org-unit load). This stays org-unit-blind for **authorization** (REQ-BANK-008): the org
+unit is used only to *record* a snapshot, never to gate a booking; `BankSecurityService` and every
+bank gate are untouched. The `/lookup` and `/memberships` gates are widened to admit
+`BANK_EMPLOYEE` (a bank employee need not hold any org-role) at both the URL and method layer.
+
+Account↔account **transfers** are unchanged — they already record from/to account + from/to holder.
+A single **"Gegenseite"** column unifies "the other side" on both PDFs (counterparty for
+deposit/withdrawal, counter-account for a transfer), which also fixes the statement PDF's prior
+omission of the transfer counter-account. The counterparty is **player-identifying**, so it is
+**redacted** alongside the holder on the member-facing surfaces (REQ-BANK-038): the redacted
+Kontoauszug omits the Gegenseite column and the org-unit read-only history nulls the counterparty.
+Booking **requests** (REQ-BANK-023): a confirmed deposit/withdrawal records the **requester** as the
+counterparty user (for a deposit request the requester *is* the depositor, REQ-BANK-042) together
+with their **deterministic primary org unit** — the requester is not present to pick, so the primary
+membership (name-sorted primary Staffel, or a leader's Bereich/OL) is recorded, null when they have
+none. The audit detail names the counterparty
+handle + org-unit name (both system identifiers, not user free text) and sets the structured
+`target_user_id` on `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED` (REQ-BANK-012) — no new event type.
+
+**Acceptance**
+
+- [x] A deposit/withdrawal naming a counterparty stamps `counterparty_user_id` + handle snapshot on
+  the header; a chosen org unit is validated to be one of that user's memberships (else 400) and its
+  name snapshotted; transfers/holder-transfers/reversal/wipe leave every counterparty column null.
+- [x] The `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED` audit row carries the counterparty as
+  `target_user_id` and names the handle + org unit in its detail; a booking without a counterparty
+  leaves both null.
+- [x] The account-detail history and both PDFs show the counterparty (Gegenpartei / Gegenseite); the
+  member-facing redacted Kontoauszug and the org-unit read-only history hide it, like the holder.
+- [x] A confirmed deposit/withdrawal **request** records the requester as the counterparty user plus
+  their deterministic primary org unit (null when the requester has no membership).
+
+**Enforced by:** `BankLedgerServiceTest` (header snapshot, org-unit-membership validation, audit
+target + detail, transfers leave it null), `BankReportServiceTest` (Gegenseite column present in the
+full statement, redacted out), `OrgUnitBankAccessServiceTest` (counterparty redacted for org-unit
+viewers), `OrgUnitMembershipServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
+resolution), `BankBookingRequestServiceTest` (confirmed request records the requester + their primary
+org unit), `UserControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
+reaches `/memberships`) · **Code:**
+`model/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `service/BankLedgerService`
+(`resolveCounterparty`), `service/BankBookingRequestService`,
+`service/OrgUnitMembershipService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
+`repository/BankPostingRepository`, `model/dto/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
+`service/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
+`db/migration/V196`, frontend `controller/BankPageController`, `controller/UserProxyController`,
+`templates/bank-account-detail.html`, `static/js/bank.js` · **ADR:**
+[ADR-0052](../adr/0052-bank-transaction-counterparty.md) · **Issues:** —
 
 ## Out of scope
 

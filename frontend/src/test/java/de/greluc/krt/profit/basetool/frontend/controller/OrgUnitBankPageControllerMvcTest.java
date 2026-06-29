@@ -402,7 +402,9 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             false,
-            BigDecimal.ZERO);
+            BigDecimal.ZERO,
+            null,
+            null);
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
     UserReferenceDto user =

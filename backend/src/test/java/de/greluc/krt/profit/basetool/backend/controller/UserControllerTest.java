@@ -519,7 +519,7 @@ class UserControllerTest {
             UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, false);
     when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of(option));
 
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId);
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
 
     assertEquals(1, result.size());
     assertSame(option, result.getFirst());
@@ -527,11 +527,26 @@ class UserControllerTest {
   }
 
   @Test
+  void getUserMemberships_allKinds_delegatesToDirectMembershipOptions() {
+    // REQ-BANK-043: the bank counterparty picker asks for all four kinds via allKinds=true.
+    UUID userId = UUID.randomUUID();
+    OrgUnitMembershipOptionDto bereich =
+        new OrgUnitMembershipOptionDto(
+            UUID.randomUUID(), "Bereich Logistik", "LOG", OrgUnitKind.BEREICH, false);
+    when(orgUnitMembershipService.listDirectMembershipOptions(userId)).thenReturn(List.of(bereich));
+
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, true);
+
+    assertSame(bereich, result.getFirst());
+    verify(orgUnitMembershipService).listDirectMembershipOptions(userId);
+  }
+
+  @Test
   void getUserMemberships_emptyResult_returnsEmptyList() {
     UUID userId = UUID.randomUUID();
     when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of());
 
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId);
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
 
     assertTrue(result.isEmpty());
   }

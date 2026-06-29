@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Bank: Ein- und Auszahlungen halten fest, von wem bzw. an wen gezahlt wird.** Beim Buchen einer Einzahlung lässt sich jetzt optional der Einzahler (und, falls er einer Einheit angehört, dessen Einheit — Staffel, Spezialkommando, Bereich oder OL) erfassen, bei einer Auszahlung der Empfänger (und ggf. Einheit) — beide werden aus den Tool-Nutzern bzw. deren Mitgliedschaften gewählt. Die Gegenpartei erscheint in der Kontohistorie, im Kontoauszug (Spalte „Gegenseite", die bei Transfers das Gegenkonto zeigt) und im Admin-Audit-Log. Auf den eingeschränkten Mitglieder-Ansichten wird sie wie der Halter ausgeblendet; bei einem bestätigten Buchungsantrag werden der Antragsteller und seine primäre Einheit als Gegenpartei vermerkt.
 - **Discord-Anmeldung: keine doppelten Konten mehr.** Wer sich erstmals über Discord anmeldet und dessen Discord-Benutzername, Server-Nickname oder E-Mail bereits zu einem vorhandenen Konto passt, wird mit einem lokalisierten Hinweis abgewiesen, das vorhandene Konto stattdessen mit Discord zu verknüpfen — statt ein zweites Konto anzulegen. Die Prüfung ist fail-open (sie blockiert nur bei eindeutiger Übereinstimmung und lässt bei Unklarheit normal in die Freigabe-Warteschlange durch) und läuft ausschließlich über HTTPS.
 
 ### Changed

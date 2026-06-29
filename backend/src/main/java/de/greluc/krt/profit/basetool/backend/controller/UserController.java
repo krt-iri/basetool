@@ -102,12 +102,14 @@ public class UserController {
   /**
    * Lightweight typeahead projection (id + username + displayName). Widened by {@code
    * BANK_MANAGEMENT} (REQ-BANK-009): bank managers resolve grantees and holders via this lookup and
-   * need not hold any org role (REQ-BANK-008).
+   * need not hold any org role (REQ-BANK-008). Also widened by {@code BANK_EMPLOYEE}
+   * (REQ-BANK-043): bank employees resolve the deposit/withdrawal counterparty (Einzahler /
+   * Empf&auml;nger) from this lookup and likewise need not hold any org role.
    *
    * @return all users as reference DTOs
    */
   @GetMapping("/lookup")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_MANAGEMENT')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE')")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> lookupUsers() {
     return userService.findAllReference();
@@ -172,22 +174,34 @@ public class UserController {
    * owningOrgUnitId} values directly from this endpoint, without having to thread membership data
    * through every page controller.
    *
-   * <p>Access policy: open to every authenticated member. The endpoint reveals only the names and
-   * shorthands of org units a target user belongs to — equivalent in sensitivity to the {@code
-   * /lookup} typeahead, which is already broadly accessible. A non-admin cannot derive any
-   * personally identifying data from the response (no display name, no email, no rank). Keeping the
-   * surface symmetric with {@code /lookup} avoids forcing the picker fragment to branch on the
-   * caller's role at render time.
+   * <p>Access policy: open to every authenticated member, plus {@code BANK_EMPLOYEE} (REQ-BANK-043:
+   * the deposit/withdrawal counterparty's org-unit picker resolves the chosen user's memberships
+   * here, and a bank employee need not hold any org role per REQ-BANK-008). The endpoint reveals
+   * only the names and shorthands of org units a target user belongs to — equivalent in sensitivity
+   * to the {@code /lookup} typeahead, which is already broadly accessible. A non-admin cannot
+   * derive any personally identifying data from the response (no display name, no email, no rank).
+   * Keeping the surface symmetric with {@code /lookup} avoids forcing the picker fragment to branch
+   * on the caller's role at render time.
    *
    * @param id the user id whose memberships to list; never {@code null}.
-   * @return picker-friendly option DTOs sorted Staffel-first then SK alphabetical; never {@code
-   *     null}, possibly empty when the user has no memberships.
+   * @param allKinds when {@code true} the response spans <strong>all four</strong> org-unit kinds
+   *     (Staffel + SK + Bereich + Organisationsleitung) — the bank counterparty picker
+   *     (REQ-BANK-043) where a Bereich/OL member's unit must be selectable; the default ({@code
+   *     false}) keeps the legacy Staffel/SK-only owner-picker shape so the sidebar and Job-Order
+   *     pickers are unchanged.
+   * @return picker-friendly option DTOs sorted Staffel-first then SK alphabetical (default) or
+   *     top-down by kind across all four kinds ({@code allKinds=true}); never {@code null},
+   *     possibly empty when the user has no memberships.
    */
   @GetMapping("/{id}/memberships")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE')")
   @Transactional(readOnly = true)
-  public List<OrgUnitMembershipOptionDto> getUserMemberships(@PathVariable @NotNull UUID id) {
-    return orgUnitMembershipService.listOptionsForUser(id);
+  public List<OrgUnitMembershipOptionDto> getUserMemberships(
+      @PathVariable @NotNull UUID id,
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+    return allKinds
+        ? orgUnitMembershipService.listDirectMembershipOptions(id)
+        : orgUnitMembershipService.listOptionsForUser(id);
   }
 
   /**

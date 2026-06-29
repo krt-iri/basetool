@@ -1116,4 +1116,67 @@ class OrgUnitMembershipServiceTest {
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(1).kind());
     assertEquals(Boolean.FALSE, result.get(1).isProfitEligible());
   }
+
+  @Test
+  void listDirectMembershipOptions_includesBereichNotJustStaffelAndSk() {
+    // REQ-BANK-043: unlike listOptionsForUser (Staffel/SK only), the bank counterparty picker must
+    // surface a direct Bereich (or OL) membership too. Ordered top-down by kind (Bereich before
+    // Staffel), so the first option is the user's primary unit.
+    UUID squadronId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    OrgUnitMembership squadronRow = new OrgUnitMembership();
+    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
+    OrgUnitMembership bereichRow = new OrgUnitMembership();
+    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
+    when(membershipRepository.findAllByIdUserId(userId))
+        .thenReturn(List.of(squadronRow, bereichRow));
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    squadron.setName("Staffel Rot");
+    squadron.setShorthand("ROT");
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    bereich.setName("Bereich Logistik");
+    bereich.setShorthand("LOG");
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(squadron, bereich));
+
+    List<OrgUnitMembershipOptionDto> options =
+        membershipService.listDirectMembershipOptions(userId);
+
+    assertEquals(2, options.size());
+    assertEquals(OrgUnitKind.BEREICH, options.get(0).kind(), "Bereich sorts before Staffel");
+    assertEquals(bereichId, options.get(0).orgUnitId());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(1).kind());
+  }
+
+  @Test
+  void findPrimaryDirectMembershipOrgUnitId_returnsTopOfKindOrder_orEmpty() {
+    // REQ-BANK-043: the requester's recorded org unit at request confirmation is the deterministic
+    // primary — the first by the top-down kind order (here the Bereich over the Staffel).
+    UUID squadronId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    OrgUnitMembership squadronRow = new OrgUnitMembership();
+    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
+    OrgUnitMembership bereichRow = new OrgUnitMembership();
+    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
+    when(membershipRepository.findAllByIdUserId(userId))
+        .thenReturn(List.of(squadronRow, bereichRow));
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    squadron.setName("Staffel Rot");
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    bereich.setName("Bereich Logistik");
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(squadron, bereich));
+
+    assertEquals(
+        Optional.of(bereichId), membershipService.findPrimaryDirectMembershipOrgUnitId(userId));
+  }
+
+  @Test
+  void findPrimaryDirectMembershipOrgUnitId_noMembership_returnsEmpty() {
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+
+    assertEquals(Optional.empty(), membershipService.findPrimaryDirectMembershipOrgUnitId(userId));
+  }
 }

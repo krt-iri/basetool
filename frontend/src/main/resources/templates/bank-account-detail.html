@@ -117,6 +117,7 @@
                             <th th:text="#{bank.booking.date}">Datum</th>
                             <th th:text="#{bank.booking.type}">Typ</th>
                             <th th:text="#{bank.booking.holder}">Halter</th>
+                            <th th:text="#{bank.booking.counterparty}">Gegenpartei</th>
                             <th th:text="#{bank.booking.note}">Notiz</th>
                             <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
                             <th sec:authorize="hasRole('BANK_MANAGEMENT')"></th>
@@ -140,6 +141,12 @@
                                       th:text="${b.holderHandle()} + ' &#8594; ' + ${b.counterHolderHandle()}">A &#8594; B</span>
                                 <span th:unless="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
                                       th:text="${b.holderHandle()}">greluc</span>
+                            </td>
+                            <!-- Counterparty (Einzahler / Empfänger) on deposits/withdrawals (REQ-BANK-043);
+                                 transfers leave it blank, the counter-account is shown in the Typ chip. -->
+                            <td class="bank-counterparty-cell" data-testid="bank-booking-counterparty">
+                                <span th:if="${b.counterpartyHandle() != null}"
+                                      th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
                             </td>
                             <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
                             <td class="text-right">
@@ -252,6 +259,29 @@
                         </select>
                         <span class="bank-field-error" data-error-for="holderId"></span>
                     </div>
+                    <!-- Counterparty (Einzahler) + their org unit (REQ-BANK-043), both optional. The
+                         org-unit select is disabled until a user is picked; bank.js fills it from that
+                         user's memberships. Empty/disabled selects are omitted from the JSON body. -->
+                    <div class="bank-form-row">
+                        <label for="bank-deposit-counterparty" th:text="#{bank.field.counterparty.depositor}">Einzahler</label>
+                        <select id="bank-deposit-counterparty" name="counterpartyUserId"
+                                data-testid="bank-deposit-counterparty"
+                                data-counterparty-user data-orgunit-target="bank-deposit-counterparty-orgunit">
+                            <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+                            <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">carol</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.counterparty.depositor.hint}">Optional: wer das Geld eingezahlt hat.</span>
+                        <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-deposit-counterparty-orgunit" th:text="#{bank.field.counterparty.orgUnit}">Einheit</label>
+                        <select id="bank-deposit-counterparty-orgunit" name="counterpartyOrgUnitId"
+                                data-testid="bank-deposit-counterparty-orgunit" data-counterparty-orgunit disabled>
+                            <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.counterparty.orgUnit.hint}">Optional: Einheit der Person.</span>
+                        <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
+                    </div>
                     <div class="bank-form-row">
                         <label for="bank-deposit-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="bank-deposit-note" name="note" maxlength="500"
@@ -305,6 +335,27 @@
                         </select>
                         <span class="bank-field-hint" th:text="#{bank.field.holder.payer.hint}">Der Halter, der das Geld physisch auszahlt &#8212; darf dabei ins Minus gehen.</span>
                         <span class="bank-field-error" data-error-for="holderId"></span>
+                    </div>
+                    <!-- Counterparty (Empfänger) + their org unit (REQ-BANK-043), both optional. -->
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-counterparty" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</label>
+                        <select id="bank-withdraw-counterparty" name="counterpartyUserId"
+                                data-testid="bank-withdraw-counterparty"
+                                data-counterparty-user data-orgunit-target="bank-withdraw-counterparty-orgunit">
+                            <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+                            <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">dave</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.counterparty.recipient.hint}">Optional: wer die Auszahlung erh&auml;lt.</span>
+                        <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+                    </div>
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-counterparty-orgunit" th:text="#{bank.field.counterparty.orgUnit}">Einheit</label>
+                        <select id="bank-withdraw-counterparty-orgunit" name="counterpartyOrgUnitId"
+                                data-testid="bank-withdraw-counterparty-orgunit" data-counterparty-orgunit disabled>
+                            <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+                        </select>
+                        <span class="bank-field-hint" th:text="#{bank.field.counterparty.orgUnit.hint}">Optional: Einheit der Person.</span>
+                        <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-withdraw-note" th:text="#{bank.field.note}">Notiz</label>

@@ -417,11 +417,17 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
-                    // BANK_MANAGEMENT widening (REQ-BANK-009): the grants UI resolves grantees
-                    // via the user lookup, and bank staff need not hold any org-role
-                    // (REQ-BANK-008) — without this, a pure bank manager would receive 403 here.
+                    // Bank widening (REQ-BANK-009 grants, REQ-BANK-043 deposit/withdrawal
+                    // counterparty): bank staff resolve grantees and the Einzahler/Empfänger via
+                    // the
+                    // user lookup and need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE
+                    // covers
+                    // BANK_MANAGEMENT via the role hierarchy; both are listed so the URL gate does
+                    // not
+                    // depend on hierarchy evaluation at the filter layer.
                     .requestMatchers("/api/v1/users/lookup")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER", "BANK_MANAGEMENT")
+                    .hasAnyRole(
+                        "ADMIN", "OFFICER", "KRT_MEMBER", "BANK_MANAGEMENT", "BANK_EMPLOYEE")
                     .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users")
@@ -453,8 +459,13 @@ public class SecurityConfig {
                     // UserController#getUserMemberships ist die zweite Verteidigungslinie
                     // (defense in depth) und bleibt das Source-of-truth fuer die zulaessigen
                     // Rollen — die URL-Regel oeffnet nur das Tor.
+                    // BANK_EMPLOYEE widening (REQ-BANK-043): the deposit/withdrawal counterparty
+                    // org-unit picker resolves the chosen user's memberships here; a bank employee
+                    // need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE covers
+                    // BANK_MANAGEMENT
+                    // via the role hierarchy.
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
+                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER", "BANK_EMPLOYEE")
                     .requestMatchers("/api/v1/users/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")

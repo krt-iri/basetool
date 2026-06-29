@@ -389,7 +389,9 @@ class OrgUnitBankAccessServiceTest {
             "Other",
             "counterHolder",
             false,
-            BigDecimal.ZERO);
+            BigDecimal.ZERO,
+            "carol",
+            "Staffel Rot");
     when(bankAccountService.getBookings(eq(accountId), any()))
         .thenReturn(new PageImpl<>(List.of(raw)));
 
@@ -398,6 +400,10 @@ class OrgUnitBankAccessServiceTest {
     BankBookingDto redacted = page.getContent().getFirst();
     assertThat(redacted.holderHandle()).isNull();
     assertThat(redacted.counterHolderHandle()).isNull();
+    // REQ-BANK-043: the deposit/withdrawal counterparty is player-identifying too, so it is
+    // redacted alongside the holder columns for org-unit viewers.
+    assertThat(redacted.counterpartyHandle()).isNull();
+    assertThat(redacted.counterpartyOrgUnitName()).isNull();
     assertThat(redacted.counterAccountNo()).isEqualTo("KB-0002");
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
   }

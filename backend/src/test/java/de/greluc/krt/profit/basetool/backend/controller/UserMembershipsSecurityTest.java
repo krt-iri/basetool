@@ -116,6 +116,22 @@ class UserMembershipsSecurityTest {
   }
 
   /**
+   * Bank employees must reach the endpoint (REQ-BANK-043): the deposit/withdrawal counterparty
+   * org-unit picker resolves the chosen user's memberships here, and a bank employee need not hold
+   * any org-role (REQ-BANK-008). Pins the URL-filter widening that admits {@code BANK_EMPLOYEE}.
+   *
+   * @throws Exception MockMvc plumbing.
+   */
+  @Test
+  void getUserMemberships_bankEmployee_isAllowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/{id}/memberships", UUID.randomUUID())
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+  }
+
+  /**
    * Unauthenticated callers are rejected at the URL-filter level. The application-wide {@code
    * anyRequest().authenticated()} catch-all in SecurityConfig already covers this — the test pins
    * that the new {@code /memberships}-specific rule does not accidentally weaken the gate to

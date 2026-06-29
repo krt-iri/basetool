@@ -156,16 +156,15 @@ public class BankPageController {
                 .filter(a -> "ACTIVE".equals(a.status()))
                 .toList());
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
-    // Approval-limit editor user picker (REQ-BANK-041): only fetched when this surface may edit
-    // limits (bank management / admin), so a plain employee's detail page makes no lookup call.
-    List<UserReferenceDto> users = List.of();
-    if (detail != null && detail.approvalLimits() != null && detail.approvalLimits().canEdit()) {
-      List<UserReferenceDto> lookup =
-          backendApiClient.get(
-              "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
-      users = lookup == null ? List.<UserReferenceDto>of() : lookup;
-    }
-    model.addAttribute("users", users);
+    // User lookup feeds two pickers: the deposit/withdrawal counterparty (Einzahler / Empfänger,
+    // REQ-BANK-043) shown to every booking employee, and the approval-limit editor (REQ-BANK-041,
+    // management/admin only). Since the counterparty picker is on the always-present booking
+    // modals,
+    // the lookup is fetched on every detail render (the /lookup gate now admits BANK_EMPLOYEE).
+    List<UserReferenceDto> lookup =
+        backendApiClient.get(
+            "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+    model.addAttribute("users", lookup == null ? List.<UserReferenceDto>of() : lookup);
     // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) drives the live "Gebühr / kommt an"
     // preview in the withdraw/transfer modals (bank.js). It rides on <main>, which survives the
     // accountBody swap, so it is fetched once on the full-page render.
