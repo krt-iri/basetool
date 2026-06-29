@@ -76,7 +76,7 @@ public class UserProxyController {
 
   /**
    * Forwards the per-user membership lookup to the backend so the bank booking form's counterparty
-   * org-unit picker (REQ-BANK-043) can populate its dependent {@code <select>} from the chosen
+   * org-unit picker (REQ-BANK-044) can populate its dependent {@code <select>} from the chosen
    * counterparty's memberships. Returns the raw option maps ({@code orgUnitId}, {@code
    * orgUnitName}, {@code orgUnitShorthand}, {@code kind}); an empty list on backend failure so the
    * picker degrades to "no org unit" rather than surfacing an error. The {@link UUID} path type
@@ -84,7 +84,7 @@ public class UserProxyController {
    *
    * @param userId the counterparty user whose org-unit memberships to list
    * @param allKinds when {@code true} forwards {@code allKinds=true} so the response spans all four
-   *     org-unit kinds (the bank counterparty picker; REQ-BANK-043), else the default Staffel/SK
+   *     org-unit kinds (the bank counterparty picker; REQ-BANK-044), else the default Staffel/SK
    *     set
    * @return the user's membership options (raw JSON maps), never {@code null}
    */

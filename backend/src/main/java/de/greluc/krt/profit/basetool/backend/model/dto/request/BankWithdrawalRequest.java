@@ -39,11 +39,11 @@ import org.jetbrains.annotations.Nullable;
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
  * @param counterpartyUserId optional Empf&auml;nger — the member who received the payout
- *     (REQ-BANK-043), distinct from the paying holder; {@code null} when no counterparty is
+ *     (REQ-BANK-044), distinct from the paying holder; {@code null} when no counterparty is
  *     recorded
  * @param counterpartyOrgUnitId optional org unit the Empf&auml;nger belongs to, chosen from their
  *     own memberships; only meaningful together with {@code counterpartyUserId} and validated to be
- *     one of that user's memberships (REQ-BANK-043)
+ *     one of that user's memberships (REQ-BANK-044)
  */
 public record BankWithdrawalRequest(
     @NotNull UUID accountId,
@@ -55,7 +55,7 @@ public record BankWithdrawalRequest(
 
   /**
    * Convenience constructor for a withdrawal with <strong>no</strong> recorded counterparty
-   * (REQ-BANK-043) — the common case where the Empf&auml;nger is not captured. Delegates to the
+   * (REQ-BANK-044) — the common case where the Empf&auml;nger is not captured. Delegates to the
    * canonical constructor with both counterparty fields {@code null}. Inbound JSON is always
    * deserialized via the canonical (all-component) constructor, so this overload only serves
    * programmatic callers.

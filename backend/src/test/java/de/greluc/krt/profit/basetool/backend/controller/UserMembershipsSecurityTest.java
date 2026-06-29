@@ -116,7 +116,7 @@ class UserMembershipsSecurityTest {
   }
 
   /**
-   * Bank employees must reach the endpoint (REQ-BANK-043): the deposit/withdrawal counterparty
+   * Bank employees must reach the endpoint (REQ-BANK-044): the deposit/withdrawal counterparty
    * org-unit picker resolves the chosen user's memberships here, and a bank employee need not hold
    * any org-role (REQ-BANK-008). Pins the URL-filter widening that admits {@code BANK_EMPLOYEE}.
    *

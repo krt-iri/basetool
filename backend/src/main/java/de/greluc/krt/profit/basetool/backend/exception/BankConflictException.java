@@ -101,6 +101,20 @@ public class BankConflictException extends RuntimeException {
    */
   public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED = "BANK_OWNER_APPROVAL_REQUIRED";
 
+  /**
+   * Split deposit (REQ-BANK-043) attempted while there is no active squadron account to distribute
+   * to — none exists, or the only one is the deposit's own named account (which is excluded from
+   * the split). The split cannot be honoured.
+   */
+  public static final String CODE_BANK_SPLIT_NO_TARGETS = "BANK_SPLIT_NO_TARGETS";
+
+  /**
+   * Split deposit (REQ-BANK-043) whose percentage of the gross rounds to less than 1 aUEC, so there
+   * is nothing to distribute. The requested split cannot be honoured — raise the amount or the
+   * percentage.
+   */
+  public static final String CODE_BANK_SPLIT_TOO_SMALL = "BANK_SPLIT_TOO_SMALL";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

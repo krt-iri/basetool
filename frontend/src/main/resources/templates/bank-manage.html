@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-transfer-fee-rate=${transferFeeRate}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
@@ -386,13 +386,13 @@
             <form class="bank-ajax-form no-track" data-refresh="manageBody"
                   data-endpoint="/api/proxy/bank/holders" data-method="POST">
                 <div class="krt-modal-body">
-                    <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Das Handle wird beim Registrieren eingefroren.</p>
+                    <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Angezeigt wird immer der aktuelle Anzeigename des Nutzers; der bei der Registrierung erfasste Name dient nur als R&uuml;ckfall nach einer Nutzerl&ouml;schung.</p>
                     <div class="bank-form-row">
                         <label for="bank-holder-user" th:text="#{bank.field.user}">Nutzer</label>
                         <select id="bank-holder-user" name="userId" required data-role="bank-holder-user"
-                                data-testid="bank-holder-user">
+                                data-krt-combobox data-testid="bank-holder-user">
                             <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                            <option th:each="u : ${users}" th:value="${u.id()}"
+                            <option th:each="u : ${users}" th:value="${u.id()}" th:attr="data-search=${u.username()}"
                                     th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="userId"></span>
@@ -479,7 +479,7 @@
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-source" th:text="#{bank.field.holderSource}">Von Halter</label>
                         <select id="bank-holder-transfer-source" name="sourceHolderId" required
-                                data-role="bank-holder-select" data-testid="bank-holder-transfer-source">
+                                data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-source">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>
@@ -488,7 +488,7 @@
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-dest" th:text="#{bank.field.holderDestination}">An Halter</label>
                         <select id="bank-holder-transfer-dest" name="destinationHolderId" required
-                                data-role="bank-holder-select" data-testid="bank-holder-transfer-dest">
+                                data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-dest">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">carol</option>
                         </select>
@@ -499,15 +499,8 @@
                         <input type="number" id="bank-holder-transfer-amount" name="amount" step="1" min="1"
                                inputmode="numeric" required data-testid="bank-holder-transfer-amount">
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- Live fee preview (REQ-BANK-033): the entered amount is what the source
-                             holder sends; bank.js fills the in-game fee and what arrives at the target. -->
-                        <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
-                           data-testid="bank-holder-transfer-fee-preview">
-                            <span th:text="#{bank.fee.label}">Geb&uuml;hr</span>:
-                            <span data-fee-value>0</span> aUEC &middot;
-                            <span th:text="#{bank.fee.net.label}">kommt an</span>:
-                            <span data-fee-net>0</span> aUEC
-                        </p>
+                        <!-- No fee preview here: the holder→holder Umbuchung is fee-free
+                             (REQ-BANK-031, ADR-0052) — the staff bear any in-game fee personally. -->
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-note" th:text="#{bank.field.note}">Notiz</label>
@@ -529,7 +522,6 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

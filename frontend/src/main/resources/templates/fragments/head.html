@@ -121,6 +121,29 @@
     -->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
+      dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
+      ~20 user-selection pickers across the app need only the `data-krt-combobox` marker (a single
+      control may still override any string via a `data-combobox-*` attribute). Read by the
+      combobox's global auto-initialiser at enhance time, so order vs. the script below is moot.
+    -->
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtComboboxI18n = {
+            placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select…',
+            noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matches',
+            hint: /*[[#{userSelect.search.hint}]]*/ 'Keep typing to narrow the list…',
+            invalid: /*[[#{userSelect.search.invalid}]]*/ 'Please select an entry from the list.',
+            loading: /*[[#{userSelect.search.loading}]]*/ 'Searching…'
+        };
+    </script>
+    <!--
+      Searchable combobox enhancer (REQ-FE-011). Loaded globally and synchronously (no `defer`) so
+      `window.krtSearchableSelect` exists before any inline page `<script>` that calls it (e.g. the
+      orders item-search), and so its DOMContentLoaded / `krt:swapped` auto-initialiser upgrades
+      every `select[data-krt-combobox]` — including pickers inside fragments swapped in by krtFetch.
+    -->
+    <script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Notification bell (epic #622): lazy dropdown load, no-reload mark-read/delete via krtFetch,
       and the always-on unread-badge poll. Deferred — it self-initialises on DOMContentLoaded and
       only runs where the bell is present (authenticated pages).

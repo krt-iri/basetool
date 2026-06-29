@@ -400,7 +400,7 @@ class OrgUnitBankAccessServiceTest {
     BankBookingDto redacted = page.getContent().getFirst();
     assertThat(redacted.holderHandle()).isNull();
     assertThat(redacted.counterHolderHandle()).isNull();
-    // REQ-BANK-043: the deposit/withdrawal counterparty is player-identifying too, so it is
+    // REQ-BANK-044: the deposit/withdrawal counterparty is player-identifying too, so it is
     // redacted alongside the holder columns for org-unit viewers.
     assertThat(redacted.counterpartyHandle()).isNull();
     assertThat(redacted.counterpartyOrgUnitName()).isNull();
@@ -594,7 +594,43 @@ class OrgUnitBankAccessServiceTest {
             eq("from sale"),
             eq(null),
             eq(false),
+            eq(null),
+            eq(false),
             eq(null)))
+        .thenReturn(expected);
+
+    assertThat(service.createBookingRequest(request)).isSameAs(expected);
+    verifyNoInteractions(ownerScopeService);
+  }
+
+  @Test
+  void createBookingRequest_splitDeposit_passesSplitSnapshotToCreate() {
+    // REQ-BANK-043: a split deposit request forwards split_enabled + split_percent to the
+    // org-unit-blind create(); the split is DEPOSIT-only and never approval-limited.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId,
+            BankBookingRequestType.DEPOSIT,
+            null,
+            new BigDecimal("1000"),
+            "from sale",
+            true,
+            new BigDecimal("30"));
+    BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.DEPOSIT),
+            eq(new BigDecimal("1000")),
+            eq("from sale"),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("30"))))
         .thenReturn(expected);
 
     assertThat(service.createBookingRequest(request)).isSameAs(expected);
@@ -618,6 +654,8 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("500")),
             eq("from sale"),
+            eq(null),
+            eq(false),
             eq(null),
             eq(false),
             eq(null)))
@@ -645,6 +683,8 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("250")),
             eq(null),
+            eq(null),
+            eq(false),
             eq(null),
             eq(false),
             eq(null)))
@@ -676,6 +716,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(false),
+            eq(null),
+            eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -687,6 +729,8 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("5000")),
             eq(null),
+            eq(null),
+            eq(false),
             eq(null),
             eq(false),
             eq(null));
@@ -754,7 +798,9 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(true),
-            eq(new BigDecimal("100"))))
+            eq(new BigDecimal("100")),
+            eq(false),
+            eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     service.createBookingRequest(request);
@@ -767,7 +813,9 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(true),
-            eq(new BigDecimal("100")));
+            eq(new BigDecimal("100")),
+            eq(false),
+            eq(null));
   }
 
   @Test
@@ -790,6 +838,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(destId),
             eq(false),
+            eq(null),
+            eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -802,6 +852,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq(null),
             eq(destId),
+            eq(false),
+            eq(null),
             eq(false),
             eq(null));
   }
@@ -838,7 +890,9 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(true),
-            eq(new BigDecimal("100"))))
+            eq(new BigDecimal("100")),
+            eq(false),
+            eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     service.createBookingRequest(request);
@@ -851,7 +905,9 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(true),
-            eq(new BigDecimal("100")));
+            eq(new BigDecimal("100")),
+            eq(false),
+            eq(null));
   }
 
   @Test
@@ -1007,6 +1063,8 @@ class OrgUnitBankAccessServiceTest {
         null,
         Instant.now(),
         null,
+        null,
+        false,
         null,
         false,
         null,

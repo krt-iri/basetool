@@ -356,6 +356,33 @@
                            data-testid="org-unit-request-limit-warning"
                            th:text="#{bank.approvalLimit.requesterWarning}">Der Betrag &uuml;berschreitet dein Freigabe-Limit.</p>
                     </div>
+                    <!-- Split deposit (REQ-BANK-043): DEPOSIT-only; the wrapper is shown only when the
+                         request type is a deposit (bank.js syncRequestTypeRows). -->
+                    <div data-split-deposit-only>
+                        <div class="bank-form-row">
+                            <label class="bank-check-label">
+                                <input type="checkbox" name="splitEnabled" value="true" disabled
+                                       data-role="bank-split-toggle" data-testid="org-unit-request-split-toggle">
+                                <span th:text="#{bank.split.toggle}">Anteil auf alle Staffelkonten verteilen</span>
+                            </label>
+                        </div>
+                        <div class="bank-form-row" data-split-row hidden>
+                            <label for="org-unit-request-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
+                            <input type="number" id="org-unit-request-split-percent" name="splitPercent"
+                                   min="1" max="100" step="1" disabled
+                                   data-testid="org-unit-request-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
+                            <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>
+                            <p class="bank-field-hint bank-split-preview" data-split-preview hidden
+                               data-testid="org-unit-request-split-preview">
+                                <span th:text="#{bank.split.preview.label}">Aufteilung:</span>
+                                <span data-split-slice>0</span>
+                                <span th:text="#{bank.split.preview.toSquadrons}">aUEC auf die Staffelkonten,</span>
+                                <span data-split-remainder>0</span>
+                                <span th:text="#{bank.split.preview.remainder}">aUEC verbleiben auf dem Zielkonto.</span>
+                            </p>
+                            <span class="bank-field-error" data-error-for="splitPercent"></span>
+                        </div>
+                    </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="org-unit-request-note" name="note" maxlength="500"

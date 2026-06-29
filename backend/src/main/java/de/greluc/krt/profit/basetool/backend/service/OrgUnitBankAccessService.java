@@ -768,6 +768,9 @@ public class OrgUnitBankAccessService {
       if (request.targetAccountId() != null) {
         throw new BadRequestException("A deposit request must not carry a destination account");
       }
+      // REQ-BANK-043: a deposit request may carry a split snapshot (whole-percent distributed
+      // across
+      // the squadron accounts on confirmation); the DTO already pins split = DEPOSIT-only.
       return bankBookingRequestService.create(
           account.getId(),
           BankBookingRequestType.DEPOSIT,
@@ -775,7 +778,9 @@ public class OrgUnitBankAccessService {
           request.note(),
           null,
           false,
-          null);
+          null,
+          request.splitEnabled(),
+          request.splitPercent());
     }
 
     // REQ-BANK-039: a withdrawal/transfer stays gated by view eligibility — only a caller who may
@@ -801,6 +806,7 @@ public class OrgUnitBankAccessService {
     BigDecimal applicableLimit = resolveApplicableLimit(account);
     boolean requiresOwnerApproval =
         applicableLimit != null && request.amount().compareTo(applicableLimit) > 0;
+    // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
         account.getId(),
         request.type(),
@@ -808,7 +814,9 @@ public class OrgUnitBankAccessService {
         request.note(),
         targetAccountId,
         requiresOwnerApproval,
-        applicableLimit);
+        applicableLimit,
+        false,
+        null);
   }
 
   /**
@@ -1652,7 +1660,7 @@ public class OrgUnitBankAccessService {
   /**
    * Redacts the player-custody columns of a booking row for an org-unit viewer (REQ-BANK-038): the
    * holder and counter-holder handles plus the deposit/withdrawal counterparty (Einzahler /
-   * Empf&auml;nger and their org unit, REQ-BANK-043 — likewise player-identifying) are nulled,
+   * Empf&auml;nger and their org unit, REQ-BANK-044 — likewise player-identifying) are nulled,
    * everything else is preserved.
    *
    * @param booking the bank-staff booking row

@@ -59,6 +59,15 @@ public enum BankAuditEventType {
   /** A {@code DEPOSIT} transaction was booked. */
   DEPOSIT_BOOKED,
 
+  /**
+   * A split {@code DEPOSIT} was booked (REQ-BANK-043): one transaction crediting the named account
+   * the remainder and distributing a percentage of the gross evenly across all active squadron
+   * accounts. One summarizing event (like {@code WIPE_RESET_EXECUTED}), not one per credited
+   * account; the details payload carries the gross, holder handle, percentage and target count — no
+   * free text or PII beyond the holder handle the plain deposit event already records.
+   */
+  DEPOSIT_SPLIT_BOOKED,
+
   /** A {@code WITHDRAWAL} transaction was booked. */
   WITHDRAWAL_BOOKED,
 

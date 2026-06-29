@@ -1,6 +1,10 @@
 # ADR-0041 — Bank: factor the in-game transfer fee into holder-initiated transfers
 
-- **Status:** Accepted (epic #556 follow-up, owner-approved 2026-06-23)
+- **Status:** Superseded by [ADR-0052](0052-bank-transfer-fee-borne-by-debited-account.md)
+  (2026-06-29) — the fee is now **added on top** of the entered amount and borne by the debited
+  account (the entered amount is what *arrives*), reversing the carve-out semantics this ADR fixed.
+  The ledger/integrity/reversal machinery below is unchanged; only the direction of the fee flips.
+  Originally Accepted (epic #556 follow-up, owner-approved 2026-06-23).
 - **Date:** 2026-06-23
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-033 + amended REQ-BANK-004/-006/-011/-020/-031

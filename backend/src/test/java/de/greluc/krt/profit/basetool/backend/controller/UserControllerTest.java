@@ -528,7 +528,7 @@ class UserControllerTest {
 
   @Test
   void getUserMemberships_allKinds_delegatesToDirectMembershipOptions() {
-    // REQ-BANK-043: the bank counterparty picker asks for all four kinds via allKinds=true.
+    // REQ-BANK-044: the bank counterparty picker asks for all four kinds via allKinds=true.
     UUID userId = UUID.randomUUID();
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(

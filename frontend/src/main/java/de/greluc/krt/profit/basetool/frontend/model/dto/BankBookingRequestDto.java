@@ -41,7 +41,8 @@ import org.jetbrains.annotations.Nullable;
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
- * @param holderHandle the recorded holder's handle, or {@code null} while not confirmed
+ * @param holderHandle the recorded holder's display name (live effective name, snapshot fallback
+ *     when the user is gone, REQ-BANK-003), or {@code null} while not confirmed
  * @param resultingTransactionId the booked ledger transaction id, or {@code null} while not
  *     confirmed
  * @param deciderHandle the deciding bank employee's handle, or {@code null} while pending/cancelled
@@ -56,6 +57,10 @@ import org.jetbrains.annotations.Nullable;
  * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}
+ * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
+ *     confirmation (REQ-BANK-044)
+ * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
+ *     null} when not a split
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -83,4 +88,6 @@ public record BankBookingRequestDto(
     @Nullable BigDecimal applicableLimit,
     boolean ownerApprovalGranted,
     @Nullable String ownerApprovalGrantedByHandle,
+    boolean splitEnabled,
+    @Nullable BigDecimal splitPercent,
     Long version) {}

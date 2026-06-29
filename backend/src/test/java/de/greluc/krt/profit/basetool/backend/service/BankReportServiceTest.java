@@ -89,6 +89,8 @@ class BankReportServiceTest {
     // Given
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
+    // The fee is added on top (ADR-0052): a 200 payout debits the account the gross 201 (200 + 1
+    // fee), so the statement shows the leg -201 and a closing balance of 500 - 201 = 299.
     withdraw("200");
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
@@ -101,9 +103,9 @@ class BankReportServiceTest {
     assertTrue(text.contains(account.getAccountNo()), "account number present");
     assertTrue(text.contains("ANFANGSSALDO"), "opening label present");
     assertTrue(text.contains("ENDSALDO"), "closing label present");
-    assertTrue(text.contains("300 aUEC"), "closing balance 300 present");
+    assertTrue(text.contains("299 aUEC"), "closing balance 299 present (200 payout + 1 fee)");
     assertTrue(text.contains("+500"), "deposit amount present");
-    assertTrue(text.contains("-200"), "withdrawal amount present");
+    assertTrue(text.contains("-201"), "withdrawal gross (200 + 1 fee) present");
     assertTrue(text.contains("Einzahlung"), "deposit type label present");
     assertTrue(text.contains("Auszahlung"), "withdrawal type label present");
     // The per-booking holder annotation (derived from the holder ledger by amount sign, ADR-0039)
@@ -140,8 +142,9 @@ class BankReportServiceTest {
     assertTrue(firstHalf.contains("500 aUEC"), "closing 500 in first period");
     // ... and the second half only the withdrawal on an opening of 500
     assertFalse(secondHalf.contains("+500"), "deposit outside second period");
-    assertTrue(secondHalf.contains("-200"), "withdrawal inside second period");
-    assertTrue(secondHalf.contains("300 aUEC"), "closing 300 in second period");
+    // The 200 payout debits the gross 201 (200 + 1 fee on top, ADR-0052): leg -201, closing 299.
+    assertTrue(secondHalf.contains("-201"), "withdrawal gross inside second period");
+    assertTrue(secondHalf.contains("299 aUEC"), "closing 299 in second period");
   }
 
   @Test
@@ -197,13 +200,14 @@ class BankReportServiceTest {
     assertFalse(redacted.contains("HALTER"), "redacted statement drops the Halter column header");
     // The history itself is unchanged in the redacted variant.
     assertTrue(redacted.contains("+500"), "deposit amount still present when redacted");
-    assertTrue(redacted.contains("-200"), "withdrawal amount still present when redacted");
-    assertTrue(redacted.contains("300 aUEC"), "closing balance still present when redacted");
+    // The 200 payout debits the gross 201 (200 + 1 fee on top, ADR-0052): leg -201, closing 299.
+    assertTrue(redacted.contains("-201"), "withdrawal gross still present when redacted");
+    assertTrue(redacted.contains("299 aUEC"), "closing balance still present when redacted");
   }
 
   @Test
   void statement_showsCounterpartyOnGegenseiteColumnAndRedactsIt() throws IOException {
-    // REQ-BANK-043: a deposit's recorded counterparty (Einzahler) shows in the Gegenseite column of
+    // REQ-BANK-044: a deposit's recorded counterparty (Einzahler) shows in the Gegenseite column of
     // the bank-staff statement, but is redacted — like the Halter — on the org-unit-facing variant.
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     String counterpartyHandle = "cp-" + UUID.randomUUID().toString().substring(0, 8);

@@ -402,7 +402,7 @@ class BankOrgUnitRequestsE2eTest {
   private static void confirmRequest(Page page, String requestId) {
     page.locator("[data-testid='bank-request-confirm-btn'][data-field-_id='" + requestId + "']")
         .click(new Locator.ClickOptions().setTimeout(20_000));
-    page.locator("[data-testid='bank-confirm-holder']").selectOption(holderId);
+    E2eSupport.selectComboboxByValue(page.locator("[data-testid='bank-confirm-holder']"), holderId);
     dropFooter(page);
     page.waitForResponse(
         r ->

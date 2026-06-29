@@ -109,11 +109,13 @@ class BankBookingE2eTest {
     assertEquals(201, seeder.bankDeposit(MGMT_USER, MGMT_PASSWORD, account, holderAId, 1000));
     assertEquals(
         0, balance(account).compareTo(new BigDecimal("1000")), "balance is 1000 after the deposit");
+    // The fee is added on top (ADR-0052): a 400 payout debits the account the gross 402 (400 + 2
+    // fee at 0.5%), leaving 1000 - 402 = 598.
     assertEquals(201, seeder.bankWithdraw(MGMT_USER, MGMT_PASSWORD, account, holderAId, 400));
     assertEquals(
         0,
-        balance(account).compareTo(new BigDecimal("600")),
-        "balance is 600 after the withdrawal");
+        balance(account).compareTo(new BigDecimal("598")),
+        "balance is 598 after the withdrawal (400 payout + 2 fee)");
   }
 
   /**
@@ -132,10 +134,10 @@ class BankBookingE2eTest {
   }
 
   /**
-   * A transfer between two accounts AND two different holders moves money and carves out the
-   * in-game fee (REQ-BANK-033, ADR-0041): the source is debited the full gross while the
-   * destination is credited the net (gross − fee). With the seeded 0.5% rate, 200 aUEC carries a 1
-   * aUEC fee, so the destination gains 199.
+   * A transfer between two accounts AND two different holders moves money and adds the in-game fee
+   * on top (REQ-BANK-033, ADR-0052): the source is debited the gross (amount + fee) while the
+   * destination is credited the full entered amount. With the seeded 0.5% rate, 200 aUEC carries a
+   * 1 aUEC fee, so the source loses 201 and the destination gains the full 200.
    */
   @Test
   void transferBetweenAccountsMovesMoney() {
@@ -160,12 +162,12 @@ class BankBookingE2eTest {
         "the transfer is accepted");
     assertEquals(
         0,
-        balance(source).compareTo(sourceBefore.subtract(new BigDecimal("200"))),
-        "the source lost the full gross (200)");
+        balance(source).compareTo(sourceBefore.subtract(new BigDecimal("201"))),
+        "the source lost the gross (200 + 1 aUEC in-game fee)");
     assertEquals(
         0,
-        balance(dest).compareTo(destBefore.add(new BigDecimal("199"))),
-        "the destination gained the net (200 - 1 aUEC in-game fee)");
+        balance(dest).compareTo(destBefore.add(new BigDecimal("200"))),
+        "the destination gained the full entered amount (200)");
   }
 
   /** A transfer to the same account AND the same holder is a no-op booking — rejected with 409. */
@@ -276,8 +278,9 @@ class BankBookingE2eTest {
     page.locator("[data-testid='bank-deposit-open']")
         .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
     page.locator("[data-testid='bank-deposit-amount']").fill(amount);
-    // The holder select carries the registered holder options; pick the employee's holder.
-    page.locator("[data-testid='bank-deposit-holder']").selectOption(uiHolderId);
+    // The holder picker is a searchable combobox; pick the employee's holder by its value.
+    E2eSupport.selectComboboxByValue(
+        page.locator("[data-testid='bank-deposit-holder']"), uiHolderId);
     page.waitForResponse(
         r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
         // 60 s (above the 30 s default): the deposit's proxied XHR round-trip can outrun 30 s on a

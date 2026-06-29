@@ -157,7 +157,7 @@ public class BankPageController {
                 .toList());
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
     // User lookup feeds two pickers: the deposit/withdrawal counterparty (Einzahler / Empfänger,
-    // REQ-BANK-043) shown to every booking employee, and the approval-limit editor (REQ-BANK-041,
+    // REQ-BANK-044) shown to every booking employee, and the approval-limit editor (REQ-BANK-041,
     // management/admin only). Since the counterparty picker is on the always-present booking
     // modals,
     // the lookup is fetched on every detail render (the /lookup gate now admits BANK_EMPLOYEE).
@@ -165,9 +165,9 @@ public class BankPageController {
         backendApiClient.get(
             "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
     model.addAttribute("users", lookup == null ? List.<UserReferenceDto>of() : lookup);
-    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) drives the live "Gebühr / kommt an"
-    // preview in the withdraw/transfer modals (bank.js). It rides on <main>, which survives the
-    // accountBody swap, so it is fetched once on the full-page render.
+    // The in-game transfer-fee rate (ADR-0052, REQ-BANK-033) drives the live "Gebühr / wird
+    // abgebucht" preview in the withdraw/transfer modals (bank.js). It rides on <main>, which
+    // survives the accountBody swap, so it is fetched once on the full-page render.
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("accountBody".equals(fragment)) {
       return "bank-account-detail :: accountBody";
@@ -298,7 +298,7 @@ public class BankPageController {
   }
 
   /**
-   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0041,
+   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0052,
    * REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO} so the page
    * still renders (the preview then simply shows no fee). The authoritative fee is always computed
    * server-side at booking time.

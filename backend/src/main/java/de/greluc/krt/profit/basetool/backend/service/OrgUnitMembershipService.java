@@ -269,7 +269,7 @@ public class OrgUnitMembershipService {
    * #listOptionsForUser(UUID)} — which deliberately materialises only the {@code SQUADRON} / {@code
    * SPECIAL_COMMAND} options the owner picker renders — this surfaces a direct Bereich or OL
    * membership too, resolving names through the kind-safe {@link OrgUnitRepository#findAllById}.
-   * Backs the bank deposit/withdrawal counterparty org-unit picker (REQ-BANK-043), where a
+   * Backs the bank deposit/withdrawal counterparty org-unit picker (REQ-BANK-044), where a
    * depositor/recipient who is a Bereich/OL member must be able to record that unit. Ordered
    * top-down by kind (OL → Bereich → Staffel → SK) then by name, so the first element is the user's
    * deterministic primary unit.
@@ -301,7 +301,7 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Resolves the user's <em>primary</em> direct org-unit membership id (REQ-BANK-043) — the first
+   * Resolves the user's <em>primary</em> direct org-unit membership id (REQ-BANK-044) — the first
    * of {@link #listDirectMembershipOptions(UUID)} in the deterministic top-down order, i.e. a
    * regular member's name-sorted primary Staffel, or a leader's Bereich / OL. Used to record the
    * requester's org unit when a booking <em>request</em> is confirmed (the requester is not present

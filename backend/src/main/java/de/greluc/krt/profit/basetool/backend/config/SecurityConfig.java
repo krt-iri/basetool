@@ -417,7 +417,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
-                    // Bank widening (REQ-BANK-009 grants, REQ-BANK-043 deposit/withdrawal
+                    // Bank widening (REQ-BANK-009 grants, REQ-BANK-044 deposit/withdrawal
                     // counterparty): bank staff resolve grantees and the Einzahler/Empfänger via
                     // the
                     // user lookup and need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE
@@ -459,7 +459,7 @@ public class SecurityConfig {
                     // UserController#getUserMemberships ist die zweite Verteidigungslinie
                     // (defense in depth) und bleibt das Source-of-truth fuer die zulaessigen
                     // Rollen — die URL-Regel oeffnet nur das Tor.
-                    // BANK_EMPLOYEE widening (REQ-BANK-043): the deposit/withdrawal counterparty
+                    // BANK_EMPLOYEE widening (REQ-BANK-044): the deposit/withdrawal counterparty
                     // org-unit picker resolves the chosen user's memberships here; a bank employee
                     // need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE covers
                     // BANK_MANAGEMENT

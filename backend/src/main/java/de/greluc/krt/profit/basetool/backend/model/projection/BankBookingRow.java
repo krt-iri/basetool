@@ -39,10 +39,11 @@ import java.util.UUID;
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
- * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
- *     REQ-BANK-033); {@code 0} for non-fee transactions and same-holder transfers
+ * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
+ *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee transactions and
+ *     same-holder transfers
  * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
- *     handle snapshot (REQ-BANK-043), else {@code null}
+ *     handle snapshot (REQ-BANK-044), else {@code null}
  * @param counterpartyOrgUnitName the counterparty's org-unit name snapshot, or {@code null} when no
  *     counterparty or no org unit was recorded
  */

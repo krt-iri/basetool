@@ -21,12 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +33,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,6 +65,9 @@ public class BankManagePageController {
    *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
    *     the modals live outside the swapped region
    * @param authentication the caller's authentication, used to detect the management perspective
+   * @param principal the authenticated OIDC user, used to read the caller's {@code sub} (Keycloak
+   *     UUID) so the holder tab can link the caller's own holder row; {@code null} for a non-OIDC
+   *     principal (e.g. a {@code @WithMockUser} test), in which case no self-link is rendered
    * @param model Spring MVC model
    * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
@@ -74,6 +77,7 @@ public class BankManagePageController {
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String fragment,
       Authentication authentication,
+      @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, "ROLE_BANK_MANAGEMENT");
     PageResponse<BankAccountDto> accounts =
@@ -89,7 +93,12 @@ public class BankManagePageController {
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
     // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
     // server-side (canSeeHolder) — this only governs which links the UI renders.
-    model.addAttribute("selfUserId", authentication != null ? authentication.getName() : null);
+    // NOTE: authentication.getName() returns the preferred_username (the frontend OAuth2
+    // user-name-attribute), NOT the Keycloak sub — comparing it against the holder's userId
+    // (== app_user.id == sub) never matched, so a plain bank employee never saw the link to their
+    // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
+    // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
+    model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
     model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";
@@ -114,15 +123,9 @@ public class BankManagePageController {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
       model.addAttribute("users", List.<UserReferenceDto>of());
     }
-    // The in-game transfer-fee rate (ADR-0041, REQ-BANK-033) feeds the live "Gebühr / kommt an"
-    // preview in the holder→holder Umbuchung modal (open to every bank employee). Only the full
-    // page
-    // renders the modals, so it is fetched only here.
-    BankTransferFeeRateDto feeRate =
-        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
-    model.addAttribute(
-        "transferFeeRate",
-        feeRate == null || feeRate.rate() == null ? BigDecimal.ZERO : feeRate.rate());
+    // No transfer-fee rate is fetched here: the only booking modal on this page is the
+    // holder→holder
+    // Umbuchung, which is fee-free (REQ-BANK-031, ADR-0052), so it needs no live fee preview.
     return "bank-manage";
   }
 

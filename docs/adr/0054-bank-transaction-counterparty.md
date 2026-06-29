@@ -1,9 +1,9 @@
-# ADR-0052 — Bank: deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
+# ADR-0054 — Bank: deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
 
 - **Status:** Accepted
 - **Date:** 2026-06-29
 - **Deciders:** @greluc
-- **Related:** spec REQ-BANK-043 (amends the recording of REQ-BANK-004 bookings, REQ-BANK-012 audit,
+- **Related:** spec REQ-BANK-044 (amends the recording of REQ-BANK-004 bookings, REQ-BANK-012 audit,
   REQ-BANK-014/-015 PDFs, REQ-BANK-023 request confirmation, REQ-BANK-038 redaction) · builds on
   ADR-0039 (decoupled holder ledger) · concurrency & org-unit-blindness rules in `CLAUDE.md`,
   ADR-0011/0020

@@ -1,8 +1,7 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
 > **Status:** Implemented — epic
-> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5); latest addition
-> REQ-BANK-043 (deposit/withdrawal counterparty). The
+> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
 > tests; subsequent behaviour changes keep this spec in sync in the same PR.
 
@@ -111,6 +110,20 @@ never hard-deleted while ledger rows reference them. Management may still **manu
 register any tool user as a custodian; in addition, **all bank staff are auto-registered**
 as holders (REQ-BANK-029).
 
+**Displayed name (live, not the snapshot).** Everywhere a holder is shown across the bank — the
+*Halter* registry tab, the holder detail header, every holder-select dropdown (Umbuchung,
+Ein-/Auszahlung, Anträge), the booking history, the account statement and the management report PDF
+— the label is the linked user's **live effective name**: their **display name** when set,
+otherwise their **username**. The denormalized `handle` snapshot is **only** a deletion fallback —
+it is shown solely once the linked user is gone (`user_id` set to NULL), keeping the ledger
+readable. So changing a display name is reflected immediately across the whole bank, and the
+registry is ordered by that live name. The resolution lives in `BankHolder.getDisplayName()` for the
+entity surfaces and in a `CASE` over the left-joined user in the holder-ledger projections
+(`holderTotals`, `findHolderLegsByTransactionIds`) for the history/report surfaces; the holder
+read fetch-joins the user to stay N+1-free. The append-only ledger **notes** and the **audit log**
+keep the name as recorded at the time of the action (they record what happened, not the current
+identity).
+
 **Acceptance**
 
 - [x] A deposit/withdrawal records exactly one holder leg; an account↔account transfer two
@@ -120,8 +133,11 @@ as holders (REQ-BANK-029).
   holder distribution.
 - [x] A holder row whose linked user is deleted keeps its handle snapshot and its ledger
   history.
+- [x] Every bank surface shows the holder's **live** effective name (display name preferred,
+  username fallback); renaming a user is reflected immediately in the registry, dropdowns, history
+  and statements, while a deleted user's rows fall back to the frozen handle snapshot.
 
-**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest` · **Code:** `model/BankHolder`, `model/BankHolderPosting`, `repository/BankHolderPostingRepository`, `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest`, `BankHolderLiveDisplayNameTest` (live name preferred + rename reflected + deleted-user snapshot fallback, registry & statement), `BankReportServiceTest` (holder column on statements) · **Code:** `model/BankHolder` (`getDisplayName`), `model/BankHolderPosting`, `mapper/BankHolderMapper`, `repository/BankHolderRepository` (`findAllWithUser`), `repository/BankHolderPostingRepository` (`holderTotals` / `findHolderLegsByTransactionIds` live `CASE`), `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
@@ -140,6 +156,11 @@ references the original. A `WIPE_RESET` (a deliberate end-state) and a `REVERSAL
 themselves **not reversible** (stable code `BANK_NOT_REVERSIBLE`). Account balance is the
 SQL sum of its `bank_posting` rows and a holder's global balance the SQL sum of its
 `bank_holder_posting` rows, both computed on read (ADR-0010/0039).
+
+> **Amended by REQ-BANK-043:** a **split** `DEPOSIT` is the one deposit that carries **more than one
+> account leg** — one positive leg per credited account (the named remainder + each squadron share)
+> against a **single** positive holder leg over the gross (the money landed once). The legs sum to
+> the gross; deposits stay fee-free. A plain (non-split) deposit keeps the one-account-leg shape.
 
 **Acceptance**
 
@@ -162,6 +183,11 @@ Bank amounts follow the project-wide whole-number-amounts contract
 `@DecimalMin("1")` (a zero-amount booking is meaningless), display rounded HALF_UP to
 whole aUEC via the frontend `MoneyFormat` bean. Amount inputs use
 `<input type="number" step="1" inputmode="numeric">`.
+
+> **Amended by REQ-BANK-043:** a split deposit's percentage is a whole-percent (1–100) and its
+> `slice = round(gross × P / 100)` is whole (HALF_UP); the slice is distributed whole-aUEC across the
+> squadron accounts by the largest-remainder rule so every per-account leg stays whole and the legs
+> sum back to the gross exactly (no aUEC created or lost).
 
 **Acceptance**
 
@@ -332,9 +358,9 @@ A `TRANSFER` (Konto→Konto-Umbuchung, e.g. Staffel → SK, area → cartel) mov
 **two different accounts**: two account legs **and** two holder legs — the physical custody
 moves with the booked money (a source and a destination holder; they may be the same player).
 When the holder **changes**, the source physically sends the money in-game, so the **transfer
-fee is carved out** (REQ-BANK-033, ADR-0041): the source is debited the full gross, the
-destination credited the net, and both leg pairs net to `−fee`; a **same-holder** transfer is a
-fee-free re-label and nets to zero. The employee needs `can_transfer` on the **source**
+fee is added on top** (REQ-BANK-033, ADR-0052): the source is debited the gross (`amount + fee`),
+the destination credited the full entered amount, and both leg pairs net to `−fee`; a
+**same-holder** transfer is a fee-free re-label and nets to zero. The employee needs `can_transfer` on the **source**
 account; the **destination** must be an account the employee can see (any grant row). Bank
 management and admins are unrestricted. The source account is guarded against overdraft
 (REQ-BANK-006); the holder dimension is not. The **intra-account holder rebooking** of the
@@ -549,6 +575,11 @@ balances** — the holder dimension is intentionally allowed to be negative (REQ
 it is **not** checked; an audit row exists for every audited transaction — every type except
 `WIPE_RESET`, which is summarized by one event, not one per generated transaction) and reports
 violations as `ERROR` log events with `correlationId`.
+
+> **Amended by REQ-BANK-043:** a **split** `DEPOSIT` has several positive account legs summing to the
+> gross against one holder leg of the gross. It is a `DEPOSIT`, so the zero-/`−fee`-sum invariants
+> (which apply only to `TRANSFER`/`HOLDER_TRANSFER`) do not constrain it; it still carries exactly one
+> audit row (`DEPOSIT_SPLIT_BOOKED`), so the audit-row-per-transaction sweep is unchanged.
 
 **Acceptance**
 
@@ -950,10 +981,12 @@ zero (REQ-BANK-006). It is gated `hasRole('BANK_EMPLOYEE')`, needs **no** per-ac
 (it touches no account), and **ignores the holder `active` flag in both directions** so a
 deactivated holder's residual (positive or negative) can be reconciled. Source and destination
 holder must differ. Every Umbuchung is audited (`HOLDER_TRANSFER`, REQ-BANK-012) and recorded
-in the unified activity audit (REQ-AUDIT-001). Because the source holder physically sends the
-money in-game, the **in-game transfer fee is carved out** (REQ-BANK-033, ADR-0041): the source
-is debited the full gross, the destination credited the net, so the two holder legs net to
-`−fee`.
+in the unified activity audit (REQ-AUDIT-001). The Umbuchung is **fee-free** (ADR-0052): although a
+holder physically sends the money in-game, this internal reconciliation runs among bank staff who
+bear that fee **personally** — it is not the bank's concern — so the source is debited exactly the
+entered amount, the destination credited the same, no `transfer_fee` is recorded, and the two holder
+legs net to zero (in contrast to a customer-facing payout/transfer, where the fee is added on top,
+REQ-BANK-033).
 
 **Acceptance**
 
@@ -983,7 +1016,10 @@ it mutates nothing, so it logs no audit event. It stays org-unit-blind like ever
 
 In the holder menu (`/bank/manage`, tab *Halter*) the handle links to the holder detail page
 (`/bank/holders/{id}`) when the caller may view it (their own row, or any row for management); other
-rows render the handle as plain text. The detail page is read-only (no booking actions).
+rows render the handle as plain text. The detail page is read-only (no booking actions). The
+own-row match keys on the caller's OIDC `sub` (== `app_user.id` == the holder's `userId`), read from
+the authenticated principal — **not** the `preferred_username` that the frontend exposes as the
+authentication name — so a plain bank employee always sees the link to their own holder.
 
 The detail page also carries a **balance-split calculator**: the holder enters their current
 in-game account balance and the page shows — **purely client-side, nothing is stored** — how much
@@ -999,50 +1035,66 @@ bank owes them, so their own money exceeds the entered balance.
   rejected (403), even via a forged request.
 - [x] Bank management opens any holder's history; the page is paged newest-first and reuses the
   shared pager (AJAX swap, no reload).
+- [x] On the *Halter* tab a plain bank employee sees the link to their own holder row (keyed on the
+  OIDC `sub`, not the `preferred_username`) and reaches their own custody history; every other
+  holder's handle stays plain text.
 - [x] The history is read-only and writes no audit event; the gate ignores org-unit scope and the
   active-org-unit pin (REQ-BANK-008).
 - [x] The balance-split calculator shows, for an entered current balance, the bank-reserved amount
   (= the custody total) and the own private money (= balance − custody total) live and client-side;
   nothing is persisted.
 
-**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest`, `BankManagePageControllerTest` (selfUserId = OIDC sub, not preferred_username), `BankHolderSelfLinkRenderMvcTest` (employee links own holder only) · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `controller/BankManagePageController` (holder self-link selfUserId), `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
 
 Star Citizen charges an in-game fee on every aUEC transfer a holder actively initiates, so the
 bank factors that fee in wherever a holder physically sends money — and **only** there — so the
-bank staff are never out of pocket (ADR-0041):
+bank staff are never out of pocket and the requested amount still arrives in full (ADR-0052,
+superseding the carve-out model of ADR-0041):
 
-- **Where it applies:** `WITHDRAWAL`, a `HOLDER_TRANSFER` (Umbuchung), and an account-to-account
-  `TRANSFER` **when the holder changes** (a same-holder transfer is a pure re-label and stays
-  fee-free). **`DEPOSIT` is exempt** — whoever pays money *in* bears their own fee.
-- **Semantics:** the entered amount is the **gross** the holder sends and is **debited in full**
-  from the source (account + holder stash). The fee `= round(gross × rate)` (whole aUEC, HALF_UP)
-  is **carved out** and recorded on `bank_transaction.transfer_fee`; the **destination is credited
-  the net** (`gross − fee`), so the amount that actually arrives is smaller. The fee and the
-  arriving amount are shown explicitly — a live preview in the booking modals (fed by `GET
-  /api/v1/bank/transfer-fee-rate`) and on every outgoing leg of the account/holder history.
+- **Where it applies:** `WITHDRAWAL` and an account-to-account `TRANSFER` **when the holder
+  changes** (a same-holder transfer is a pure re-label and stays fee-free) — the customer-facing
+  moves the bank makes on a member's behalf. **`DEPOSIT` is exempt** (whoever pays money *in* bears
+  their own fee) and so is the internal **`HOLDER_TRANSFER`** (Umbuchung at
+  `/bank/manage?tab=halter`): that reconciliation runs among bank staff, who bear its in-game fee
+  **personally**, so the bank does not model it (REQ-BANK-031).
+- **Semantics:** the entered amount is the amount that must **arrive** at the destination. The fee
+  `= round(amount × rate)` (whole aUEC, HALF_UP) is **added on top** and recorded on
+  `bank_transaction.transfer_fee`; the source (account + holder stash) is **debited the gross**
+  (`amount + fee`), so the **destination receives the full entered amount** and the **debited
+  account bears the fee**. A 500 000 transfer at 0.5% therefore costs the source 502 500. The fee
+  and the gross debited are shown explicitly — a live preview in the booking modals (fed by `GET
+  /api/v1/bank/transfer-fee-rate`) and, on every outgoing leg of the account/holder history, the
+  fee plus the amount that arrived (`|leg| − fee`).
 - **Rate:** the same runtime-editable setting the operation payout uses
   (`operation.transfer_fee_rate`, default 0.5%, editable at `/admin/settings`) — one rate for the
   whole org.
-- **Ledger consequence (amends REQ-BANK-020):** a fee-bearing `TRANSFER` / `HOLDER_TRANSFER` no
-  longer nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the
-  game), so the integrity sweep expects `SUM(legs) = −transfer_fee` for those types. The
-  `REVERSAL` mirror invariant is unchanged (a reversal negates the actual recorded legs). The
-  no-overdraft guard stays **account-only** (REQ-BANK-006); the holder dimension may still go
-  negative.
+- **Overdraft (REQ-BANK-006):** the source-account no-overdraft guard runs against the **gross**
+  (`amount + fee`) — a booking whose account cannot cover the amount **plus** its fee is refused
+  (`BANK_OVERDRAFT`), so the fee can never drive an account negative. The holder dimension may
+  still go negative (ADR-0039).
+- **Ledger consequence (amends REQ-BANK-020):** a fee-bearing holder-changing `TRANSFER` no longer
+  nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the game), so
+  the integrity sweep expects `SUM(legs) = −transfer_fee` for it (source `−(amount + fee)`,
+  destination `+amount`). The fee-free `HOLDER_TRANSFER` carries `transfer_fee = 0` and nets to zero
+  as before — the same `SUM(legs) = −transfer_fee` check holds with a zero fee, so no integrity
+  change is needed. The `REVERSAL` mirror invariant is unchanged (a reversal negates the actual
+  recorded legs, restoring the gross to the source).
 
 **Acceptance**
 
-- [x] A withdrawal of `G` debits the account and the holder `G`, records `fee = round(G × rate)`,
-  and the history shows the fee plus the arriving amount `G − fee`; the holder is not out of pocket.
-- [x] A holder→holder Umbuchung and a holder-changing account transfer credit the destination
-  `G − fee`; their legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer and
-  a deposit record no fee and net to zero / move the full amount.
-- [x] The booking modals show a live "Gebühr / kommt an" preview as the amount is typed; the rate
-  is the shared `operation.transfer_fee_rate`.
+- [x] A withdrawal of `A` records `fee = round(A × rate)`, debits the account and the holder the
+  gross `A + fee`, and is refused when the account cannot cover `A + fee`; the recipient effectively
+  receives the full `A` and the holder is not out of pocket.
+- [x] A holder-changing account transfer credits the destination the full `A` and debits the source
+  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer, a
+  deposit and an internal holder→holder Umbuchung record no fee and net to zero / move the full
+  amount.
+- [x] The booking modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited)
+  as the amount is typed; the rate is the shared `operation.transfer_fee_rate`.
 
-**Enforced by:** `BankLedgerServiceTest` (fee carve-out, net to destination, same-holder fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService`, `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (fee added on top, full amount to destination, overdraft against the gross, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 
@@ -1267,6 +1319,11 @@ confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · *
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
+> **Amended by REQ-BANK-043:** a deposit request (like a direct deposit) may additionally carry a
+> split that distributes a percentage of the gross across all active squadron accounts. The
+> percentage is snapshotted on the off-ledger request and resolved into concrete legs at
+> confirmation; it never makes a deposit approval-limited. Withdrawals/transfers never carry a split.
+
 A **deposit** booking request is the one movement kind a requester cannot abuse — it only *adds*
 money to an account, and nothing moves until a bank employee confirms receipt in-game
 (REQ-BANK-023). It is therefore deliberately unrestricted (owner decision), **amending**
@@ -1313,7 +1370,87 @@ frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html`,
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
 **Issues:** —
 
-### REQ-BANK-043 — Deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
+### REQ-BANK-043 — Split deposit across squadron accounts
+
+A deposit — both the direct bank-staff booking (REQ-BANK-004) and the confirm-before-post deposit
+request (REQ-BANK-042) — may optionally **distribute a percentage of the gross evenly across all
+active squadron accounts**, crediting the named account only the remainder (owner request). The
+option is a single checkbox plus one whole-percent `P` (1–100); it is **deposit-only** (money
+entering the bank) and never applies to a withdrawal or transfer.
+
+- **Squadron accounts** = `ORG_UNIT` accounts whose owning org unit is a `SQUADRON`
+  (`OrgUnitKind.SQUADRON`), `ACTIVE` only. SK / AREA / CARTEL / CARTEL_BANK / SPECIAL accounts are
+  never split targets. The **named account is excluded** from the distribution set (even when it is
+  itself a squadron account): it only ever receives the remainder. The enumeration reads the
+  `org_unit.kind` via `OrgUnit#getKind()` (an owner *label*, not a scope), so the bank stays
+  org-unit-blind (REQ-BANK-008) — no `OwnerScopeService`, both ArchUnit pins green.
+- **Math (whole-aUEC, REQ-BANK-005).** `slice = round(gross × P / 100)` (HALF_UP, whole). The slice
+  is split across the `N` squadron accounts with the **largest-remainder** rule: `base = floor(slice
+  / N)`, and the leftover `slice − base·N` aUEC go one each to the first accounts by ascending id, so
+  the per-account amounts are as even as possible, stay whole and sum to the slice exactly. The named
+  account is credited `gross − slice`. Every account leg plus the named leg sums to the gross.
+  Zero-amount legs are dropped (a 100 % split books no named leg; a slice smaller than `N` credits
+  only the first `slice` accounts).
+- **Ledger shape (amends REQ-BANK-004).** A split deposit is **one** `DEPOSIT` transaction with
+  **one positive account leg per credited account** (the named remainder + each squadron share) and
+  a **single** positive holder leg over the whole gross — the money physically landed once with one
+  custodian (REQ-BANK-003); the split is a pure account-side allocation. Deposits are fee-free
+  (REQ-BANK-033), so no fee applies. All affected accounts are pessimistically locked in ascending id
+  order (the global lock order, REQ-BANK-006/-011/-013), so the fan-out cannot deadlock.
+- **Authorization (unchanged).** A direct split deposit needs `BANK_EMPLOYEE` + `can_deposit` on the
+  **named** account (REQ-BANK-009) — crediting the squadron accounts needs no further grant, because
+  a deposit only adds money (the same rationale as the unrestricted deposit *request* of
+  REQ-BANK-042). The request variant follows REQ-BANK-042 (any authenticated user, any active
+  account, no approval limit; the split never makes a deposit approval-limited).
+- **Request variant (amends REQ-BANK-042).** A deposit request snapshots `split_enabled` +
+  `split_percent` on the off-ledger row (V196); the concrete per-squadron legs are (re)computed at
+  **confirmation** against the squadron accounts active **then**, exactly like the approval-limit
+  snapshot of REQ-BANK-041. The bank employee sees the split in the confirm modal before booking.
+- **Failures (409).** `BANK_SPLIT_NO_TARGETS` when no active squadron account remains to distribute
+  to (none exists, or the only one is the named account); `BANK_SPLIT_TOO_SMALL` when the slice
+  rounds below 1 aUEC.
+- **Audit (REQ-BANK-012, REQ-AUDIT-001).** One summarizing `DEPOSIT_SPLIT_BOOKED` event per split
+  transaction — the `WIPE_RESET_EXECUTED` precedent (one event for a multi-account transaction, not
+  one per leg); the PII-free details carry the gross, holder handle, percentage and target count
+  (the holder handle is the same datum the plain `DEPOSIT_BOOKED` detail already records).
+- **Integrity (amends REQ-BANK-020).** A split `DEPOSIT` carries `N` positive account legs summing
+  to the gross against one holder leg of the gross; it is a `DEPOSIT`, so the
+  transfer/holder-transfer zero-/`−fee`-sum invariants do not apply, and a reversal mirrors all its
+  legs generically (REQ-BANK-004). It still carries exactly one audit row, so the
+  audit-row-per-transaction sweep is unaffected.
+- **Frontend (REQ-FE-001…010).** The deposit modal (bank staff) and the deposit-request modal
+  (org-unit page) gain the checkbox + percentage + a live "slice / remainder" preview; the bank-staff
+  confirm modal shows the split before booking. The split is submitted through the existing
+  `krtFetch` deposit/request writes; the pages where these actions happen do not display the other
+  squadron accounts' balances, so the standard in-place fragment swap covers every derived UI on the
+  acting page (a separately-open dashboard refreshes on its own next load — cross-page peer sync is
+  Mission-only, REQ-FE-010).
+
+**Acceptance**
+
+- [x] A split deposit books one `DEPOSIT` transaction crediting `gross − slice` to the named account
+  and the slice evenly across the active squadron accounts (largest-remainder), with one holder leg
+  over the gross; the legs sum to the gross.
+- [x] The named account is excluded from the distribution even when it is a squadron account; a
+  100 % split books no named leg.
+- [x] `BANK_SPLIT_NO_TARGETS` / `BANK_SPLIT_TOO_SMALL` are returned (409) for the no-target /
+  rounds-to-zero cases.
+- [x] A deposit request snapshots the percentage and resolves the legs at confirmation; a
+  withdrawal/transfer request rejects a split (DTO + V196 CHECK).
+- [x] One `DEPOSIT_SPLIT_BOOKED` audit row per split transaction; it appears in the admin viewer's
+  Bank event-type filter with DE/EN labels.
+
+**Enforced by:** `BankLedgerSplitDepositTest` (split distribution, largest-remainder, exclude-named,
+100 %, no-targets, too-small, single holder leg), `BankBookingRequestServiceTest` (split request
+snapshot + confirm books a split), `OrgUnitBankAccessServiceTest` (deposit request carries the split)
+· **Code:** `service/BankLedgerService#bookSplitDeposit`,
+`model/dto/request/BankDepositRequest`, `model/dto/request/CreateBankBookingRequest`,
+`model/BankBookingRequest`, `repository/BankAccountRepository#findByTypeAndStatusOrderById`,
+`model/BankAuditEventType#DEPOSIT_SPLIT_BOOKED`, `db/migration/V196`, frontend
+`templates/bank-account-detail.html` / `org-unit-bank.html` / `bank-requests.html`,
+`static/js/bank.js` · **Issues:** —
+
+### REQ-BANK-044 — Deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
 
 A deposit and a withdrawal each record only the **holder** — the bank custodian who physically
 received the money in (deposit) or paid it out (withdrawal). They do **not** record the *external
@@ -1322,10 +1459,11 @@ party* on the far side: who handed the money in (the **Einzahler**) or who recei
 **counterparty** to deposits and withdrawals so the account history, the Kontoauszug PDF and the
 admin audit log answer "von wem / an wen" the payment went. The counterparty is a distinct dimension
 from the holder (a custodian receives a member's deposit; the depositing member is the counterparty)
-and is captured on the **transaction header** (V196: `counterparty_user_id` FK `app_user`
+and is captured on the **transaction header** (V197: `counterparty_user_id` FK `app_user`
 `ON DELETE SET NULL`, plus deletion-proof `counterparty_handle` / `counterparty_org_unit_name`
 snapshots and a `counterparty_org_unit_id` FK `org_unit`), set once at insert — the append-only
-ledger contract (REQ-BANK-004) is unaffected.
+ledger contract (REQ-BANK-004) is unaffected. A **split** deposit (REQ-BANK-043) records the
+counterparty on its single header too.
 
 Design (owner-confirmed): the counterparty is a **tool user** (no free-text), selected from the
 shared `GET /api/v1/users/lookup` picker; its **org unit is picked at booking** from the user's own
@@ -1349,9 +1487,9 @@ Booking **requests** (REQ-BANK-023): a confirmed deposit/withdrawal records the 
 counterparty user (for a deposit request the requester *is* the depositor, REQ-BANK-042) together
 with their **deterministic primary org unit** — the requester is not present to pick, so the primary
 membership (name-sorted primary Staffel, or a leader's Bereich/OL) is recorded, null when they have
-none. The audit detail names the counterparty
-handle + org-unit name (both system identifiers, not user free text) and sets the structured
-`target_user_id` on `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED` (REQ-BANK-012) — no new event type.
+none. The audit detail names the counterparty handle + org-unit name (both system identifiers, not
+user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED`
+(REQ-BANK-012) — no new event type.
 
 **Acceptance**
 
@@ -1378,9 +1516,9 @@ reaches `/memberships`) · **Code:**
 `service/OrgUnitMembershipService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
 `repository/BankPostingRepository`, `model/dto/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
 `service/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
-`db/migration/V196`, frontend `controller/BankPageController`, `controller/UserProxyController`,
+`db/migration/V197`, frontend `controller/BankPageController`, `controller/UserProxyController`,
 `templates/bank-account-detail.html`, `static/js/bank.js` · **ADR:**
-[ADR-0052](../adr/0052-bank-transaction-counterparty.md) · **Issues:** —
+[ADR-0054](../adr/0054-bank-transaction-counterparty.md) · **Issues:** —
 
 ## Out of scope
 

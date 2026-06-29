@@ -46,11 +46,12 @@ import org.jetbrains.annotations.Nullable;
  *     non-transfers
  * @param intraAccount {@code true} for holder rebookings (both legs on this account — custody
  *     moved, the balance did not; REQ-BANK-011)
- * @param transferFee the in-game transfer fee carved out of this transaction (ADR-0041,
- *     REQ-BANK-033); {@code 0} for non-fee rows. On an outgoing leg (amount &lt; 0) the recipient
- *     received {@code |amount| − transferFee}
+ * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
+ *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
+ *     outgoing leg (amount &lt; 0) the leg is the gross debited, so the recipient received {@code
+ *     |amount| − transferFee}
  * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
- *     handle — the Einzahler / Empf&auml;nger on the far side (REQ-BANK-043), {@code null}
+ *     handle — the Einzahler / Empf&auml;nger on the far side (REQ-BANK-044), {@code null}
  *     otherwise or when none was recorded
  * @param counterpartyOrgUnitName the counterparty's org-unit name, or {@code null} when no
  *     counterparty or no org unit was recorded

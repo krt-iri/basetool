@@ -1,5 +1,5 @@
 -- =====================================================================
--- V196 - Kartell bank: bank_transaction counterparty (REQ-BANK-043)
+-- V197 - Kartell bank: bank_transaction counterparty (REQ-BANK-044)
 -- =====================================================================
 -- Why: a deposit/withdrawal so far records only the HOLDER — the bank
 -- custodian who physically received the money (deposit) or paid it out
@@ -45,10 +45,10 @@ ALTER TABLE bank_transaction
         );
 
 COMMENT ON COLUMN bank_transaction.counterparty_user_id IS
-    'The member on the far side of a DEPOSIT (Einzahler) / WITHDRAWAL (Empfaenger), FK app_user ON DELETE SET NULL; NULL for transfers/holder-transfers/reversal/wipe and for bookings without a recorded counterparty (REQ-BANK-043).';
+    'The member on the far side of a DEPOSIT (Einzahler) / WITHDRAWAL (Empfaenger), FK app_user ON DELETE SET NULL; NULL for transfers/holder-transfers/reversal/wipe and for bookings without a recorded counterparty (REQ-BANK-044).';
 COMMENT ON COLUMN bank_transaction.counterparty_handle IS
     'Deletion-proof handle snapshot of counterparty_user_id (mirrors bank_audit_event.actor_handle); NULL exactly when counterparty_user_id is NULL.';
 COMMENT ON COLUMN bank_transaction.counterparty_org_unit_id IS
-    'Optional org unit the counterparty belongs to, picked from their memberships at booking time; FK org_unit ON DELETE SET NULL, only set together with a counterparty user (REQ-BANK-043).';
+    'Optional org unit the counterparty belongs to, picked from their memberships at booking time; FK org_unit ON DELETE SET NULL, only set together with a counterparty user (REQ-BANK-044).';
 COMMENT ON COLUMN bank_transaction.counterparty_org_unit_name IS
     'Deletion-proof name snapshot of counterparty_org_unit_id; NULL exactly when counterparty_org_unit_id is NULL.';

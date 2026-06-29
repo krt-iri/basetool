@@ -191,7 +191,7 @@ public class BankManagementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-043).
+    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044).
     final Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         txIds.isEmpty()
             ? Map.of()
@@ -270,7 +270,7 @@ public class BankManagementReportService {
   }
 
   /**
-   * Renders the "Gegenseite" cell for a report row (REQ-BANK-043) — the far side of the booking:
+   * Renders the "Gegenseite" cell for a report row (REQ-BANK-044) — the far side of the booking:
    * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
    * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number; empty
    * otherwise. The type column and amount sign convey the direction, so no arrow glyph is rendered.

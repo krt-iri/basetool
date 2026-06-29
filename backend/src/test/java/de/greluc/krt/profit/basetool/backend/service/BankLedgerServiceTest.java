@@ -123,8 +123,10 @@ class BankLedgerServiceTest {
             new BankDepositRequest(
                 account.getId(), holderA.getId(), new BigDecimal("500"), "seed"));
 
-    // Then: one account leg (+500) and one holder leg (+500 global)
+    // Then: one account leg (+500) and one holder leg (+500 global); a deposit is fee-free (the
+    // depositor bears their own in-game fee, REQ-BANK-033, ADR-0052)
     assertEquals(BankTransactionType.DEPOSIT, tx.type());
+    assertEquals(0, storedFee(tx).signum(), "deposit is fee-free");
     assertEquals(0, balance(account).compareTo(new BigDecimal("500")));
     assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("500")));
     assertEquals(
@@ -155,17 +157,58 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_allowsHolderToGoNegativeWhenAccountCovers() {
-    // Given: account holds 1000 (A:300, B:700) — the account covers a 400 payout, holder A does not
+    // Given: account holds 1000 (A:300, B:700) — the account covers a 400 payout plus its fee,
+    // holder A does not
     deposit(account, holderA, "300");
     deposit(account, holderB, "700");
 
-    // When: A pays out 400 — A fronts the missing 100 (no holder overdraft, ADR-0039)
+    // When: A pays out 400 to a recipient — the fee (round(400 * 0.005) = 2) is added on top
+    // (ADR-0052), so the account and holder A are debited the gross 402; A fronts the missing 102
+    // (no holder overdraft, ADR-0039)
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("400"), null));
 
-    // Then: the account drops by 400, holder A's GLOBAL balance goes negative
-    assertEquals(0, balance(account).compareTo(new BigDecimal("600")));
-    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-100")));
+    // Then: the account drops by the gross 402, holder A's GLOBAL balance goes negative
+    assertEquals(0, balance(account).compareTo(new BigDecimal("598")));
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-102")));
+  }
+
+  @Test
+  void bookWithdrawal_addsFeeOnTopSoTheAccountBearsItAndTheRecipientGetsTheFullAmount() {
+    // Given (REQ-BANK-033, ADR-0052): the entered amount is what the recipient must receive; the
+    // 0.5% fee is added on top and borne by the debited account. A 1000 payout needs 1005 in the
+    // account (1000 + round(1000 * 0.005) = 5 fee).
+    deposit(account, holderA, "1005");
+
+    // When: pay out 1000
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                account.getId(), holderA.getId(), new BigDecimal("1000"), null));
+
+    // Then: the account and holder are debited the gross 1005; the recorded fee is 5 and the
+    // recipient effectively received the full 1000 (gross - fee)
+    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
+    assertEquals(0, balance(account).signum(), "account bore the gross 1005");
+    assertEquals(0, holderTotal(holderA).signum(), "holder bore the gross 1005");
+  }
+
+  @Test
+  void bookWithdrawal_rejectsWhenTheFeeOnTopWouldOverdrawTheAccount() {
+    // Given: the account holds exactly the entered amount but not the fee on top (ADR-0052)
+    deposit(account, holderA, "1000");
+
+    // When / Then: a 1000 payout needs 1005 (1000 + 5 fee); the account cannot cover the gross, so
+    // the booking is refused rather than driving the account negative (REQ-BANK-006)
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                bankLedgerService.bookWithdrawal(
+                    new BankWithdrawalRequest(
+                        account.getId(), holderA.getId(), new BigDecimal("1000"), null)));
+    assertEquals(BankConflictException.CODE_BANK_OVERDRAFT, ex.getCode());
+    assertEquals(0, balance(account).compareTo(new BigDecimal("1000")), "balance unchanged");
   }
 
   @Test
@@ -197,13 +240,14 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void bookTransfer_holderChange_carvesOutFeeAndCreditsNetToDestination() {
-    // Given (REQ-BANK-033, ADR-0041): a transfer that changes the holder is a real in-game send, so
-    // the 0.5% fee (seeded operation.transfer_fee_rate) is carved out — the source is debited the
-    // full gross, the destination credited the net, and the two legs net to -fee.
-    deposit(account, holderA, "1000");
+  void bookTransfer_holderChange_addsFeeOnTopAndCreditsFullAmountToDestination() {
+    // Given (REQ-BANK-033, ADR-0052): a transfer that changes the holder is a real in-game send, so
+    // the 0.5% fee (seeded operation.transfer_fee_rate) is added on top — the source is debited the
+    // gross (amount + fee), the destination credited the full entered amount, and the two legs net
+    // to -fee. Moving 1000 needs 1005 in the source.
+    deposit(account, holderA, "1005");
 
-    // When: move the whole 1000 to another account AND another holder
+    // When: deliver 1000 to another account AND another holder
     BankTransactionDto tx =
         bankLedgerService.bookTransfer(
             new BankTransferRequest(
@@ -215,7 +259,8 @@ class BankLedgerServiceTest {
                 "Bereichsanteil"),
             true);
 
-    // Then: fee = round(1000 * 0.005) = 5; the destination receives 995, the legs net to -5
+    // Then: fee = round(1000 * 0.005) = 5; the source is debited the gross 1005, the destination
+    // receives the full 1000, the legs net to -5
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
     assertEquals(
@@ -228,10 +273,13 @@ class BankLedgerServiceTest {
         0,
         sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
             .compareTo(new BigDecimal("-5")));
-    assertEquals(0, balance(account).signum(), "source debited the full gross");
-    assertEquals(0, balance(otherAccount).compareTo(new BigDecimal("995")), "destination gets net");
+    assertEquals(0, balance(account).signum(), "source debited the gross 1005");
+    assertEquals(
+        0,
+        balance(otherAccount).compareTo(new BigDecimal("1000")),
+        "destination gets the full entered amount");
     assertEquals(0, holderTotal(holderA).signum());
-    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("995")));
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("1000")));
   }
 
   @Test
@@ -257,34 +305,32 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void bookHolderTransfer_movesGlobalCustodyWithNoAccountLegAndCarvesOutFee() {
+  void bookHolderTransfer_movesGlobalCustodyWithNoAccountLegAndIsFeeFree() {
     // Given: holder A holds 800 (via a deposit onto the account)
     deposit(account, holderA, "800");
     BigDecimal accountBefore = balance(account);
     long auditBefore = auditEventRepository.count();
 
-    // When: A hands 400 of physical custody to B — no account is touched. Because A physically
-    // sends the money in-game, the 0.5% fee applies: fee = round(400 * 0.005) = 2, B receives 398.
+    // When: A hands 400 of physical custody to B — no account is touched. The internal Umbuchung is
+    // fee-free (REQ-BANK-031, ADR-0052): the staff bear any in-game fee personally, so A is debited
+    // exactly 400 and B credited exactly 400.
     BankTransactionDto tx =
         bankLedgerService.bookHolderTransfer(
             new BankHolderTransferRequest(
                 holderA.getId(), holderB.getId(), new BigDecimal("400"), "Schichtwechsel"));
 
     // Then: only holder balances move; the account is untouched and the tx books no account leg;
-    // the source is debited the full gross, the destination credited the net, legs net to -fee.
+    // no fee is recorded and the two holder legs net to zero.
     assertEquals(BankTransactionType.HOLDER_TRANSFER, tx.type());
-    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("2")));
+    assertEquals(0, storedFee(tx).signum(), "holder Umbuchung is fee-free");
     assertEquals(0, balance(account).compareTo(accountBefore), "account balance unchanged");
     assertTrue(postingRepository.findLegsByTransactionIds(List.of(tx.id())).isEmpty());
     List<BankHolderLeg> holderLegs =
         holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id()));
     assertEquals(2, holderLegs.size());
-    assertEquals(
-        0,
-        sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
-            .compareTo(new BigDecimal("-2")));
-    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("400")), "source debited gross");
-    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("398")), "destination gets net");
+    assertEquals(0, sum(holderLegs.stream().map(BankHolderLeg::amount).toList()).signum());
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("400")), "source debited 400");
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("400")), "destination gets 400");
     assertEquals(auditBefore + 1, auditEventRepository.count());
     assertTrue(auditEventRepository.existsByTransactionId(tx.id()));
   }
@@ -308,14 +354,15 @@ class BankLedgerServiceTest {
     holderRepository.save(holderB);
 
     // When: reconcile B's stash even though it is deactivated; A goes negative (no holder
-    // overdraft). The fee applies (A sends in-game): fee = round(200 * 0.005) = 1, B receives 199.
+    // overdraft). The internal Umbuchung is fee-free (REQ-BANK-031, ADR-0052), so A is debited
+    // exactly 200 and B credited exactly 200.
     bankLedgerService.bookHolderTransfer(
         new BankHolderTransferRequest(
             holderA.getId(), holderB.getId(), new BigDecimal("200"), null));
 
-    // Then: source debited the full gross (goes negative), destination credited the net
+    // Then: source debited 200 (goes negative), destination credited the full 200
     assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-200")));
-    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("199")));
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("200")));
   }
 
   @Test
@@ -416,10 +463,11 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_rejectsWhenAccountWouldGoNegative() {
-    // Given: deposit 100 to A, then pay it all out — the account is back to zero
-    BankTransactionDto deposit = deposit(account, holderA, "100");
+    // Given: deposit 201 to A, then pay 200 out — with the 1 aUEC fee on top (ADR-0052) the gross
+    // debit is 201, so the account is back to zero
+    BankTransactionDto deposit = deposit(account, holderA, "201");
     bankLedgerService.bookWithdrawal(
-        new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("100"), null));
+        new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("200"), null));
 
     // When / Then: undoing the deposit would drive the ACCOUNT negative (the holder may go
     // negative,
@@ -531,10 +579,11 @@ class BankLedgerServiceTest {
       pool.shutdownNow();
     }
 
-    // Then: exactly 2 succeed (2 x 200 = 400 <= 500; a third would overdraw the account)
+    // Then: exactly 2 succeed (each gross debit is 200 + round(200 * 0.005) = 201, so 2 x 201 = 402
+    // <= 500; a third would overdraw the account). The fee on top (ADR-0052) leaves 500 - 402 = 98.
     assertEquals(2, success.get(), "exactly two withdrawals fit into the balance");
     assertEquals(THREADS - 2, conflict.get());
-    assertEquals(0, balance(account).compareTo(new BigDecimal("100")));
+    assertEquals(0, balance(account).compareTo(new BigDecimal("98")));
   }
 
   @Test
@@ -570,7 +619,7 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_recordsCounterpartyUserHandleAndOrgUnitSnapshotAndAuditTarget() {
-    // Given (REQ-BANK-043): an Einzahler who belongs to one Staffel
+    // Given (REQ-BANK-044): an Einzahler who belongs to one Staffel
     User depositor = newUser("einzahler");
     Squadron staffel = newSquadron("Staffel " + UUID.randomUUID());
     linkMembership(depositor, staffel);
@@ -601,7 +650,7 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_recordsCounterpartyUserWithoutOrgUnitAndAuditTarget() {
-    // Given (REQ-BANK-043): a payout to a recorded Empfänger, no org unit chosen
+    // Given (REQ-BANK-044): a payout to a recorded Empfänger, no org unit chosen
     deposit(account, holderA, "500");
     User recipient = newUser("empfaenger");
 
@@ -628,7 +677,7 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_rejectsCounterpartyOrgUnitThatIsNotAMembership() {
-    // Given (REQ-BANK-043): a user who is NOT a member of the chosen org unit
+    // Given (REQ-BANK-044): a user who is NOT a member of the chosen org unit
     User depositor = newUser("fremd");
     Squadron unrelated = newSquadron("Fremd " + UUID.randomUUID());
 
@@ -674,7 +723,7 @@ class BankLedgerServiceTest {
     return holderPostingRepository.holderTotal(holder.getId());
   }
 
-  /** Reads the in-game transfer fee recorded on a persisted transaction (ADR-0041). */
+  /** Reads the in-game transfer fee recorded on a persisted transaction (ADR-0052). */
   private BigDecimal storedFee(BankTransactionDto tx) {
     return transactionRepository.findById(tx.id()).orElseThrow().getTransferFee();
   }

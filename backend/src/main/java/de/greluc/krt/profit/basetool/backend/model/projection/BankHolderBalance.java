@@ -29,7 +29,9 @@ import java.util.UUID;
  * (REQ-BANK-006).
  *
  * @param holderId the {@code bank_holder} id
- * @param handle the holder's deletion-proof handle snapshot, for display
+ * @param handle the holder's live display name for the report — the linked user's current effective
+ *     name (display name preferred, username fallback), falling back to the deletion-proof handle
+ *     snapshot when the user is gone (REQ-BANK-003)
  * @param holderActive whether the holder currently accepts new incoming postings
  * @param amount the signed global amount the holder physically holds across the whole bank
  */

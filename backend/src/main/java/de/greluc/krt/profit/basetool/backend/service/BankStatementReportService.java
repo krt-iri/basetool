@@ -147,7 +147,7 @@ public class BankStatementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-043); only
+    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044); only
     // fetched for the non-redacted bank-staff variant, which is the only one carrying that column.
     Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         (redactHolders || txIds.isEmpty())
@@ -272,7 +272,7 @@ public class BankStatementReportService {
   }
 
   /**
-   * Renders the "Gegenseite" cell for a statement row (REQ-BANK-043) — the far side of the booking:
+   * Renders the "Gegenseite" cell for a statement row (REQ-BANK-044) — the far side of the booking:
    * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
    * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number (the
    * account leg on the other account); empty for every other type or when nothing was recorded. The

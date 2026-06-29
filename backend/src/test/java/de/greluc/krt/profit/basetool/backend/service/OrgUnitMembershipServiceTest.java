@@ -1119,7 +1119,7 @@ class OrgUnitMembershipServiceTest {
 
   @Test
   void listDirectMembershipOptions_includesBereichNotJustStaffelAndSk() {
-    // REQ-BANK-043: unlike listOptionsForUser (Staffel/SK only), the bank counterparty picker must
+    // REQ-BANK-044: unlike listOptionsForUser (Staffel/SK only), the bank counterparty picker must
     // surface a direct Bereich (or OL) membership too. Ordered top-down by kind (Bereich before
     // Staffel), so the first option is the user's primary unit.
     UUID squadronId = UUID.randomUUID();
@@ -1151,7 +1151,7 @@ class OrgUnitMembershipServiceTest {
 
   @Test
   void findPrimaryDirectMembershipOrgUnitId_returnsTopOfKindOrder_orEmpty() {
-    // REQ-BANK-043: the requester's recorded org unit at request confirmation is the deterministic
+    // REQ-BANK-044: the requester's recorded org unit at request confirmation is the deterministic
     // primary — the first by the top-down kind order (here the Bereich over the Staffel).
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();

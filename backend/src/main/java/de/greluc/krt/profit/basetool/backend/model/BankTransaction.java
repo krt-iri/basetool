@@ -92,7 +92,7 @@ public class BankTransaction {
    * The member on the far side of a {@link BankTransactionType#DEPOSIT} (the Einzahler who handed
    * the money in) or {@link BankTransactionType#WITHDRAWAL} (the Empf&auml;nger who received the
    * payout), distinct from the {@code BankHolderPosting} holder (the bank custodian who physically
-   * received/paid). REQ-BANK-043. The database FK is {@code ON DELETE SET NULL}; {@link
+   * received/paid). REQ-BANK-044. The database FK is {@code ON DELETE SET NULL}; {@link
    * #counterpartyHandle} keeps the row attributable afterwards. {@code null} for transfers,
    * holder→holder Umbuchungen, reversals, the wipe reset, and for bookings where no counterparty
    * was recorded (the field is optional). Kept as a plain UUID — the booking surfaces render the
@@ -105,8 +105,8 @@ public class BankTransaction {
   /**
    * Deletion-proof handle snapshot of {@link #counterpartyUserId} (the effective name at booking
    * time), mirroring the {@code bank_audit_event.actor_handle} / {@code bank_holder.handle}
-   * snapshot pattern so the booking history and statements survive user deletion (REQ-BANK-043).
-   * {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V196 CHECK).
+   * snapshot pattern so the booking history and statements survive user deletion (REQ-BANK-044).
+   * {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V197 CHECK).
    */
   @Nullable
   @Column(name = "counterparty_handle", length = 255)
@@ -114,7 +114,7 @@ public class BankTransaction {
 
   /**
    * Optional org unit the counterparty belongs to, picked from their own memberships at booking
-   * time (membership is multi, so the booker chooses which one). REQ-BANK-043. The FK references
+   * time (membership is multi, so the booker chooses which one). REQ-BANK-044. The FK references
    * {@code org_unit} ({@code ON DELETE SET NULL}); only ever set together with {@link
    * #counterpartyUserId}. Kept as a plain UUID (no JPA relation) — consistent with how the rest of
    * the bank treats org-unit references during the SQUADRON soak — with {@link
@@ -125,24 +125,26 @@ public class BankTransaction {
   private UUID counterpartyOrgUnitId;
 
   /**
-   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId} (REQ-BANK-043), so the history
+   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId} (REQ-BANK-044), so the history
    * and statements label the counterparty's org unit without a live polymorphic org-unit load.
-   * {@code null} exactly when {@link #counterpartyOrgUnitId} is {@code null} (V196 CHECK).
+   * {@code null} exactly when {@link #counterpartyOrgUnitId} is {@code null} (V197 CHECK).
    */
   @Nullable
   @Column(name = "counterparty_org_unit_name", length = 255)
   private String counterpartyOrgUnitName;
 
   /**
-   * In-game aUEC transfer fee carved out of the gross sent amount (ADR-0041, REQ-BANK-033). Set by
-   * {@code BankLedgerService} on every transaction where a holder actively initiates an in-game
-   * transfer — {@link BankTransactionType#WITHDRAWAL}, an account-to-account {@link
-   * BankTransactionType#TRANSFER} with a holder change, and a {@link
-   * BankTransactionType#HOLDER_TRANSFER}; {@code 0} for {@link BankTransactionType#DEPOSIT} (the
-   * depositor bears their own fee), {@link BankTransactionType#WIPE_RESET}, {@link
-   * BankTransactionType#REVERSAL} and same-holder transfers. The destination leg is credited the
-   * net (gross − fee), so a fee-bearing TRANSFER/HOLDER_TRANSFER nets to {@code -transfer_fee}
-   * across its legs (REQ-BANK-020 integrity widened accordingly). Never negative (V183 CHECK).
+   * In-game aUEC transfer fee added on top of the entered amount and borne by the debited source
+   * (ADR-0052 superseding ADR-0041, REQ-BANK-033). Set by {@code BankLedgerService} on a
+   * customer-facing transfer the bank makes on a member's behalf — a {@link
+   * BankTransactionType#WITHDRAWAL} and an account-to-account {@link BankTransactionType#TRANSFER}
+   * with a holder change; {@code 0} for {@link BankTransactionType#DEPOSIT} (the depositor bears
+   * their own fee), the internal {@link BankTransactionType#HOLDER_TRANSFER} Umbuchung (the staff
+   * bear that in-game fee personally), {@link BankTransactionType#WIPE_RESET}, {@link
+   * BankTransactionType#REVERSAL} and same-holder transfers. The source leg is debited the gross
+   * (entered amount + fee) and the destination leg credited the full entered amount, so a
+   * fee-bearing TRANSFER nets to {@code -transfer_fee} across its legs (REQ-BANK-020 integrity
+   * widened accordingly). Never negative (V183 CHECK).
    */
   @Column(name = "transfer_fee", nullable = false, precision = 19, scale = 4, updatable = false)
   @Builder.Default

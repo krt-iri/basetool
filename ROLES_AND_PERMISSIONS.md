@@ -544,11 +544,15 @@ holder balance is a **global** quantity in its own ledger
 (`bank_holder_posting`), not account-bound, and **may go negative** — a
 holder fronts their own money if needed and is later settled via a **holder-to-holder Umbuchung**
 (`HOLDER_TRANSFER`, REQ-BANK-031). Only **accounts** are hard-protected against
-overdraft. Because a holder sends the money in-game themselves when withdrawing or doing an Umbuchung,
-the **in-game transfer fee** (default 0.5 %, the same setting `operation.transfer_fee_rate`
-as for the operations payout) is deducted on `WITHDRAWAL`, `HOLDER_TRANSFER` and a
-holder-changing `TRANSFER` — the source is charged gross, the target is credited net;
-`DEPOSIT` and same-holder transfers stay fee-free (REQ-BANK-033, ADR-0041). **All bank
+overdraft. When the bank sends money in-game on a member's behalf, the **in-game transfer fee**
+(default 0.5 %, the same setting `operation.transfer_fee_rate` as for the operations payout) is added
+**on top** and borne by the debited account: it applies to `WITHDRAWAL` and a holder-changing
+`TRANSFER` — the source is debited the gross (amount + fee), the destination/recipient gets the
+**full** entered amount, and the account-overdraft guard runs against the gross (a booking that
+cannot cover amount + fee is refused, so a fee never drives an account negative). `DEPOSIT`,
+same-holder transfers and the internal holder-to-holder Umbuchung (`HOLDER_TRANSFER`) are
+**fee-free** — for the Umbuchung the bank staff bear the in-game fee personally
+(REQ-BANK-033, ADR-0052). **All bank
 employees and Bank Management members are
 automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses all
 bank roles, their role-driven holder is automatically deactivated (the remaining balance
@@ -638,6 +642,7 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 - **Transfer requests (REQ-BANK-040):** in addition to deposit/withdrawal, a `TRANSFER` from the (visible) source account to **any active account** as target can be requested. The bank employee books it on confirmation as a real `TRANSFER` (recording source/target holders, in-game fee REQ-BANK-033); requires `can_transfer` on the **source** — a grant on the target is not required.
 - **Approval limits per account/level + two-stage approval (REQ-BANK-041), for withdrawals/transfers:** per level (Squadron/Bereich sub-ranks, all members, individual user) a limit (>= 0 aUEC) may apply, up to which one may request without approval; a missing limit = unlimited. Above the limit the request is marked `requires_owner_approval`: (1) the **responsible holder** grants the approval in the „Fremde Anträge" tab (audited `BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`), (2) the **bank employee** confirms only after the mandatory checkbox „Freigabe durch Kontoverantwortlichen erfolgt" (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`; without the checkbox 409 `BANK_OWNER_APPROVAL_REQUIRED`). Configuring limits is allowed for the **responsible holder, Bank Management and Admin** — never a plain Bank Empl.; they are read-visible in the account details for all view-eligible users (audited `APPROVAL_LIMIT_SET/CLEARED`). Deposits are never approval-limited (REQ-BANK-042).
 - **Unrestricted deposits (REQ-BANK-042):** a **deposit** request is exempt from both the view-eligibility gate and the approval limits above — **any authenticated user** may request a deposit against **any active account** (every type incl. `SPECIAL` / `CARTEL_BANK`, even one they cannot view), and it is never marked `requires_owner_approval`. The bank employee confirms it on in-game receipt as usual; only the account-active guard remains (`BANK_ACCOUNT_CLOSED`).
+- **Split deposit across squadron accounts (REQ-BANK-043):** a **deposit** — direct booking (Bank Empl.) or request (any user) — may optionally distribute a whole-percent (1–100) of the gross evenly across all active squadron accounts, crediting the named account the remainder. No extra capability is required: a direct split deposit still needs only `BANK_EMPLOYEE` + `can_deposit` on the **named** account (crediting the squadron accounts adds money only, like the unrestricted request), and the request variant follows REQ-BANK-042. DEPOSIT-only; the split never makes a deposit approval-limited. Audited once as `DEPOSIT_SPLIT_BOOKED`.
 
 | Function (gate)                                                                                                                              | Member (if visible) | Responsible | Bank Empl. | Bank Mgmt. | Admin |
 |:---------------------------------------------------------------------------------------------------------------------------------------------|:-------------------:|:-----------:|:----------:|:----------:|:-----:|
