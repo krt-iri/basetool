@@ -868,12 +868,24 @@
             return;
         }
         row.hidden = !isTransfer;
-        const control = row.querySelector('select');
+        // Native <select> before enhancement / no-JS, or the searchable combobox's hidden input
+        // afterwards (the holder picker is upgraded into a combobox). Disabling the hidden input
+        // keeps it out of the submit for a non-transfer; the visible textbox is disabled to match.
+        const control = row.querySelector('select, .krt-combobox input[type="hidden"]');
         if (control) {
             control.disabled = !isTransfer;
             control.required = isTransfer;
             if (!isTransfer) {
-                control.value = '';
+                if (control.krtCombobox) {
+                    control.krtCombobox.setValue('');
+                } else {
+                    control.value = '';
+                }
+            }
+            const box = control.closest ? control.closest('.krt-combobox') : null;
+            const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+            if (textbox) {
+                textbox.disabled = !isTransfer;
             }
         }
     }
@@ -1030,14 +1042,11 @@
         }
     });
 
-    /* Enhance the user pickers into searchable comboboxes when the helper is loaded. */
-    if (typeof window.krtSearchableSelect === 'function') {
-        document
-            .querySelectorAll('select[data-role="bank-holder-user"]')
-            .forEach(function (select) {
-                window.krtSearchableSelect(select);
-            });
-    }
+    /*
+     * The user pickers (data-role="bank-holder-user") and holder pickers are enhanced into
+     * searchable comboboxes by the global krt-searchable-select.js auto-initialiser (they carry the
+     * data-krt-combobox marker in the templates); no per-page wiring is needed here (REQ-FE-011).
+     */
 
     /**
      * Fetches one bank PDF with CSRF + the browser's IANA zone and saves it as a file.

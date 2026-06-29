@@ -171,9 +171,10 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
-                        <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}">
+                        <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
+                                th:attr="data-krt-combobox=${isLogistician ? '' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
+                            <option th:each="user : ${users}" th:value="${user.id}" th:attr="data-search=${user.username}" th:text="${user.effectiveName}"></option>
                         </select>
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>
@@ -413,8 +414,8 @@
                             </div>
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
-                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required>
-                                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.effectiveName}"></option>
+                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox>
+                                    <option th:each="u : ${users}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
                                 </select>
                             </div>
                         </div>
@@ -446,6 +447,16 @@
             </form>
         </div>
     </div>
+
+    <!-- Pristine (un-enhanced) receiver-picker template used by duplicateStoreItem(): cloning the
+         live, already-enhanced combobox DOM yields a dead control, so a split row replaces the clone
+         with a fresh <select data-krt-combobox> from here (id/name stamped per index in JS) and
+         re-enhances it via window.krtEnhanceComboboxes. -->
+    <template id="store-user-select-tpl">
+        <select data-krt-combobox required>
+            <option th:each="u : ${users}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
+        </select>
+    </template>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
@@ -574,7 +585,23 @@
                 el.htmlFor = el.htmlFor.replace(/_\d+$/, `_${newIndex}`);
             }
         });
-        
+
+        // The receiver picker is a searchable combobox; cloning its enhanced DOM yields a dead
+        // control. Carry over the source row's chosen receiver, then swap the dead clone for a fresh
+        // <select data-krt-combobox> from the pristine template (re-enhanced below). Resolve the
+        // control by its preserved id (works whether the source was enhanced or still a plain select).
+        const tpl = document.getElementById('store-user-select-tpl');
+        const sourceUser = blockToCopy.querySelector('[id^="storeUser_"]');
+        const sourceUserValue = sourceUser ? sourceUser.value : '';
+        const clonedUser = newBlock.querySelector('[id^="storeUser_"]');
+        if (tpl && clonedUser) {
+            const freshUser = tpl.content.firstElementChild.cloneNode(true);
+            freshUser.id = `storeUser_${newIndex}`;
+            freshUser.name = `items[${newIndex}].userId`;
+            freshUser.value = sourceUserValue;
+            (clonedUser.closest('.krt-combobox') || clonedUser).replaceWith(freshUser);
+        }
+
         const btnInNewBlock = newBlock.querySelector('button');
         if (btnInNewBlock) {
             btnInNewBlock.textContent = '-';
@@ -587,6 +614,11 @@
         
         blockToCopy.after(newBlock);
         reindexStoreItems();
+        // Upgrade the freshly inserted receiver <select> into a searchable combobox (idempotent;
+        // skips controls already enhanced). reindexStoreItems() has stamped its final id/name.
+        if (window.krtEnhanceComboboxes) {
+            window.krtEnhanceComboboxes(newBlock);
+        }
     }
 
     function reindexStoreItems() {

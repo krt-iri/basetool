@@ -159,7 +159,7 @@
                         <label for="bank-confirm-holder" data-confirm-holder-label
                                th:attr="data-label-default=#{bank.field.holder},data-label-source=#{bank.field.holder.source}"
                                th:text="#{bank.field.holder}">Halter</label>
-                        <select id="bank-confirm-holder" name="holderId" required data-testid="bank-confirm-holder">
+                        <select id="bank-confirm-holder" name="holderId" required data-krt-combobox data-testid="bank-confirm-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.active()} ? ${h.handle()} : (${h.handle()} + ' ' + #{bank.holder.inactive})">greluc</option>
@@ -172,7 +172,7 @@
                     <div class="bank-form-row" data-confirm-destination-holder hidden>
                         <label for="bank-confirm-destination-holder" th:text="#{bank.field.holder.target}">Ziel-Halter</label>
                         <select id="bank-confirm-destination-holder" name="destinationHolderId" disabled
-                                data-testid="bank-confirm-destination-holder">
+                                data-krt-combobox data-testid="bank-confirm-destination-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
                         </select>

@@ -108,11 +108,14 @@ class RefineryOrderCreateE2eTest {
         page.waitForURL(url -> url.contains("/refinery-orders/create"));
         page.waitForLoadState();
 
-        // The owner select is editable only for logisticians; pick the first user when enabled,
-        // otherwise it auto-defaults to the caller via a hidden field.
-        Locator owner = page.locator("#ownerId");
-        if (owner.isEnabled()) {
-          owner.selectOption(new SelectOption().setIndex(1));
+        // The owner picker is a searchable combobox for logisticians (enhanced from #ownerId), and
+        // a
+        // disabled native field otherwise; pick the first user when the editable combobox is
+        // present,
+        // else it auto-defaults to the caller via a hidden field.
+        Locator ownerCombo = page.locator(".krt-combobox:has(#ownerId) .krt-combobox__input");
+        if (ownerCombo.count() > 0) {
+          E2eSupport.selectComboboxFirstOption(ownerCombo);
         }
         page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
         page.locator("#refiningMethodId")
