@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.9](https://github.com/krt-profit/basetool/releases/tag/v1.0.9) - 2026-06-30
+
 ### Added
 
 - **Einsatz: Strukturierte, klassifizierte Ziele statt einzelnem Kurz-Ziel.** Ziele werden jetzt — wie der Ablauf — als einzelne Punkte im Verwaltung-Tab gepflegt und als Hauptziel, Nebenziel oder Nicht-Ziel (ausdrücklich kein Ziel des Einsatzes) klassifiziert. In der Übersicht erscheinen sie in einer eigenen „Ziele"-Box, gruppiert (Hauptziele, dann Nebenziele, dann Nicht-Ziele). Das bisherige einzelne Kurz-Ziel entfällt; vorhandene Texte werden automatisch in ein Hauptziel überführt (REQ-MISSION-012, ADR-0057).
