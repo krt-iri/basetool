@@ -1228,13 +1228,19 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > bounce the user back to the history tab.
 >
 > **Amendment (settings tiles):** within the *Verantwortung & Sichtbarkeit* tab the three settings
-> areas — **Kontostandsziel**, **Sichtbarkeit** and **Freigabe-Limits** — each render as their **own
-> `.hud-box` tile** inside a responsive `.oud-settings-grid` (`repeat(auto-fit, minmax(300px, 1fr))`),
-> so they sit **side by side** when the viewport is wide enough for their content and wrap to fewer
-> columns (down to a single column on a phone) otherwise. Each tile renders only when its capability
-> is granted (`canSetTarget` / `canConfigureVisibility` + `visibilityConfigurable` / the
-> approval-limit editor's `canEdit`), and the grid keeps the `org-unit-bank-settings` testid so the
-> `orgUnitBankSettings` swap target and the tests still resolve the region.
+> areas — **Sichtbarkeit**, **Freigabe-Limits** and **Kontostandsziel** (in that order, the
+> fill-to-target goal **last**) — each render as their **own `.hud-box` tile** inside a responsive
+> `.oud-settings-grid` (`repeat(auto-fill, minmax(min(540px, 100%), 1fr))`). The 540px track floor is
+> wide enough that each tile's widest row stays on **one line**, so the tiles **never cram their
+> content**: when two no longer fit side by side they **overflow to the next row** instead — two
+> abreast on desktop / ultra-wide (`main` caps at 1600px, so three would force a sub-540px,
+> content-wrapping width) and one per row on narrower desktops, tablets and phones. `min(540px, 100%)`
+> keeps the lone column from overflowing a phone viewport, and `auto-fill` (not `auto-fit`) keeps the
+> trailing Kontostandsziel tile at a single track width rather than stretching it across the row. Each
+> tile renders only when its capability is granted (`canSetTarget` / `canConfigureVisibility` +
+> `visibilityConfigurable` / the approval-limit editor's `canEdit`), and the grid keeps the
+> `org-unit-bank-settings` testid so the `orgUnitBankSettings` swap target and the tests still resolve
+> the region.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 

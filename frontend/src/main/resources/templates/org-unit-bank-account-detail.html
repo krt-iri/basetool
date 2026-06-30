@@ -126,35 +126,13 @@
              aria-labelledby="oud-tab-settings" hidden>
 
         <!-- Responsibility settings (REQ-BANK-035/-036/-041): only for the holder / OL. The three
-             independent areas — Kontostandsziel, Sichtbarkeit, Freigabe-Limits — each render as their
-             own hud-box tile inside a responsive auto-fit grid, so they sit side by side when the
-             screen is wide enough for their content and stack to fewer columns (down to one on a
-             phone) otherwise. The grid keeps the org-unit-bank-settings testid so the settings swap
-             target and the tests still resolve the region. -->
+             independent areas — Sichtbarkeit, Freigabe-Limits, Kontostandsziel (in that order, the
+             fill-to-target goal last) — each render as their own hud-box tile inside the responsive
+             .oud-settings-grid, whose 540px track floor keeps every tile wide enough that its content
+             never wraps: when two no longer fit side by side the tiles overflow to the next row rather
+             than cramming. The grid keeps the org-unit-bank-settings testid so the settings swap target
+             and the tests still resolve the region. -->
         <div class="oud-settings-grid mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
-
-            <!-- Balance target tile -->
-            <div th:if="${settings.canSetTarget()}" class="hud-box" data-testid="org-unit-bank-target-settings">
-                <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
-                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
-                    Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
-                <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
-                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/balance-target" data-method="PUT">
-                    <input type="hidden" name="_id" th:value="${acct.id()}">
-                    <input type="hidden" name="version" th:value="${settings.version()}">
-                    <div class="bank-form-row">
-                        <label for="org-unit-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
-                        <input type="number" id="org-unit-target-amount" name="target" min="1" step="1"
-                               th:value="${settings.balanceTarget() != null ? @moneyFormat.round(settings.balanceTarget()) : ''}"
-                               data-testid="org-unit-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
-                        <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>
-                        <span class="bank-field-error" data-error-for="target"></span>
-                        <span class="bank-field-error" data-error-for="_global"></span>
-                    </div>
-                    <button type="submit" class="btn btn--cta btn-sm" data-testid="org-unit-target-submit"
-                            th:text="#{bank.orgUnit.settings.target.save}">Ziel speichern</button>
-                </form>
-            </div>
 
             <!-- Configurable visibility (REQ-BANK-035): quiet per-entry toggles instead of a wall of
                  filled CTAs. Each entry shows a chip--success "granted" + a ghost "remove" when the
@@ -247,6 +225,31 @@
                  data-testid="org-unit-bank-approval-limit-tile">
                 <th:block
                     th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
+            </div>
+
+            <!-- Balance target tile (REQ-BANK-036): rendered LAST so the settings tab leads with the
+                 access-control areas (Sichtbarkeit + Freigabe-Limits) and closes with the quieter
+                 fill-to-target goal. -->
+            <div th:if="${settings.canSetTarget()}" class="hud-box" data-testid="org-unit-bank-target-settings">
+                <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
+                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
+                    Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
+                <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/balance-target" data-method="PUT">
+                    <input type="hidden" name="_id" th:value="${acct.id()}">
+                    <input type="hidden" name="version" th:value="${settings.version()}">
+                    <div class="bank-form-row">
+                        <label for="org-unit-target-amount" th:text="#{bank.orgUnit.field.target}">Zielkontostand (aUEC)</label>
+                        <input type="number" id="org-unit-target-amount" name="target" min="1" step="1"
+                               th:value="${settings.balanceTarget() != null ? @moneyFormat.round(settings.balanceTarget()) : ''}"
+                               data-testid="org-unit-target-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.orgUnit.settings.target.clearHint}">Leer lassen und speichern entfernt das Ziel.</span>
+                        <span class="bank-field-error" data-error-for="target"></span>
+                        <span class="bank-field-error" data-error-for="_global"></span>
+                    </div>
+                    <button type="submit" class="btn btn--cta btn-sm" data-testid="org-unit-target-submit"
+                            th:text="#{bank.orgUnit.settings.target.save}">Ziel speichern</button>
+                </form>
             </div>
         </div>
         </div>
