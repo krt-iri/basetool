@@ -54,9 +54,9 @@ NPM_DIR="${IRI_NPM_DIR:-/var/iri/npm}"
 PROFILE=prod
 
 # Writer services quiesced for the dump. Keycloak + the two Postgres DBs + Redis
-# + NPM stay up (NPM must, to serve the maintenance page). Space-separated; word
-# splitting is intentional for these fixed names.
-WRITER_SERVICES="frontend backend ingest"
+# + NPM stay up (NPM must, to serve the maintenance page). An array so each name
+# is passed as its own argument (no word-splitting landmines).
+WRITER_SERVICES=(frontend backend ingest)
 STOP_TIMEOUT="${IRI_BACKUP_STOP_TIMEOUT:-30}"
 LOCK_WAIT="${IRI_BACKUP_LOCK_WAIT:-300}"
 
@@ -137,8 +137,10 @@ export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
 mkdir -p "${DOCKER_CONFIG}" "${RESTIC_CACHE_DIR}" "${STAGING_BASE}"
 
 # Load the backup secrets/config (RESTIC_REPOSITORY, RESTIC_PASSWORD, RCLONE_CONFIG, …).
-# shellcheck disable=SC1090
-set -a; . "${BACKUP_ENV}"; set +a
+set -a
+# shellcheck source=/dev/null  # operator-provided host file, not in the repo
+. "${BACKUP_ENV}"
+set +a
 [[ -n "${RESTIC_REPOSITORY:-}" ]] || fail "RESTIC_REPOSITORY not set in ${BACKUP_ENV}"
 [[ -n "${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}" ]] || fail "RESTIC_PASSWORD or RESTIC_PASSWORD_FILE not set in ${BACKUP_ENV}"
 
@@ -152,7 +154,7 @@ if docker compose version --short >/dev/null 2>&1; then :; else fail "docker com
 # --- Dry run ----------------------------------------------------------------
 if [[ "${DRY_RUN}" == "true" ]]; then
   log "DRY RUN — would back up: krt_basetool + keycloak dumps, ${NPM_DIR}, .env, ${KEYSTORE_PATH}, realm-export.json, keycloak/providers"
-  log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
+  log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
   log "existing snapshots:"
   restic snapshots --compact 2>&1 | sed 's/^/  /' || log "  (repo not reachable / not initialized yet)"
   exit 0
@@ -171,25 +173,28 @@ mkdir -p "${STAGING}/config"
 chmod 700 "${STAGING}"
 
 QUIESCED=false
+# shellcheck disable=SC2317  # cleanup runs indirectly via the EXIT trap set below
 cleanup() {
   local rc=$?
   # Safety net: if we stopped the writers and never restarted them (a dump
   # failed), bring them back so production is not left down.
   if [[ "${QUIESCED}" == "true" ]]; then
-    log "cleanup: writers still stopped — restarting ${WRITER_SERVICES}"
-    dc start ${WRITER_SERVICES} >/dev/null 2>&1 || log "WARN: failed to restart writers during cleanup"
+    log "cleanup: writers still stopped — restarting ${WRITER_SERVICES[*]}"
+    dc start "${WRITER_SERVICES[@]}" >/dev/null 2>&1 || log "WARN: failed to restart writers during cleanup"
     QUIESCED=false
   fi
   # The staged dumps contain plaintext secrets + PII — never leave them around.
-  [[ -n "${STAGING:-}" && -d "${STAGING}" ]] && rm -rf "${STAGING}" || true
+  if [[ -n "${STAGING:-}" && -d "${STAGING}" ]]; then
+    rm -rf "${STAGING}"
+  fi
   exit "${rc}"
 }
 trap cleanup EXIT
 
 # --- Quiesce writers (REQ-OPS-009) ------------------------------------------
 if [[ "${QUIESCE}" == "true" ]]; then
-  log "quiescing writers for the dump: stop ${WRITER_SERVICES} (NPM serves the maintenance page)"
-  dc stop -t "${STOP_TIMEOUT}" ${WRITER_SERVICES}
+  log "quiescing writers for the dump: stop ${WRITER_SERVICES[*]} (NPM serves the maintenance page)"
+  dc stop -t "${STOP_TIMEOUT}" "${WRITER_SERVICES[@]}"
   QUIESCED=true
 else
   log "running ONLINE (no quiesce): relying on pg_dump MVCC snapshot consistency"
@@ -197,11 +202,15 @@ fi
 
 # --- Dump the databases (creds stay inside the containers) ------------------
 log "dumping backend database (krt_basetool)"
+# SC2016: the $VARs are intentionally single-quoted — they must expand inside the
+# container from its own env, not on the host (keeps the password off the host arg list).
+# shellcheck disable=SC2016
 dc exec -T db-backend sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -Fc "$POSTGRES_DB"' \
   > "${STAGING}/krt_basetool.dump"
 
 log "dumping Keycloak database (keycloak)"
+# shellcheck disable=SC2016  # see the note above — expand inside the container, not the host
 dc exec -T db-keycloak sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15433 -Fc "$POSTGRES_DB"' \
   > "${STAGING}/keycloak.dump"
@@ -214,9 +223,14 @@ docker run --rm -v "${NPM_DIR}:/src:ro" "${HELPER_IMAGE}" tar -C /src -cz . \
 # --- Capture host secrets / config needed for a full restore ----------------
 log "capturing host config (.env, keystore, realm-export, providers)"
 cp -p "${COMPOSE_DIR}/.env" "${STAGING}/config/dotenv"
-[[ -f "${KEYSTORE_PATH}" ]] && cp -p "${KEYSTORE_PATH}" "${STAGING}/config/keystore.p12" \
-  || log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
-[[ -f "${COMPOSE_DIR}/realm-export.json" ]] && cp -p "${COMPOSE_DIR}/realm-export.json" "${STAGING}/config/realm-export.json" || true
+if [[ -f "${KEYSTORE_PATH}" ]]; then
+  cp -p "${KEYSTORE_PATH}" "${STAGING}/config/keystore.p12"
+else
+  log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
+fi
+if [[ -f "${COMPOSE_DIR}/realm-export.json" ]]; then
+  cp -p "${COMPOSE_DIR}/realm-export.json" "${STAGING}/config/realm-export.json"
+fi
 if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
   tar -C "${COMPOSE_DIR}/keycloak" -czf "${STAGING}/config/providers.tar.gz" providers 2>/dev/null \
     || log "WARN: could not archive keycloak/providers — skipped"
@@ -224,8 +238,8 @@ fi
 
 # --- Restart writers BEFORE the slow upload, then release the deploy lock ----
 if [[ "${QUIESCED}" == "true" ]]; then
-  log "dumps captured — restarting writers (${WRITER_SERVICES})"
-  dc start ${WRITER_SERVICES}
+  log "dumps captured — restarting writers (${WRITER_SERVICES[*]})"
+  dc start "${WRITER_SERVICES[@]}"
   QUIESCED=false
 fi
 flock -u 200 || true
