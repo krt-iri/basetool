@@ -217,24 +217,26 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("step--done")))
         .andExpect(content().string(containsString("step--now")))
         .andExpect(content().string(containsString("data-trigger=\"mission-toggle-step\"")))
-        // Re-split overview + the new core fields.
+        // Re-split overview + the new Ziele box (structured goals replace the single objective
+        // row).
         .andExpect(content().string(containsString("Mission auf einen Blick")))
+        .andExpect(content().string(containsString("class=\"ziele\"")))
         .andExpect(content().string(containsString("Janalite sammeln")))
-        // Verwaltung drag-editor (canEdit fixture) + the new form fields.
+        // Verwaltung drag-editors (canEdit fixture) + the meeting-point form field.
         .andExpect(content().string(containsString("id=\"mission-step-list\"")))
-        .andExpect(content().string(containsString("name=\"objective\"")))
+        .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
         .andExpect(content().string(containsString("name=\"meetingPoint\"")));
   }
 
   /**
-   * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus a non-empty
-   * objective (Ziel) and meeting point (Treffpunkt), so the per-step checklist/editor and the new
-   * at-a-glance rows actually render (REQ-MISSION-009/-010). Editable (canEdit), so the editor +
-   * done-toggle show.
+   * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus one goal (Ziel) and
+   * a meeting point (Treffpunkt), so the per-step checklist/editor, the Ziele box/editor and the
+   * new at-a-glance rows actually render (REQ-MISSION-009/-012). Editable (canEdit), so the editors
+   * + done-toggle show.
    *
    * @param missionId the id to stamp on the mission
    * @param steps the Ablauf steps to render
-   * @return a mission fixture with steps + objective + meeting point
+   * @return a mission fixture with steps + one goal + meeting point
    */
   private MissionDto missionWithSteps(
       UUID missionId,
@@ -278,7 +280,13 @@ class MissionPageControllerMvcTest {
         0L,
         steps,
         0L,
-        "Janalite sammeln",
+        java.util.List.of(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.MissionObjectiveDto(
+                UUID.randomUUID(),
+                "Janalite sammeln",
+                de.greluc.krt.profit.basetool.frontend.model.dto.MissionObjectiveKind.PRIMARY,
+                0)),
+        0L,
         "ARC-L1");
   }
 
@@ -329,7 +337,8 @@ class MissionPageControllerMvcTest {
         0L,
         java.util.List.of(),
         0L,
-        null,
+        java.util.List.of(),
+        0L,
         null);
   }
 
@@ -407,7 +416,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -482,7 +492,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -575,7 +586,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -685,7 +697,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -756,7 +769,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
@@ -845,7 +859,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     MissionDto refreshed =
         new MissionDto(
@@ -884,7 +899,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
@@ -947,7 +963,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
@@ -1542,7 +1559,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -1668,7 +1686,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
@@ -1874,7 +1893,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2050,7 +2070,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2182,7 +2203,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2311,7 +2333,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2438,7 +2461,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2524,7 +2548,7 @@ class MissionPageControllerMvcTest {
 
     de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto gunner =
         new de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto(
-            jobTypeId, "Gunner", null, "CREW", null, true, false, 1L);
+            jobTypeId, "Gunner", null, "CREW", null, true, false, false, 1L);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto crew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
             crewId, participantId, "Crewman", java.util.Set.of(gunner));
@@ -2569,7 +2593,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     when(backendApiClient.get(
@@ -2660,7 +2685,8 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null);
 
     when(backendApiClient.get(
@@ -2716,7 +2742,8 @@ class MissionPageControllerMvcTest {
         0L,
         java.util.List.of(),
         0L,
-        null,
+        java.util.List.of(),
+        0L,
         null);
   }
 

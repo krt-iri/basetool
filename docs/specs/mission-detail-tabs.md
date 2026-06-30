@@ -1,5 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
-> **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md)
+> **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md),
+> [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md)
 
 # Mission detail page — tab layout (Variante B)
 
@@ -34,16 +35,19 @@ handlers (carried on `#overview-head-meta` + `#crew-count-meta`) so a peer's sch
 or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 
 1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
-   2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout). Two columns of
-   stacked panels: **left** = "Mission auf einen Blick" (the short objective `Ziel` + planned/actual
-   times, meeting time, `Treffpunkt`, operation, internal chip, party lead as a `.kv-list`, plus the
-   caller's personal participation chip), "Weitere Leads" (the leadership-position rows) and "Funk"
-   (the dynamic frequencies — the central, unit-less frequencies that carry a value, followed by the
-   per-unit frequencies of the units that have one, each unit row tagged with a muted "Einheit"
-   qualifier; central types without a value and units without a frequency are omitted and the whole
-   panel collapses when nothing is set, #816); **right** = a "Teilnehmer" attendance meter (registered count + a
-   checked-in progress bar derived from `checkedInParticipants/registeredParticipants`), the
-   read-only **Ablauf** checklist (REQ-MISSION-009) and a "Kalender" open card. The long **Markdown**
+   2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout; the column sides were
+   swapped and a "Ziele" box added by the REQ-MISSION-012 goals change). Two columns of stacked
+   panels: **left** = a "Ziele" box (the structured, classified mission goals grouped Hauptziel →
+   Nebenziel → Nicht-Ziel, REQ-MISSION-012), the read-only **Ablauf** checklist (REQ-MISSION-009), a
+   "Teilnehmer" attendance meter (registered count + a checked-in progress bar derived from
+   `checkedInParticipants/registeredParticipants`) and a "Kalender" open card; **right** = "Mission auf
+   einen Blick" (planned/actual times, meeting time, `Treffpunkt`, operation, internal chip, party lead
+   as a `.kv-list`, plus the caller's personal participation chip — the former single short objective
+   `Ziel` row was removed, replaced by the Ziele box), "Weitere Leads" (the leadership-position rows)
+   and "Funk" (the dynamic frequencies — the central, unit-less frequencies that carry a value,
+   followed by the per-unit frequencies of the units that have one, each unit row tagged with a muted
+   "Einheit" qualifier; central types without a value and units without a frequency are omitted and the
+   whole panel collapses when nothing is set, #816). The long **Markdown**
    description moves into a collapsible gray-card `<details class="more">` below the grid — the same
    `--color-bg-dark-gray` panel surface as the other overview cards (owner request 2026-06-27, #818
    follow-up), with a chevron that flips on open, replacing the former bare `hud-details` summary that
@@ -162,15 +166,18 @@ audited area: each mutation records a `MISSION_STEP_*` event (`ADDED` / `UPDATED
 `REORDERED` / `DONE_CHANGED`) carrying only ids/counts/the done flag — **never** the step title or
 meta (free text), per REQ-AUDIT-001. Migration: V192 (`mission_step` table + `mission.steps_version`).
 
-### REQ-MISSION-010 — Short objective (Ziel) and rally point (Treffpunkt)
+### REQ-MISSION-010 — Rally point (Treffpunkt)
 
-A mission carries two short free-text core-section fields: **`objective`** (Ziel, ≤250 chars — the
-headline goal shown first in "Mission auf einen Blick", distinct from the long Markdown description)
-and **`meetingPoint`** (Treffpunkt, ≤200 chars — the rally point). Both are edited in the Verwaltung
-details form and belong to the **core** section (guarded by `coreVersion`, persisted via the existing
-`/core` patch; no new lock). Both are non-PII planning data, forwarded to outsiders/guests like the
-units and frequencies (the long Markdown description remains the one free-text field hidden from
-outsiders). Migration: V192 (`mission.objective`, `mission.meeting_point`).
+A mission carries the short free-text core-section field **`meetingPoint`** (Treffpunkt, ≤200 chars —
+the rally point), edited in the Verwaltung details form and belonging to the **core** section (guarded
+by `coreVersion`, persisted via the existing `/core` patch; no new lock). It is non-PII planning data,
+forwarded to outsiders/guests like the units and frequencies (the long Markdown description remains the
+one free-text field hidden from outsiders). Migration: V192 (`mission.meeting_point`).
+
+> The former single short **`objective`** (Ziel, ≤250 chars, shown first in "Mission auf einen Blick")
+> was **superseded by the structured, classified mission goals** of REQ-MISSION-012. V199 drops
+> `mission.objective`, migrating each existing non-empty value into one Hauptziel so no planning data
+> is lost.
 
 ### REQ-MISSION-011 — Operation detail page adopts the Variante B tab shell
 
@@ -196,3 +203,71 @@ same `@markdown` (`MarkdownRenderer`) bean the page uses on save — so the prev
 the persisted render (raw HTML escaped, unsafe link protocols stripped). No backend, DTO, migration or
 permission change; every existing operation contract (save / delete AJAX twins, payout paid-out
 asymmetric authorization, missions pager) is preserved.
+
+### REQ-MISSION-012 — Mission goals (Ziele) as classified, ordered children
+
+A mission carries an ordered, reorderable list of **goals** (Ziele) that **replaces** the former
+single short `objective` (REQ-MISSION-010). Each goal is a persisted `MissionObjective` child of the
+mission (`title` required ≤250 chars, a `kind` classification, an explicit `orderIndex`). The
+classification is one of three kinds — **Hauptziel** (`PRIMARY`), **Nebenziel** (`SECONDARY`) and
+**Nicht-Ziel** (`NON_GOAL`, an explicit *non*-goal the operation deliberately does not pursue, stated
+to bound the scope). A goal has **no** `done` flag (it is a scope statement, not a progress item like
+an Ablauf step) and **no** free-text `meta`.
+
+Goals are authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-objective-list`:
+per-row title input + a kind `<select>`, up/down + drag reorder, delete, "Ziel hinzufügen", a live "N
+Ziele" counter) and shown **read-only** in the Übersicht as a dedicated **"Ziele" box** — the first
+panel of the left column — that **groups** the goals by kind: all Hauptziele first, then Nebenziele,
+then Nicht-Ziele, each group under its localized header, empty groups omitted, with an empty hint when
+the mission has no goals. Edit access is the mission's `canManageMission` gate (no new permission).
+Outsiders/guests see the Ziele box read-only — it is non-PII planning data, forwarded like the Ablauf
+steps, units and frequencies (ADR-0057).
+
+All four mutations (add / edit / remove / reorder) go through dedicated slim endpoints
+`…/missions/{id}/objectives[/{objId}][/reorder]/slim` (`@PreAuthorize canManageMission`), each echoing
+the mission's dedicated **`objectivesVersion`** section counter — a manual `@OptimisticLock(excluded =
+true) Long` in the `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion`/`stepsVersion`
+family — so a goal edit never 409s a concurrent core / schedule / flags / Ablauf edit, and a stale
+`objectivesVersion` surfaces as HTTP 409. Reorder reassigns `orderIndex` over the managed children by
+dirty-checking (no per-child save, no clearing bulk query mid-loop) and records **one** event.
+Mutations re-render the editor + overview-Ziele fragments in place via
+`krtFetch`/`krtRefreshMissionSection(['objectives','overview'])` (no reload) and propagate to peers
+over the presence socket (REQ-FE-010, ADR-0031). Missionen is an audited area: each mutation records a
+`MISSION_OBJECTIVE_*` event (`ADDED` / `UPDATED` / `REMOVED` / `REORDERED`) carrying only ids / counts /
+the **kind enum** — **never** the goal title (free text), per REQ-AUDIT-001. Migration: V199
+(`mission_objective` table + `mission.objectives_version`), which also drops the legacy
+`mission.objective` column after migrating each existing non-empty value into one `PRIMARY` goal.
+Decision: [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md).
+
+### REQ-MISSION-013 — Facts-bar leader (Einsatzleiter) and Treffpunkt
+
+**Leader.** The sticky facts-bar **"Leiter"** cell shows the mission's **Einsatzleiter** — the
+participant whose `plannedMissionJobType` is the single designated **mission-lead** job type
+(`JobType.isMissionLead`) — falling back to the mission **owner** when no Einsatzleiter is assigned,
+and to "none" otherwise (the owner is redacted for outsiders, so a guest with no Einsatzleiter sees
+"none"). This **replaces** the former behaviour where the facts bar mirrored the built-in
+**Partyleiter** (`partyLeadUser`); the Partyleiter remains a separate field shown in the "Mission auf
+einen Blick" panel and is no longer reflected in the facts bar. The leader name is computed
+server-side, rendered into the facts cell and exposed on the `#overview-head-meta` fragment as
+`data-leader`; the `krt:swapped` handler patches the cell (which lives outside the overview fragment)
+on every overview refresh. Because the leader derives from a participant's planned job type, the
+participant **edit** and **unregister** flows additionally refresh `['…','overview']` so the cell never
+goes stale (REQ-FE-010).
+
+**Einsatzleiter designation.** "Einsatzleiter" is **not** hard-coded: it is a single, admin-set
+designation on the job-type reference data. `JobType` carries a `isMissionLead` flag; **at most one**
+job type may hold it (DB-enforced by a partial unique index, V200) and only a `MISSION`-archetype
+**leadership** role may be designated. The flag is set on the job-type admin page (`/admin/mission-data`);
+re-designating moves it (the service clears the previous holder, and rejects a non-MISSION/non-leadership
+designation with 400).
+
+**Single Einsatzleiter per mission.** A mission may have only **one** Einsatzleiter: assigning the
+designated mission-lead `plannedMissionJobType` to a second participant is rejected with **HTTP 409**
+(`BusinessConflictException`) — the editor must first clear the existing one. JobType is not an audited
+area, so no audit event is added.
+
+**Treffpunkt.** The mission's `meetingPoint` (Treffpunkt) is surfaced in two more places: a facts-bar
+cell (map-pin icon) **after the planned-end time** on the detail page, and on the **home-page mission
+tile** (Einsatzkachel) **between the status and the TeamSpeak meeting time**. The latter requires
+`meetingPoint` on `MissionListDto` (backend + frontend, auto-mapped from the entity). Both render only
+when a meeting point is set. Migration: V200 (`job_type.is_mission_lead`).

@@ -237,6 +237,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             null,
+            null,
             0L);
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
@@ -295,6 +296,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             "PLANNED",
+            null,
             null,
             null,
             null,

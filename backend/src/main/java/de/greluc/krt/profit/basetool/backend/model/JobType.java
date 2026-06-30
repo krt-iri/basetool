@@ -70,4 +70,15 @@ public class JobType extends AbstractEntity<UUID> {
 
   @Column(nullable = false)
   private boolean isLeadershipRole = false;
+
+  /**
+   * Marks this job type as the single "Einsatzleiter" (mission lead) designation. At most one
+   * {@code job_type} row may carry this flag (DB-enforced by a partial unique index, V200), and
+   * only a {@link JobTypeArchetype#MISSION} {@link #isLeadershipRole leadership role} may be
+   * designated. The mission overview's facts-bar "Leiter" shows the participant whose {@code
+   * plannedMissionJobType} is the designated type (falling back to the mission owner); a mission
+   * may have only one such participant.
+   */
+  @Column(name = "is_mission_lead", nullable = false)
+  private boolean isMissionLead = false;
 }

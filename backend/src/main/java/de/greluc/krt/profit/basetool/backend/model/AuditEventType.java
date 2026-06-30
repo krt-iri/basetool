@@ -300,6 +300,18 @@ public enum AuditEventType {
   /** An Ablauf step's shared done flag was toggled on or off. */
   MISSION_STEP_DONE_CHANGED(AuditDomain.MISSION),
 
+  /** A goal (Ziel) was added to a mission. */
+  MISSION_OBJECTIVE_ADDED(AuditDomain.MISSION),
+
+  /** A mission goal's text or classification was edited. */
+  MISSION_OBJECTIVE_UPDATED(AuditDomain.MISSION),
+
+  /** A goal was removed from a mission. */
+  MISSION_OBJECTIVE_REMOVED(AuditDomain.MISSION),
+
+  /** A mission's goals were reordered (one event per reorder action). */
+  MISSION_OBJECTIVE_REORDERED(AuditDomain.MISSION),
+
   /** The mission audit log was exported as a PDF or JSON for a period. */
   MISSION_AUDIT_EXPORTED(AuditDomain.MISSION),
 

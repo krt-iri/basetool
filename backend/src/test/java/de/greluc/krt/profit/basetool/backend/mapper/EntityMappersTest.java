@@ -155,7 +155,8 @@ class EntityMappersTest {
     UUID parentId = UUID.randomUUID();
     UUID jtId = UUID.randomUUID();
     JobTypeDto dto =
-        new JobTypeDto(jtId, "Child", "desc", JobTypeArchetype.CREW, parentId, true, false, 1L);
+        new JobTypeDto(
+            jtId, "Child", "desc", JobTypeArchetype.CREW, parentId, true, false, false, 1L);
 
     // When
     JobType jt = EntityMappers.toEntity(dto);
@@ -175,7 +176,7 @@ class EntityMappersTest {
     // Given
     JobTypeDto dto =
         new JobTypeDto(
-            UUID.randomUUID(), "Solo", null, JobTypeArchetype.MISSION, null, true, true, 1L);
+            UUID.randomUUID(), "Solo", null, JobTypeArchetype.MISSION, null, true, true, false, 1L);
 
     // When
     JobType jt = EntityMappers.toEntity(dto);

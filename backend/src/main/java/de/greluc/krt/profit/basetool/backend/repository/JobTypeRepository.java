@@ -68,4 +68,16 @@ public interface JobTypeRepository extends JpaRepository<JobType, UUID> {
    * NameIgnoreCaseAndIdNot}.
    */
   boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
+
+  /**
+   * Returns the job type(s) currently designated as the "Einsatzleiter" (mission lead). A partial
+   * unique index (V200) keeps this to at most one row, but the query returns a list so the
+   * re-designation path can defensively clear any stragglers. JPQL is used (not a derived query) to
+   * reference the {@code isMissionLead} field unambiguously.
+   *
+   * @return the designated mission-lead job types (normally zero or one)
+   */
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT j FROM JobType j WHERE j.isMissionLead = true")
+  List<JobType> findAllMissionLead();
 }

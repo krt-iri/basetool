@@ -28,8 +28,27 @@ public record JobTypeForm(
     @Size(max = 1000) String description,
     @NotBlank(message = "{validation.archetype.required}") @Size(max = 50) String archetype,
     Boolean isLeadershipRole,
+    Boolean isMissionLead,
     Long version) {
+
+  /**
+   * Exposes the leadership flag under the {@code isLeadershipRole} bean property name so the
+   * Thymeleaf checkbox binding ({@code *{isLeadershipRole}}) resolves on this record.
+   *
+   * @return the leadership-role flag (may be {@code null} when the checkbox was unchecked)
+   */
   public Boolean getIsLeadershipRole() {
     return isLeadershipRole;
+  }
+
+  /**
+   * Exposes the Einsatzleiter (mission-lead) designation flag under the {@code isMissionLead} bean
+   * property name so the Thymeleaf checkbox binding ({@code *{isMissionLead}}) resolves on this
+   * record.
+   *
+   * @return the mission-lead designation flag (may be {@code null} when the checkbox was unchecked)
+   */
+  public Boolean getIsMissionLead() {
+    return isMissionLead;
   }
 }

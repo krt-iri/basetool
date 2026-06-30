@@ -198,7 +198,8 @@ class MissionControllerLifecycleTest {
         0L,
         List.of(), // steps
         0L, // stepsVersion
-        null, // objective
+        List.of(), // objectives
+        0L, // objectivesVersion
         null); // meetingPoint
   }
 
@@ -220,6 +221,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             1L);
@@ -272,6 +274,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             1L);
@@ -345,6 +348,7 @@ class MissionControllerLifecycleTest {
             false,
             null,
             null,
+            null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -395,6 +399,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             1L);
@@ -631,19 +636,11 @@ class MissionControllerLifecycleTest {
     UUID operationId = UUID.randomUUID();
     PatchMissionCoreRequest request =
         new PatchMissionCoreRequest(
-            "New name", "New description", "https://cal", "PLANNED", operationId, 5L, null, null);
+            "New name", "New description", "https://cal", "PLANNED", operationId, 5L, null);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
     when(missionService.updateCoreSection(
-            id,
-            "New name",
-            "New description",
-            "https://cal",
-            "PLANNED",
-            operationId,
-            null,
-            null,
-            5L))
+            id, "New name", "New description", "https://cal", "PLANNED", operationId, null, 5L))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
@@ -657,15 +654,7 @@ class MissionControllerLifecycleTest {
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .updateCoreSection(
-            id,
-            "New name",
-            "New description",
-            "https://cal",
-            "PLANNED",
-            operationId,
-            null,
-            null,
-            5L);
+            id, "New name", "New description", "https://cal", "PLANNED", operationId, null, 5L);
   }
 
   // ── PATCH /api/v1/missions/{id}/schedule ─────────────────────────────
@@ -784,7 +773,7 @@ class MissionControllerLifecycleTest {
     UUID parentId = UUID.randomUUID();
     CreateMissionRequest request =
         new CreateMissionRequest(
-            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null, null);
+            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null);
     Mission persistedParent = new Mission();
     MissionDto parentDto = fullMissionDto(parentId);
     when(missionService.addSubMission(parentId, request)).thenReturn(persistedParent);

@@ -94,7 +94,7 @@ class JobTypeTest {
   void testCreateJobType_Officer_Forbidden() throws Exception {
     JobTypeDto jobType =
         new JobTypeDto(
-            null, "Pilot", "Flies the ship", JobTypeArchetype.CREW, null, true, false, null);
+            null, "Pilot", "Flies the ship", JobTypeArchetype.CREW, null, true, false, false, null);
 
     mockMvc
         .perform(
@@ -118,7 +118,8 @@ class JobTypeTest {
   @Test
   void testCreateJobType_Guest_Forbidden() throws Exception {
     JobTypeDto jobType =
-        new JobTypeDto(null, "Hacker", null, JobTypeArchetype.MISSION, null, true, false, null);
+        new JobTypeDto(
+            null, "Hacker", null, JobTypeArchetype.MISSION, null, true, false, false, null);
 
     mockMvc
         .perform(
@@ -149,6 +150,7 @@ class JobTypeTest {
             JobTypeArchetype.CREW,
             parent.getId(),
             true,
+            false,
             false,
             null);
 
@@ -182,7 +184,7 @@ class JobTypeTest {
   void testCreateJobType_WithEmptyParent_ShouldWork() throws Exception {
     JobTypeDto jobType =
         new JobTypeDto(
-            null, "Test Empty Parent", null, JobTypeArchetype.CREW, null, true, false, null);
+            null, "Test Empty Parent", null, JobTypeArchetype.CREW, null, true, false, false, null);
 
     mockMvc
         .perform(
@@ -203,7 +205,8 @@ class JobTypeTest {
 
   @Test
   void testCreateJobType_WithoutArchetype_ShouldFail() throws Exception {
-    JobTypeDto jobType = new JobTypeDto(null, "Ghost Job", null, null, null, true, false, null);
+    JobTypeDto jobType =
+        new JobTypeDto(null, "Ghost Job", null, null, null, true, false, false, null);
     mockMvc
         .perform(
             post("/api/v1/job-types")

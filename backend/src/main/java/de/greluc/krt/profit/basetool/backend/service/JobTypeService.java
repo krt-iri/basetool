@@ -117,6 +117,7 @@ public class JobTypeService {
     } else {
       jobType.setParent(null);
     }
+    applyMissionLeadDesignation(jobType, jobType.isMissionLead());
     return jobTypeRepository.save(jobType);
   }
 
@@ -153,6 +154,7 @@ public class JobTypeService {
     jobType.setDescription(jobTypeDto.description());
     jobType.setArchetype(jobTypeDto.archetype());
     jobType.setLeadershipRole(jobTypeDto.isLeadershipRole());
+    applyMissionLeadDesignation(jobType, Boolean.TRUE.equals(jobTypeDto.isMissionLead()));
 
     if (jobTypeDto.parentId() != null) {
       JobType parent =
@@ -209,5 +211,36 @@ public class JobTypeService {
 
     jobTypeToActivate.setActive(true);
     jobTypeRepository.save(jobTypeToActivate);
+  }
+
+  /**
+   * Applies the single "Einsatzleiter" (mission lead) designation to a job type. When {@code wants}
+   * is {@code false} the flag is cleared. When {@code true} the job type must be a {@link
+   * JobTypeArchetype#MISSION} leadership role (else {@link IllegalArgumentException} → 400), and
+   * any other job type currently carrying the designation is cleared first so at most one type is
+   * the Einsatzleiter (the DB partial unique index is the backstop). Operates on managed entities
+   * and relies on the caller's enclosing transaction.
+   *
+   * @param jobType the job type being created/updated (its archetype + leadership flag are already
+   *     set)
+   * @param wants whether the caller wants this job type to be the Einsatzleiter designation
+   * @throws IllegalArgumentException when designating a non-MISSION or non-leadership job type
+   */
+  private void applyMissionLeadDesignation(@NotNull JobType jobType, boolean wants) {
+    if (!wants) {
+      jobType.setMissionLead(false);
+      return;
+    }
+    if (jobType.getArchetype() != JobTypeArchetype.MISSION || !jobType.isLeadershipRole()) {
+      throw new IllegalArgumentException(
+          "Only a MISSION leadership role can be designated as the Einsatzleiter (mission lead).");
+    }
+    for (JobType current : jobTypeRepository.findAllMissionLead()) {
+      if (jobType.getId() == null || !jobType.getId().equals(current.getId())) {
+        current.setMissionLead(false);
+        jobTypeRepository.save(current);
+      }
+    }
+    jobType.setMissionLead(true);
   }
 }

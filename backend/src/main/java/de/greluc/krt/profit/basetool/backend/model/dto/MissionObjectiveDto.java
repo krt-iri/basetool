@@ -17,25 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.model.dto;
+package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import java.time.Instant;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission List payload. */
-public record MissionListDto(
-    UUID id,
-    String name,
-    String description,
-    String calendarLink,
-    String status,
-    Instant meetingTime,
-    Instant plannedStartTime,
-    Instant actualStartTime,
-    Instant plannedEndTime,
-    Instant actualEndTime,
-    Boolean isInternal,
-    OperationDto operation,
-    SquadronReferenceDto owningSquadron,
-    String meetingPoint,
-    Long version) {}
+/**
+ * Outbound projection of a single mission goal (Ziel).
+ *
+ * @param id the goal id
+ * @param title the required goal text (the bullet label)
+ * @param kind the classification (primary / secondary / non-goal) driving the grouped display
+ * @param orderIndex the zero-based position within the mission's goal list
+ */
+public record MissionObjectiveDto(
+    UUID id, String title, MissionObjectiveKind kind, int orderIndex) {}

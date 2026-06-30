@@ -17,25 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.model.dto;
+package de.greluc.krt.profit.basetool.backend.repository;
 
-import java.time.Instant;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-/** Data transfer record carrying Mission List payload. */
-public record MissionListDto(
-    UUID id,
-    String name,
-    String description,
-    String calendarLink,
-    String status,
-    Instant meetingTime,
-    Instant plannedStartTime,
-    Instant actualStartTime,
-    Instant plannedEndTime,
-    Instant actualEndTime,
-    Boolean isInternal,
-    OperationDto operation,
-    SquadronReferenceDto owningSquadron,
-    String meetingPoint,
-    Long version) {}
+/** Spring Data repository for {@link MissionObjective} (mission goals / Ziele). */
+public interface MissionObjectiveRepository extends JpaRepository<MissionObjective, UUID> {
+  /** Returns the mission's goals in ascending order. */
+  List<MissionObjective> findByMissionIdOrderByOrderIndexAsc(UUID missionId);
+}

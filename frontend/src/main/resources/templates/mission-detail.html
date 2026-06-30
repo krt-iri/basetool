@@ -224,6 +224,18 @@
         .ablauf .step--now .step-meta { color: var(--color-primary); }
         .subhead { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: var(--fw-bold); color: var(--color-gray-2); margin: 12px 0 6px; padding-top: 10px; border-top: var(--border-hairline); }
 
+        /* Uebersicht — Ziele (mission goals) read-only grouped list (Hauptziel/Nebenziel/Nicht-Ziel) */
+        .ziele-group + .ziele-group { margin-top: 12px; }
+        .ziele-group-head { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: var(--fw-bold); color: var(--color-gray-2); margin: 0 0 6px; }
+        .ziele-group-head--primary { color: var(--color-primary); }
+        .ziele { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .ziele .ziel { display: flex; align-items: flex-start; gap: 8px; }
+        .ziele .ziel::before { content: ''; flex: none; width: 6px; height: 6px; margin-top: 7px; background: var(--color-gray-2); transform: rotate(45deg); }
+        .ziele .ziel--primary::before { background: var(--color-primary); }
+        .ziele .ziel--non_goal::before { opacity: 0.5; }
+        .ziele .ziel-title { font-size: 0.82rem; font-weight: var(--fw-bold); color: var(--color-white); }
+        .ziele .ziel--non_goal .ziel-title { color: var(--color-gray-2); text-decoration: line-through; }
+
         /* Verwaltung — Ablauf editor (drag-sortable step rows) */
         .ae-list { display: flex; flex-direction: column; gap: 8px; }
         .ae-row { display: flex; align-items: center; gap: 9px; padding: 8px 9px; background: var(--color-surface-input); border: var(--border-hairline); }
@@ -234,6 +246,7 @@
         @media (max-width: 620px) { .ae-fields { grid-template-columns: 1fr; } }
         .ae-fields input { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }
         .ae-fields input.ae-meta { color: var(--color-gray-1); font-weight: 400; }
+        .ae-fields select.ae-kind { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }
         .ae-move { display: flex; flex-direction: column; gap: 2px; flex: none; }
         .ae-move button { min-height: 18px; min-width: 26px; padding: 0; }
         .ae-row .btn-icon { flex: none; }
@@ -294,7 +307,8 @@
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-headset"/></svg><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.end}">Ende</span><span id="facts-planned-end" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-party-lead" class="fact-v" th:text="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))}">&mdash;</span></span>
+            <span class="fact" th:if="${!#strings.isEmpty(mission.meetingPoint)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-map-pin"/></svg><span class="fact-k" th:text="#{mission.meeting_point}">Treffpunkt</span><span class="fact-v" th:text="${mission.meetingPoint}">&mdash;</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-leader" class="fact-v" th:text="${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')}">&mdash;</span></span>
             <span class="fact" th:title="#{mission.participants.count.tooltip}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span class="fact-v"><span id="facts-registered" th:text="${mission.registeredParticipants}">0</span><span class="facts-checked-in-suffix"> &middot; <span id="facts-checked-in" th:text="${mission.checkedInParticipants}">0</span> <span th:text="#{mission.facts.checked_in_suffix}">eingecheckt</span></span></span></span>
         </div>
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
@@ -322,7 +336,7 @@
                            data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
                            data-planned-end-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'},
                            data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'},
-                           data-party-lead=${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))},
+                           data-leader=${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')},
                            data-owning-org-unit-shorthand=${mission.owningSquadron != null ? mission.owningSquadron.shorthand() : ''},
                            data-owning-org-unit-name=${mission.owningSquadron != null ? mission.owningSquadron.name() : ''}"></span>
             <!-- Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
@@ -333,16 +347,102 @@
                  ids are preserved so the schedule/party-lead/frequency live-update patches keep
                  working. -->
             <div class="pane-grid-2">
-                <!-- LEFT: at-a-glance facts, further leads, radio -->
+                <!-- LEFT: goals (Ziele), Ablauf checklist, attendance, calendar -->
+                <div class="pane-col">
+                    <!-- Ziele (REQ-MISSION-012): structured goals grouped Hauptziel -> Nebenziel ->
+                         Nicht-Ziel; read-only here, authored in the Verwaltung tab. Refreshed in place
+                         through the 'overview' section swap
+                         (krtRefreshMissionSection(['objectives','overview'])); no version attribute
+                         because the overview box carries no mutation (the editor lives in Verwaltung). -->
+                    <div class="kpanel">
+                        <div class="kpanel-head">
+                            <span th:text="#{mission.objective.section}">Ziele</span>
+                            <span class="ucount" th:if="${mission.objectives != null and !mission.objectives.isEmpty()}" th:text="${mission.objectives.size()}">0</span>
+                        </div>
+                        <!-- Three explicit groups with string-literal kind filters (a SpEL selection
+                             ?[...] re-roots on the element, so an outer loop variable is not reachable
+                             inside it — hence no th:each over the kinds). Empty groups are omitted. -->
+                        <div class="kpanel-body"
+                             th:with="primaryGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'PRIMARY'] : null},
+                                      secondaryGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'SECONDARY'] : null},
+                                      nonGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'NON_GOAL'] : null}">
+                            <div class="ziele-group" th:if="${primaryGoals != null and !primaryGoals.isEmpty()}">
+                                <div class="ziele-group-head ziele-group-head--primary" th:text="#{mission.objective.group.primary}">Hauptziele</div>
+                                <ul class="ziele">
+                                    <li th:each="o : ${primaryGoals}" class="ziel ziel--primary"><span class="ziel-title" th:text="${o.title}">Ziel</span></li>
+                                </ul>
+                            </div>
+                            <div class="ziele-group" th:if="${secondaryGoals != null and !secondaryGoals.isEmpty()}">
+                                <div class="ziele-group-head" th:text="#{mission.objective.group.secondary}">Nebenziele</div>
+                                <ul class="ziele">
+                                    <li th:each="o : ${secondaryGoals}" class="ziel ziel--secondary"><span class="ziel-title" th:text="${o.title}">Ziel</span></li>
+                                </ul>
+                            </div>
+                            <div class="ziele-group" th:if="${nonGoals != null and !nonGoals.isEmpty()}">
+                                <div class="ziele-group-head" th:text="#{mission.objective.group.non_goal}">Nicht-Ziele</div>
+                                <ul class="ziele">
+                                    <li th:each="o : ${nonGoals}" class="ziel ziel--non_goal"><span class="ziel-title" th:text="${o.title}">Ziel</span></li>
+                                </ul>
+                            </div>
+                            <p th:if="${mission.objectives == null or mission.objectives.isEmpty()}" class="desc" th:text="#{mission.objective.empty}">Noch keine Ziele.</p>
+                        </div>
+                    </div>
+                    <!-- Ablauf checklist (moved from the former right column) -->
+                    <div class="kpanel">
+                        <div class="kpanel-head">
+                            <span th:text="#{mission.step.section}">Ablauf</span>
+                            <span class="ucount" th:if="${mission.steps != null and !mission.steps.isEmpty()}" th:text="${mission.steps.size()}">0</span>
+                        </div>
+                        <div class="kpanel-body">
+                            <ol class="ablauf" th:if="${mission.steps != null and !mission.steps.isEmpty()}"
+                                th:attr="data-steps-version=${mission.stepsVersion}"
+                                th:with="firstOpen=${(mission.steps == null) ? null : mission.steps.^[!done]}">
+                                <li th:each="s : ${mission.steps}" class="step"
+                                    th:classappend="${s.done} ? 'step--done' : (${firstOpen != null and firstOpen.id == s.id} ? 'step--now' : '')">
+                                    <span class="step-num" th:if="${mission.canEdit}" role="button" tabindex="0"
+                                          data-trigger="mission-toggle-step"
+                                          th:data-step-id="${s.id}" th:data-done="${s.done}"
+                                          th:title="#{mission.step.toggle.tooltip}" th:aria-label="#{mission.step.toggle.tooltip}"></span>
+                                    <span class="step-num" th:unless="${mission.canEdit}" aria-hidden="true"></span>
+                                    <span class="step-body">
+                                        <span class="step-title" th:text="${s.title}">Schritt</span>
+                                        <span class="step-meta" th:if="${!#strings.isEmpty(s.meta)}" th:text="${s.meta}">Zeit / Ort</span>
+                                        <span class="step-meta" th:if="${#strings.isEmpty(s.meta) and firstOpen != null and firstOpen.id == s.id}" th:text="#{mission.step.now}">aktuelle Phase</span>
+                                    </span>
+                                </li>
+                            </ol>
+                            <p th:if="${mission.steps == null or mission.steps.isEmpty()}" class="desc" th:text="#{mission.step.empty}">Noch keine Schritte.</p>
+                        </div>
+                    </div>
+                    <!-- Teilnehmer attendance meter (moved from the former right column) -->
+                    <div class="kpanel">
+                        <div class="kpanel-head" th:text="#{mission.overview.attendance}">Teilnehmer</div>
+                        <div class="kpanel-body">
+                            <div class="attendance" th:with="reg=${mission.registeredParticipants != null ? mission.registeredParticipants : 0}, chk=${mission.checkedInParticipants != null ? mission.checkedInParticipants : 0}">
+                                <div class="attendance-count"><span class="att-n" th:text="${reg}">0</span><span class="att-label" th:text="#{mission.participants}">Teilnehmer</span></div>
+                                <div class="attendance-meter"><i th:style="'width:' + ${reg > 0 ? (chk * 100 / reg) : 0} + '%'"></i></div>
+                                <div class="attendance-sub">
+                                    <span th:text="${#messages.msg('mission.overview.attendance.checked_in', chk)}">davon 0 eingecheckt</span>
+                                    &middot;
+                                    <span th:text="${#messages.msg('mission.overview.attendance.pending', reg - chk)}">0 ausstehend</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Kalender (moved from the former right column) -->
+                    <div class="kpanel" th:if="${!#strings.isEmpty(mission.calendarLink)}">
+                        <div class="kpanel-head" th:text="#{mission.calendar_link}">Kalender</div>
+                        <div class="kpanel-body">
+                            <a th:href="${mission.calendarLink}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs2"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
+                        </div>
+                    </div>
+                </div>
+                <!-- RIGHT: at-a-glance facts, further leads, radio -->
                 <div class="pane-col">
                     <div class="kpanel">
                         <div class="kpanel-head" th:text="#{mission.overview.at_a_glance}">Mission auf einen Blick</div>
                         <div class="kpanel-body">
                             <dl class="kv-list">
-                                <th:block th:if="${!#strings.isEmpty(mission.objective)}">
-                                    <dt th:text="#{mission.objective}">Ziel</dt>
-                                    <dd th:text="${mission.objective}">&mdash;</dd>
-                                </th:block>
                                 <dt th:text="#{mission.planned_start}">Geplanter Start</dt>
                                 <dd><span class="krt-local-dt" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></dd>
                                 <dt th:text="#{mission.planned_end}">Geplantes Ende</dt>
@@ -425,55 +525,6 @@
                         </div>
                     </div>
                     </th:block>
-                </div>
-                <!-- RIGHT: attendance, Ablauf checklist, calendar -->
-                <div class="pane-col">
-                    <div class="kpanel">
-                        <div class="kpanel-head" th:text="#{mission.overview.attendance}">Teilnehmer</div>
-                        <div class="kpanel-body">
-                            <div class="attendance" th:with="reg=${mission.registeredParticipants != null ? mission.registeredParticipants : 0}, chk=${mission.checkedInParticipants != null ? mission.checkedInParticipants : 0}">
-                                <div class="attendance-count"><span class="att-n" th:text="${reg}">0</span><span class="att-label" th:text="#{mission.participants}">Teilnehmer</span></div>
-                                <div class="attendance-meter"><i th:style="'width:' + ${reg > 0 ? (chk * 100 / reg) : 0} + '%'"></i></div>
-                                <div class="attendance-sub">
-                                    <span th:text="${#messages.msg('mission.overview.attendance.checked_in', chk)}">davon 0 eingecheckt</span>
-                                    &middot;
-                                    <span th:text="${#messages.msg('mission.overview.attendance.pending', reg - chk)}">0 ausstehend</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="kpanel">
-                        <div class="kpanel-head">
-                            <span th:text="#{mission.step.section}">Ablauf</span>
-                            <span class="ucount" th:if="${mission.steps != null and !mission.steps.isEmpty()}" th:text="${mission.steps.size()}">0</span>
-                        </div>
-                        <div class="kpanel-body">
-                            <ol class="ablauf" th:if="${mission.steps != null and !mission.steps.isEmpty()}"
-                                th:attr="data-steps-version=${mission.stepsVersion}"
-                                th:with="firstOpen=${(mission.steps == null) ? null : mission.steps.^[!done]}">
-                                <li th:each="s : ${mission.steps}" class="step"
-                                    th:classappend="${s.done} ? 'step--done' : (${firstOpen != null and firstOpen.id == s.id} ? 'step--now' : '')">
-                                    <span class="step-num" th:if="${mission.canEdit}" role="button" tabindex="0"
-                                          data-trigger="mission-toggle-step"
-                                          th:data-step-id="${s.id}" th:data-done="${s.done}"
-                                          th:title="#{mission.step.toggle.tooltip}" th:aria-label="#{mission.step.toggle.tooltip}"></span>
-                                    <span class="step-num" th:unless="${mission.canEdit}" aria-hidden="true"></span>
-                                    <span class="step-body">
-                                        <span class="step-title" th:text="${s.title}">Schritt</span>
-                                        <span class="step-meta" th:if="${!#strings.isEmpty(s.meta)}" th:text="${s.meta}">Zeit / Ort</span>
-                                        <span class="step-meta" th:if="${#strings.isEmpty(s.meta) and firstOpen != null and firstOpen.id == s.id}" th:text="#{mission.step.now}">aktuelle Phase</span>
-                                    </span>
-                                </li>
-                            </ol>
-                            <p th:if="${mission.steps == null or mission.steps.isEmpty()}" class="desc" th:text="#{mission.step.empty}">Noch keine Schritte.</p>
-                        </div>
-                    </div>
-                    <div class="kpanel" th:if="${!#strings.isEmpty(mission.calendarLink)}">
-                        <div class="kpanel-head" th:text="#{mission.calendar_link}">Kalender</div>
-                        <div class="kpanel-body">
-                            <a th:href="${mission.calendarLink}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs2"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
-                        </div>
-                    </div>
                 </div>
             </div>
             <!-- Detaillierte Beschreibung (Markdown) — collapsible gray card (.more) matching the
@@ -830,17 +881,6 @@
                 <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
             </div>
 
-            <div class="form-group">
-                <label th:text="#{mission.objective}">Ziel</label>
-                <textarea name="objective" id="mission-objective" rows="2" maxlength="250"
-                          th:text="*{objective}" th:disabled="${!isNew and !mission.canEdit}"></textarea>
-                <small class="form-hint">
-                    <span th:text="#{mission.objective.hint}">Kurzes Einsatzziel.</span>
-                    <span class="charhint"><span id="mission-objective-count" th:text="${missionForm.objective != null ? missionForm.objective.length() : 0}">0</span> / 250</span>
-                </small>
-                <div class="field-error" data-error-for="objective" th:text="${#fields.hasErrors('objective') ? #fields.errors('objective')[0] : ''}"></div>
-            </div>
-
             <div class="form-group" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')">
                 <label th:text="#{mission.description}">Description</label>
                 <textarea name="description" rows="5" th:text="*{description}"
@@ -1064,6 +1104,51 @@
                             </div>
                             <button type="button" class="btn btn-ghost btn-xs2" id="mission-step-add" data-trigger="mission-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
                             <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
+                        </div>
+                    </div>
+                    </th:block></div>
+
+                    <!-- Ziele editor (REQ-MISSION-012): classified, sortable goals. In-place AJAX swap
+                         container — a goal add/edit/remove/reorder re-renders this objectivesEditor
+                         fragment via ?fragment=objectives-editor AND the overview Ziele box via
+                         ?fragment=overview. Handlers are delegated on document so they survive swaps.
+                         The dedicated mission.objectivesVersion section counter keeps the goals lock
+                         narrow (a goal edit never 409s a concurrent core/schedule/flags/Ablauf edit). -->
+                    <div id="mission-objectives-results"><th:block th:fragment="objectivesEditor">
+                    <div class="kpanel" th:if="${!isNew and mission.canEdit}"
+                         th:attr="data-objectives-version=${mission.objectivesVersion}"
+                         th:with="nGoals=${mission.objectives != null ? mission.objectives.size() : 0}">
+                        <div class="kpanel-head">
+                            <span th:text="#{mission.objective.editor.title}">Ziele &mdash; Ziele setzen</span>
+                            <span class="ph-extra" th:text="${nGoals == 1 ? #messages.msg('mission.objective.count.one', nGoals) : #messages.msg('mission.objective.count.other', nGoals)}">0 Ziele</span>
+                        </div>
+                        <div class="kpanel-body">
+                            <div class="ae-list" id="mission-objective-list">
+                                <div th:each="o, st : ${mission.objectives}" class="ae-row" draggable="true"
+                                     th:attr="data-objective-id=${o.id}">
+                                    <span class="ae-grip" th:title="#{mission.objective.drag}" aria-hidden="true">&#x283F;</span>
+                                    <span class="ae-num" th:text="${st.count}">1</span>
+                                    <span class="ae-fields">
+                                        <input class="ae-title" type="text" maxlength="250" th:value="${o.title}"
+                                               th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
+                                        <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
+                                            <option value="PRIMARY" th:text="#{mission.objective.kind.primary}" th:selected="${o.kind != null and o.kind.name() == 'PRIMARY'}">Hauptziel</option>
+                                            <option value="SECONDARY" th:text="#{mission.objective.kind.secondary}" th:selected="${o.kind != null and o.kind.name() == 'SECONDARY'}">Nebenziel</option>
+                                            <option value="NON_GOAL" th:text="#{mission.objective.kind.non_goal}" th:selected="${o.kind != null and o.kind.name() == 'NON_GOAL'}">Nicht-Ziel</option>
+                                        </select>
+                                    </span>
+                                    <span class="ae-move">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-objective-up"
+                                                th:title="#{mission.objective.move_up}" th:aria-label="#{mission.objective.move_up}">&#x25B2;</button>
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-objective-down"
+                                                th:title="#{mission.objective.move_down}" th:aria-label="#{mission.objective.move_down}">&#x25BC;</button>
+                                    </span>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="mission-objective-delete"
+                                            th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-ghost btn-xs2" id="mission-objective-add" data-trigger="mission-objective-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                            <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.objective.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + Klassifizierung frei editierbar.</p>
                         </div>
                     </div>
                     </th:block></div>
@@ -1718,6 +1803,7 @@
         'mission.save.section.schedule': /*[[#{mission.save.section.schedule}]]*/ 'Schedule',
         'mission.save.section.flags': /*[[#{mission.save.section.flags}]]*/ 'Flags',
         'mission.save.section.steps': /*[[#{mission.save.section.steps}]]*/ 'Schedule steps',
+        'mission.save.section.objectives': /*[[#{mission.save.section.objectives}]]*/ 'Goals',
         'mission.conflict.toast.title': /*[[#{mission.conflict.toast.title}]]*/ 'Conflict',
         'mission.conflict.toast.detail': /*[[#{mission.conflict.toast.detail}]]*/ 'The data was changed in the meantime.',
         'mission.conflict.section.participant': /*[[#{mission.conflict.section.participant}]]*/ 'Participant',
@@ -1732,6 +1818,7 @@
         'mission.conflict.section.schedule': /*[[#{mission.conflict.section.schedule}]]*/ 'Schedule',
         'mission.conflict.section.flags': /*[[#{mission.conflict.section.flags}]]*/ 'Flags',
         'mission.conflict.section.steps': /*[[#{mission.conflict.section.steps}]]*/ 'Schedule steps',
+        'mission.conflict.section.objectives': /*[[#{mission.conflict.section.objectives}]]*/ 'Goals',
         'mission.section.refresh.error': /*[[#{mission.section.refresh.error}]]*/ 'The section could not be refreshed. Please reload the page.',
         'mission.conflict.action.reload': /*[[#{mission.conflict.action.reload}]]*/ 'Load current values',
         'mission.conflict.action.reload.question': /*[[#{mission.conflict.action.reload.question}]]*/ 'Load current values?',
@@ -1764,6 +1851,12 @@
     window.MISSION_STEP_I18N = {
         'default_title': /*[[#{mission.step.default_title}]]*/ 'New step',
         'delete_confirm': /*[[#{mission.step.delete.confirm}]]*/ 'This schedule step will be deleted.'
+    };
+    // Ziele (goals) — default title used when a new goal is appended (the backend's @NotBlank title
+    // forbids an empty goal), the default classification, and the delete-confirm consequence text.
+    window.MISSION_OBJECTIVE_I18N = {
+        'default_title': /*[[#{mission.objective.default_title}]]*/ 'New goal',
+        'delete_confirm': /*[[#{mission.objective.delete.confirm}]]*/ 'This goal will be deleted.'
     };
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
@@ -1808,7 +1901,8 @@
             finance: { container: '#finance-results', fragmentValue: 'finance' },
             mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
             overview: { container: '#overview-results', fragmentValue: 'overview' },
-            steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' }
+            steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
+            objectives: { container: '#mission-objectives-results', fragmentValue: 'objectives-editor' }
         };
         // Live multi-user sync (REQ-FE-010): tell other users viewing this mission that these
         // sections just changed, so their views re-fetch the same fragments in place. Suppressed
@@ -1936,10 +2030,12 @@
         patchFact('facts-planned-start', 'data-planned-start-utc');
         patchFact('facts-planned-end', 'data-planned-end-utc');
         patchFact('facts-ts', 'data-meeting-utc');
-        // The "Leiter" fact (party lead) mirrors the overview party-lead row — patch it from the
-        // fresh name the fragment exposes so a peer's party-lead change shows in the header too.
-        const lead = meta.getAttribute('data-party-lead');
-        const leadEl = document.getElementById('facts-party-lead');
+        // The "Leiter" fact shows the Einsatzleiter (the participant designated as mission lead),
+        // else the mission owner — computed server-side and exposed on the fragment as data-leader, so
+        // a peer's participant / planned-job-type change updates the header too (it lives outside the
+        // overview fragment).
+        const lead = meta.getAttribute('data-leader');
+        const leadEl = document.getElementById('facts-leader');
         if (leadEl && lead != null) {
             leadEl.textContent = lead;
         }
@@ -2250,12 +2346,128 @@
             dragRow = null;
         });
 
-        // Ziel (objective) live character counter in the Verwaltung details form.
-        document.addEventListener('input', function (e) {
-            if (e.target && e.target.id === 'mission-objective') {
-                const c = document.getElementById('mission-objective-count');
-                if (c) { c.textContent = e.target.value.length; }
+    })();
+
+    // ---- Ziele (mission goals): Verwaltung drag-editor (classified, sortable) ---------------------
+    // Mirrors the Ablauf editor: every mutation goes through krtMissionWrite (CSRF + retry-once-on-403
+    // + the shared 409 reload-confirm) against the /objectives/* AJAX proxies, then re-renders the
+    // editor + overview Ziele fragments in place via krtRefreshMissionSection (which also broadcasts to
+    // peers, REQ-FE-010). The dedicated mission.objectivesVersion section counter is read from the
+    // nearest [data-objectives-version] holder and echoed on every write. Handlers are delegated on
+    // document so they survive the innerHTML swaps. No window.location.reload() on success. Goals carry
+    // no done-toggle (a goal is a scope statement, not a progress item).
+    (function () {
+        function mid() { return window.missionId || (typeof missionId !== 'undefined' ? missionId : null); }
+        function versionFrom(el) {
+            const holder = el && el.closest('[data-objectives-version]');
+            return holder ? Number(holder.getAttribute('data-objectives-version')) : null;
+        }
+        function refreshObjectives() {
+            if (window.krtRefreshMissionSection) {
+                return window.krtRefreshMissionSection(['objectives', 'overview']);
             }
+            return Promise.resolve();
+        }
+        function writeObjective(opts) {
+            return window.krtMissionWrite(Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts));
+        }
+        function listOrder() {
+            return Array.prototype.map.call(
+                document.querySelectorAll('#mission-objective-list .ae-row'),
+                function (r) { return r.getAttribute('data-objective-id'); });
+        }
+
+        function addObjective(btn) {
+            const v = versionFrom(btn);
+            if (v === null || Number.isNaN(v)) { return; }
+            const title = (window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.default_title) || 'New goal';
+            writeObjective({ method: 'POST', url: '/missions/' + mid() + '/objectives/ajax', payload: { title: title, kind: 'PRIMARY', objectivesVersion: v } });
+        }
+        function editObjective(row) {
+            const oid = row.getAttribute('data-objective-id');
+            const v = versionFrom(row);
+            const titleInput = row.querySelector('.ae-title');
+            const kindSelect = row.querySelector('.ae-kind');
+            if (!oid || v === null || Number.isNaN(v) || !titleInput || !kindSelect) { return; }
+            const title = titleInput.value.trim();
+            // The backend requires a non-blank title; an emptied title is a no-op (restored on the
+            // next swap) rather than a rejected write.
+            if (!title) { return; }
+            writeObjective({ method: 'PUT', url: '/missions/' + mid() + '/objectives/' + oid + '/ajax', payload: { title: title, kind: kindSelect.value, objectivesVersion: v } });
+        }
+        async function deleteObjective(btn) {
+            const row = btn.closest('.ae-row'); if (!row) { return; }
+            const oid = row.getAttribute('data-objective-id');
+            const v = versionFrom(row);
+            if (!oid || v === null || Number.isNaN(v)) { return; }
+            const msg = (window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm) || 'Delete this goal?';
+            const ok = await window.showKrtConfirm(msg, msg,
+                (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) || 'OK',
+                (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) || 'Cancel');
+            if (!ok) { return; }
+            writeObjective({ method: 'DELETE', url: '/missions/' + mid() + '/objectives/' + oid + '/ajax?objectivesVersion=' + v });
+        }
+        function reorder(order, v) {
+            if (v === null || Number.isNaN(v)) { return; }
+            writeObjective({ method: 'PUT', url: '/missions/' + mid() + '/objectives/reorder/ajax', payload: { objectiveIds: order, objectivesVersion: v } });
+        }
+        function moveObjective(btn, dir) {
+            const row = btn.closest('.ae-row'); if (!row) { return; }
+            const v = versionFrom(row);
+            const order = listOrder();
+            const i = order.indexOf(row.getAttribute('data-objective-id'));
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= order.length) { return; }
+            const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+            reorder(order, v);
+        }
+
+        document.addEventListener('click', function (e) {
+            const t = e.target.closest('[data-trigger]'); if (!t) { return; }
+            const trig = t.getAttribute('data-trigger');
+            if (trig === 'mission-objective-add') { e.preventDefault(); addObjective(t); }
+            else if (trig === 'mission-objective-delete') { e.preventDefault(); deleteObjective(t); }
+            else if (trig === 'mission-objective-up') { e.preventDefault(); moveObjective(t, -1); }
+            else if (trig === 'mission-objective-down') { e.preventDefault(); moveObjective(t, 1); }
+        });
+        document.addEventListener('change', function (e) {
+            const inp = e.target.closest('#mission-objective-list .ae-title, #mission-objective-list .ae-kind');
+            if (!inp) { return; }
+            const row = inp.closest('.ae-row'); if (row) { editObjective(row); }
+        });
+
+        // Drag reorder — scoped to #mission-objective-list so the crew board's / Ablauf's own drag is
+        // untouched (we only preventDefault once a drag that started in the goal list is in flight).
+        let dragRow = null;
+        document.addEventListener('dragstart', function (e) {
+            const row = e.target.closest('#mission-objective-list .ae-row'); if (!row) { return; }
+            dragRow = row; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; }
+        });
+        document.addEventListener('dragover', function (e) {
+            const list = e.target.closest('#mission-objective-list'); if (!list || !dragRow) { return; }
+            e.preventDefault();
+            const row = e.target.closest('.ae-row');
+            list.querySelectorAll('.ae-row').forEach(function (r) { r.classList.remove('drag-over'); });
+            if (row && row !== dragRow) { row.classList.add('drag-over'); }
+        });
+        document.addEventListener('drop', function (e) {
+            const list = e.target.closest('#mission-objective-list'); if (!list || !dragRow) { return; }
+            e.preventDefault();
+            const target = e.target.closest('.ae-row');
+            list.querySelectorAll('.ae-row').forEach(function (r) { r.classList.remove('drag-over'); });
+            if (target && target !== dragRow) {
+                const v = versionFrom(dragRow);
+                const order = listOrder();
+                const from = order.indexOf(dragRow.getAttribute('data-objective-id'));
+                order.splice(order.indexOf(target.getAttribute('data-objective-id')), 0, order.splice(from, 1)[0]);
+                reorder(order, v);
+            }
+            dragRow = null;
+        });
+        document.addEventListener('dragend', function () {
+            document.querySelectorAll('#mission-objective-list .ae-row.drag-over')
+                .forEach(function (r) { r.classList.remove('drag-over'); });
+            dragRow = null;
         });
     })();
 </script>
@@ -2860,7 +3072,10 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection(['crew', 'finance']);
+                        // 'overview' too: editing a participant's planned mission job type can change
+                        // who the Einsatzleiter is, and the facts-bar "Leiter" is patched off the
+                        // overview fragment's data-leader (REQ-MISSION-013).
+                        window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                     }
                 });
             }
@@ -2907,7 +3122,9 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection(['crew', 'finance']);
+                        // 'overview' too: unregistering a participant may remove the Einsatzleiter, so
+                        // the facts-bar "Leiter" (patched off the overview's data-leader) must refresh.
+                        window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                     }
                 });
             }
@@ -3198,10 +3415,8 @@
                     : (dto.partyLeadGuestName || noneLabel);
                 if (display) display.textContent = resolvedName;
                 if (overview) overview.textContent = resolvedName;
-                // Keep the sticky facts-bar "Leiter" fact in sync — it lives outside the overview
-                // fragment, so the local patch must touch it directly (peers get it via the swap).
-                const factLead = document.getElementById('facts-party-lead');
-                if (factLead) factLead.textContent = resolvedName;
+                // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not
+                // the party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
                 if (versionInput && dto.partyLeadVersion != null) {
                     versionInput.value = dto.partyLeadVersion;
                 }

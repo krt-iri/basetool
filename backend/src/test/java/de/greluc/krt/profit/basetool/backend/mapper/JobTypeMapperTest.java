@@ -70,7 +70,15 @@ class JobTypeMapperTest {
     UUID parentId = UUID.randomUUID();
     JobTypeDto dto =
         new JobTypeDto(
-            UUID.randomUUID(), "Child", null, JobTypeArchetype.CREW, parentId, true, false, null);
+            UUID.randomUUID(),
+            "Child",
+            null,
+            JobTypeArchetype.CREW,
+            parentId,
+            true,
+            false,
+            false,
+            null);
 
     JobType entity = mapper.toEntity(dto);
     assertNotNull(entity);
@@ -86,7 +94,7 @@ class JobTypeMapperTest {
   void toEntity_withNullParentId_shouldSetParentNull() {
     JobTypeDto dto =
         new JobTypeDto(
-            UUID.randomUUID(), "Solo", null, JobTypeArchetype.CREW, null, true, false, null);
+            UUID.randomUUID(), "Solo", null, JobTypeArchetype.CREW, null, true, false, false, null);
     JobType entity = mapper.toEntity(dto);
     assertNull(entity.getParent());
   }

@@ -143,7 +143,8 @@ class MissionTimeTest {
             0L,
             Collections.emptyList(), // steps
             0L, // stepsVersion
-            null, // objective
+            Collections.emptyList(), // objectives
+            0L, // objectivesVersion
             null); // meetingPoint
 
     mockMvc
@@ -202,7 +203,8 @@ class MissionTimeTest {
             0L,
             Collections.emptyList(), // steps
             0L, // stepsVersion
-            null, // objective
+            Collections.emptyList(), // objectives
+            0L, // objectivesVersion
             null); // meetingPoint
 
     mockMvc
@@ -331,7 +333,8 @@ class MissionTimeTest {
             0L,
             Collections.emptyList(), // steps
             0L, // stepsVersion
-            null, // objective
+            Collections.emptyList(), // objectives
+            0L, // objectivesVersion
             null); // meetingPoint
 
     mockMvc

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionObjectiveDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
@@ -133,6 +135,9 @@ public abstract class MissionMapper {
 
   /** Maps a {@link MissionStep} (Ablauf step) entity to its outbound DTO. */
   public abstract MissionStepDto toDto(MissionStep missionStep);
+
+  /** Maps a {@link MissionObjective} (mission goal / Ziel) entity to its outbound DTO. */
+  public abstract MissionObjectiveDto toDto(MissionObjective missionObjective);
 
   /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
   @Mapping(target = "parentId", source = "parent.id")

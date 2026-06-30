@@ -87,6 +87,7 @@ public final class EntityMappers {
         parentId,
         jt.isActive(),
         jt.isLeadershipRole(),
+        jt.isMissionLead(),
         jt.getVersion());
   }
 

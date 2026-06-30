@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionObjectiveDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
@@ -378,12 +379,13 @@ public class MissionController {
         dto.partyLeadUser(),
         dto.partyLeadGuestName(),
         dto.partyLeadVersion(),
-        // Ablauf steps, objective (Ziel) and meeting point (Treffpunkt) are non-PII mission
+        // Ablauf steps, goals (Ziele) and meeting point (Treffpunkt) are non-PII mission
         // planning data — forwarded like the assigned units and frequencies (the long Markdown
         // description stays the one free-text field hidden from outsiders, handled below).
         dto.steps(),
         dto.stepsVersion(),
-        dto.objective(),
+        dto.objectives(),
+        dto.objectivesVersion(),
         dto.meetingPoint());
   }
 
@@ -466,7 +468,8 @@ public class MissionController {
         peer.partyLeadVersion(),
         peer.steps(), // Ablauf kept (planning data, like units/frequencies)
         peer.stepsVersion(),
-        peer.objective(), // short objective kept; long description is the hidden free-text field
+        peer.objectives(), // goals kept; long description is the hidden free-text field
+        peer.objectivesVersion(),
         peer.meetingPoint());
   }
 
@@ -653,7 +656,6 @@ public class MissionController {
             request.calendarLink(),
             request.status(),
             request.operationId(),
-            request.objective(),
             request.meetingPoint(),
             request.version()));
   }
@@ -1914,6 +1916,113 @@ public class MissionController {
         .sorted(
             java.util.Comparator.comparingInt(
                 de.greluc.krt.profit.basetool.backend.model.MissionStep::getOrderIndex))
+        .map(missionMapper::toDto)
+        .toList();
+  }
+
+  // --- Mission goals (Ziele) ---
+
+  /**
+   * Appends a goal (Ziel) and returns the mission's full goal list in order (slim). Guarded by the
+   * mission's {@code objectivesVersion} section counter, so editing the goals never collides with a
+   * concurrent core / schedule / flags / Ablauf edit.
+   *
+   * @param id mission id
+   * @param request the goal payload (title, kind, expected objectivesVersion)
+   * @return the mission's ordered goals after the add
+   */
+  @PostMapping("/{id}/objectives/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Add a goal (Ziel) to a mission (slim response)",
+      description =
+          "Adds a classified goal and returns the mission's ordered goal list as slim DTOs.")
+  public List<MissionObjectiveDto> addObjectiveSlim(
+      @PathVariable @NotNull UUID id,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionObjectiveRequest
+              request) {
+    var mission =
+        missionService.addObjective(
+            id, request.title(), request.kind(), request.objectivesVersion());
+    return toObjectiveDtos(mission);
+  }
+
+  /**
+   * Edits a goal's text / classification and returns the mission's ordered goal list.
+   *
+   * @param id mission id
+   * @param objectiveId goal id
+   * @param request the goal payload (title, kind, expected objectivesVersion)
+   * @return the mission's ordered goals after the edit
+   */
+  @PutMapping("/{id}/objectives/{objectiveId}/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Update a mission goal (slim response)",
+      description = "Edits a goal's text / classification and returns the ordered goal list.")
+  public List<MissionObjectiveDto> updateObjectiveSlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID objectiveId,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionObjectiveRequest
+              request) {
+    var mission =
+        missionService.updateObjective(
+            id, objectiveId, request.title(), request.kind(), request.objectivesVersion());
+    return toObjectiveDtos(mission);
+  }
+
+  /**
+   * Removes a goal and returns the mission's remaining ordered goal list.
+   *
+   * @param id mission id
+   * @param objectiveId goal id
+   * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
+   * @return the mission's ordered goals after the removal
+   */
+  @DeleteMapping("/{id}/objectives/{objectiveId}/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Delete a mission goal (slim response)",
+      description = "Removes a goal, re-packs the order, and returns the ordered goal list.")
+  public List<MissionObjectiveDto> deleteObjectiveSlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID objectiveId,
+      @RequestParam @NotNull Long objectivesVersion) {
+    var mission = missionService.deleteObjective(id, objectiveId, objectivesVersion);
+    return toObjectiveDtos(mission);
+  }
+
+  /**
+   * Reorders the mission's goals and returns the new ordered goal list.
+   *
+   * @param id mission id
+   * @param request the desired goal-id order + expected objectivesVersion
+   * @return the mission's ordered goals after the reorder
+   */
+  @PutMapping("/{id}/objectives/reorder/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Reorder a mission's goals (slim response)",
+      description = "Reorders the goal list and returns the ordered goal list.")
+  public List<MissionObjectiveDto> reorderObjectivesSlim(
+      @PathVariable @NotNull UUID id,
+      @jakarta.validation.Valid @RequestBody @NotNull
+          de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionObjectivesRequest
+              request) {
+    var mission =
+        missionService.reorderObjectives(id, request.objectiveIds(), request.objectivesVersion());
+    return toObjectiveDtos(mission);
+  }
+
+  /** Projects a mission's goals into an ordered list of slim DTOs (by {@code orderIndex}). */
+  private List<MissionObjectiveDto> toObjectiveDtos(
+      de.greluc.krt.profit.basetool.backend.model.Mission m) {
+    return m.getObjectives().stream()
+        .sorted(
+            java.util.Comparator.comparingInt(
+                de.greluc.krt.profit.basetool.backend.model.MissionObjective::getOrderIndex))
         .map(missionMapper::toDto)
         .toList();
   }

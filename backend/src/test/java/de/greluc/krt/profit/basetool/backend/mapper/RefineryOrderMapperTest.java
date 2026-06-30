@@ -255,7 +255,8 @@ class RefineryOrderMapperTest {
             0L, // partyLeadVersion
             null, // steps
             null, // stepsVersion
-            null, // objective
+            null, // objectives
+            null, // objectivesVersion
             null // meetingPoint
             );
 

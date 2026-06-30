@@ -17,21 +17,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
+import jakarta.validation.constraints.Size;
 
-/** Data transfer record carrying Job Type payload. */
-public record JobTypeDto(
-    UUID id,
-    @NotBlank String name,
-    String description,
-    @NotNull JobTypeArchetype archetype,
-    UUID parentId,
-    Boolean active,
-    Boolean isLeadershipRole,
-    Boolean isMissionLead,
-    Long version) {}
+/**
+ * Request DTO for editing a mission goal's text and/or classification. {@code objectivesVersion} is
+ * the mission's expected {@code objectives_version} section counter — a stale value yields HTTP
+ * 409.
+ *
+ * @param title the required goal text (≤250 chars)
+ * @param kind the classification (primary / secondary / non-goal)
+ * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
+ */
+public record UpdateMissionObjectiveRequest(
+    @NotBlank @Size(max = 250) String title,
+    @NotNull MissionObjectiveKind kind,
+    @NotNull Long objectivesVersion) {}

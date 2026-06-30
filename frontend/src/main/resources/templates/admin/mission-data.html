@@ -150,7 +150,10 @@
                             <span th:if="${!job.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span>
                         </td>
                         <td th:text="${job.archetype}">Archetype</td>
-                        <td th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</td>
+                        <td>
+                            <span th:text="${job.isLeadershipRole ? 'Ja' : 'Nein'}">Leadership</span>
+                            <span th:if="${job.isMissionLead}" class="chip chip--primary chip-xs" th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
+                        </td>
                         <td th:text="${job.description}">Desc</td>
                         <td class="flex-gap-xs">
                             <button class="btn btn-ghost btn-icon edit-jobtype-btn"
@@ -159,6 +162,7 @@
                                     th:data-name="${job.name}"
                                     th:data-archetype="${job.archetype}"
                                     th:data-leadership="${job.isLeadershipRole}"
+                                    th:data-mission-lead="${job.isMissionLead}"
                                     th:data-desc="${job.description}"
                                     th:data-version="${job.version}"
                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
@@ -292,6 +296,14 @@
                         <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
                     </label>
                     <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
+                </div>
+                <div class="form-group" id="jt-missionlead-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-direction: row; cursor: pointer;">
+                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" style="width: auto;" th:checked="*{isMissionLead}">
+                        <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
+                    </label>
+                    <small class="form-hint" th:text="#{admin.job_type.is_mission_lead.hint}">Nur eine Mission-F&uuml;hrungsposition kann der Einsatzleiter sein.</small>
+                    <div th:if="${#fields.hasErrors('isMissionLead')}" th:errors="*{isMissionLead}" class="field-error"></div>
                 </div>
                 <div class="form-group">
                     <label th:text="#{admin.job_type.description}">Beschreibung</label>
@@ -483,6 +495,23 @@
         const jtClose = document.querySelector('.close-jobtype-modal');
         const jtArchetypeSelect = document.getElementById('jt-archetype');
         const jtLeadershipGroup = document.getElementById('jt-leadership-group');
+        const jtLeadership = document.getElementById('jt-leadership');
+        const jtMissionLeadGroup = document.getElementById('jt-missionlead-group');
+
+        // The Einsatzleiter (mission-lead) designation only makes sense for a MISSION leadership
+        // role, so its checkbox is shown only then; hiding it also clears it (the backend rejects a
+        // mission-lead designation on a non-MISSION or non-leadership role anyway).
+        function updateMissionLeadVisibility() {
+            const eligible =
+                jtArchetypeSelect.value === 'MISSION' && jtLeadership && jtLeadership.checked;
+            if (jtMissionLeadGroup) {
+                jtMissionLeadGroup.style.display = eligible ? 'block' : 'none';
+                if (!eligible) {
+                    const cb = document.getElementById('jt-missionlead');
+                    if (cb) cb.checked = false;
+                }
+            }
+        }
 
         function updateLeadershipVisibility() {
             // Leadership flag is now supported for both archetypes MISSION and CREW.
@@ -490,12 +519,16 @@
                 jtLeadershipGroup.style.display = 'block';
             } else {
                 jtLeadershipGroup.style.display = 'none';
-                document.getElementById('jt-leadership').checked = false;
+                if (jtLeadership) jtLeadership.checked = false;
             }
+            updateMissionLeadVisibility();
         }
-        
+
         if (jtArchetypeSelect) {
             jtArchetypeSelect.addEventListener('change', updateLeadershipVisibility);
+        }
+        if (jtLeadership) {
+            jtLeadership.addEventListener('change', updateMissionLeadVisibility);
         }
 
         if (jtAddBtn) {
@@ -506,6 +539,7 @@
                 document.getElementById('jt-desc').value = '';
                 document.getElementById('jt-archetype').value = 'MISSION';
                 document.getElementById('jt-leadership').checked = false;
+                document.getElementById('jt-missionlead').checked = false;
                 document.getElementById('edit-jobtype-version').value = '0';
                 updateLeadershipVisibility();
                 jtModal.style.display = "flex";
@@ -522,6 +556,7 @@
             document.getElementById('jt-desc').value = btn.getAttribute('data-desc');
             document.getElementById('jt-archetype').value = btn.getAttribute('data-archetype');
             document.getElementById('jt-leadership').checked = btn.getAttribute('data-leadership') === 'true';
+            document.getElementById('jt-missionlead').checked = btn.getAttribute('data-mission-lead') === 'true';
             document.getElementById('edit-jobtype-version').value = btn.getAttribute('data-version');
             updateLeadershipVisibility();
             jtModal.style.display = "flex";

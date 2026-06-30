@@ -80,6 +80,8 @@
                      <strong th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}" th:text="#{mission.calendar_link} + ':'">Kalender:</strong>
                      <span th:if="${mission.calendarLink != null and !#strings.isEmpty(mission.calendarLink)}"><a th:href="${mission.calendarLink}" target="_blank" rel="noopener noreferrer" th:text="#{mission.calendar_link_open}">Öffnen</a></span>
                      <strong th:text="#{mission.status} + ':'">Status:</strong> <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}" th:text="${mission.status}">Status</span>
+                     <strong th:if="${!#strings.isEmpty(mission.meetingPoint)}" th:text="#{mission.meeting_point} + ':'">Treffpunkt:</strong>
+                     <span th:if="${!#strings.isEmpty(mission.meetingPoint)}" th:text="${mission.meetingPoint}">Treffpunkt</span>
                      <strong th:text="#{mission.meeting_time} + ':'">Treffen Teamspeak:</strong> <span class="utc-time" th:text="${mission.meetingTime}">Time</span>
                      <strong th:text="#{mission.start} + ':'">Serverjoin:</strong> <span class="utc-time" th:text="${mission.plannedStartTime}">Time</span>
                 </div>

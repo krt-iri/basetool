@@ -19,23 +19,20 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
-import java.time.Instant;
-import java.util.UUID;
+/**
+ * Frontend mirror of the backend's {@code MissionObjectiveKind} — the classification of a mission
+ * goal (Ziel). Drives the grouped overview display (Hauptziel -&gt; Nebenziel -&gt; Nicht-Ziel) and
+ * the per-row selector in the goals editor. The localized German labels come from the message
+ * bundle (key {@code mission.objective.kind.*}).
+ */
+public enum MissionObjectiveKind {
 
-/** Data transfer record carrying Mission List payload. */
-public record MissionListDto(
-    UUID id,
-    String name,
-    String description,
-    String calendarLink,
-    String status,
-    Instant meetingTime,
-    Instant plannedStartTime,
-    Instant actualStartTime,
-    Instant plannedEndTime,
-    Instant actualEndTime,
-    Boolean isInternal,
-    OperationDto operation,
-    SquadronReferenceDto owningSquadron,
-    String meetingPoint,
-    Long version) {}
+  /** A primary objective ("Hauptziel") — a core, must-achieve goal of the mission. */
+  PRIMARY,
+
+  /** A secondary objective ("Nebenziel") — a desirable but non-essential goal. */
+  SECONDARY,
+
+  /** An explicit non-goal ("Nicht-Ziel") — something the mission deliberately does NOT pursue. */
+  NON_GOAL
+}
