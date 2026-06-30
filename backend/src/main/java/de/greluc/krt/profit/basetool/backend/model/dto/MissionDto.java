@@ -88,5 +88,6 @@ public record MissionDto(
     Long partyLeadVersion,
     List<MissionStepDto> steps,
     Long stepsVersion,
-    String objective,
+    List<MissionObjectiveDto> objectives,
+    Long objectivesVersion,
     String meetingPoint) {}

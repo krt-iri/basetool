@@ -51,5 +51,4 @@ public record PatchMissionCoreRequest(
     @Nullable @Size(max = 64) String status,
     @Nullable UUID operationId,
     @NotNull Long version,
-    @Nullable @Size(max = 250) String objective,
     @Nullable @Size(max = 200) String meetingPoint) {}

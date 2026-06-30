@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionStep;
@@ -43,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionCrewRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -110,6 +113,7 @@ public class MissionService {
   private final MissionUnitRepository missionUnitRepository;
   private final MissionCrewRepository missionCrewRepository;
   private final MissionStepRepository missionStepRepository;
+  private final MissionObjectiveRepository missionObjectiveRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
@@ -389,7 +393,6 @@ public class MissionService {
   private void applyCreatePayload(Mission mission, CreateMissionRequest request) {
     mission.setName(request.name());
     mission.setDescription(request.description());
-    mission.setObjective(request.objective());
     mission.setMeetingPoint(request.meetingPoint());
     mission.setCalendarLink(request.calendarLink());
     mission.setStatus(request.status());
@@ -452,7 +455,6 @@ public class MissionService {
 
     mission.setName(request.name());
     mission.setDescription(request.description());
-    mission.setObjective(request.objective());
     mission.setMeetingPoint(request.meetingPoint());
     mission.setCalendarLink(request.calendarLink());
     mission.setStatus(request.status());
@@ -528,7 +530,6 @@ public class MissionService {
       String calendarLink,
       String status,
       UUID operationId,
-      String objective,
       String meetingPoint,
       @NotNull Long expectedCoreVersion) {
     Mission mission =
@@ -548,7 +549,6 @@ public class MissionService {
 
     mission.setName(name);
     mission.setDescription(description);
-    mission.setObjective(objective);
     mission.setMeetingPoint(meetingPoint);
     mission.setCalendarLink(calendarLink);
     if (status != null) {
@@ -1857,6 +1857,214 @@ public class MissionService {
   private static void repackStepOrder(@NotNull Mission mission) {
     List<MissionStep> ordered = new ArrayList<>(mission.getSteps());
     ordered.sort(Comparator.comparingInt(MissionStep::getOrderIndex));
+    for (int i = 0; i < ordered.size(); i++) {
+      ordered.get(i).setOrderIndex(i);
+    }
+  }
+
+  // --- Mission goals (Ziele) ---
+
+  private void assertObjectivesVersion(
+      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
+    long current = mission.getObjectivesVersion() == null ? 0L : mission.getObjectivesVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          Mission.class, missionId);
+    }
+  }
+
+  private void bumpObjectivesVersion(@NotNull Mission mission) {
+    long current = mission.getObjectivesVersion() == null ? 0L : mission.getObjectivesVersion();
+    mission.setObjectivesVersion(current + 1L);
+  }
+
+  /**
+   * Appends a goal (Ziel) to a mission at the end of the list (next {@code orderIndex}) and bumps
+   * {@code objectivesVersion}. Guarded by the dedicated goals-section counter so editing the goals
+   * never collides with a concurrent core / schedule / flags / Ablauf edit. Records an audit event
+   * carrying the goal id and kind only — never the title (user free text).
+   *
+   * @param missionId the mission id
+   * @param title the required goal text
+   * @param kind the classification (primary / secondary / non-goal)
+   * @param expectedObjectivesVersion the goals-section version the caller last saw
+   * @return the managed mission
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   *     unknown
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedObjectivesVersion} is stale
+   */
+  @Transactional
+  public Mission addObjective(
+      @NotNull UUID missionId,
+      String title,
+      @NotNull MissionObjectiveKind kind,
+      @NotNull Long expectedObjectivesVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+
+    MissionObjective objective = new MissionObjective();
+    objective.setTitle(title == null ? null : title.trim());
+    objective.setKind(kind);
+    objective.setOrderIndex(nextObjectiveOrderIndex(mission));
+    mission.addObjective(objective);
+    missionObjectiveRepository.save(objective);
+
+    bumpObjectivesVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_OBJECTIVE_ADDED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "objective=" + objective.getId() + " kind=" + kind);
+    return mission;
+  }
+
+  /**
+   * Edits an existing goal's text and classification. Mutates the managed child via dirty-checking
+   * (no explicit child save) and bumps {@code objectivesVersion}.
+   *
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedObjectivesVersion} is stale
+   */
+  @Transactional
+  public Mission updateObjective(
+      @NotNull UUID missionId,
+      @NotNull UUID objectiveId,
+      String title,
+      @NotNull MissionObjectiveKind kind,
+      @NotNull Long expectedObjectivesVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+
+    MissionObjective objective = findObjective(mission, objectiveId);
+    objective.setTitle(title == null ? null : title.trim());
+    objective.setKind(kind);
+
+    bumpObjectivesVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_OBJECTIVE_UPDATED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "objective=" + objectiveId + " kind=" + kind);
+    return mission;
+  }
+
+  /**
+   * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
+   * contiguous. Bumps {@code objectivesVersion}.
+   *
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
+   *     a child of the mission
+   */
+  @Transactional
+  public Mission deleteObjective(
+      @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+
+    boolean removed = mission.removeObjective(objectiveId);
+    if (!removed) {
+      throw new NotFoundException("MissionObjective not found in this mission");
+    }
+    repackObjectiveOrder(mission);
+
+    bumpObjectivesVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_OBJECTIVE_REMOVED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "objective=" + objectiveId);
+    return mission;
+  }
+
+  /**
+   * Reorders the mission's goals. {@code orderedObjectiveIds} must be exactly the mission's goal
+   * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
+   * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
+   * double-version bump). The {@code objectivesVersion} optimistic guard serialises concurrent
+   * reorders, making a pessimistic lock unnecessary. Records a single reorder event (count only).
+   *
+   * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     expectedObjectivesVersion} is stale
+   */
+  @Transactional
+  public Mission reorderObjectives(
+      @NotNull UUID missionId,
+      @NotNull List<UUID> orderedObjectiveIds,
+      @NotNull Long expectedObjectivesVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+
+    Set<UUID> existingIds =
+        mission.getObjectives().stream().map(MissionObjective::getId).collect(Collectors.toSet());
+    if (orderedObjectiveIds.size() != existingIds.size()
+        || !existingIds.equals(new HashSet<>(orderedObjectiveIds))) {
+      throw new IllegalArgumentException("Reorder id set must match the mission's goals exactly");
+    }
+
+    Map<UUID, MissionObjective> byId =
+        mission.getObjectives().stream().collect(Collectors.toMap(MissionObjective::getId, o -> o));
+    for (int i = 0; i < orderedObjectiveIds.size(); i++) {
+      byId.get(orderedObjectiveIds.get(i)).setOrderIndex(i);
+    }
+
+    bumpObjectivesVersion(mission);
+    missionRepository.save(mission);
+    auditService.record(
+        AuditEventType.MISSION_OBJECTIVE_REORDERED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "count=" + existingIds.size());
+    return mission;
+  }
+
+  /**
+   * Finds a managed goal by id within the mission, or throws.
+   *
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
+   *     a child of the mission
+   */
+  private static MissionObjective findObjective(
+      @NotNull Mission mission, @NotNull UUID objectiveId) {
+    return mission.getObjectives().stream()
+        .filter(o -> o.getId() != null && o.getId().equals(objectiveId))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException("MissionObjective not found in this mission"));
+  }
+
+  /** Returns the {@code orderIndex} to assign a newly appended goal (max existing + 1, or 0). */
+  private static int nextObjectiveOrderIndex(@NotNull Mission mission) {
+    int max = -1;
+    for (MissionObjective o : mission.getObjectives()) {
+      max = Math.max(max, o.getOrderIndex());
+    }
+    return max + 1;
+  }
+
+  /** Re-assigns the remaining goals' {@code orderIndex} to a contiguous 0..n-1 by current order. */
+  private static void repackObjectiveOrder(@NotNull Mission mission) {
+    List<MissionObjective> ordered = new ArrayList<>(mission.getObjectives());
+    ordered.sort(Comparator.comparingInt(MissionObjective::getOrderIndex));
     for (int i = 0; i < ordered.size(); i++) {
       ordered.get(i).setOrderIndex(i);
     }

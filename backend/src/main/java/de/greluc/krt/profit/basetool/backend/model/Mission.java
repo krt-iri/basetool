@@ -52,7 +52,15 @@ import org.hibernate.annotations.OptimisticLock;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"participants", "assignedUnits", "subMissions", "financeEntries", "steps"})
+@ToString(
+    exclude = {
+      "participants",
+      "assignedUnits",
+      "subMissions",
+      "financeEntries",
+      "steps",
+      "objectives"
+    })
 public class Mission extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -64,15 +72,6 @@ public class Mission extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   private String description;
-
-  /**
-   * Short free-text objective ("Ziel") shown prominently in the overview's "Mission auf einen
-   * Blick" panel. Distinct from the long Markdown {@link #description}: capped at 250 characters
-   * and rendered as plain text. Nullable. Part of the {@code core} section (guarded by {@link
-   * #coreVersion}).
-   */
-  @Column(length = 250)
-  private String objective;
 
   /**
    * Free-text rally point ("Treffpunkt", e.g. "Lobby Mining → ARC-L1") shown in the overview.
@@ -144,6 +143,16 @@ public class Mission extends AbstractEntity<UUID> {
   private Long stepsVersion = 0L;
 
   /**
+   * Section-scoped optimistic-lock counter for the goals (Ziele) editor ({@link #objectives}).
+   * Independent of the global {@link AbstractEntity#getVersion()} and marked
+   * {@code @OptimisticLock(excluded = true)} so editing the goal list never invalidates another
+   * user's open core / schedule / flags / Ablauf form on the same mission.
+   */
+  @Column(name = "objectives_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  private Long objectivesVersion = 0L;
+
+  /**
    * Section-scoped optimistic-lock counter for the owning-org-unit reassignment endpoint ({@link
    * #owningOrgUnit}). Independent of the global {@link AbstractEntity#getVersion()} and marked
    * {@code @OptimisticLock(excluded = true)} so re-homing the mission to a different org unit never
@@ -187,6 +196,24 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   @Getter(AccessLevel.NONE)
   private Set<MissionStep> steps = new LinkedHashSet<>();
+
+  /**
+   * Ordered, reorderable mission goals (Ziele). Loaded by ascending {@link
+   * MissionObjective#getOrderIndex()} into a {@link LinkedHashSet} so iteration (and the mapped DTO
+   * list) preserves the authored order; the overview regroups them by {@link MissionObjectiveKind}.
+   * Excluded from the global optimistic-lock; the dedicated {@link #objectivesVersion} guards
+   * concurrent edits instead.
+   *
+   * <p>The Lombok getter is suppressed ({@link AccessLevel#NONE}) in favour of the hand-written
+   * {@link #getObjectives()}, which hands out an unmodifiable view so callers cannot mutate the
+   * managed collection through the getter; structural changes go through {@link
+   * #addObjective(MissionObjective)} / {@link #removeObjective(UUID)}.
+   */
+  @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("orderIndex ASC")
+  @OptimisticLock(excluded = true)
+  @Getter(AccessLevel.NONE)
+  private Set<MissionObjective> objectives = new LinkedHashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_mission_id")
@@ -314,5 +341,39 @@ public class Mission extends AbstractEntity<UUID> {
    */
   public boolean removeStep(UUID stepId) {
     return steps.removeIf(s -> stepId.equals(s.getId()));
+  }
+
+  /**
+   * Returns the mission goals as an unmodifiable view ordered by {@code orderIndex}. Reads (DTO
+   * mapping, index lookups, reorder validation) iterate this view; callers that need to add or
+   * remove a goal use {@link #addObjective(MissionObjective)} / {@link #removeObjective(UUID)} so
+   * the managed collection is never mutated through the getter.
+   *
+   * @return an unmodifiable view of the mission's goals
+   */
+  public Set<MissionObjective> getObjectives() {
+    return Collections.unmodifiableSet(objectives);
+  }
+
+  /**
+   * Appends a goal to the collection and wires the inverse side so the bidirectional association
+   * stays consistent before the cascade persists it.
+   *
+   * @param objective the goal to attach to this mission
+   */
+  public void addObjective(MissionObjective objective) {
+    objective.setMission(this);
+    objectives.add(objective);
+  }
+
+  /**
+   * Removes the goal with the given id from the collection (orphan-removal then deletes the row on
+   * flush).
+   *
+   * @param objectiveId the id of the goal to remove
+   * @return {@code true} if a goal was removed, {@code false} if no goal had that id
+   */
+  public boolean removeObjective(UUID objectiveId) {
+    return objectives.removeIf(o -> objectiveId.equals(o.getId()));
   }
 }

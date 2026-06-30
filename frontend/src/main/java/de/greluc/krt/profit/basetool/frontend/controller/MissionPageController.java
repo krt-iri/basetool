@@ -510,7 +510,6 @@ public class MissionPageController {
                 mission.flagsVersion(),
                 // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
                 null,
-                mission.objective(),
                 mission.meetingPoint()));
       }
       model.addAttribute("isNew", false);
@@ -740,6 +739,7 @@ public class MissionPageController {
         case "mgmt" -> "mission-detail :: mgmtPanels";
         case "overview" -> "mission-detail :: overviewSection";
         case "steps-editor" -> "mission-detail :: stepsEditor";
+        case "objectives-editor" -> "mission-detail :: objectivesEditor";
         default -> "mission-detail";
       };
     }
@@ -1381,7 +1381,6 @@ public class MissionPageController {
               null,
               null,
               null,
-              null,
               null));
     }
     model.addAttribute("isNew", true);
@@ -1423,7 +1422,8 @@ public class MissionPageController {
             0L,
             java.util.List.of(),
             0L,
-            null,
+            java.util.List.of(),
+            0L,
             null));
     addFormsToModel(model, principal);
     addOperationsToModel(model, false);
@@ -1520,7 +1520,6 @@ public class MissionPageController {
               form.isInternal(),
               operation != null ? operation.id() : null,
               form.owningOrgUnitId(),
-              form.objective(),
               form.meetingPoint());
 
       backendApiClient.post("/api/v1/missions", createRequest, Void.class);
@@ -1623,7 +1622,6 @@ public class MissionPageController {
     corePatch.put("calendarLink", form.calendarLink());
     corePatch.put("status", form.status());
     corePatch.put("operationId", operationId);
-    corePatch.put("objective", form.objective());
     corePatch.put("meetingPoint", form.meetingPoint());
     corePatch.put("version", form.coreVersion());
     backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
@@ -2287,6 +2285,153 @@ public class MissionPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in toggleStepDoneAjax for mission {} step {}", id, stepId, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  // --- Mission goals (Ziele) ---
+
+  /**
+   * AJAX proxy: appends a goal (Ziel) via the backend slim endpoint and returns the resulting
+   * ordered goal list. The page re-renders the editor + overview Ziele fragments in place; the
+   * backend's {@code objectivesVersion} guard keeps the goals section's optimistic lock narrow.
+   *
+   * @param id the mission id
+   * @param body the goal payload (title, kind, expected objectivesVersion)
+   * @return the ordered goal list, or the propagated backend error
+   */
+  @PostMapping(
+      value = "/{id}/objectives/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> addObjectiveAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.post(
+              "/api/v1/missions/" + id + "/objectives/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Add objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: edits a goal's text / classification and returns the ordered goal list.
+   *
+   * @param id the mission id
+   * @param objectiveId the goal id
+   * @param body the goal payload (title, kind, expected objectivesVersion)
+   * @return the ordered goal list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/objectives/{objectiveId}/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> updateObjectiveAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID objectiveId,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.put(
+              "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
+              body,
+              Object.class,
+              false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Update objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug(
+          "UNEXPECTED ERROR in updateObjectiveAjax for mission {} objective {}",
+          id,
+          objectiveId,
+          e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: removes a goal and returns the remaining ordered goal list. The expected {@code
+   * objectivesVersion} travels as a query parameter (DELETE carries no body).
+   *
+   * @param id the mission id
+   * @param objectiveId the goal id
+   * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
+   * @return the ordered goal list, or the propagated backend error
+   */
+  @DeleteMapping(
+      value = "/{id}/objectives/{objectiveId}/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> deleteObjectiveAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID objectiveId,
+      @RequestParam @NotNull Long objectivesVersion) {
+    try {
+      Object result =
+          backendApiClient.delete(
+              "/api/v1/missions/"
+                  + id
+                  + "/objectives/"
+                  + objectiveId
+                  + "/slim?objectivesVersion="
+                  + objectivesVersion,
+              Object.class,
+              false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Delete objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug(
+          "UNEXPECTED ERROR in deleteObjectiveAjax for mission {} objective {}",
+          id,
+          objectiveId,
+          e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy: reorders the mission's goals and returns the new ordered goal list.
+   *
+   * @param id the mission id
+   * @param body the desired goal-id order + expected objectivesVersion
+   * @return the ordered goal list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/objectives/reorder/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public org.springframework.http.ResponseEntity<Object> reorderObjectivesAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.put(
+              "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Reorder objectives (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in reorderObjectivesAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

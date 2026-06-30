@@ -59,5 +59,4 @@ public record UpdateMissionRequest(
     @Nullable Boolean isInternal,
     @Nullable UUID operationId,
     @NotNull Long version,
-    @Nullable @Size(max = 250) String objective,
     @Nullable @Size(max = 200) String meetingPoint) {}
