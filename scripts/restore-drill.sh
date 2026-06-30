@@ -47,8 +47,10 @@ export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
 mkdir -p "${DOCKER_CONFIG}" "${RESTIC_CACHE_DIR}" "${WORK_BASE}"
 
-# shellcheck disable=SC1090
-set -a; . "${BACKUP_ENV}"; set +a
+set -a
+# shellcheck source=/dev/null  # operator-provided host file, not in the repo
+. "${BACKUP_ENV}"
+set +a
 [[ -n "${RESTIC_REPOSITORY:-}" ]] || fail "RESTIC_REPOSITORY not set in ${BACKUP_ENV}"
 
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -56,6 +58,7 @@ WORK="${WORK_BASE}/${TS}"
 mkdir -p "${WORK}"
 chmod 700 "${WORK}"
 
+# shellcheck disable=SC2317  # cleanup runs indirectly via the EXIT trap set below
 cleanup() {
   local rc=$?
   docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
