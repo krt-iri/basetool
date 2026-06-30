@@ -10,6 +10,8 @@
 
 - **Org-Einheits-Bank: „Verantwortung & Sichtbarkeit" zeigt Kontostandsziel, Sichtbarkeit und Freigabe-Limits in drei eigenen Kacheln.** Im Reiter „Verantwortung & Sichtbarkeit" einer Konto-Detailseite (`/org-unit-bank/accounts/{id}`) stehen die drei Einstellungsbereiche nun in je einer eigenen Box, die je nach Bildschirmbreite nebeneinander stehen oder umbrechen (bis zu einer Spalte auf dem Smartphone), statt untereinander in einer Box (REQ-BANK-038).
 
+- **Datenschutzerklärung auf den aktuellen Stand gebracht.** Neu beschrieben sind die Anmeldung über Discord (übermittelte Profildaten, Mitgliedschafts- und Rollenprüfung im Discord-Server, dauerhaft gespeicherte Discord-ID und Server-Nickname, Datenübermittlung an Discord Inc. in die USA), die im Mitgliederkonto gespeicherten Daten samt tatsächlichem Löschverhalten sowie Hinweise zu In-App-Benachrichtigungen, Echtzeit-Anwesenheit in der Einsatzplanung und der begleitenden Desktop-Import-Anwendung. Veraltete bzw. unbelegte Passagen (nicht vorhandenes Kontaktformular/Forum, die 7-Tage-IP-Anonymisierungszusage im Server-Log-Abschnitt) wurden entfernt und Cookie-Angaben korrigiert (SESSION bleibt bis zu 30 Tage erhalten).
+
 ### Fixed
 
 - **Org-Einheits-Bank: Freigabe-Limit-Eingabe für einzelne Nutzer wieder bündig.** Im Formular „Einzelne Nutzer" der Freigabe-Limits saß das Limit-Eingabefeld 12 px höher als das Nutzer-Auswahlfeld und der „Setzen"-Button; jetzt stehen alle drei wieder auf gleicher Höhe.
