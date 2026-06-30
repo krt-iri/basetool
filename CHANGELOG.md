@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.8](https://github.com/krt-profit/basetool/releases/tag/v1.0.8) - 2026-06-30
+
 ### Added
 
 - **Bank: Begründung bei Auszahlungen und Transfers (Pflicht bei KRT-, Bank- und Sonderkonten).** Eine Auszahlung oder ein Transfer — sowohl die Bankmitarbeiter-Buchung als auch der Buchungsantrag — kann jetzt eine Begründung tragen. Beim Abruf aus dem KRT-Konto, dem Bank-Konto oder einem Sonderkonto ist sie Pflicht, bei Staffel-, SK- und Bereichskonten optional (wie die Notiz); bei Einzahlungen entfällt das Feld. Die Begründung wird wie die Notiz in der Kontohistorie und im Kontoauszug- sowie Management-Report-PDF angezeigt und vom Antrag bis zur Bestätigung übernommen (REQ-BANK-045).
