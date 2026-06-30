@@ -496,7 +496,9 @@ public class BankAccountService {
         counterAccountName,
         counterHolderHandle,
         false,
-        row.transferFee());
+        row.transferFee(),
+        row.counterpartyHandle(),
+        row.counterpartyOrgUnitName());
   }
 
   /**

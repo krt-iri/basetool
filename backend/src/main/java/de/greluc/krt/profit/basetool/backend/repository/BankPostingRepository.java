@@ -100,7 +100,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow("
-          + "p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee)"
+          + "p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee,"
+          + " t.counterpartyHandle, t.counterpartyOrgUnitName)"
           + " FROM BankPosting p JOIN p.transaction t"
           + " LEFT JOIN t.reversedTransaction rt WHERE p.account.id = :accountId")
   Page<BankBookingRow> findBookings(@Param("accountId") UUID accountId, Pageable pageable);
@@ -115,7 +116,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    */
   @Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow("
-          + "p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee)"
+          + "p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee,"
+          + " t.counterpartyHandle, t.counterpartyOrgUnitName)"
           + " FROM BankPosting p JOIN p.transaction t"
           + " LEFT JOIN t.reversedTransaction rt"
           + " WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to"

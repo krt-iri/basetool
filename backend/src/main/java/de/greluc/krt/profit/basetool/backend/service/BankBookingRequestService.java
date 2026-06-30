@@ -105,6 +105,7 @@ public class BankBookingRequestService {
   private final BankAuditService bankAuditService;
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
+  private final OrgUnitMembershipService orgUnitMembershipService;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -123,7 +124,7 @@ public class BankBookingRequestService {
    *     (snapshot)
    * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
    * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
-   *     confirmation (REQ-BANK-043); always {@code false} for withdrawal/transfer
+   *     confirmation (REQ-BANK-044); always {@code false} for withdrawal/transfer
    * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
    *     unless {@code splitEnabled}
    * @return the created request
@@ -354,6 +355,20 @@ public class BankBookingRequestService {
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
+    // REQ-BANK-044: a confirmed deposit/withdrawal records the requester as the counterparty
+    // (Einzahler/Empfänger — for a deposit request, REQ-BANK-042, the requester IS the depositor)
+    // together with their org unit. requested_by is ON DELETE SET NULL, so a non-null id always
+    // still resolves; the requester may belong to several units, so the deterministic primary unit
+    // is recorded (name-sorted primary Staffel, or a leader's Bereich/OL), null when they have
+    // none.
+    UUID requesterId = request.getRequestedBy();
+    UUID counterpartyOrgUnitId =
+        requesterId == null
+            ? null
+            : orgUnitMembershipService
+                .findPrimaryDirectMembershipOrgUnitId(requesterId)
+                .orElse(null);
+
     BankTransactionDto booked =
         switch (request.getType()) {
           case DEPOSIT ->
@@ -368,11 +383,18 @@ public class BankBookingRequestService {
                       request.getAmount(),
                       request.getNote(),
                       request.isSplitEnabled(),
-                      request.getSplitPercent()));
+                      request.getSplitPercent(),
+                      requesterId,
+                      counterpartyOrgUnitId));
           case WITHDRAWAL ->
               bankLedgerService.bookWithdrawal(
                   new BankWithdrawalRequest(
-                      accountId, holderId, request.getAmount(), request.getNote()));
+                      accountId,
+                      holderId,
+                      request.getAmount(),
+                      request.getNote(),
+                      requesterId,
+                      counterpartyOrgUnitId));
           case TRANSFER -> {
             BankAccount target = request.getTargetAccount();
             if (target == null || destinationHolderId == null) {

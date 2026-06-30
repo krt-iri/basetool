@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
@@ -190,6 +191,12 @@ public class BankManagementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
+    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044).
+    final Map<UUID, List<BankCounterLeg>> accountLegsByTx =
+        txIds.isEmpty()
+            ? Map.of()
+            : bankPostingRepository.findLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
 
     BigDecimal inflow = BigDecimal.ZERO;
     BigDecimal outflow = BigDecimal.ZERO;
@@ -229,12 +236,13 @@ public class BankManagementReportService {
                 krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
     krt.document().add(new Paragraph(" "));
 
-    PdfPTable table = new PdfPTable(5);
+    PdfPTable table = new PdfPTable(6);
     table.setWidthPercentage(100);
-    table.setWidths(new float[] {1.6f, 1.3f, 1.5f, 2.2f, 1.3f});
+    table.setWidths(new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.9f, 1.2f});
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
+    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
 
@@ -250,14 +258,47 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
       KrtPdfSupport.addTableCell(table, holder, bg, false);
+      KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
       KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       alt = !alt;
     }
     if (rows.isEmpty()) {
-      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 5);
+      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 6);
     }
     krt.document().add(table);
+  }
+
+  /**
+   * Renders the "Gegenseite" cell for a report row (REQ-BANK-044) — the far side of the booking:
+   * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
+   * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number; empty
+   * otherwise. The type column and amount sign convey the direction, so no arrow glyph is rendered.
+   *
+   * @param row the report row
+   * @param accountLegsByTx the section's account legs grouped by transaction (transfer counter
+   *     accounts)
+   * @return the cell text, never {@code null}
+   */
+  private static @NotNull String counterpartyCell(
+      @NotNull BankBookingRow row, @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx) {
+    return switch (row.type()) {
+      case DEPOSIT, WITHDRAWAL -> {
+        if (row.counterpartyHandle() == null) {
+          yield "";
+        }
+        yield row.counterpartyOrgUnitName() == null
+            ? row.counterpartyHandle()
+            : row.counterpartyHandle() + " (" + row.counterpartyOrgUnitName() + ")";
+      }
+      case TRANSFER ->
+          accountLegsByTx.getOrDefault(row.transactionId(), List.of()).stream()
+              .filter(leg -> !leg.postingId().equals(row.postingId()))
+              .map(BankCounterLeg::accountNo)
+              .findFirst()
+              .orElse("");
+      default -> "";
+    };
   }
 
   /**

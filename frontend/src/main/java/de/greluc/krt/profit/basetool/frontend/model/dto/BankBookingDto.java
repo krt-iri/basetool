@@ -46,6 +46,11 @@ import org.jetbrains.annotations.Nullable;
  *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
  *     outgoing leg the leg is the gross debited, so the recipient received {@code |amount| −
  *     transferFee}
+ * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
+ *     handle — the Einzahler / Empf&auml;nger on the far side (REQ-BANK-044), {@code null}
+ *     otherwise
+ * @param counterpartyOrgUnitName the counterparty's org-unit name, or {@code null} when none was
+ *     recorded
  */
 public record BankBookingDto(
     UUID postingId,
@@ -60,4 +65,6 @@ public record BankBookingDto(
     @Nullable String counterAccountName,
     @Nullable String counterHolderHandle,
     boolean intraAccount,
-    BigDecimal transferFee) {}
+    BigDecimal transferFee,
+    @Nullable String counterpartyHandle,
+    @Nullable String counterpartyOrgUnitName) {}

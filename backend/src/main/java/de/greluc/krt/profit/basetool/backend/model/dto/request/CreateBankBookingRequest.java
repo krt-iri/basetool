@@ -53,7 +53,7 @@ import org.jetbrains.annotations.Nullable;
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note carried onto the booking on confirmation
  * @param splitEnabled whether a {@code DEPOSIT} distributes {@link #splitPercent} across squadron
- *     accounts (REQ-BANK-043)
+ *     accounts (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) to distribute; required when {@link #splitEnabled},
  *     absent otherwise
  */

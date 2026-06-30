@@ -27600,6 +27600,14 @@
             "type" : "string",
             "format" : "uuid"
           }
+        }, {
+          "name" : "allKinds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "200" : {
@@ -51844,6 +51852,14 @@
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "accountId", "amount", "holderId" ]
@@ -52098,6 +52114,14 @@
             "type" : "number",
             "maximum" : 100,
             "minimum" : 1
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "splitConfigConsistent" : {
             "type" : "boolean"
@@ -54235,6 +54259,12 @@
           },
           "transferFee" : {
             "type" : "number"
+          },
+          "counterpartyHandle" : {
+            "type" : "string"
+          },
+          "counterpartyOrgUnitName" : {
+            "type" : "string"
           }
         }
       },

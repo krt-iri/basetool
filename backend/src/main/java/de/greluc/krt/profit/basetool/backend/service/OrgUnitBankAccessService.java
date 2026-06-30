@@ -1659,10 +1659,12 @@ public class OrgUnitBankAccessService {
 
   /**
    * Redacts the player-custody columns of a booking row for an org-unit viewer (REQ-BANK-038): the
-   * holder and counter-holder handles are nulled, everything else is preserved.
+   * holder and counter-holder handles plus the deposit/withdrawal counterparty (Einzahler /
+   * Empf&auml;nger and their org unit, REQ-BANK-044 — likewise player-identifying) are nulled,
+   * everything else is preserved.
    *
    * @param booking the bank-staff booking row
-   * @return a copy with the holder handles removed
+   * @return a copy with the holder and counterparty handles removed
    */
   @NotNull
   private static BankBookingDto redact(@NotNull BankBookingDto booking) {
@@ -1679,7 +1681,9 @@ public class OrgUnitBankAccessService {
         booking.counterAccountName(),
         null,
         booking.intraAccount(),
-        booking.transferFee());
+        booking.transferFee(),
+        null,
+        null);
   }
 
   /**

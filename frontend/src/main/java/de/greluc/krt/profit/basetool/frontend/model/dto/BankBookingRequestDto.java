@@ -58,7 +58,7 @@ import org.jetbrains.annotations.Nullable;
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}
  * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
- *     confirmation (REQ-BANK-043)
+ *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
  * @param version the optimistic-locking version echoed on cancel/confirm/reject

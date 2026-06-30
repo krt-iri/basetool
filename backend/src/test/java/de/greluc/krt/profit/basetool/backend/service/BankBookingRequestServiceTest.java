@@ -89,6 +89,7 @@ class BankBookingRequestServiceTest {
   @Mock private BankAuditService bankAuditService;
   @Mock private AuthHelperService authHelperService;
   @Mock private UserRepository userRepository;
+  @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private BankBookingRequestService service;
@@ -312,6 +313,11 @@ class BankBookingRequestServiceTest {
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
+    // REQ-BANK-044: the confirmed booking records the requester (Einzahler) plus their primary
+    // unit.
+    UUID requesterOrgUnit = UUID.randomUUID();
+    when(orgUnitMembershipService.findPrimaryDirectMembershipOrgUnitId(requester))
+        .thenReturn(Optional.of(requesterOrgUnit));
 
     BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, 0L, null);
 
@@ -321,6 +327,9 @@ class BankBookingRequestServiceTest {
     verify(bankLedgerService).bookDeposit(booked.capture());
     assertThat(booked.getValue().accountId()).isEqualTo(accountId);
     assertThat(booked.getValue().holderId()).isEqualTo(holderId);
+    // The requester becomes the counterparty, with their resolved primary org unit (REQ-BANK-044).
+    assertThat(booked.getValue().counterpartyUserId()).isEqualTo(requester);
+    assertThat(booked.getValue().counterpartyOrgUnitId()).isEqualTo(requesterOrgUnit);
     verify(bankAuditService)
         .record(
             eq(

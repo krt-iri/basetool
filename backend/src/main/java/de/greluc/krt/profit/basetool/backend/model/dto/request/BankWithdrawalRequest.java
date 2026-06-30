@@ -38,9 +38,35 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId the player who physically paid the money out (REQ-BANK-003)
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
+ * @param counterpartyUserId optional Empf&auml;nger — the member who received the payout
+ *     (REQ-BANK-044), distinct from the paying holder; {@code null} when no counterparty is
+ *     recorded
+ * @param counterpartyOrgUnitId optional org unit the Empf&auml;nger belongs to, chosen from their
+ *     own memberships; only meaningful together with {@code counterpartyUserId} and validated to be
+ *     one of that user's memberships (REQ-BANK-044)
  */
 public record BankWithdrawalRequest(
     @NotNull UUID accountId,
     @NotNull UUID holderId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
-    @Nullable @Size(max = 500) String note) {}
+    @Nullable @Size(max = 500) String note,
+    @Nullable UUID counterpartyUserId,
+    @Nullable UUID counterpartyOrgUnitId) {
+
+  /**
+   * Convenience constructor for a withdrawal with <strong>no</strong> recorded counterparty
+   * (REQ-BANK-044) — the common case where the Empf&auml;nger is not captured. Delegates to the
+   * canonical constructor with both counterparty fields {@code null}. Inbound JSON is always
+   * deserialized via the canonical (all-component) constructor, so this overload only serves
+   * programmatic callers.
+   *
+   * @param accountId the paying account
+   * @param holderId the player who physically paid the money out
+   * @param amount whole-aUEC amount, at least 1
+   * @param note optional free-text note for the booking history and statements
+   */
+  public BankWithdrawalRequest(
+      UUID accountId, UUID holderId, BigDecimal amount, @Nullable String note) {
+    this(accountId, holderId, amount, note, null, null);
+  }
+}

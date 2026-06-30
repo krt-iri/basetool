@@ -249,6 +249,69 @@
     });
 
     /**
+     * Fills a counterparty org-unit <select> from the chosen counterparty user's
+     * memberships (REQ-BANK-044). Resets it to just its placeholder and disables it
+     * while loading or when no user is selected; auto-selects when the user has exactly
+     * one membership. A read-only same-origin GET, so no CSRF / krtFetch is involved.
+     *
+     * @param {HTMLSelectElement} userSelect the counterparty user picker
+     * @param {HTMLSelectElement} orgSelect the dependent org-unit picker
+     */
+    async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
+        const placeholder = orgSelect.querySelector('option[value=""]');
+        orgSelect.innerHTML = '';
+        if (placeholder) {
+            orgSelect.appendChild(placeholder);
+        }
+        orgSelect.value = '';
+        orgSelect.disabled = true;
+        const userId = userSelect.value;
+        if (!userId) {
+            return;
+        }
+        let memberships = [];
+        try {
+            const response = await fetch(
+                '/users/' + encodeURIComponent(userId) + '/memberships?allKinds=true',
+                {
+                    headers: { Accept: 'application/json' },
+                },
+            );
+            if (response.ok) {
+                memberships = await response.json();
+            }
+        } catch {
+            memberships = [];
+        }
+        if (!Array.isArray(memberships) || memberships.length === 0) {
+            return;
+        }
+        memberships.forEach(function (membership) {
+            const option = document.createElement('option');
+            option.value = membership.orgUnitId;
+            option.textContent = membership.orgUnitName;
+            orgSelect.appendChild(option);
+        });
+        orgSelect.disabled = false;
+        if (memberships.length === 1) {
+            orgSelect.value = memberships[0].orgUnitId;
+        }
+    }
+
+    // Delegated so it survives the accountBody fragment swap (REQ-FE-005): a change on a
+    // counterparty user picker (re)loads its paired org-unit select.
+    document.addEventListener('change', function (event) {
+        const userSelect = event.target.closest('select[data-counterparty-user]');
+        if (!userSelect) {
+            return;
+        }
+        const orgSelect = document.getElementById(userSelect.getAttribute('data-orgunit-target'));
+        if (orgSelect) {
+            fillCounterpartyOrgUnits(userSelect, orgSelect);
+        }
+    });
+
+    /**
      * Converts one form control into its JSON value: checkboxes to booleans,
      * whitelisted names to numbers/booleans, everything else stays a string.
      *

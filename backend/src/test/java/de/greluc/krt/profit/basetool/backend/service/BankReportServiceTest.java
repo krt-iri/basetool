@@ -32,11 +32,13 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -66,6 +68,7 @@ class BankReportServiceTest {
   @Autowired private BankAccountRepository accountRepository;
   @Autowired private BankHolderRepository holderRepository;
   @Autowired private BankAuditEventRepository auditEventRepository;
+  @Autowired private UserRepository userRepository;
 
   private BankAccount account;
   private BankHolder holder;
@@ -203,6 +206,34 @@ class BankReportServiceTest {
   }
 
   @Test
+  void statement_showsCounterpartyOnGegenseiteColumnAndRedactsIt() throws IOException {
+    // REQ-BANK-044: a deposit's recorded counterparty (Einzahler) shows in the Gegenseite column of
+    // the bank-staff statement, but is redacted — like the Halter — on the org-unit-facing variant.
+    Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
+    String counterpartyHandle = "cp-" + UUID.randomUUID().toString().substring(0, 8);
+    User counterparty = newUser(counterpartyHandle);
+    bankLedgerService.bookDeposit(
+        new BankDepositRequest(
+            account.getId(),
+            holder.getId(),
+            new BigDecimal("500"),
+            null,
+            counterparty.getId(),
+            null));
+    Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
+
+    String full =
+        extractText(statementService.generateStatement(account.getId(), before, after, null));
+    String redacted =
+        extractText(statementService.generateStatement(account.getId(), before, after, null, true));
+
+    assertTrue(full.contains("GEGENSEITE"), "full statement carries the Gegenseite column header");
+    assertTrue(full.contains(counterpartyHandle), "full statement names the counterparty");
+    assertFalse(redacted.contains("GEGENSEITE"), "redacted statement drops the Gegenseite column");
+    assertFalse(redacted.contains(counterpartyHandle), "redacted statement hides the counterparty");
+  }
+
+  @Test
   void statement_rejectsInvertedPeriodAndUnknownAccount() {
     // Given
     Instant now = Instant.now();
@@ -309,6 +340,16 @@ class BankReportServiceTest {
   private void withdraw(String amount) {
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holder.getId(), new BigDecimal(amount), null));
+  }
+
+  /** Creates a minimal persisted tool user; its username doubles as the effective-name handle. */
+  private User newUser(String handle) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(handle);
+    user.setRank(1);
+    user.setInKeycloak(true);
+    return userRepository.save(user);
   }
 
   private BankAccount newAccount(String name) {

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
@@ -146,9 +147,25 @@ public class BankStatementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
+    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044); only
+    // fetched for the non-redacted bank-staff variant, which is the only one carrying that column.
+    Map<UUID, List<BankCounterLeg>> accountLegsByTx =
+        (redactHolders || txIds.isEmpty())
+            ? Map.of()
+            : bankPostingRepository.findLegsByTransactionIds(txIds).stream()
+                .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
 
     byte[] pdf =
-        buildPdf(account, from, to, opening, rows, holderLegsByTx, userZone, redactHolders);
+        buildPdf(
+            account,
+            from,
+            to,
+            opening,
+            rows,
+            holderLegsByTx,
+            accountLegsByTx,
+            userZone,
+            redactHolders);
     bankAuditService.record(
         BankAuditEventType.STATEMENT_EXPORTED, accountId, null, null, "period=" + from + ".." + to);
     log.info(
@@ -166,6 +183,7 @@ public class BankStatementReportService {
       @NotNull BigDecimal opening,
       @NotNull List<BankBookingRow> rows,
       @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx,
+      @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
       @Nullable ZoneId userZone,
       boolean redactHolders) {
     ZoneId zone = userZone != null ? userZone : ZoneOffset.UTC;
@@ -197,18 +215,20 @@ public class BankStatementReportService {
       KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
 
       // Org-unit viewers get the same history without the player-custody column (REQ-BANK-038): the
-      // redacted layout drops the "Halter" column entirely.
-      int columns = redactHolders ? 5 : 6;
+      // redacted layout drops both the "Halter" and the counterparty "Gegenseite" column, since the
+      // latter likewise names a player. Bank staff get both.
+      int columns = redactHolders ? 5 : 7;
       PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
       table.setWidths(
           redactHolders
               ? new float[] {1.6f, 1.3f, 2.7f, 1.3f, 1.4f}
-              : new float[] {1.6f, 1.3f, 1.5f, 2.2f, 1.3f, 1.4f});
+              : new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.9f, 1.2f, 1.3f});
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
       if (!redactHolders) {
         KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
+        KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
       }
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
@@ -229,6 +249,7 @@ public class BankStatementReportService {
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
           KrtPdfSupport.addTableCell(table, holder, bg, false);
+          KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
         }
         KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
@@ -248,6 +269,39 @@ public class BankStatementReportService {
     } catch (Exception e) {
       throw new ReportGenerationException("PDF generation failed", e);
     }
+  }
+
+  /**
+   * Renders the "Gegenseite" cell for a statement row (REQ-BANK-044) — the far side of the booking:
+   * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
+   * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number (the
+   * account leg on the other account); empty for every other type or when nothing was recorded. The
+   * type column and the amount sign already convey the direction, so no arrow glyph is rendered.
+   *
+   * @param row the statement row
+   * @param accountLegsByTx the page's account legs grouped by transaction (for transfer counter
+   *     accounts)
+   * @return the cell text, never {@code null}
+   */
+  private static @NotNull String counterpartyCell(
+      @NotNull BankBookingRow row, @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx) {
+    return switch (row.type()) {
+      case DEPOSIT, WITHDRAWAL -> {
+        if (row.counterpartyHandle() == null) {
+          yield "";
+        }
+        yield row.counterpartyOrgUnitName() == null
+            ? row.counterpartyHandle()
+            : row.counterpartyHandle() + " (" + row.counterpartyOrgUnitName() + ")";
+      }
+      case TRANSFER ->
+          accountLegsByTx.getOrDefault(row.transactionId(), List.of()).stream()
+              .filter(leg -> !leg.postingId().equals(row.postingId()))
+              .map(BankCounterLeg::accountNo)
+              .findFirst()
+              .orElse("");
+      default -> "";
+    };
   }
 
   /**

@@ -89,6 +89,51 @@ public class BankTransaction {
   private String note;
 
   /**
+   * The member on the far side of a {@link BankTransactionType#DEPOSIT} (the Einzahler who handed
+   * the money in) or {@link BankTransactionType#WITHDRAWAL} (the Empf&auml;nger who received the
+   * payout), distinct from the {@code BankHolderPosting} holder (the bank custodian who physically
+   * received/paid). REQ-BANK-044. The database FK is {@code ON DELETE SET NULL}; {@link
+   * #counterpartyHandle} keeps the row attributable afterwards. {@code null} for transfers,
+   * holder→holder Umbuchungen, reversals, the wipe reset, and for bookings where no counterparty
+   * was recorded (the field is optional). Kept as a plain UUID — the booking surfaces render the
+   * {@link #counterpartyHandle} snapshot, not a live join.
+   */
+  @Nullable
+  @Column(name = "counterparty_user_id")
+  private UUID counterpartyUserId;
+
+  /**
+   * Deletion-proof handle snapshot of {@link #counterpartyUserId} (the effective name at booking
+   * time), mirroring the {@code bank_audit_event.actor_handle} / {@code bank_holder.handle}
+   * snapshot pattern so the booking history and statements survive user deletion (REQ-BANK-044).
+   * {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V197 CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_handle", length = 255)
+  private String counterpartyHandle;
+
+  /**
+   * Optional org unit the counterparty belongs to, picked from their own memberships at booking
+   * time (membership is multi, so the booker chooses which one). REQ-BANK-044. The FK references
+   * {@code org_unit} ({@code ON DELETE SET NULL}); only ever set together with {@link
+   * #counterpartyUserId}. Kept as a plain UUID (no JPA relation) — consistent with how the rest of
+   * the bank treats org-unit references during the SQUADRON soak — with {@link
+   * #counterpartyOrgUnitName} carrying the display label.
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_id")
+  private UUID counterpartyOrgUnitId;
+
+  /**
+   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId} (REQ-BANK-044), so the history
+   * and statements label the counterparty's org unit without a live polymorphic org-unit load.
+   * {@code null} exactly when {@link #counterpartyOrgUnitId} is {@code null} (V197 CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_name", length = 255)
+  private String counterpartyOrgUnitName;
+
+  /**
    * In-game aUEC transfer fee added on top of the entered amount and borne by the debited source
    * (ADR-0052 superseding ADR-0041, REQ-BANK-033). Set by {@code BankLedgerService} on a
    * customer-facing transfer the bank makes on a member's behalf — a {@link

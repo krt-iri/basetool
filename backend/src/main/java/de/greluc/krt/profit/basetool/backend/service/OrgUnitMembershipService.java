@@ -263,6 +263,60 @@ public class OrgUnitMembershipService {
   }
 
   /**
+   * Lists every org unit the given user is a <em>direct</em> member of across <strong>all four
+   * kinds</strong> (Staffel + SK + Bereich + Organisationsleitung), materialised as the
+   * picker-optimised {@link OrgUnitMembershipOptionDto} wire shape with names. Unlike {@link
+   * #listOptionsForUser(UUID)} — which deliberately materialises only the {@code SQUADRON} / {@code
+   * SPECIAL_COMMAND} options the owner picker renders — this surfaces a direct Bereich or OL
+   * membership too, resolving names through the kind-safe {@link OrgUnitRepository#findAllById}.
+   * Backs the bank deposit/withdrawal counterparty org-unit picker (REQ-BANK-044), where a
+   * depositor/recipient who is a Bereich/OL member must be able to record that unit. Ordered
+   * top-down by kind (OL → Bereich → Staffel → SK) then by name, so the first element is the user's
+   * deterministic primary unit.
+   *
+   * @param userId the user whose direct memberships to enumerate; never {@code null}.
+   * @return picker-friendly DTOs across all four kinds; never {@code null}, possibly empty.
+   */
+  public List<OrgUnitMembershipOptionDto> listDirectMembershipOptions(@NotNull UUID userId) {
+    Set<UUID> ids = findDirectMembershipOrgUnitIds(userId);
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    List<OrgUnitMembershipOptionDto> options = new ArrayList<>(ids.size());
+    for (OrgUnit orgUnit : orgUnitRepository.findAllById(ids)) {
+      options.add(
+          new OrgUnitMembershipOptionDto(
+              orgUnit.getId(),
+              orgUnit.getName(),
+              orgUnit.getShorthand(),
+              orgUnit.getKind(),
+              orgUnit.isProfitEligible()));
+    }
+    options.sort(
+        Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))
+            .thenComparing(
+                o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
+                String.CASE_INSENSITIVE_ORDER));
+    return options;
+  }
+
+  /**
+   * Resolves the user's <em>primary</em> direct org-unit membership id (REQ-BANK-044) — the first
+   * of {@link #listDirectMembershipOptions(UUID)} in the deterministic top-down order, i.e. a
+   * regular member's name-sorted primary Staffel, or a leader's Bereich / OL. Used to record the
+   * requester's org unit when a booking <em>request</em> is confirmed (the requester is not present
+   * to pick one).
+   *
+   * @param userId the user whose primary membership to resolve; never {@code null}.
+   * @return the primary org-unit id, or empty when the user has no direct membership at all.
+   */
+  public Optional<UUID> findPrimaryDirectMembershipOrgUnitId(@NotNull UUID userId) {
+    return listDirectMembershipOptions(userId).stream()
+        .findFirst()
+        .map(OrgUnitMembershipOptionDto::orgUnitId);
+  }
+
+  /**
    * Picker options for the <em>owning-org-unit</em> drill-down (epic #692 Phase 5, REQ-ORG-016 /
    * REQ-ORG-018): the caller's direct memberships <em>plus</em> the cascading leadership reach
    * (delegated to {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}).

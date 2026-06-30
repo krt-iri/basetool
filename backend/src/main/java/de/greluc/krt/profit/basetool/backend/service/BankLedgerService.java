@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -33,8 +34,10 @@ import de.greluc.krt.profit.basetool.backend.model.BankPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankHolderTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
@@ -47,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -104,19 +108,26 @@ public class BankLedgerService {
   private final BankAuditService bankAuditService;
   private final BankTransferFeeService transferFeeService;
   private final AuthHelperService authHelperService;
+  private final UserRepository userRepository;
+  private final OrgUnitMembershipService orgUnitMembershipService;
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
    * positive holder leg naming the holder who physically received the money. When the payload opts
    * into a split (REQ-BANK-043) the booking fans out across the squadron accounts via {@link
-   * #bookSplitDeposit(BankDepositRequest, BankHolder)} instead.
+   * #bookSplitDeposit(BankDepositRequest, BankHolder)} instead. A non-split deposit optionally
+   * records the <strong>counterparty</strong> — the Einzahler who handed the money in, and the org
+   * unit they belong to — on the transaction header (REQ-BANK-044), distinct from the receiving
+   * holder.
    *
    * @param request validated deposit payload
    * @return acknowledgement of the created transaction
-   * @throws NotFoundException when account or holder do not exist
+   * @throws NotFoundException when account, holder or the named counterparty user do not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account, {@code
    *     BANK_HOLDER_INACTIVE} on a deactivated holder, or {@code BANK_SPLIT_NO_TARGETS} / {@code
    *     BANK_SPLIT_TOO_SMALL} when a requested split cannot be honoured
+   * @throws BadRequestException when a counterparty org unit is named that is not one of the
+   *     counterparty user's memberships (REQ-BANK-044)
    */
   @Transactional
   public BankTransactionDto bookDeposit(@NotNull BankDepositRequest request) {
@@ -129,20 +140,27 @@ public class BankLedgerService {
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
     requireActiveHolder(holder);
+    CounterpartySnapshot counterparty =
+        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
 
     Instant now = Instant.now();
     // A deposit carries no bank-borne fee: whoever pays money IN bears their own in-game transfer
     // fee, so the full amount lands on the account and the holder's stash (REQ-BANK-033).
     BankTransaction tx =
-        persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now);
+        persistTransaction(
+            BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now, counterparty);
     persistAccountPosting(tx, account, request.amount(), now);
     persistHolderPosting(tx, holder, request.amount(), now);
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_BOOKED,
         account.getId(),
         tx.getId(),
-        null,
-        "+" + request.amount().toPlainString() + " aUEC @" + holder.getHandle());
+        counterparty == null ? null : counterparty.userId(),
+        "+"
+            + request.amount().toPlainString()
+            + " aUEC @"
+            + holder.getHandle()
+            + counterpartyDetail(counterparty, "<-"));
     return toDto(tx);
   }
 
@@ -231,9 +249,12 @@ public class BankLedgerService {
     BigDecimal distributed = shares.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     BigDecimal namedShare = gross.subtract(distributed);
 
+    CounterpartySnapshot counterparty =
+        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now);
+        persistTransaction(
+            BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now, counterparty);
     // The named account keeps the remainder; a 100 % split leaves nothing for it, so its leg is
     // dropped (a posting is never zero, REQ-BANK-004).
     if (namedShare.signum() > 0) {
@@ -247,11 +268,12 @@ public class BankLedgerService {
         BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
         named.getId(),
         tx.getId(),
-        null,
+        counterparty == null ? null : counterparty.userId(),
         "+"
             + gross.toPlainString()
             + " aUEC @"
             + holder.getHandle()
+            + counterpartyDetail(counterparty, "<-")
             + " split "
             + plain(request.splitPercent())
             + "% ("
@@ -264,7 +286,7 @@ public class BankLedgerService {
 
   /**
    * Distributes a whole-aUEC slice as evenly as possible across the given targets with the
-   * largest-remainder rule (REQ-BANK-043): each target gets {@code floor(slice / N)} and the
+   * largest-remainder rule (REQ-BANK-044): each target gets {@code floor(slice / N)} and the
    * leftover {@code slice − base·N} aUEC go one each to the first targets in the supplied order.
    * Zero shares (when {@code base} is 0 and the target is past the remainder cut-off) are omitted,
    * so the result never carries a zero leg and its values always sum to {@code slice} exactly.
@@ -302,16 +324,24 @@ public class BankLedgerService {
    * that gross, so the account may not be driven negative by the fee. The holder is thus not out of
    * pocket — the fee is borne by the debited account, not by their private money.
    *
+   * <p>Optionally records the <strong>counterparty</strong> — the Empf&auml;nger who received the
+   * payout, and the org unit they belong to — on the transaction header (REQ-BANK-044), distinct
+   * from the paying holder.
+   *
    * @param request validated withdrawal payload
    * @return acknowledgement of the created transaction
-   * @throws NotFoundException when account or holder do not exist
+   * @throws NotFoundException when account, holder or the named counterparty user do not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} or {@code BANK_OVERDRAFT}
+   * @throws BadRequestException when a counterparty org unit is named that is not one of the
+   *     counterparty user's memberships (REQ-BANK-044)
    */
   @Transactional
   public BankTransactionDto bookWithdrawal(@NotNull BankWithdrawalRequest request) {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     BankHolder holder = requireHolder(request.holderId());
+    CounterpartySnapshot counterparty =
+        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
 
     BigDecimal fee = transferFeeService.feeOn(request.amount());
     BigDecimal debit = transferFeeService.totalDebit(request.amount());
@@ -319,15 +349,21 @@ public class BankLedgerService {
 
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.WITHDRAWAL, request.note(), null, fee, now);
+        persistTransaction(
+            BankTransactionType.WITHDRAWAL, request.note(), null, fee, now, counterparty);
     persistAccountPosting(tx, account, debit.negate(), now);
     persistHolderPosting(tx, holder, debit.negate(), now);
     bankAuditService.record(
         BankAuditEventType.WITHDRAWAL_BOOKED,
         account.getId(),
         tx.getId(),
-        null,
-        "-" + plain(debit) + " aUEC @" + holder.getHandle() + feeDetail(fee));
+        counterparty == null ? null : counterparty.userId(),
+        "-"
+            + plain(debit)
+            + " aUEC @"
+            + holder.getHandle()
+            + counterpartyDetail(counterparty, "->")
+            + feeDetail(fee));
     return toDto(tx);
   }
 
@@ -398,7 +434,7 @@ public class BankLedgerService {
 
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now);
+        persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now, null);
     persistAccountPosting(tx, source, debit.negate(), now);
     persistAccountPosting(tx, destination, request.amount(), now);
     persistHolderPosting(tx, sourceHolder, debit.negate(), now);
@@ -452,7 +488,7 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.HOLDER_TRANSFER, request.note(), null, BigDecimal.ZERO, now);
+            BankTransactionType.HOLDER_TRANSFER, request.note(), null, BigDecimal.ZERO, now, null);
     persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
     persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
@@ -538,7 +574,8 @@ public class BankLedgerService {
     // is
     // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
-        persistTransaction(BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now);
+        persistTransaction(
+            BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now, null);
     for (BankCounterLeg leg : accountLegs) {
       persistAccountPosting(
           reversal, lockedAccounts.get(leg.accountId()), leg.amount().negate(), now);
@@ -598,7 +635,7 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.WIPE_RESET, "SC wipe reset", null, BigDecimal.ZERO, now);
+            BankTransactionType.WIPE_RESET, "SC wipe reset", null, BigDecimal.ZERO, now, null);
     BigDecimal totalZeroed = BigDecimal.ZERO;
     for (BankAccount account : accounts) {
       BigDecimal balance = accountBalances.get(account.getId());
@@ -770,6 +807,9 @@ public class BankLedgerService {
    * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
    *     BigDecimal#ZERO} for non-fee transactions
    * @param now the shared booking instant
+   * @param counterparty the deposit/withdrawal counterparty to stamp on the header (REQ-BANK-044),
+   *     or {@code null} for transfers, holder→holder Umbuchungen, reversals, the wipe reset and
+   *     bookings without a recorded counterparty
    * @return the persisted header
    */
   private BankTransaction persistTransaction(
@@ -777,7 +817,8 @@ public class BankLedgerService {
       @Nullable String note,
       @Nullable BankTransaction reversed,
       @NotNull BigDecimal fee,
-      @NotNull Instant now) {
+      @NotNull Instant now,
+      @Nullable CounterpartySnapshot counterparty) {
     BankTransaction tx =
         BankTransaction.builder()
             .type(type)
@@ -785,10 +826,95 @@ public class BankLedgerService {
             .note(note)
             .reversedTransaction(reversed)
             .transferFee(fee)
+            .counterpartyUserId(counterparty == null ? null : counterparty.userId())
+            .counterpartyHandle(counterparty == null ? null : counterparty.handle())
+            .counterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId())
+            .counterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName())
             .createdAt(now)
             .build();
     return transactionRepository.save(tx);
   }
+
+  /**
+   * Resolves the optional deposit/withdrawal counterparty (REQ-BANK-044) into a snapshot stamped on
+   * the transaction header. A {@code null} user means "no counterparty recorded" (a lone org unit
+   * without a user is rejected). The handle is snapshotted from the user's effective name; when an
+   * org unit is named it is validated to be one of the user's own memberships across all four kinds
+   * (via the shared, kind-safe {@link OrgUnitMembershipService#listDirectMembershipOptions}) and
+   * its name snapshotted, so a later user/org-unit deletion leaves the recorded booking intact.
+   *
+   * @param userId the counterparty user id, or {@code null} when none was chosen
+   * @param orgUnitId the counterparty's chosen org unit, or {@code null}
+   * @return the resolved snapshot, or {@code null} when no counterparty user was chosen
+   * @throws BadRequestException when an org unit is named without a user, or one that is not a
+   *     membership of the counterparty user
+   * @throws NotFoundException when the named counterparty user does not exist
+   */
+  @Nullable
+  private CounterpartySnapshot resolveCounterparty(
+      @Nullable UUID userId, @Nullable UUID orgUnitId) {
+    if (userId == null) {
+      if (orgUnitId != null) {
+        throw new BadRequestException("A counterparty org unit requires a counterparty user");
+      }
+      return null;
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+    if (orgUnitId == null) {
+      return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
+    }
+    OrgUnitMembershipOptionDto membership =
+        orgUnitMembershipService.listDirectMembershipOptions(userId).stream()
+            .filter(option -> option.orgUnitId().equals(orgUnitId))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "The selected org unit is not one of the counterparty's memberships"));
+    return new CounterpartySnapshot(
+        user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+  }
+
+  /**
+   * Renders the audit-detail suffix naming the deposit/withdrawal counterparty (REQ-BANK-044):
+   * {@code " <- handle (OrgUnit)"} for a deposit (money came FROM the Einzahler) or {@code " ->
+   * handle (OrgUnit)"} for a withdrawal (money went TO the Empf&auml;nger); empty when no
+   * counterparty was recorded. The org-unit segment is omitted when none was chosen. Only the
+   * handle and org-unit name — both system identifiers, not user free text — appear, consistent
+   * with the existing holder-handle detail.
+   *
+   * @param counterparty the resolved counterparty, or {@code null}
+   * @param arrow the direction marker ({@code "<-"} deposit, {@code "->"} withdrawal)
+   * @return the counterparty suffix, or an empty string when there is none
+   */
+  private static String counterpartyDetail(
+      @Nullable CounterpartySnapshot counterparty, @NotNull String arrow) {
+    if (counterparty == null) {
+      return "";
+    }
+    String orgUnit =
+        counterparty.orgUnitName() == null ? "" : " (" + counterparty.orgUnitName() + ")";
+    return " " + arrow + " " + counterparty.handle() + orgUnit;
+  }
+
+  /**
+   * Immutable snapshot of a deposit/withdrawal counterparty (REQ-BANK-044) threaded from {@link
+   * #resolveCounterparty} onto the transaction header — the far-side member and, optionally, the
+   * org unit they belong to, each captured with a deletion-proof name snapshot.
+   *
+   * @param userId the counterparty user id (never {@code null} within a non-null snapshot)
+   * @param handle the user's effective-name snapshot
+   * @param orgUnitId the chosen org unit id, or {@code null}
+   * @param orgUnitName the org unit's name snapshot, or {@code null} when no org unit was chosen
+   */
+  public record CounterpartySnapshot(
+      @NotNull UUID userId,
+      @NotNull String handle,
+      @Nullable UUID orgUnitId,
+      @Nullable String orgUnitName) {}
 
   /**
    * Persists one signed account leg stamped with the shared booking instant.

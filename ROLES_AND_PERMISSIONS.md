@@ -619,8 +619,9 @@ decides per account what is visible.
   Bank Empl. (for Sonderkonten only bank staff).
 - **Read-only detail + account statement (REQ-BANK-038):** whoever may view an account opens the
   read-only detail view **with history** and can retrieve an **account statement** — no
-  deposit/withdrawal/Umbuchung; the **holder column is redacted** (in the table and the PDF). Bank staff
-  keep the full view incl. holders.
+  deposit/withdrawal/Umbuchung; the **holder column and the deposit/withdrawal counterparty**
+  (Einzahler/Empfänger, REQ-BANK-043 — likewise player-identifying) **are redacted** (in the table
+  and the PDF). Bank staff keep the full view incl. holders and counterparty.
 
 | Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
 |:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|
