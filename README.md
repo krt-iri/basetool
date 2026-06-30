@@ -320,6 +320,29 @@ missions (`V144`) and leadership operations (`V145`). See
 [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md)
 (`REQ-ORG-*`) for the current per-aggregate scope model.
 
+### 3.5 Backups & disaster recovery
+
+The production host runs an automated, client-side-encrypted, **off-site** backup. Every
+night at 04:15 `scripts/backup.sh` (systemd `iri-backup.timer`) captures both PostgreSQL
+databases (`krt_basetool` + the Keycloak realm), the nginx-proxy-manager state, and the host
+secrets needed to stand the stack back up (`.env`, `keystore.p12`, `realm-export.json`,
+`keycloak/providers`), then pushes them with **restic** to a **Nextcloud** target over an
+rclone WebDAV remote (GFS retention: 7 daily / 4 weekly / 6 monthly, with a `restic check`).
+For a consistent snapshot the writer services (`frontend`, `backend`, `ingest`) are stopped
+**only for the dump** — seconds, inside the 04:00–05:00 window, NPM serving the maintenance
+page meanwhile — while the slow upload runs after the stack is back up. A weekly restore
+drill (`iri-restore-drill.timer`) restores the latest snapshot into a throwaway PostgreSQL
+and verifies it, so recoverability is proven, not assumed.
+
+Delivery is outbound-only (consistent with the pull-only host posture, `REQ-OPS-001`). Redis
+(only sessions) and the WireGuard `wg0.conf` key are intentionally **not** in this backup —
+`wg0.conf` is the operator's out-of-band responsibility. The backup credentials (restic
+repository password + Nextcloud app password) live host-only in `/etc/iri/backup.env`, never
+in git or the config bundle. Setup, the secured-Nextcloud-target guide, and the full restore
+procedure are in [`docs/backup.md`](docs/backup.md); the binding requirements are in
+[`docs/specs/backup-recovery.md`](docs/specs/backup-recovery.md) (`REQ-OPS-008..012`,
+ADR-0056).
+
 ---
 
 ## 4. Development & Testing

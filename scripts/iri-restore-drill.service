@@ -1,0 +1,55 @@
+; systemd service for the weekly Profit Basetool restore drill (REQ-OPS-011).
+;
+; Installation (on the production host, one-time — see docs/backup.md):
+;   sudo cp /var/iri/code/scripts/iri-restore-drill.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-restore-drill.timer   /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now iri-restore-drill.timer
+;
+; Run an immediate drill:
+;   sudo systemctl start iri-restore-drill.service
+;   journalctl -u iri-restore-drill.service -f
+;
+; Restores the latest off-site snapshot into a THROWAWAY Postgres container and
+; verifies it. It never touches production state. A failure (unrestorable
+; backup) makes the unit report `failed` — treat that as a sev incident.
+
+[Unit]
+Description=Profit Basetool — weekly restore drill (prove backups are recoverable)
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/backup.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+
+User=deploy
+Group=docker
+
+ExecStart=/var/iri/code/scripts/restore-drill.sh
+
+StandardOutput=append:/var/log/iri-restore-drill.log
+StandardError=append:/var/log/iri-restore-drill.log
+
+; --- Hardening (mirrors iri-backup.service) --------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+ReadWritePaths=/var/lib/iri /var/iri /var/log
+
+MemoryMax=1G
+CPUQuota=200%
+
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

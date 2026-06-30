@@ -1,0 +1,70 @@
+; systemd service for the nightly Profit Basetool off-site backup.
+;
+; Installation (on the production host, one-time — see docs/backup.md):
+;   sudo cp /var/iri/code/scripts/iri-backup.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-backup.timer   /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now iri-backup.timer
+;
+; Run an immediate backup (bypassing the next scheduled tick):
+;   sudo systemctl start iri-backup.service
+;
+; Inspect:
+;   systemctl status iri-backup.timer
+;   journalctl -u iri-backup.service -f
+;
+; Runs as the same unprivileged `deploy` user as iri-deploy (member of the
+; `docker` group, no shell, no sudo): it needs Docker (stop/start/exec/run) and
+; read access to the host config, nothing more. The root-owned NPM bind mount
+; is read via a throwaway root container, not by this user directly.
+
+[Unit]
+Description=Profit Basetool — nightly encrypted off-site backup to Nextcloud
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/backup.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+
+User=deploy
+Group=docker
+
+ExecStart=/var/iri/code/scripts/backup.sh
+
+; stdout/stderr to journald AND to /var/log/iri-backup.log for logrotate-kept history.
+StandardOutput=append:/var/log/iri-backup.log
+StandardError=append:/var/log/iri-backup.log
+
+; --- Hardening (mirrors iri-deploy.service) --------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+; Writable paths the script needs:
+;   /var/lib/iri — restic cache + docker config (deploy has no usable $HOME)
+;   /var/iri     — the /var/iri/backup staging tree (Docker volume hierarchy)
+;   /var/log     — append to iri-backup.log
+;   /var/lock    — the shared deploy flock
+; /etc/iri/backup.env is read-only (default under ProtectSystem=strict) — fine, we only read it.
+ReadWritePaths=/var/lib/iri /var/iri /var/log /var/lock
+
+; restic + a brief pg_dump are light on this host; cap generously. The heavy
+; lifting is delegated to docker and the restic process.
+MemoryMax=1G
+CPUQuota=200%
+
+; A failed backup must be loud, not silent. (Wire an OnFailure= alerting unit
+; here if/when one exists — see docs/backup.md.)
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target
