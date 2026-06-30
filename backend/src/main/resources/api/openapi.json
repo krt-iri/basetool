@@ -50883,6 +50883,11 @@
             "maxLength" : 500,
             "minLength" : 0
           },
+          "justification" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
           "splitEnabled" : {
             "type" : "boolean"
           },
@@ -50929,6 +50934,9 @@
             "type" : "number"
           },
           "note" : {
+            "type" : "string"
+          },
+          "justification" : {
             "type" : "string"
           },
           "status" : {
@@ -51853,6 +51861,11 @@
             "maxLength" : 500,
             "minLength" : 0
           },
+          "justification" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
           "counterpartyUserId" : {
             "type" : "string",
             "format" : "uuid"
@@ -51909,6 +51922,11 @@
             "minimum" : 1
           },
           "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "justification" : {
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
@@ -54235,6 +54253,9 @@
             "type" : "string"
           },
           "note" : {
+            "type" : "string"
+          },
+          "justification" : {
             "type" : "string"
           },
           "createdAt" : {

@@ -98,7 +98,9 @@ class BankInPlaceFragmentMvcTest {
                 Collections.emptyList()));
 
     mockMvc
-        .perform(get("/bank/manage").param("fragment", "manageBody"))
+        // Pin the accounts tab explicitly: Halter is the default-open tab, so the account row only
+        // renders in the swapped body when ?tab=konten is requested.
+        .perform(get("/bank/manage").param("tab", "konten").param("fragment", "manageBody"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank-manage :: manageBody"))
         // The tab-nav (with its counts) and the account row are inside the swapped body.

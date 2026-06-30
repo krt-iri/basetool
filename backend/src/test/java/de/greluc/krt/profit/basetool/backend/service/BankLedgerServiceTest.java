@@ -103,7 +103,12 @@ class BankLedgerServiceTest {
   private BankHolder holderA;
   private BankHolder holderB;
 
-  /** Seeds two fresh SPECIAL accounts and two holders per test (unique names per run). */
+  /**
+   * Seeds two fresh AREA accounts and two holders per test (unique names per run). AREA is used as
+   * the neutral, justification-optional fixture (REQ-BANK-045): the general ledger tests must not
+   * be entangled with the Begründung rule; the dedicated justification tests build a SPECIAL
+   * account via {@link #newMandatingAccount(String)}.
+   */
   @BeforeEach
   void seed() {
     account = newAccount("Test Konto " + UUID.randomUUID());
@@ -153,6 +158,57 @@ class BankLedgerServiceTest {
     assertEquals(BankConflictException.CODE_BANK_OVERDRAFT, ex.getCode());
     assertEquals("100", ex.getProperties().get("available"));
     assertEquals(0, balance(account).compareTo(new BigDecimal("100")), "balance unchanged");
+  }
+
+  @Test
+  void bookWithdrawal_fromMandatingAccount_blankJustification_rejected() {
+    // REQ-BANK-045: a direct withdrawal leaving a CARTEL / CARTEL_BANK / SPECIAL account must carry
+    // a
+    // non-blank Begründung; a blank one is rejected with BANK_JUSTIFICATION_REQUIRED and the
+    // balance
+    // is untouched.
+    BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
+    deposit(special, holderA, "500");
+
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                bankLedgerService.bookWithdrawal(
+                    new BankWithdrawalRequest(
+                        special.getId(),
+                        holderA.getId(),
+                        new BigDecimal("100"),
+                        "note",
+                        "   ",
+                        null,
+                        null)));
+
+    assertEquals(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED, ex.getCode());
+    assertEquals(0, balance(special).compareTo(new BigDecimal("500")), "balance unchanged");
+  }
+
+  @Test
+  void bookWithdrawal_fromMandatingAccount_persistsJustification() {
+    // REQ-BANK-045: a non-blank Begründung is stored on the ledger transaction header so it
+    // surfaces
+    // in the booking history and the statement PDF.
+    BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
+    deposit(special, holderA, "500");
+
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                special.getId(),
+                holderA.getId(),
+                new BigDecimal("100"),
+                null,
+                "Reparaturkosten",
+                null,
+                null));
+
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertEquals("Reparaturkosten", stored.getJustification());
   }
 
   @Test
@@ -662,6 +718,7 @@ class BankLedgerServiceTest {
                 holderA.getId(),
                 new BigDecimal("100"),
                 null,
+                null,
                 recipient.getId(),
                 null));
 
@@ -733,6 +790,28 @@ class BankLedgerServiceTest {
   }
 
   private BankAccount newAccount(String name) {
+    BankAccount a = new BankAccount();
+    a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
+    a.setName(name);
+    // AREA carries a free-form area name and no org-unit FK (V150/V168 owner-ref CHECK) — a
+    // justification-optional type, so the general ledger tests need no Begründung (REQ-BANK-045).
+    a.setType(BankAccountType.AREA);
+    a.setAreaName(name);
+    a.setStatus(BankAccountStatus.ACTIVE);
+    BankAccount saved = accountRepository.save(a);
+    assertNotNull(saved.getId());
+    return saved;
+  }
+
+  /**
+   * Seeds an active {@code SPECIAL} account — a {@linkplain
+   * BankAccountType#requiresDebitJustification() justification-mandating} type — for the
+   * REQ-BANK-045 Begründung tests.
+   *
+   * @param name the display name
+   * @return the persisted SPECIAL account
+   */
+  private BankAccount newMandatingAccount(String name) {
     BankAccount a = new BankAccount();
     a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
     a.setName(name);

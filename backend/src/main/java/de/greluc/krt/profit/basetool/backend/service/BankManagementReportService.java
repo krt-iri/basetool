@@ -236,14 +236,17 @@ public class BankManagementReportService {
                 krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
     krt.document().add(new Paragraph(" "));
 
-    PdfPTable table = new PdfPTable(6);
+    PdfPTable table = new PdfPTable(7);
     table.setWidthPercentage(100);
-    table.setWidths(new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.9f, 1.2f});
+    // The Begründung column (REQ-BANK-045) is carved out of the wide note column so every other
+    // column keeps its original width and the type/holder labels never narrow into a wrap.
+    table.setWidths(new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.0f, 0.9f, 1.2f});
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
+    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.justification"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
 
     boolean alt = false;
@@ -260,11 +263,13 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, holder, bg, false);
       KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
       KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
+      KrtPdfSupport.addTableCell(
+          table, row.justification() != null ? row.justification() : "", bg, false);
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       alt = !alt;
     }
     if (rows.isEmpty()) {
-      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 6);
+      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 7);
     }
     krt.document().add(table);
   }

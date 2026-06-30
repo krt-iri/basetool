@@ -38,6 +38,11 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId the player who physically paid the money out (REQ-BANK-003)
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
+ * @param justification optional free-text justification (Begr&uuml;ndung) for the booking history
+ *     and statements (REQ-BANK-045); required by the service when the paying account type
+ *     {@linkplain
+ *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
+ *     mandates a reason}, optional otherwise
  * @param counterpartyUserId optional Empf&auml;nger — the member who received the payout
  *     (REQ-BANK-044), distinct from the paying holder; {@code null} when no counterparty is
  *     recorded
@@ -50,15 +55,16 @@ public record BankWithdrawalRequest(
     @NotNull UUID holderId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
+    @Nullable @Size(max = 500) String justification,
     @Nullable UUID counterpartyUserId,
     @Nullable UUID counterpartyOrgUnitId) {
 
   /**
-   * Convenience constructor for a withdrawal with <strong>no</strong> recorded counterparty
-   * (REQ-BANK-044) — the common case where the Empf&auml;nger is not captured. Delegates to the
-   * canonical constructor with both counterparty fields {@code null}. Inbound JSON is always
-   * deserialized via the canonical (all-component) constructor, so this overload only serves
-   * programmatic callers.
+   * Convenience constructor for a withdrawal with <strong>no</strong> recorded justification or
+   * counterparty (REQ-BANK-044/-045) — the common case where neither is captured. Delegates to the
+   * canonical constructor with the justification and both counterparty fields {@code null}. Inbound
+   * JSON is always deserialized via the canonical (all-component) constructor, so this overload
+   * only serves programmatic callers.
    *
    * @param accountId the paying account
    * @param holderId the player who physically paid the money out
@@ -67,6 +73,6 @@ public record BankWithdrawalRequest(
    */
   public BankWithdrawalRequest(
       UUID accountId, UUID holderId, BigDecimal amount, @Nullable String note) {
-    this(accountId, holderId, amount, note, null, null);
+    this(accountId, holderId, amount, note, null, null, null);
   }
 }

@@ -122,6 +122,16 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private String note;
 
   /**
+   * Optional free-text justification (Begr&uuml;ndung) supplied by the requester, carried onto the
+   * booking on confirmation (REQ-BANK-045). Captured only for a {@code WITHDRAWAL} / {@code
+   * TRANSFER} and required when the source account type {@linkplain
+   * BankAccountType#requiresDebitJustification() mandates a reason}; {@code null} otherwise.
+   */
+  @Nullable
+  @Column(length = 500, updatable = false)
+  private String justification;
+
+  /**
    * Snapshot at creation (REQ-BANK-043): whether this {@code DEPOSIT} request distributes {@link
    * #splitPercent} of the gross evenly across all active squadron accounts on confirmation (the
    * named account is credited the remainder). DEPOSIT-only and immutable; always {@code false} for

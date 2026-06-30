@@ -52,6 +52,11 @@ import org.jetbrains.annotations.Nullable;
  * @param targetAccountId the destination account for a {@code TRANSFER}; {@code null} otherwise
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note carried onto the booking on confirmation
+ * @param justification optional free-text justification (Begr&uuml;ndung) carried onto the booking
+ *     on confirmation (REQ-BANK-045); captured only for a {@code WITHDRAWAL} / {@code TRANSFER} and
+ *     required by the service when the source account type {@linkplain
+ *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
+ *     mandates a reason}, optional otherwise
  * @param splitEnabled whether a {@code DEPOSIT} distributes {@link #splitPercent} across squadron
  *     accounts (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) to distribute; required when {@link #splitEnabled},
@@ -63,6 +68,7 @@ public record CreateBankBookingRequest(
     @Nullable UUID targetAccountId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
+    @Nullable @Size(max = 500) String justification,
     boolean splitEnabled,
     @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent) {
 
@@ -97,6 +103,6 @@ public record CreateBankBookingRequest(
       @Nullable UUID targetAccountId,
       @NotNull BigDecimal amount,
       @Nullable String note) {
-    this(sourceAccountId, type, targetAccountId, amount, note, false, null);
+    this(sourceAccountId, type, targetAccountId, amount, note, null, false, null);
   }
 }

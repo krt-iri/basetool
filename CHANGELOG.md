@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bank: Begründung bei Auszahlungen und Transfers (Pflicht bei KRT-, Bank- und Sonderkonten).** Eine Auszahlung oder ein Transfer — sowohl die Bankmitarbeiter-Buchung als auch der Buchungsantrag — kann jetzt eine Begründung tragen. Beim Abruf aus dem KRT-Konto, dem Bank-Konto oder einem Sonderkonto ist sie Pflicht, bei Staffel-, SK- und Bereichskonten optional (wie die Notiz); bei Einzahlungen entfällt das Feld. Die Begründung wird wie die Notiz in der Kontohistorie und im Kontoauszug- sowie Management-Report-PDF angezeigt und vom Antrag bis zur Bestätigung übernommen (REQ-BANK-045).
+
+### Changed
+
+- **Bank: Anträge ohne Freigabe-Limit brauchen jetzt immer die Freigabe des Kontoverantwortlichen.** Auf Konten mit Freigabe-Limits gilt nun: Ist für einen Nutzer — direkt oder über seine Rolle (z. B. KL) — kein Limit gesetzt, muss sein Auszahlungs-/Transfer-Antrag immer vom Kontoverantwortlichen freigegeben werden; ist ein Limit gesetzt, nur noch oberhalb des Limits. Zuvor bedeutete „kein Limit" unbegrenzt ohne Freigabe (REQ-BANK-041).
+
+- **Bank-Antragsdialog: Zielkonto und Prozentsatz erscheinen nur, wenn sie gebraucht werden.** Im Antragsdialog auf /org-unit-bank wird „Zielkonto" nur noch bei einem Transfer angezeigt und das Prozentsatz-Feld nur, wenn der Haken „Anteil gleichmäßig auf alle Staffelkonten verteilen" gesetzt ist (zuvor waren beide Felder immer sichtbar). Das Prozentsatz-Feld verhält sich ebenso im Einzahlungsdialog der Bankmitarbeiter.
+
+- **Bank-Verwaltung: „Halter" ist jetzt der erste und standardmäßig geöffnete Tab.** Auf /bank/manage steht der Halter-Tab nun links und wird beim Aufruf ohne Tab-Auswahl direkt geöffnet; der Konten-Tab folgt rechts.
+
 ## [v1.0.7](https://github.com/krt-profit/basetool/releases/tag/v1.0.7) - 2026-06-30
 
 ### Added

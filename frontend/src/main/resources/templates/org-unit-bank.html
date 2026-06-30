@@ -311,7 +311,7 @@
                                 data-role="org-unit-request-account" data-testid="org-unit-request-account">
                             <option th:each="t : ${requestTransferTargets}"
                                     th:value="${t.id()}"
-                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())}"
+                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
                                     th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
                         </select>
                         <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>
@@ -382,6 +382,18 @@
                             </p>
                             <span class="bank-field-error" data-error-for="splitPercent"></span>
                         </div>
+                    </div>
+                    <!-- Begründung (REQ-BANK-045): shown only for a WITHDRAWAL/TRANSFER, and required when
+                         the chosen source account type mandates a reason (CARTEL / CARTEL_BANK / SPECIAL).
+                         Both the visibility and the required flag are driven by bank.js
+                         (syncRequestTypeRows + updateJustificationRequired); the input is disabled while
+                         hidden so a deposit request omits it from the body entirely. -->
+                    <div class="bank-form-row" data-request-justification-only hidden>
+                        <label for="org-unit-request-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
+                        <input type="text" id="org-unit-request-justification" name="justification" maxlength="500" disabled
+                               data-testid="org-unit-request-justification" th:placeholder="#{bank.field.justification.placeholder}">
+                        <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
+                        <span class="bank-field-error" data-error-for="justification"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>

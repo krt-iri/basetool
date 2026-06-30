@@ -99,7 +99,7 @@
                             <button type="button" class="btn btn--cta btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()}"
                                     th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
@@ -139,6 +139,15 @@
                         <span th:text="#{bank.split.confirm.label}">Split-Einzahlung:</span>
                         <span data-split-confirm-percent>0</span><span>%</span>
                         <span th:text="#{bank.split.confirm.note}">des Betrags werden gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt.</span>
+                    </p>
+
+                    <!-- Requester's Begründung (REQ-BANK-045): read-only context for the confirming
+                         employee, shown only when the request carries one. Primed per row by bank.js
+                         (applyConfirmModalState) from the trigger's data-field-justification. -->
+                    <p class="bank-field-hint" data-confirm-justification hidden
+                       data-testid="bank-confirm-justification">
+                        <span th:text="#{bank.field.justification} + ':'">Begr&uuml;ndung:</span>
+                        <span data-bank-label="justification"></span>
                     </p>
 
                     <!-- Over-limit owner-approval gate (REQ-BANK-041): shown only when the request

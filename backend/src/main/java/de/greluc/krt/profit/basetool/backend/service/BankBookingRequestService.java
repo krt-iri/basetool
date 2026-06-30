@@ -119,6 +119,10 @@ public class BankBookingRequestService {
    * @param type deposit, withdrawal or transfer
    * @param amount the requested whole-aUEC amount
    * @param note the requester's optional note
+   * @param justification the requester's optional justification (Begr&uuml;ndung); required for a
+   *     {@code WITHDRAWAL} / {@code TRANSFER} from a {@linkplain
+   *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
+   *     justification-mandating} account (REQ-BANK-045)
    * @param targetAccountId the transfer destination, or {@code null} for deposit/withdrawal
    * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
    *     (snapshot)
@@ -138,6 +142,7 @@ public class BankBookingRequestService {
       @NotNull BankBookingRequestType type,
       @NotNull BigDecimal amount,
       String note,
+      @Nullable String justification,
       @Nullable UUID targetAccountId,
       boolean requiresOwnerApproval,
       @Nullable BigDecimal applicableLimit,
@@ -148,6 +153,11 @@ public class BankBookingRequestService {
             .findById(accountId)
             .orElseThrow(() -> new NotFoundException("Bank account not found"));
     requireActiveForRequest(account);
+    // REQ-BANK-045: a withdrawal/transfer request leaving a justification-mandating account
+    // (CARTEL, CARTEL_BANK, SPECIAL) must carry a non-blank Begründung; a deposit never does.
+    if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
+      BankLedgerService.requireDebitJustification(account, justification);
+    }
 
     BankAccount targetAccount = null;
     if (type == BankBookingRequestType.TRANSFER) {
@@ -175,6 +185,7 @@ public class BankBookingRequestService {
     request.setType(type);
     request.setAmount(amount);
     request.setNote(note);
+    request.setJustification(justification);
     request.setStatus(BankBookingRequestStatus.PENDING);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
@@ -393,6 +404,7 @@ public class BankBookingRequestService {
                       holderId,
                       request.getAmount(),
                       request.getNote(),
+                      request.getJustification(),
                       requesterId,
                       counterpartyOrgUnitId));
           case TRANSFER -> {
@@ -415,7 +427,8 @@ public class BankBookingRequestService {
                     target.getId(),
                     destinationHolderId,
                     request.getAmount(),
-                    request.getNote()),
+                    request.getNote(),
+                    request.getJustification()),
                 true);
           }
         };
@@ -702,6 +715,7 @@ public class BankBookingRequestService {
         request.getType(),
         request.getAmount(),
         request.getNote(),
+        request.getJustification(),
         request.getStatus(),
         request.getRequesterHandle(),
         holder == null ? null : holder.getId(),

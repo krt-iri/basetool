@@ -148,7 +148,13 @@ public class BankLedgerService {
     // fee, so the full amount lands on the account and the holder's stash (REQ-BANK-033).
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now, counterparty);
+            BankTransactionType.DEPOSIT,
+            request.note(),
+            null,
+            null,
+            BigDecimal.ZERO,
+            now,
+            counterparty);
     persistAccountPosting(tx, account, request.amount(), now);
     persistHolderPosting(tx, holder, request.amount(), now);
     bankAuditService.record(
@@ -254,7 +260,13 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.DEPOSIT, request.note(), null, BigDecimal.ZERO, now, counterparty);
+            BankTransactionType.DEPOSIT,
+            request.note(),
+            null,
+            null,
+            BigDecimal.ZERO,
+            now,
+            counterparty);
     // The named account keeps the remainder; a 100 % split leaves nothing for it, so its leg is
     // dropped (a posting is never zero, REQ-BANK-004).
     if (namedShare.signum() > 0) {
@@ -339,6 +351,7 @@ public class BankLedgerService {
   public BankTransactionDto bookWithdrawal(@NotNull BankWithdrawalRequest request) {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
+    requireDebitJustification(account, request.justification());
     BankHolder holder = requireHolder(request.holderId());
     CounterpartySnapshot counterparty =
         resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
@@ -350,7 +363,13 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.WITHDRAWAL, request.note(), null, fee, now, counterparty);
+            BankTransactionType.WITHDRAWAL,
+            request.note(),
+            request.justification(),
+            null,
+            fee,
+            now,
+            counterparty);
     persistAccountPosting(tx, account, debit.negate(), now);
     persistHolderPosting(tx, holder, debit.negate(), now);
     bankAuditService.record(
@@ -416,6 +435,7 @@ public class BankLedgerService {
     }
     requireActive(source);
     requireActive(destination);
+    requireDebitJustification(source, request.justification());
 
     final BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
@@ -434,7 +454,14 @@ public class BankLedgerService {
 
     Instant now = Instant.now();
     BankTransaction tx =
-        persistTransaction(BankTransactionType.TRANSFER, request.note(), null, fee, now, null);
+        persistTransaction(
+            BankTransactionType.TRANSFER,
+            request.note(),
+            request.justification(),
+            null,
+            fee,
+            now,
+            null);
     persistAccountPosting(tx, source, debit.negate(), now);
     persistAccountPosting(tx, destination, request.amount(), now);
     persistHolderPosting(tx, sourceHolder, debit.negate(), now);
@@ -488,7 +515,13 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.HOLDER_TRANSFER, request.note(), null, BigDecimal.ZERO, now, null);
+            BankTransactionType.HOLDER_TRANSFER,
+            request.note(),
+            null,
+            null,
+            BigDecimal.ZERO,
+            now,
+            null);
     persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
     persistHolderPosting(tx, destinationHolder, request.amount(), now);
     bankAuditService.record(
@@ -575,7 +608,7 @@ public class BankLedgerService {
     // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
         persistTransaction(
-            BankTransactionType.REVERSAL, note, original, BigDecimal.ZERO, now, null);
+            BankTransactionType.REVERSAL, note, null, original, BigDecimal.ZERO, now, null);
     for (BankCounterLeg leg : accountLegs) {
       persistAccountPosting(
           reversal, lockedAccounts.get(leg.accountId()), leg.amount().negate(), now);
@@ -635,7 +668,13 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.WIPE_RESET, "SC wipe reset", null, BigDecimal.ZERO, now, null);
+            BankTransactionType.WIPE_RESET,
+            "SC wipe reset",
+            null,
+            null,
+            BigDecimal.ZERO,
+            now,
+            null);
     BigDecimal totalZeroed = BigDecimal.ZERO;
     for (BankAccount account : accounts) {
       BigDecimal balance = accountBalances.get(account.getId());
@@ -695,6 +734,30 @@ public class BankLedgerService {
           BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
           "The account is closed and rejects postings",
           Map.of("accountNo", account.getAccountNo()));
+    }
+  }
+
+  /**
+   * Enforces the conditional Begr&uuml;ndung rule (REQ-BANK-045) for a debit (withdrawal/transfer)
+   * leaving the given account: when the account type {@linkplain
+   * BankAccountType#requiresDebitJustification() mandates a reason} ({@code CARTEL}, {@code
+   * CARTEL_BANK}, {@code SPECIAL}) the justification must be present and non-blank. Shared by the
+   * direct-booking paths here and the booking-request create path (after its own type guard). A
+   * deposit never reaches this check.
+   *
+   * @param account the debited (source/paying) account
+   * @param justification the supplied justification, or {@code null}
+   * @throws BankConflictException with {@code BANK_JUSTIFICATION_REQUIRED} when a reason is
+   *     mandated but missing
+   */
+  static void requireDebitJustification(
+      @NotNull BankAccount account, @Nullable String justification) {
+    if (account.getType().requiresDebitJustification()
+        && (justification == null || justification.isBlank())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED,
+          "A justification is required for a withdrawal or transfer from this account",
+          Map.of("accountNo", account.getAccountNo(), "accountType", account.getType().name()));
     }
   }
 
@@ -803,6 +866,8 @@ public class BankLedgerService {
    *
    * @param type the transaction type
    * @param note optional free-text note
+   * @param justification optional free-text justification (Begr&uuml;ndung), only a {@code
+   *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045); {@code null} otherwise
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
    * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
    *     BigDecimal#ZERO} for non-fee transactions
@@ -815,6 +880,7 @@ public class BankLedgerService {
   private BankTransaction persistTransaction(
       @NotNull BankTransactionType type,
       @Nullable String note,
+      @Nullable String justification,
       @Nullable BankTransaction reversed,
       @NotNull BigDecimal fee,
       @NotNull Instant now,
@@ -824,6 +890,7 @@ public class BankLedgerService {
             .type(type)
             .initiatedBy(authHelperService.currentUserId().orElse(null))
             .note(note)
+            .justification(justification)
             .reversedTransaction(reversed)
             .transferFee(fee)
             .counterpartyUserId(counterparty == null ? null : counterparty.userId())

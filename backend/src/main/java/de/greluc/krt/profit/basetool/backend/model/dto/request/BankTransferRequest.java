@@ -42,6 +42,11 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationHolderId the player whose stash grows
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
+ * @param justification optional free-text justification (Begr&uuml;ndung) for the booking history
+ *     and statements (REQ-BANK-045); required by the service when the source account type
+ *     {@linkplain
+ *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
+ *     mandates a reason}, optional otherwise
  */
 public record BankTransferRequest(
     @NotNull UUID sourceAccountId,
@@ -49,4 +54,36 @@ public record BankTransferRequest(
     @NotNull UUID destinationAccountId,
     @NotNull UUID destinationHolderId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
-    @Nullable @Size(max = 500) String note) {}
+    @Nullable @Size(max = 500) String note,
+    @Nullable @Size(max = 500) String justification) {
+
+  /**
+   * Convenience constructor for a transfer without a recorded justification (the pre-REQ-BANK-045
+   * shape), delegating to the canonical constructor with {@code justification} {@code null}.
+   * Inbound JSON is always deserialized via the canonical (all-component) constructor, so this
+   * overload only serves programmatic callers.
+   *
+   * @param sourceAccountId the account the value leaves
+   * @param sourceHolderId the player whose stash shrinks
+   * @param destinationAccountId the account the value enters (must differ from the source)
+   * @param destinationHolderId the player whose stash grows
+   * @param amount whole-aUEC amount, at least 1
+   * @param note optional free-text note for the booking history and statements
+   */
+  public BankTransferRequest(
+      UUID sourceAccountId,
+      UUID sourceHolderId,
+      UUID destinationAccountId,
+      UUID destinationHolderId,
+      BigDecimal amount,
+      @Nullable String note) {
+    this(
+        sourceAccountId,
+        sourceHolderId,
+        destinationAccountId,
+        destinationHolderId,
+        amount,
+        note,
+        null);
+  }
+}

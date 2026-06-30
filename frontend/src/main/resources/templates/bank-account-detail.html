@@ -119,6 +119,7 @@
                             <th th:text="#{bank.booking.holder}">Halter</th>
                             <th th:text="#{bank.booking.counterparty}">Gegenpartei</th>
                             <th th:text="#{bank.booking.note}">Notiz</th>
+                            <th th:text="#{bank.booking.justification}">Begr&uuml;ndung</th>
                             <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
                             <th sec:authorize="hasRole('BANK_MANAGEMENT')"></th>
                         </tr>
@@ -149,6 +150,8 @@
                                       th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
                             </td>
                             <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
+                            <td class="bank-note-cell" data-testid="bank-booking-justification"
+                                th:text="${b.justification()}" th:title="${b.justification()}"></td>
                             <td class="text-right">
                                 <span class="bank-amount"
                                       th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
@@ -383,6 +386,16 @@
                         <span class="bank-field-hint" th:text="#{bank.field.counterparty.orgUnit.hint}">Optional: Einheit der Person.</span>
                         <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
                     </div>
+                    <!-- Begründung (REQ-BANK-045): always shown for a withdrawal; required when the
+                         paying account type mandates a reason (CARTEL / CARTEL_BANK / SPECIAL),
+                         optional for ORG_UNIT / AREA — decided server-side from acct.type(). -->
+                    <div class="bank-form-row">
+                        <label for="bank-withdraw-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
+                        <input type="text" id="bank-withdraw-justification" name="justification" maxlength="500"
+                               th:required="${acct.type() == 'CARTEL' or acct.type() == 'CARTEL_BANK' or acct.type() == 'SPECIAL'}"
+                               data-testid="bank-withdraw-justification" th:placeholder="#{bank.field.justification.placeholder}">
+                        <span class="bank-field-error" data-error-for="justification"></span>
+                    </div>
                     <div class="bank-form-row">
                         <label for="bank-withdraw-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="bank-withdraw-note" name="note" maxlength="500"
@@ -459,6 +472,16 @@
                         </select>
                         <span class="bank-field-hint" th:text="#{bank.field.holder.target.hint}">Gleicher Halter = Custody bleibt unver&auml;ndert.</span>
                         <span class="bank-field-error" data-error-for="destinationHolderId"></span>
+                    </div>
+                    <!-- Begründung (REQ-BANK-045): always shown for a transfer; required when the
+                         source account type mandates a reason (CARTEL / CARTEL_BANK / SPECIAL),
+                         optional for ORG_UNIT / AREA — decided server-side from acct.type(). -->
+                    <div class="bank-form-row">
+                        <label for="bank-transfer-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
+                        <input type="text" id="bank-transfer-justification" name="justification" maxlength="500"
+                               th:required="${acct.type() == 'CARTEL' or acct.type() == 'CARTEL_BANK' or acct.type() == 'SPECIAL'}"
+                               data-testid="bank-transfer-justification" th:placeholder="#{bank.field.justification.placeholder}">
+                        <span class="bank-field-error" data-error-for="justification"></span>
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-transfer-note" th:text="#{bank.field.note}">Notiz</label>
