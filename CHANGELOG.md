@@ -4,8 +4,6 @@
 
 ### Added
 
-- **Automatische, verschlüsselte Off-Site-Backups auf Nextcloud mit wöchentlicher Wiederherstellungsprobe.** Der Produktionsserver sichert jede Nacht um 04:15 beide Datenbanken (Anwendung + Keycloak), die Reverse-Proxy-Konfiguration und die für eine vollständige Wiederherstellung nötigen Host-Geheimnisse client-seitig verschlüsselt per restic auf eine Nextcloud-Freigabe (Aufbewahrung 7 täglich/4 wöchentlich/6 monatlich, ausgehend, ohne offenen Zugang zum Server). Für konsistente Daten werden die schreibenden Dienste nur für den Datenbank-Dump kurz pausiert (Sekunden, innerhalb des Fensters 04:00–05:00; der langsame Upload läuft danach im laufenden Betrieb). Eine wöchentliche Probe spielt das jüngste Backup testweise in eine Wegwerf-Datenbank zurück und meldet einen Fehler, falls es nicht sauber wiederherstellbar ist. Redis (Sitzungen) und der WireGuard-Schlüssel bleiben bewusst außen vor. Details: docs/backup.md, REQ-OPS-008..012, ADR-0056.
-
 - **Bank: Begründung bei Auszahlungen und Transfers (Pflicht bei KRT-, Bank- und Sonderkonten).** Eine Auszahlung oder ein Transfer — sowohl die Bankmitarbeiter-Buchung als auch der Buchungsantrag — kann jetzt eine Begründung tragen. Beim Abruf aus dem KRT-Konto, dem Bank-Konto oder einem Sonderkonto ist sie Pflicht, bei Staffel-, SK- und Bereichskonten optional (wie die Notiz); bei Einzahlungen entfällt das Feld. Die Begründung wird wie die Notiz in der Kontohistorie und im Kontoauszug- sowie Management-Report-PDF angezeigt und vom Antrag bis zur Bestätigung übernommen (REQ-BANK-045).
 
 ### Changed
@@ -15,6 +13,12 @@
 - **Bank-Antragsdialog: Zielkonto und Prozentsatz erscheinen nur, wenn sie gebraucht werden.** Im Antragsdialog auf /org-unit-bank wird „Zielkonto" nur noch bei einem Transfer angezeigt und das Prozentsatz-Feld nur, wenn der Haken „Anteil gleichmäßig auf alle Staffelkonten verteilen" gesetzt ist (zuvor waren beide Felder immer sichtbar). Das Prozentsatz-Feld verhält sich ebenso im Einzahlungsdialog der Bankmitarbeiter.
 
 - **Bank-Verwaltung: „Halter" ist jetzt der erste und standardmäßig geöffnete Tab.** Auf /bank/manage steht der Halter-Tab nun links und wird beim Aufruf ohne Tab-Auswahl direkt geöffnet; der Konten-Tab folgt rechts.
+
+## [v1.0.7](https://github.com/krt-profit/basetool/releases/tag/v1.0.7) - 2026-06-30
+
+### Added
+
+- **Automatische, verschlüsselte Off-Site-Backups auf Nextcloud mit wöchentlicher Wiederherstellungsprobe.** Der Produktionsserver sichert jede Nacht um 04:15 beide Datenbanken (Anwendung + Keycloak), die Reverse-Proxy-Konfiguration und die für eine vollständige Wiederherstellung nötigen Host-Geheimnisse client-seitig verschlüsselt per restic auf eine Nextcloud-Freigabe (Aufbewahrung 7 täglich/4 wöchentlich/6 monatlich, ausgehend, ohne offenen Zugang zum Server). Für konsistente Daten werden die schreibenden Dienste nur für den Datenbank-Dump kurz pausiert (Sekunden, innerhalb des Fensters 04:00–05:00; der langsame Upload läuft danach im laufenden Betrieb). Eine wöchentliche Probe spielt das jüngste Backup testweise in eine Wegwerf-Datenbank zurück und meldet einen Fehler, falls es nicht sauber wiederherstellbar ist. Redis (Sitzungen) und der WireGuard-Schlüssel bleiben bewusst außen vor. Details: docs/backup.md, REQ-OPS-008..012, ADR-0056.
 
 ## [v1.0.6](https://github.com/krt-profit/basetool/releases/tag/v1.0.6) - 2026-06-30
 
