@@ -1,0 +1,20 @@
+# logrotate(8) configuration for /var/log/iri-restore-drill.log.
+#
+# Installation (on the production host, one-time):
+#   sudo cp /var/iri/code/scripts/iri-restore-drill.logrotate /etc/logrotate.d/iri-restore-drill
+#   sudo chown root:root /etc/logrotate.d/iri-restore-drill
+#   sudo chmod 0644       /etc/logrotate.d/iri-restore-drill
+#
+# `copytruncate` is required because iri-restore-drill.service appends via
+# `StandardOutput=append:...`, holding the fd open across logrotate's run.
+
+/var/log/iri-restore-drill.log {
+    monthly
+    rotate 12
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 deploy adm
+}
