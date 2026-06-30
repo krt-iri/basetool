@@ -87,7 +87,10 @@ public class BankManagePageController {
         backendApiClient.get(
             "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
     model.addAttribute(
-        "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
+        "accounts",
+        accounts == null
+            ? List.<BankAccountDto>of()
+            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder

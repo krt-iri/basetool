@@ -217,19 +217,13 @@
                 </div>
             </div>
 
-            <!-- Approval limits (REQ-BANK-041): read-only for a plain employee (self-boxed), editable
-                 for bank management / admin (wrapped in a panel here). Lives inside accountBody so a
-                 limit write swaps it in place. -->
+            <!-- Approval limits (REQ-BANK-041): read-only here for every viewer. The bank-staff
+                 account-detail surface never edits limits — the backend always assembles them with
+                 canEdit=false, so the display block renders whenever a limit is set, regardless of
+                 the viewer's role. Configuring limits happens exclusively in the org-unit bank
+                 settings. Lives inside accountBody so a peer's limit write swaps it in on refresh. -->
             <th:block
                 th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
-            <div class="bank-panel"
-                 th:if="${detail.approvalLimits() != null and detail.approvalLimits().canEdit()}"
-                 data-testid="bank-approval-limit-panel">
-                <div class="bank-panel-body">
-                    <th:block
-                        th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${detail.approvalLimits()}, ${users}, 'accountBody')}"></th:block>
-                </div>
-            </div>
         </div>
     </div>
 

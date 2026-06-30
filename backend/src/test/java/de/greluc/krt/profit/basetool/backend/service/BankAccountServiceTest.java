@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
@@ -73,6 +74,7 @@ class BankAccountServiceTest {
   @Mock private BankAuditService bankAuditService;
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankGrantService bankGrantService;
+  @Mock private BankApprovalLimitService bankApprovalLimitService;
 
   @InjectMocks private BankAccountService bankAccountService;
 
@@ -463,6 +465,23 @@ class BankAccountServiceTest {
         ObjectOptimisticLockingFailureException.class,
         () -> bankAccountService.setBalanceTarget(accountId, new BigDecimal("1"), 4L));
     verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement() {
+    // REQ-BANK-041: the bank-staff account-detail surface never edits approval limits. Even a
+    // management caller gets the read-only variant (assemble called with canEdit == false) — limits
+    // are set/cleared exclusively in the org-unit bank settings, so this surface only displays
+    // them.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = accountWithVersion(accountId, 1L);
+    account.setType(BankAccountType.ORG_UNIT);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    bankAccountService.getAccountDetail(
+        accountId, new BankCapabilitiesDto(false, false, false, true));
+
+    verify(bankApprovalLimitService).assemble(account, false);
   }
 
   /** Creates an account in the management perspective (any type, no auto-grant). */
