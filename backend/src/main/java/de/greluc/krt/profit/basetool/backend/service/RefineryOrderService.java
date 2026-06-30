@@ -104,14 +104,34 @@ public class RefineryOrderService {
   }
 
   /**
-   * Convenience overload without status filter.
+   * Lists a target user's refinery orders for the cross-user oversight endpoint {@code GET
+   * /api/v1/refinery-orders/users/{userId}}, filtered to the caller's effective org-unit scope.
    *
-   * @param userId owner id
+   * <p>Security (finding SEC-01): the per-user {@code @PreAuthorize} gate {@link
+   * OwnerScopeService#canViewUserRefineryOrders(UUID)} is only a coarse user-level pre-check — it
+   * passes when the caller shares <em>any one</em> of the (up to two, REQ-ORG-017) org units the
+   * target belongs to. The precise per-row filtering happens here via {@link
+   * RefineryOrderRepository#findByOwnerIdScoped} and the caller's {@link ScopePredicate}, so a
+   * logistician who shares only one of a multi-Staffel target's units never sees the target's
+   * orders stamped to the other, foreign unit. Refinery is a strict-staffel aggregate with no
+   * cross-squadron escape, mirroring {@link #getMissionRefineryOrdersScoped} (BAC-004). The
+   * self-service "my orders" list ({@code GET /my-orders}) stays owner-scoped and unfiltered via
+   * {@link #getMyRefineryOrders(UUID, List, Pageable)} — a user always sees all of their own orders
+   * (REQ-ORG-011 owner escape).
+   *
+   * @param targetUserId the user whose orders to list; never {@code null}
    * @param pageable page request
-   * @return paged orders owned by the user
+   * @return the in-scope page of the target user's orders
    */
-  public Page<RefineryOrder> getMyRefineryOrders(@NotNull UUID userId, @NotNull Pageable pageable) {
-    return refineryOrderRepository.findByOwnerId(userId, pageable);
+  public Page<RefineryOrder> getUserRefineryOrdersScoped(
+      @NotNull UUID targetUserId, @NotNull Pageable pageable) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return refineryOrderRepository.findByOwnerIdScoped(
+        targetUserId,
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**

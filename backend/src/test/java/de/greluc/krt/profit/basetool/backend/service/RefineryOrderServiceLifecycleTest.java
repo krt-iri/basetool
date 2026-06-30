@@ -77,8 +77,9 @@ import org.springframework.security.access.AccessDeniedException;
  *
  * <ul>
  *   <li>{@link RefineryOrderService#getRefineryOrder} not-found path.
- *   <li>{@link RefineryOrderService#getMyRefineryOrders} (both overloads and with/without status
- *       filter).
+ *   <li>{@link RefineryOrderService#getMyRefineryOrders} (self list, with/without status filter).
+ *   <li>{@link RefineryOrderService#getUserRefineryOrdersScoped} (cross-user oversight list — the
+ *       org-unit-scoped path that closes finding SEC-01).
  *   <li>{@link RefineryOrderService#getAllRefineryOrders} (both overloads and with/without status
  *       filter).
  *   <li>{@link RefineryOrderService#getMissionRefineryOrdersScoped} (org-unit-scoped logistician
@@ -211,11 +212,51 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
-    void getMyRefineryOrders_secondOverload_delegatesToOwnerVariant() {
+    void getUserRefineryOrdersScoped_adminAllScope_forwardsAdminAllScopeToScopedQuery() {
+      // SEC-01: the cross-user oversight list must go through the org-unit-scoped query, never the
+      // unscoped findByOwnerId. An admin with no active pin resolves to adminAllScope=true and sees
+      // every order the target owns.
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findByOwnerId(OWNER_ID, pageable)).thenReturn(page);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(true, null, Set.of()));
+      when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, true, null, Set.of(), pageable))
+          .thenReturn(page);
 
-      assertEquals(1, service.getMyRefineryOrders(OWNER_ID, pageable).getTotalElements());
+      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
+      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+    }
+
+    @Test
+    void getUserRefineryOrdersScoped_nonAdminMemberUnion_forwardsOnlyTheCallersOrgUnits() {
+      // SEC-01 core regression: the caller (a logistician) is a member of exactly one Staffel. The
+      // service must forward ONLY that org unit to the scoped query, so the target's orders stamped
+      // to a second, foreign Staffel are never requested — even though the coarse
+      // canViewUserRefineryOrders gate let the caller through on the one shared Staffel.
+      UUID callerStaffelA = UUID.randomUUID();
+      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffelA)));
+      when(refineryOrderRepository.findByOwnerIdScoped(
+              OWNER_ID, false, null, Set.of(callerStaffelA), pageable))
+          .thenReturn(page);
+
+      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
+      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+    }
+
+    @Test
+    void getUserRefineryOrdersScoped_pinnedCaller_forwardsActiveOrgUnitId() {
+      // A caller pinned to a single org unit forwards activeOrgUnitId and an empty member set, so
+      // the scoped query narrows to the pinned unit only.
+      UUID pinned = UUID.randomUUID();
+      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, pinned, Set.of()));
+      when(refineryOrderRepository.findByOwnerIdScoped(OWNER_ID, false, pinned, Set.of(), pageable))
+          .thenReturn(page);
+
+      assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
+      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
     }
 
     @Test

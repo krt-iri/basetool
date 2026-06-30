@@ -76,7 +76,19 @@ Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back
 reach stays own-squadron: the two previously-unscoped per-user refinery endpoints (`GET` / `POST
 /api/v1/refinery-orders/users/{userId}`) were scoped with `@ownerScopeService.canViewUserRefineryOrders`
 / `canManageUserRefineryOrders` (PR #808 security review) so the flat role can no longer act org-wide
-there — matching the strict-staffel reach the per-order refinery checks already used.
+there.
+
+The `canView/canManageUserRefineryOrders` gate is a **coarse user-level pre-check**: it passes when
+the caller shares *any one* of the target user's org units (`anyMatch`). Because a member may belong
+to up to two Staffeln (REQ-ORG-017), the gate alone does **not** bound which of the target's rows the
+caller sees — so it must be paired with per-row org-unit filtering. **Read path (finding SEC-01):**
+`GET /users/{userId}` lists through the strict-staffel scoped query `findByOwnerIdScoped`
+(`getUserRefineryOrdersScoped`), so a logistician sharing only one of a multi-Staffel target's units
+never reads the target's orders stamped to the other, foreign unit — the list can never return a row
+the per-order `canSeeRefineryOrder` gate would individually deny. **Write path:** `POST
+/users/{userId}` constrains the new order's `owningOrgUnit` through `resolveStampedOrgUnit` (the stamp
+must be a membership of the target *or* a unit the caller may edit), which is not a disclosure (a row
+stamped outside the caller's scope is one the caller cannot read back).
 
 **Acceptance**
 
@@ -86,8 +98,12 @@ there — matching the strict-staffel reach the per-order refinery checks alread
 - [x] The flat `ROLE_LOGISTICIAN` does not grant org-wide reach: the per-user refinery endpoints are
   owner-scoped to the caller's strict org-unit scope (admin / self / a unit the target user belongs
   to), for every oversight rank — squadron ranks included.
+- [x] The `GET /users/{userId}` list is filtered **per row** to the caller's org-unit scope via
+  `findByOwnerIdScoped`, so a caller sharing only one of a multi-Staffel target's units cannot read
+  the target's orders stamped to the other unit (finding SEC-01) — the coarse `anyMatch` gate is not
+  relied on for per-row isolation.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (incl. `staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade`), `OwnerScopeServiceTest` (`CanActOnUserRefineryOrdersTests`), `RefineryOrderServiceLifecycleTest` (`getUserRefineryOrdersScoped_*`), `RefineryOrderRepositoryScopedTest`, `MembershipRoleMigrationEquivalenceTest` · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitCascadeService`, `OwnerScopeService#canViewUserRefineryOrders` / `#canManageUserRefineryOrders`, `RefineryOrderService#getUserRefineryOrdersScoped`, `RefineryOrderRepository#findByOwnerIdScoped`, `RefineryOrderController` · **Decision:** ADR-0042 · **Issues:** #800 · **Security:** SEC-01
 
 ### REQ-ROLE-003 — Kommandogruppe entity
 

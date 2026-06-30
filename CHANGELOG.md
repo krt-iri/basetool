@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Raffinerie: Nutzerbezogene Auftragsliste wird jetzt streng auf den eigenen Sichtbarkeitsbereich gefiltert.** Rief ein Logistiker die Raffinerie-Auftragsliste eines Mitglieds ab (`GET /api/v1/refinery-orders/users/{userId}`), bekam er bisher alle Aufträge des Mitglieds — auch solche, die einer Staffel zugeordnet sind, die der Logistiker selbst nicht sieht (möglich, weil ein Mitglied zu zwei Staffeln gehören kann). Die Liste wird jetzt pro Zeile auf den Org-Einheits-Sichtbarkeitsbereich des Aufrufers eingeschränkt und gibt keine fremden Staffel-Aufträge mehr preis (SEC-01).
+
 ## [v1.0.9](https://github.com/krt-profit/basetool/releases/tag/v1.0.9) - 2026-06-30
 
 ### Added
