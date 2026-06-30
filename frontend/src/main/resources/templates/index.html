@@ -64,11 +64,6 @@
 
         <div th:if="${not #lists.isEmpty(upcomingMissions)}" class="grid-auto-cards mt-1">
             <div th:each="mission : ${upcomingMissions}" class="hud-box mission-tile">
-                <!-- Flag own-unit missions (owning Staffel in myOrgUnitIds) with the own-unit chip
-                     (REQ-MISSION-012). myOrgUnitIds is empty for guests, so the chip never shows. -->
-                <div th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="mission-tile__badge">
-                    <span class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
-                </div>
                 <div class="mission-info-grid">
                      <strong th:text="#{mission.name} + ':'">Name:</strong> <span th:text="${mission.name}">Mission Name</span>
                      <strong th:text="#{mission.owningOrgUnit} + ':'">Verantwortliche Einheit:</strong> <span th:text="${mission.owningSquadron != null ? mission.owningSquadron.name : #messages.msg('mission.owningOrgUnit.none')}">Einheit</span>
@@ -90,6 +85,13 @@
                 </div>
                 <div sec:authorize="isAuthenticated()" class="mission-tile__actions">
                     <a th:href="@{/missions/{id}(id=${mission.id})}" class="btn btn--cta" th:text="#{mission.open_mission}">Einsatz öffnen</a>
+                    <!-- Own-unit chip pinned to the bottom-right of the tile (REQ-MISSION-012):
+                         kept out of the top of the flow (right of the CTA via margin-left:auto) so a
+                         chip never adds a row above the body and every tile's body text starts at the
+                         same height, with or without the chip. myOrgUnitIds is empty for guests, so
+                         the chip never shows; the chip implies an authenticated viewer, so it is safe
+                         inside this isAuthenticated() block. -->
+                    <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="chip chip--primary mission-tile__badge" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
                 </div>
             </div>
         </div>
