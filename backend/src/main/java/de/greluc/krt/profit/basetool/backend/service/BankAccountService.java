@@ -119,18 +119,18 @@ public class BankAccountService {
    * {@code BankSecurityService.canSee}; the controller also evaluates and passes the capability
    * flags so this service stays free of authentication concerns.
    *
+   * <p>The approval limits are always assembled <strong>read-only</strong> ({@code canEdit =
+   * false}): per REQ-BANK-041 limits are configured exclusively on the org-unit bank settings
+   * surface, so this bank-staff detail aggregate (and the org-unit read-only display that reuses
+   * it) only ever shows the configured ceilings — it never offers the editor.
+   *
    * @param accountId the account
    * @param capabilities the caller's evaluated capabilities on the account
-   * @param canConfigureApprovalLimits whether the caller may edit this account's approval limits on
-   *     the bank surface (bank management / admin), passed in by the controller so this service
-   *     stays free of authentication concerns
    * @return the detail payload
    * @throws NotFoundException when the account does not exist
    */
   public BankAccountDetailDto getAccountDetail(
-      @NotNull UUID accountId,
-      @NotNull BankCapabilitiesDto capabilities,
-      boolean canConfigureApprovalLimits) {
+      @NotNull UUID accountId, @NotNull BankCapabilitiesDto capabilities) {
     BankAccount account = requireAccount(accountId);
     BigDecimal balance = postingRepository.accountBalance(accountId);
     Instant cutoff = Instant.now().minus(DELTA_WINDOW);
@@ -143,7 +143,7 @@ public class BankAccountService {
         delta,
         postingRepository.countByAccountId(accountId),
         capabilities,
-        bankApprovalLimitService.assemble(account, canConfigureApprovalLimits));
+        bankApprovalLimitService.assemble(account, false));
   }
 
   /**

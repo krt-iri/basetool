@@ -125,11 +125,16 @@
         <div th:if="${hasSettingsTab}" id="oud-panel-settings" data-tabpanel="settings" role="tabpanel"
              aria-labelledby="oud-tab-settings" hidden>
 
-        <!-- Responsibility settings (REQ-BANK-035/-036): only for the holder / OL. -->
-        <div class="hud-box mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
+        <!-- Responsibility settings (REQ-BANK-035/-036/-041): only for the holder / OL. The three
+             independent areas — Kontostandsziel, Sichtbarkeit, Freigabe-Limits — each render as their
+             own hud-box tile inside a responsive auto-fit grid, so they sit side by side when the
+             screen is wide enough for their content and stack to fewer columns (down to one on a
+             phone) otherwise. The grid keeps the org-unit-bank-settings testid so the settings swap
+             target and the tests still resolve the region. -->
+        <div class="oud-settings-grid mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
 
-            <!-- Balance target -->
-            <div th:if="${settings.canSetTarget()}" class="mt-2" data-testid="org-unit-bank-target-settings">
+            <!-- Balance target tile -->
+            <div th:if="${settings.canSetTarget()}" class="hud-box" data-testid="org-unit-bank-target-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
                 <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
                     Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
@@ -155,7 +160,7 @@
                  filled CTAs. Each entry shows a chip--success "granted" + a ghost "remove" when the
                  grant is set, and an outline "grant" otherwise. Endpoints/methods/_id/data-refresh are
                  unchanged from the previous chip layout. -->
-            <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="mt-2"
+            <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="hud-box"
                  data-testid="org-unit-bank-visibility-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
                 <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.visibility.hint}">
@@ -233,10 +238,16 @@
                 </form>
             </div>
 
-            <!-- Approval limits (REQ-BANK-041): responsible holder / management / admin set per-tier
-                 ceilings up to which a tier may request without explicit approval. -->
-            <th:block
-                th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
+            <!-- Approval limits tile (REQ-BANK-041): responsible holder / management / admin set
+                 per-tier ceilings up to which a tier may request without explicit approval. Its own
+                 hud-box so it sits beside the target + visibility tiles; the th:if mirrors the
+                 fragment's own canEdit guard so the tile never renders empty. -->
+            <div class="hud-box"
+                 th:if="${settings.approvalLimits() != null and settings.approvalLimits().canEdit()}"
+                 data-testid="org-unit-bank-approval-limit-tile">
+                <th:block
+                    th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
+            </div>
         </div>
         </div>
     </th:block>

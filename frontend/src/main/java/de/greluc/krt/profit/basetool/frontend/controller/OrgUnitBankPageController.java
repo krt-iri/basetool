@@ -100,7 +100,8 @@ public class OrgUnitBankPageController {
             balancesFuture, ownRequestsFuture, foreignRequestsFuture, transferTargetsFuture)
         .join();
 
-    List<OrgUnitBankBalanceDto> safeBalances = balancesFuture.join();
+    List<OrgUnitBankBalanceDto> safeBalances =
+        BankAccountOrder.byName(balancesFuture.join(), OrgUnitBankBalanceDto::accountName);
     model.addAttribute("balances", safeBalances);
     model.addAttribute("ownRequests", ownRequestsFuture.join());
     model.addAttribute("sparks", sparksByAccountId(safeBalances));
@@ -122,8 +123,10 @@ public class OrgUnitBankPageController {
     model.addAttribute(
         "hasResponsibleAccounts",
         safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
-    // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042).
-    List<BankAccountRefDto> transferTargets = transferTargetsFuture.join();
+    // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042), ordered A→Z
+    // by name like every other account picker (BankAccountOrder).
+    List<BankAccountRefDto> transferTargets =
+        BankAccountOrder.byName(transferTargetsFuture.join(), BankAccountRefDto::name);
     model.addAttribute("requestTransferTargets", transferTargets);
     // The request CTA + modal are shown whenever a request is possible at all — since a deposit may
     // target any active account, that is whenever at least one active account exists

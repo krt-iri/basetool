@@ -147,8 +147,7 @@ public class BankAccountController {
             bankSecurityService.canWithdraw(id, authentication),
             bankSecurityService.canTransfer(id, authentication),
             bankSecurityService.isManagement());
-    return bankAccountService.getAccountDetail(
-        id, capabilities, bankSecurityService.isManagement());
+    return bankAccountService.getAccountDetail(id, capabilities);
   }
 
   /**

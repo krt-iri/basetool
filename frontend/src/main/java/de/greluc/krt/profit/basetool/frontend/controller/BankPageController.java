@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -87,13 +86,9 @@ public class BankPageController {
     List<BankDashboardCardView> cards =
         dashboard == null
             ? List.of()
-            : dashboard.accounts().stream()
-                .map(BankPageController::toCardView)
-                .sorted(
-                    Comparator.comparing(
-                        card -> card.account().name() == null ? "" : card.account().name(),
-                        String.CASE_INSENSITIVE_ORDER))
-                .toList();
+            : BankAccountOrder.byName(
+                dashboard.accounts().stream().map(BankPageController::toCardView).toList(),
+                card -> card.account().name());
     model.addAttribute("dashboard", dashboard);
     model.addAttribute("cards", cards);
     model.addAttribute("now", java.time.Instant.now().toString());
@@ -151,16 +146,18 @@ public class BankPageController {
         "transferTargets",
         accounts == null
             ? List.<BankAccountDto>of()
-            : accounts.content().stream()
-                .filter(a -> !a.id().equals(id))
-                .filter(a -> "ACTIVE".equals(a.status()))
-                .toList());
+            : BankAccountOrder.byName(
+                accounts.content().stream()
+                    .filter(a -> !a.id().equals(id))
+                    .filter(a -> "ACTIVE".equals(a.status()))
+                    .toList(),
+                BankAccountDto::name));
     model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
-    // User lookup feeds two pickers: the deposit/withdrawal counterparty (Einzahler / Empfänger,
-    // REQ-BANK-044) shown to every booking employee, and the approval-limit editor (REQ-BANK-041,
-    // management/admin only). Since the counterparty picker is on the always-present booking
-    // modals,
-    // the lookup is fetched on every detail render (the /lookup gate now admits BANK_EMPLOYEE).
+    // User lookup feeds the deposit/withdrawal counterparty picker (Einzahler / Empfänger,
+    // REQ-BANK-044) on the always-present booking modals, so it is fetched on every detail render
+    // (the /lookup gate now admits BANK_EMPLOYEE). Approval limits are read-only on this surface
+    // (REQ-BANK-041) — they are configured only in the org-unit bank — so the lookup no longer
+    // feeds a limit editor here.
     List<UserReferenceDto> lookup =
         backendApiClient.get(
             "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});

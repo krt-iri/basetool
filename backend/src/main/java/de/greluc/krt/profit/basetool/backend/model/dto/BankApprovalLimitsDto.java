@@ -36,8 +36,10 @@ import org.jetbrains.annotations.Nullable;
  * #availableRoleCodes}), the all-members bucket ({@link #allMembersSupported}) and individual
  * users.
  *
- * @param canEdit whether the calling surface may set/clear limits (responsible holder / bank
- *     management / admin on the org-unit surface; management / admin on the bank surface)
+ * @param canEdit whether the calling surface may set/clear limits — only the org-unit bank settings
+ *     surface ever sets this {@code true} (responsible holder / bank management / admin,
+ *     REQ-BANK-041); the bank-staff account-detail surface always assembles limits read-only
+ *     ({@code false}), so a limit is configured exclusively in the org-unit bank
  * @param configurable whether this account type carries approval limits at all ({@code ORG_UNIT} /
  *     {@code AREA} / {@code CARTEL})
  * @param allMembersSupported whether the all-members tier applies to this account
