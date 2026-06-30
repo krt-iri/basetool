@@ -3587,6 +3587,17 @@ details.hud-details[open] > summary::after {
 
 .mission-tile__actions {
     margin-top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* Own-unit chip sits at the bottom-right of the tile (pushed past the CTA with margin-left:auto)
+   rather than at the top, so it never adds a row above the body — every tile's body text starts at
+   the same height whether or not it carries the chip. */
+.mission-tile__badge {
+    margin-left: auto;
 }
 
 /* The description label and its clamped body span the full tile width (not the narrow value

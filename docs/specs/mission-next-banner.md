@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
 > **Owner area:** MISSION · **Related ADRs:** none
 
 # Home-page upcoming-missions overview
@@ -130,7 +130,9 @@ the soonest upcoming mission.
   the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
   The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
   (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and guests (no memberships)
-  never see the chip.
+  never see the chip. The chip is pinned to the **bottom-right** of the tile (right of the "Einsatz
+  öffnen" CTA), **not** the top — so it never inserts a row above the tile body and every tile's body
+  text starts at the same height whether or not it carries the chip.
 - **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
   by the status filter). Guest/outsider redaction is unchanged: anonymous and role-less `GUEST`
   callers see only public (`isInternal = false`) `PLANNED` / `ACTIVE` missions, with the description
