@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Datenschutzerklärung auf den aktuellen Stand gebracht.** Neu beschrieben sind die Anmeldung über Discord (übermittelte Profildaten, Mitgliedschafts- und Rollenprüfung im Discord-Server, dauerhaft gespeicherte Discord-ID und Server-Nickname, Datenübermittlung an Discord Inc. in die USA), die im Mitgliederkonto gespeicherten Daten samt tatsächlichem Löschverhalten sowie Hinweise zu In-App-Benachrichtigungen, Echtzeit-Anwesenheit in der Einsatzplanung und der begleitenden Desktop-Import-Anwendung. Veraltete bzw. unbelegte Passagen (nicht vorhandenes Kontaktformular/Forum, die 7-Tage-IP-Anonymisierungszusage im Server-Log-Abschnitt) wurden entfernt und Cookie-Angaben korrigiert (SESSION bleibt bis zu 30 Tage erhalten).
+
 ## [v1.0.8](https://github.com/krt-profit/basetool/releases/tag/v1.0.8) - 2026-06-30
 
 ### Added
