@@ -1,8 +1,8 @@
 # Backup & disaster recovery — operator runbook
 
 > **Doc type:** Runbook — the *how-to*. The binding requirements (the *what-must-hold*) live in
-> [`docs/specs/backup-recovery.md`](specs/backup-recovery.md) (`REQ-OPS-007..011`); the decision
-> record is [ADR-0055](adr/0055-offsite-encrypted-backup-to-nextcloud.md).
+> [`docs/specs/backup-recovery.md`](specs/backup-recovery.md) (`REQ-OPS-008..012`); the decision
+> record is [ADR-0056](adr/0056-offsite-encrypted-backup-to-nextcloud.md).
 
 ## What this does
 
@@ -19,7 +19,7 @@ pull-only host posture (`REQ-OPS-001`).
 
 ## What is and isn't backed up
 
-**Captured** (the full-restore surface, `REQ-OPS-009`):
+**Captured** (the full-restore surface, `REQ-OPS-010`):
 
 |           Item            |                                                               How                                                                |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------|
@@ -37,7 +37,7 @@ pull-only host posture (`REQ-OPS-001`).
   somewhere independent (e.g. a password manager / offline vault). A lost `wg0.conf` private key
   forces re-keying every peer.
 
-## How consistency works (`REQ-OPS-008`)
+## How consistency works (`REQ-OPS-009`)
 
 `pg_dump` is already a transactionally consistent snapshot, so strictly no downtime is required.
 For a *globally* quiescent instant, the job:
@@ -107,7 +107,7 @@ sudo chown deploy:deploy /etc/iri/rclone.conf && sudo chmod 0600 /etc/iri/rclone
 
 ### 4. Create the backup secrets file
 
-`/etc/iri/backup.env` (host-only, `REQ-OPS-011` — never in git, never in the config bundle):
+`/etc/iri/backup.env` (host-only, `REQ-OPS-012` — never in git, never in the config bundle):
 
 ```bash
 sudo tee /etc/iri/backup.env >/dev/null <<'EOF'
@@ -197,7 +197,7 @@ token already in place — that is the [`docs/deployment.md`](deployment.md) boo
 - **List / inspect:** `sudo -u deploy restic snapshots` (after sourcing `/etc/iri/backup.env`).
 - **Rotate the Nextcloud credential:** create a new app password in Nextcloud, update
   `/etc/iri/rclone.conf`, revoke the old token. A host compromise is contained by revoking this one
-  token (`REQ-OPS-011`).
+  token (`REQ-OPS-012`).
 - **A failed backup or drill** shows `failed` in `systemctl` / `journalctl`. Treat a failed
   **restore drill** as a severe incident — it means the latest backup did not restore cleanly.
 - **Change retention/schedule:** edit `/etc/iri/backup.env` (retention) or the timer's `OnCalendar`.

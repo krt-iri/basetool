@@ -11,7 +11,7 @@
 #   sudo -u deploy /var/iri/code/scripts/backup.sh --dry-run      # show plan + snapshots, change nothing
 #
 # WHAT IS CAPTURED (the full-restore surface — docs/specs/backup-recovery.md,
-# REQ-OPS-007/009):
+# REQ-OPS-008/009):
 #   * pg_dump -Fc of the backend database          (krt_basetool)
 #   * pg_dump -Fc of the Keycloak database          (keycloak — the live source
 #     of truth for realm/users/clients, NOT the sanitized realm-export.json)
@@ -20,9 +20,9 @@
 #   * host secrets needed to stand the stack up     (.env, keystore.p12,
 #     realm-export.json, keycloak/providers)
 #   NOT captured by design: Redis (sessions just re-login), logs, and the
-#   WireGuard wg0.conf key (the operator backs that up out-of-band — REQ-OPS-009).
+#   WireGuard wg0.conf key (the operator backs that up out-of-band — REQ-OPS-010).
 #
-# CONSISTENCY (REQ-OPS-008): pg_dump alone is already a transactionally
+# CONSISTENCY (REQ-OPS-009): pg_dump alone is already a transactionally
 # consistent snapshot, but to obtain one globally quiescent instant we briefly
 # STOP the writer services (frontend, backend, ingest) for the DUMP only — NPM
 # serves the existing maintenance page meanwhile — then restart them BEFORE the
@@ -37,7 +37,7 @@
 #
 # SECRETS: the restic repo password + rclone/Nextcloud app-password live in
 # /etc/iri/backup.env (root-only), never in git and never in the .env config
-# bundle (REQ-OPS-005, REQ-OPS-011). The staged plaintext dumps live under
+# bundle (REQ-OPS-005, REQ-OPS-012). The staged plaintext dumps live under
 # /var/iri/backup/staging and are removed on every exit.
 # =============================================================================
 
@@ -60,7 +60,7 @@ WRITER_SERVICES="frontend backend ingest"
 STOP_TIMEOUT="${IRI_BACKUP_STOP_TIMEOUT:-30}"
 LOCK_WAIT="${IRI_BACKUP_LOCK_WAIT:-300}"
 
-# GFS retention (REQ-OPS-007). Overridable from backup.env.
+# GFS retention (REQ-OPS-008). Overridable from backup.env.
 KEEP_DAILY="${IRI_KEEP_DAILY:-7}"
 KEEP_WEEKLY="${IRI_KEEP_WEEKLY:-4}"
 KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
@@ -186,7 +186,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Quiesce writers (REQ-OPS-008) ------------------------------------------
+# --- Quiesce writers (REQ-OPS-009) ------------------------------------------
 if [[ "${QUIESCE}" == "true" ]]; then
   log "quiescing writers for the dump: stop ${WRITER_SERVICES} (NPM serves the maintenance page)"
   dc stop -t "${STOP_TIMEOUT}" ${WRITER_SERVICES}

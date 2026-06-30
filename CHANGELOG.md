@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Automatische, verschlüsselte Off-Site-Backups auf Nextcloud mit wöchentlicher Wiederherstellungsprobe.** Der Produktionsserver sichert jede Nacht um 04:15 beide Datenbanken (Anwendung + Keycloak), die Reverse-Proxy-Konfiguration und die für eine vollständige Wiederherstellung nötigen Host-Geheimnisse client-seitig verschlüsselt per restic auf eine Nextcloud-Freigabe (Aufbewahrung 7 täglich/4 wöchentlich/6 monatlich, ausgehend, ohne offenen Zugang zum Server). Für konsistente Daten werden die schreibenden Dienste nur für den Datenbank-Dump kurz pausiert (Sekunden, innerhalb des Fensters 04:00–05:00; der langsame Upload läuft danach im laufenden Betrieb). Eine wöchentliche Probe spielt das jüngste Backup testweise in eine Wegwerf-Datenbank zurück und meldet einen Fehler, falls es nicht sauber wiederherstellbar ist. Redis (Sitzungen) und der WireGuard-Schlüssel bleiben bewusst außen vor. Details: docs/backup.md, REQ-OPS-007..011, ADR-0055.
+- **Automatische, verschlüsselte Off-Site-Backups auf Nextcloud mit wöchentlicher Wiederherstellungsprobe.** Der Produktionsserver sichert jede Nacht um 04:15 beide Datenbanken (Anwendung + Keycloak), die Reverse-Proxy-Konfiguration und die für eine vollständige Wiederherstellung nötigen Host-Geheimnisse client-seitig verschlüsselt per restic auf eine Nextcloud-Freigabe (Aufbewahrung 7 täglich/4 wöchentlich/6 monatlich, ausgehend, ohne offenen Zugang zum Server). Für konsistente Daten werden die schreibenden Dienste nur für den Datenbank-Dump kurz pausiert (Sekunden, innerhalb des Fensters 04:00–05:00; der langsame Upload läuft danach im laufenden Betrieb). Eine wöchentliche Probe spielt das jüngste Backup testweise in eine Wegwerf-Datenbank zurück und meldet einen Fehler, falls es nicht sauber wiederherstellbar ist. Redis (Sitzungen) und der WireGuard-Schlüssel bleiben bewusst außen vor. Details: docs/backup.md, REQ-OPS-008..012, ADR-0056.
 
 ## [v1.0.6](https://github.com/krt-profit/basetool/releases/tag/v1.0.6) - 2026-06-30
 
@@ -52,7 +52,7 @@
 
 ### Changed
 
-- **Deployment: Aktualisierungen der Infrastruktur-Container (Redis, NPM) und sonstige Compose-Änderungen werden jetzt automatisch ausgerollt.** Die Compose-Datei samt Wartungsseite und Keycloak-Theme wird als signiertes, versioniertes `basetool-config`-Artefakt zusammen mit den App-Images promotet und vom Server über denselben Pull-Kanal angewendet — kein manuelles Kopieren der Compose-Datei und kein händisches `docker compose up -d` mehr. Änderungen am Postgres- oder Keycloak-Image bleiben bewusst manuell (zustandsbehaftete Upgrades). Details: `docs/deployment.md`, ADR-0049, REQ-OPS-001..006.
+- **Deployment: Aktualisierungen der Infrastruktur-Container (Redis, NPM) und sonstige Compose-Änderungen werden jetzt automatisch ausgerollt.** Die Compose-Datei samt Wartungsseite und Keycloak-Theme wird als signiertes, versioniertes `basetool-config`-Artefakt zusammen mit den App-Images promotet und vom Server über denselben Pull-Kanal angewendet — kein manuelles Kopieren der Compose-Datei und kein händisches `docker compose up -d` mehr. Änderungen am Postgres- oder Keycloak-Image bleiben bewusst manuell (zustandsbehaftete Upgrades). Details: `docs/deployment.md`, ADR-0049, REQ-OPS-001..007.
 
 ## [v1.0.1](https://github.com/krt-profit/basetool/releases/tag/v1.0.1) - 2026-06-28
 

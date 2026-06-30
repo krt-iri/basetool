@@ -1,4 +1,4 @@
-; systemd service for the weekly Profit Basetool restore drill (REQ-OPS-010).
+; systemd service for the weekly Profit Basetool restore drill (REQ-OPS-011).
 ;
 ; Installation (on the production host, one-time — see docs/backup.md):
 ;   sudo cp /var/iri/code/scripts/iri-restore-drill.service /etc/systemd/system/

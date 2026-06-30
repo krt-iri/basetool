@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0055](../adr/0055-offsite-encrypted-backup-to-nextcloud.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 
 # Backup & disaster recovery
 
@@ -16,18 +16,18 @@ off-site** backup of everything needed for a full restore, plus a recurring proo
 backups are actually recoverable. The implementation is `scripts/backup.sh` /
 `scripts/restore-drill.sh` driven by the `iri-backup.{service,timer}` and
 `iri-restore-drill.{service,timer}` systemd units; the operator runbook (the *how-to*) lives in
-[`docs/backup.md`](../backup.md). See [ADR-0055](../adr/0055-offsite-encrypted-backup-to-nextcloud.md)
+[`docs/backup.md`](../backup.md). See [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 for the decision record (restic over rclone WebDAV to Nextcloud; why not the UniFi
 `drop.ui.com` share or SMB-over-VPN).
 
 These requirements continue the `REQ-OPS-*` series begun in
-[`deployment-delivery.md`](deployment-delivery.md) (`REQ-OPS-001..006`).
+[`deployment-delivery.md`](deployment-delivery.md) (`REQ-OPS-001..007`).
 
 ## Requirements
 
-### REQ-OPS-007 — Automated, scheduled, encrypted, off-site backups
+### REQ-OPS-008 — Automated, scheduled, encrypted, off-site backups
 
-A scheduled job captures the full-restore surface (REQ-OPS-009), encrypts it **client-side**,
+A scheduled job captures the full-restore surface (REQ-OPS-010), encrypts it **client-side**,
 and stores it on an **off-site** target that is independent of the production host. Encryption
 is mandatory and non-negotiable: every backup contains host secrets (`.env`, keystore) and
 PII (the Keycloak user database), so the storage target must never see plaintext. The default
@@ -46,7 +46,7 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 
 **Enforced by:** `scripts/backup.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
-### REQ-OPS-008 — Consistency via a minimal, bounded nightly quiesce
+### REQ-OPS-009 — Consistency via a minimal, bounded nightly quiesce
 
 The backup must be **consistent**. `pg_dump` is already a transactionally consistent per-database
 snapshot, but to obtain one globally quiescent instant the job briefly **stops the writer
@@ -69,7 +69,7 @@ serves the existing maintenance page. An operator may opt into a zero-downtime o
 
 **Enforced by:** `scripts/backup.sh` (quiesce + trap + flock) · **Runbook:** [`docs/backup.md`](../backup.md)
 
-### REQ-OPS-009 — Defined backup surface and explicit exclusions
+### REQ-OPS-010 — Defined backup surface and explicit exclusions
 
 The backup set is exactly what a full restore needs, and exclusions are deliberate, not
 accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `keycloak` (the live
@@ -90,7 +90,7 @@ channel as the application data, by owner decision).
 
 **Enforced by:** `scripts/backup.sh` (capture list) · **Runbook:** [`docs/backup.md`](../backup.md) → *What is and isn't backed up*
 
-### REQ-OPS-010 — Recoverability is proven, not assumed
+### REQ-OPS-011 — Recoverability is proven, not assumed
 
 A backup that has never been restored is unverified. A **weekly** restore drill pulls the latest
 off-site snapshot, restores **both** database dumps into a **throwaway** PostgreSQL instance, and
@@ -108,7 +108,7 @@ production state, and a failure makes the unit report `failed` so it is caught.
 
 **Enforced by:** `scripts/restore-drill.sh` · `scripts/iri-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
-### REQ-OPS-011 — Backup credentials are host-only secrets
+### REQ-OPS-012 — Backup credentials are host-only secrets
 
 The restic repository password and the rclone/Nextcloud **app password** are host-only secrets in
 `/etc/iri/backup.env` (and the rclone config), readable only by the backup user. They are **never**
@@ -131,9 +131,9 @@ link), so a host compromise is contained by revoking one token.
 
 - **Point-in-time recovery (PITR / WAL archiving).** Logical `pg_dump` snapshots give a per-day
   recovery point, which fits this app's size and RPO. Continuous WAL archiving is deliberately not
-  pursued (see ADR-0055 alternatives); promote to an ADR if a sub-day RPO is ever required.
+  pursued (see ADR-0056 alternatives); promote to an ADR if a sub-day RPO is ever required.
 - **The WireGuard `wg0.conf` key.** Irreplaceable, but backed up out-of-band by the operator by
-  owner decision (REQ-OPS-009) — not this job's concern.
+  owner decision (REQ-OPS-010) — not this job's concern.
 - **Restoring/rebuilding the host OS, Docker, the `deploy` user, systemd units, and the GHCR pull
   token.** These are the bootstrap concern of [`docs/deployment.md`](../deployment.md); the restore
   runbook in [`docs/backup.md`](../backup.md) assumes a bootstrapped host and restores *data + config*

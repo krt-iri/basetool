@@ -4,7 +4,7 @@
 ; so the two never overlap, and inside the 04:00–05:00 maintenance window the
 ; backup's brief writer-quiesce is allowed to use. The user-facing downtime is
 ; only the database dump (seconds) — the slow Nextcloud upload happens after the
-; stack is back up (see scripts/backup.sh, REQ-OPS-008).
+; stack is back up (see scripts/backup.sh, REQ-OPS-009).
 ;
 ; IMPORTANT: OnCalendar uses the host's local timezone. Make sure the host TZ is
 ; what you expect (`timedatectl`); the vpn-restart cron uses the same wall clock.

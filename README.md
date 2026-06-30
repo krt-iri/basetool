@@ -340,8 +340,8 @@ Delivery is outbound-only (consistent with the pull-only host posture, `REQ-OPS-
 repository password + Nextcloud app password) live host-only in `/etc/iri/backup.env`, never
 in git or the config bundle. Setup, the secured-Nextcloud-target guide, and the full restore
 procedure are in [`docs/backup.md`](docs/backup.md); the binding requirements are in
-[`docs/specs/backup-recovery.md`](docs/specs/backup-recovery.md) (`REQ-OPS-007..011`,
-ADR-0055).
+[`docs/specs/backup-recovery.md`](docs/specs/backup-recovery.md) (`REQ-OPS-008..012`,
+ADR-0056).
 
 ---
 

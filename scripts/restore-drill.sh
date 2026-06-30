@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Profit Basetool — weekly restore drill (recoverability proof, REQ-OPS-010)
+# Profit Basetool — weekly restore drill (recoverability proof, REQ-OPS-011)
 #
 # A backup you have never restored is a hope, not a backup. This script pulls
 # the LATEST restic snapshot from Nextcloud, restores both database dumps into a

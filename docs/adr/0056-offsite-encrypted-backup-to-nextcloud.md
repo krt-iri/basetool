@@ -1,9 +1,9 @@
-# ADR-0055 — Off-site encrypted backups to Nextcloud via restic over rclone WebDAV
+# ADR-0056 — Off-site encrypted backups to Nextcloud via restic over rclone WebDAV
 
 - **Status:** Accepted
 - **Date:** 2026-06-30
 - **Deciders:** @greluc
-- **Related:** spec `REQ-OPS-007..011` ([`backup-recovery.md`](../specs/backup-recovery.md)) · runbook [`docs/backup.md`](../backup.md) · builds on `REQ-OPS-001` (pull-only host) and `REQ-OPS-005` (no secrets in the config bundle)
+- **Related:** spec `REQ-OPS-008..012` ([`backup-recovery.md`](../specs/backup-recovery.md)) · runbook [`docs/backup.md`](../backup.md) · builds on `REQ-OPS-001` (pull-only host) and `REQ-OPS-005` (no secrets in the config bundle)
 
 ## Context
 
@@ -39,14 +39,14 @@ remote, scheduled by systemd:
 - **Nextcloud over rclone WebDAV** because Nextcloud exposes first-class WebDAV over HTTPS with a
   revocable **app password** on a dedicated, non-admin account — a clean, authenticated, outbound
   push with no VPN, no SMB, and no anonymous share link.
-- **Consistency via a minimal quiesce (REQ-OPS-008):** the writer services are stopped only for the
+- **Consistency via a minimal quiesce (REQ-OPS-009):** the writer services are stopped only for the
   database dump (seconds), then restarted before the slow upload; NPM serves the maintenance page
   meanwhile. The job coordinates with `deploy.sh` via the shared `flock` and guarantees a restart
   via a `trap`.
-- **Recoverability is proven (REQ-OPS-010):** a weekly restore drill restores the latest snapshot
+- **Recoverability is proven (REQ-OPS-011):** a weekly restore drill restores the latest snapshot
   into a throwaway PostgreSQL container and verifies it.
 - The WireGuard `wg0.conf` key is **excluded** and backed up out-of-band by the operator (owner
-  decision, REQ-OPS-009).
+  decision, REQ-OPS-010).
 
 ## Consequences
 
