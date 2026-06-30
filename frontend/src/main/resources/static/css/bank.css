@@ -693,6 +693,18 @@ tr.is-inert td {
     }
 }
 
+/* Settings-tab tiles (REQ-BANK-035/-036/-041): the responsible holder's three independent settings
+   boxes — Kontostandsziel, Sichtbarkeit, Freigabe-Limits — laid out as an auto-fit grid so they sit
+   side by side when the viewport is wide enough for their content and wrap to fewer columns (down to
+   a single column on a phone) otherwise. auto-fit collapses empty tracks, so one or two visible
+   tiles stretch to fill the row; align-items keeps tiles top-aligned despite differing heights. */
+.oud-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+
 /* Balance-target progress (REQ-BANK-036) and org-unit visibility settings (REQ-BANK-035). */
 .bank-target-bar {
     width: 100%;
@@ -956,6 +968,13 @@ tr.is-inert td {
     flex: 1;
     min-width: 220px;
     max-width: 340px;
+}
+
+/* Every labeled field in an inline action row drops its default 12px stacking margin so the
+   select, the per-user limit input and the action button bottom-align flush (align-items:
+   flex-end). Without this a non-.grow .bank-form-row (the Freigabe-Limit "Einzelne Nutzer" input)
+   keeps its margin-bottom and its input floats 12px above the select and the Setzen button. */
+.field-row .bank-form-row {
     margin-bottom: 0;
 }
 

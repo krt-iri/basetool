@@ -486,7 +486,13 @@ account showing the current balance and the **net change over the last 30 days**
 (server-computed inline SVG sparkline — no charting library exists or is introduced;
 visual spec: `preview/components-kpi-sparkline.html`). Cards link to the account
 detail; closed accounts render dimmed (`.kpi-card--closed`). Cards are ordered
-alphabetically (case-insensitive) by account name in both perspectives. Management totals
+alphabetically (case-insensitive) by account name in both perspectives. This
+**A→Z-by-name, case-insensitive ordering is the canonical order for every bank account list** —
+not just the dashboard cards: the management table (`/bank/manage`), the grant filter selects,
+the transfer-target picker on the account detail, and the org-unit balance cards + booking-request
+source picker all order their accounts the same way, implemented once in the shared
+`controller/BankAccountOrder` helper so every account picker and overview reads identically.
+Management totals
 render as the `.kpi-total` aggregate strip. Bank employees see the accounts they hold grants on;
 bank management (and admins) see **all** accounts plus aggregate totals (sum of
 balances, total 30-day in/out). Itemized recent bookings deliberately live on the
@@ -499,10 +505,17 @@ per-account N+1 (REQ-DATA-003).
 - [x] Employee dashboard lists exactly the granted accounts; management/admin dashboard
   lists all accounts + totals row.
 - [x] Cards are ordered alphabetically (case-insensitive) by account name.
+- [x] Every account picker and overview (dashboard, management table, grant filters,
+  transfer-target / booking-request source pickers, org-unit balance cards) orders accounts
+  A→Z by name (case-insensitive), via the shared `BankAccountOrder` helper.
 - [x] 30-day delta equals the sum of postings in the window (test-pinned).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
 
-**Enforced by:** `BankPageControllerTest` (sparkline scaling), single-statement repository reads · **Code:** `service/BankDashboardService`, `controller/BankPageController` · **Issues:** #556
+**Enforced by:** `BankPageControllerTest` (sparkline scaling), `BankAccountOrderTest` (A→Z
+case-insensitive, null-safe, original list untouched), single-statement repository reads · **Code:**
+`service/BankDashboardService`, `controller/BankPageController`, `controller/BankAccountOrder`
+(shared account ordering for `BankManagePageController` / `BankGrantsPageController` /
+`OrgUnitBankPageController`) · **Issues:** #556
 
 ### REQ-BANK-017 — UI: design system, i18n, modals
 
@@ -1213,6 +1226,15 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > re-fetches the settings, and a settings write never resets the history page). A small closure-based
 > tab controller re-asserts the active tab on `krt:swapped` so an in-place settings write does not
 > bounce the user back to the history tab.
+>
+> **Amendment (settings tiles):** within the *Verantwortung & Sichtbarkeit* tab the three settings
+> areas — **Kontostandsziel**, **Sichtbarkeit** and **Freigabe-Limits** — each render as their **own
+> `.hud-box` tile** inside a responsive `.oud-settings-grid` (`repeat(auto-fit, minmax(300px, 1fr))`),
+> so they sit **side by side** when the viewport is wide enough for their content and wrap to fewer
+> columns (down to a single column on a phone) otherwise. Each tile renders only when its capability
+> is granted (`canSetTarget` / `canConfigureVisibility` + `visibilityConfigurable` / the
+> approval-limit editor's `canEdit`), and the grid keeps the `org-unit-bank-settings` testid so the
+> `orgUnitBankSettings` swap target and the tests still resolve the region.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
@@ -1300,10 +1322,15 @@ since it is the Sonderkonto role bucket and Sonderkonten are non-request-capable
 (`requires_owner_approval`, `applicable_limit`) so the org-unit-blind confirm path only reads the
 boolean.
 
-**Who configures limits:** the account's responsible holder (REQ-BANK-034), **bank management** and
-**admin** — never a plain bank employee. Limits are shown read-only in both account-detail surfaces
-to everyone who may open them. Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` /
-`APPROVAL_LIMIT_CLEARED`).
+**Who configures limits — and where:** the account's responsible holder (REQ-BANK-034), **bank
+management** and **admin** — never a plain bank employee. Configuration happens **exclusively on the
+org-unit bank settings surface** (the *Verantwortung & Sichtbarkeit* tab of the org-unit
+account-detail page, alongside the visibility settings). The **bank-staff account-detail page**
+(`/bank/accounts/{id}`) shows limits **read-only to every viewer**, including management/admin — it
+never offers the editor: the backend assembles that surface's limits with `canEdit = false`
+unconditionally (`BankAccountService#getAccountDetail`). Limits are thus shown read-only in both
+account-detail surfaces to everyone who may open them, and set/cleared only in the org-unit bank.
+Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` / `APPROVAL_LIMIT_CLEARED`).
 
 **Two-step approval.** When a request exceeds the requester's limit — **or when no limit applies to
 the requester at all** (amended) — it is flagged `requires_owner_approval`; the requester sees a live
@@ -1329,7 +1356,10 @@ holder/management/admin yes, employee/member no; set/clear audit; grant/revoke o
 a non-responsible-holder being rejected; **the no-limit case always flags approval**,
 `createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval`),
 `BankBookingRequestServiceTest` (snapshot at create;
-confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · **Code:**
+confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest`,
+`BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
+forced `false` even for management,
+`getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`) · **Code:**
 `model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
 `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend

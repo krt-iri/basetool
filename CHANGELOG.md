@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bank: Freigabe-Limits werden in der Kontoübersicht nur noch angezeigt, nicht mehr bearbeitet.** Auf der Bank-Kontoseite (`/bank/accounts/{id}`) können Freigabe-Limits jetzt für alle — auch Bank-Management und Admin — nur noch schreibgeschützt eingesehen werden (sofern gesetzt). Gesetzt und entfernt werden sie ausschließlich in der Org-Einheits-Bank durch den Kontoverantwortlichen, das Bank-Management und Admins (REQ-BANK-041).
+
+- **Bank: Konten werden in allen Auswahlfeldern und Übersichten alphabetisch nach Namen sortiert.** Überall, wo Konten gelistet werden — Dashboard, Bank-Verwaltung, Berechtigungen-Filter, das Zielkonto-/Quellkonto-Auswahlfeld in den Buchungs- und Antragsdialogen sowie die Kontenkarten der Org-Einheits-Bank — erscheinen sie jetzt einheitlich A→Z nach Kontonamen (ohne Groß-/Kleinschreibung zu unterscheiden) (REQ-BANK-016).
+
+- **Org-Einheits-Bank: „Verantwortung & Sichtbarkeit" zeigt Kontostandsziel, Sichtbarkeit und Freigabe-Limits in drei eigenen Kacheln.** Im Reiter „Verantwortung & Sichtbarkeit" einer Konto-Detailseite (`/org-unit-bank/accounts/{id}`) stehen die drei Einstellungsbereiche nun in je einer eigenen Box, die je nach Bildschirmbreite nebeneinander stehen oder umbrechen (bis zu einer Spalte auf dem Smartphone), statt untereinander in einer Box (REQ-BANK-038).
+
+### Fixed
+
+- **Org-Einheits-Bank: Freigabe-Limit-Eingabe für einzelne Nutzer wieder bündig.** Im Formular „Einzelne Nutzer" der Freigabe-Limits saß das Limit-Eingabefeld 12 px höher als das Nutzer-Auswahlfeld und der „Setzen"-Button; jetzt stehen alle drei wieder auf gleicher Höhe.
+
 ## [v1.0.8](https://github.com/krt-profit/basetool/releases/tag/v1.0.8) - 2026-06-30
 
 ### Added

@@ -41,7 +41,7 @@
 </th:block>
 
 <th:block th:fragment="limitsEditor(acct, limits, users, refresh)">
-    <div class="mt-2" th:if="${limits != null and limits.canEdit()}" data-testid="bank-approval-limit-settings">
+    <div th:if="${limits != null and limits.canEdit()}" data-testid="bank-approval-limit-settings">
         <h3 class="sub-h" th:text="#{bank.approvalLimit.title}">Freigabe-Limits</h3>
         <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.approvalLimit.hint}">
             Bis zu diesem Betrag darf die Stufe ohne zus&auml;tzliche Freigabe buchen; dar&uuml;ber braucht es deine Freigabe.</p>
