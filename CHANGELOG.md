@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.6](https://github.com/krt-profit/basetool/releases/tag/v1.0.6) - 2026-06-30
+
 ### Changed
 
 - **Startseite: „Meine Einheit"-Markierung sitzt jetzt unten rechts auf der Kachel.** Bei den Einsätzen der nächsten 7 Tage erscheint die „Meine Einheit"-Markierung nicht mehr oben links (was den Text nach unten schob), sondern unten rechts neben „Einsatz öffnen" — so beginnt der Text auf allen Kacheln auf gleicher Höhe, egal ob die Markierung vorhanden ist oder nicht.
