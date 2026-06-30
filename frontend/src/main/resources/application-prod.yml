@@ -57,3 +57,16 @@ app:
   backend-url: ${BACKEND_URL:https://backend:11261}
   logging:
     structured-enabled: true
+  # SEC-02 / REQ-SEC-011: the reverse proxies whose X-Forwarded-For the frontend trusts when
+  # resolving the originating client IP it relays to the backend's per-IP rate limiter. In
+  # production nginx-proxy-manager fronts the frontend on the internal Docker network, so the
+  # default Docker bridge (172.17.0.0/16) plus the typical compose-allocated user bridges
+  # (172.18.0.0/16, 172.19.0.0/16) cover the NPM hop. Mirrors the backend's
+  # app.rate-limit.trusted-proxies. Override via APP_CLIENT_IP_TRUSTED_PROXIES if the NPM
+  # container sits on a different subnet — a mismatch silently collapses every per-IP bucket onto
+  # NPM's address (no leak, but the limiter is ineffective), so it MUST match the real NPM subnet.
+  client-ip:
+    trusted-proxies:
+      - 172.17.0.0/16
+      - 172.18.0.0/16
+      - 172.19.0.0/16

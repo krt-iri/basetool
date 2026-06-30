@@ -178,13 +178,30 @@ collapses onto the single frontend container IP, so one caller can trip a public
 the whole organisation. The relay never overwrites an existing header and degrades silently to
 "frontend IP" for background tasks with no bound request.
 
+**Spoofing-resistant attribution at the frontend edge (finding SEC-02).** The relay is only as
+trustworthy as the IP the frontend *resolves*. The frontend keeps `server.forward-headers-strategy:
+none` and registers `ForwardedHeaderFilter` explicitly (`ForwardedHeaderConfig`, ordered one slot
+after `ClientIpContextFilter`) so scheme/host are still rebuilt for the OAuth2 redirect URI and HSTS,
+**but** the client IP is resolved on the *raw* headers before that filter runs. `ClientIpContextFilter`
+(at `HIGHEST_PRECEDENCE`) honours `X-Forwarded-For` only when the immediate TCP peer matches
+`app.client-ip.trusted-proxies` (the NPM Docker range) and then walks the chain right-to-left, skipping
+trusted hops and taking the first untrusted address — the RemoteIpValve algorithm. Because NPM appends
+the true peer on the right, a client-supplied (leftmost) forged entry is never reached, so rotating a
+forged `X-Forwarded-For` can no longer mint a fresh per-IP bucket per request; a direct
+(untrusted-peer) connection never has its `X-Forwarded-For` honoured. The trusted range MUST match the
+real NPM subnet (override via `APP_CLIENT_IP_TRUSTED_PROXIES`); a mismatch collapses every bucket onto
+NPM's address — no leak, but the limiter is ineffective.
+
 **Acceptance**
 
-- [ ] A backend call issued for a browser request carries `X-Forwarded-For` with the real client IP.
-- [ ] Two distinct clients hitting the same anonymous endpoint consume separate per-IP buckets.
+- [x] A backend call issued for a browser request carries `X-Forwarded-For` with the real client IP.
+- [x] Two distinct clients hitting the same anonymous endpoint consume separate per-IP buckets.
+- [x] A client-supplied `X-Forwarded-For` cannot change the resolved/relayed client IP (SEC-02): the
+  frontend ignores it unless it arrives from a trusted proxy and always takes the proxy-appended peer.
 
-**Enforced by:** `ClientIpRelayFilterTest` · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter`
-/ `RateLimitingFilter.resolveClientIp` · **Issues:** security audit DOS-1
+**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest` · **Code:** `ClientIpRelayFilter`
+/ `ClientIpContextFilter` / `ClientIpProperties` / `ForwardedHeaderConfig` /
+`RateLimitingFilter.resolveClientIp` · **Issues:** security audit DOS-1, SEC-02
 
 ### REQ-SEC-012 — Re-authentication on lost frontend OAuth2 token
 
