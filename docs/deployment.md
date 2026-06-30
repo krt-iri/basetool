@@ -701,32 +701,51 @@ emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` 
 
 ## Keycloak custom providers — Discord login SPI (epic #720)
 
-Discord login (Track 1) ships as a Keycloak provider JAR built from the `keycloak-spi` module
-(`DiscordIdentityProvider` + the fail-closed first-login membership gate). Keycloak loads it from
-`/opt/keycloak/providers`, bind-mounted from the host at `/var/iri/code/keycloak/providers`.
+Discord login ships as a Keycloak provider JAR built from the `keycloak-spi` module
+(`DiscordIdentityProvider`, the fail-closed first-login membership gate, and the fail-open
+account-existence gate). Keycloak loads it from `/opt/keycloak/providers`, bind-mounted from the host
+at `/var/iri/code/keycloak/providers`.
+
+**It is delivered automatically** (REQ-OPS-007,
+[ADR-0055](adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)). The JAR rides the same
+pull-only, digest-pinned, deliberately-promoted GHCR channel as the app images and the config bundle,
+as its own cosign-signed `basetool-keycloak-spi` artifact (a `FROM scratch` image carrying only
+`keycloak-spi.jar`). It is a **separate** artifact from `basetool-config` because REQ-OPS-005 bars
+provider JARs from the config bundle. On promotion (`promote.yml`, in lock-step with the app images +
+config), the next `deploy.sh` tick resolves the `basetool-keycloak-spi:stable` digest,
+cosign-verifies it, stages the JAR into `/var/iri/code/keycloak/providers/keycloak-spi.jar`, and
+recreates **only** keycloak (`up -d --no-deps --force-recreate keycloak`, health-gated) so its
+`start` re-runs the provider build and loads the new JAR. On a health failure the previous JAR is
+restored and keycloak brought back, and the bad target backs off. A combined Keycloak-**image** +
+provider-JAR change stays operator-gated by the postgres/Keycloak carve-out above (the image change
+blocks the tick until `--force`).
+
+The JAR is compiled to **Java-21 bytecode** to match the Keycloak runtime JVM; a mismatch surfaces as
+`UnsupportedClassVersionError` at provider load (caught by the deploy health gate, which then rolls
+the JAR back). The Discord OAuth application, the realm identity provider, the `discord_user_id`
+mappers, the membership-gate flow config and the account-existence precheck env vars are one-time
+operator steps in [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md). An
+empty or missing providers dir is harmless (Keycloak simply finds no extra providers).
+
+**Manual staging** (fallback, or first bootstrap before the `basetool-keycloak-spi` artifact has been
+promoted):
 
 ```bash
 # 1. Build the provider JAR (on a build host with the JDK 25 toolchain).
-./gradlew :keycloak-spi:build      # -> keycloak-spi/build/libs/keycloak-spi-<version>.jar
+./gradlew :keycloak-spi:jar      # -> keycloak-spi/build/libs/keycloak-spi-<version>.jar
 
 # 2. Stage it on the Keycloak host, world-readable (0644) so the uid-1000 Keycloak image can read it
 #    — the same lesson as the shared keystore.p12; 0640 makes Keycloak ignore (or fail to read) it.
 sudo install -D -m 0644 keycloak-spi-*.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
 
-# 3. Restart Keycloak so the `start` command re-runs the provider build and discovers the JAR.
+# 3. Recreate Keycloak so the `start` command re-runs the provider build and discovers the JAR.
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
-    up -d --no-deps keycloak
+    up -d --no-deps --force-recreate keycloak
 
 # 4. Verify the provider registered (no SPI load error in the log; "Discord" selectable as a Social IdP).
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
     logs --since 2m keycloak | grep -iE "error|exception|providers" | head
 ```
-
-The JAR is compiled to **Java-21 bytecode** to match the Keycloak runtime JVM; a mismatch surfaces as
-`UnsupportedClassVersionError` at provider load. The Discord OAuth application, the realm identity
-provider, the `discord_user_id` mappers and the membership-gate flow config are one-time operator
-steps in [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md). An empty or
-missing providers dir is harmless (Keycloak simply finds no extra providers).
 
 ---
 
