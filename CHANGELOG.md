@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.7](https://github.com/krt-profit/basetool/releases/tag/v1.0.7) - 2026-06-30
+
 ### Added
 
 - **Automatische, verschlüsselte Off-Site-Backups auf Nextcloud mit wöchentlicher Wiederherstellungsprobe.** Der Produktionsserver sichert jede Nacht um 04:15 beide Datenbanken (Anwendung + Keycloak), die Reverse-Proxy-Konfiguration und die für eine vollständige Wiederherstellung nötigen Host-Geheimnisse client-seitig verschlüsselt per restic auf eine Nextcloud-Freigabe (Aufbewahrung 7 täglich/4 wöchentlich/6 monatlich, ausgehend, ohne offenen Zugang zum Server). Für konsistente Daten werden die schreibenden Dienste nur für den Datenbank-Dump kurz pausiert (Sekunden, innerhalb des Fensters 04:00–05:00; der langsame Upload läuft danach im laufenden Betrieb). Eine wöchentliche Probe spielt das jüngste Backup testweise in eine Wegwerf-Datenbank zurück und meldet einen Fehler, falls es nicht sauber wiederherstellbar ist. Redis (Sitzungen) und der WireGuard-Schlüssel bleiben bewusst außen vor. Details: docs/backup.md, REQ-OPS-008..012, ADR-0056.
