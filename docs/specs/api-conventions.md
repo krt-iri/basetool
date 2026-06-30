@@ -46,7 +46,12 @@ hardcoded strings. Document the format in OpenAPI and keep frontend error displa
 
 All list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total
 elements, pages, current page). **Whitelist allowed sort fields in the service** — never
-pass user input directly to `Sort` (unstable sorting + information-disclosure risk).
+pass user input directly to `Sort` (unstable sorting + information-disclosure risk). Build the
+`Pageable` through `PaginationUtil`, which whitelists the sort field, appends `id` as a stable
+tiebreaker, and clamps `size` to `MAX_PAGE_SIZE` (100 000 — high on purpose so the "load all in one
+request" surfaces are not truncated). The clamp bounds the result-set size; the global
+query-execution timeout (REQ-DATA-009, finding SEC-03) bounds how long a heavy fetch may hold a
+database connection.
 
 ### REQ-API-006 — All times in UTC
 

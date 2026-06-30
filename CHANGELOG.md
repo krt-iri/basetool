@@ -8,6 +8,8 @@
 
 - **Ratenbegrenzung: Die Client-IP-Erkennung im Frontend lässt sich nicht mehr per `X-Forwarded-For` fälschen.** Die anonymen Endpunkte (z. B. Auftrags-Anlage) sind pro IP ratenbegrenzt; bisher übernahm das Frontend die vom Client gesendete `X-Forwarded-For`-Adresse ungeprüft, sodass ein Angreifer mit pro Anfrage wechselnder Fälschung das Limit aushebeln konnte. Das Frontend ermittelt die echte Client-IP jetzt nur noch über vertrauenswürdige Proxys (NPM) und ignoriert vom Client gesetzte Werte (SEC-02).
 
+- **Datenbank: Globales Abfrage-Zeitlimit verhindert das Blockieren von Verbindungen durch einzelne schwere Anfragen.** Jede Datenbankabfrage der Anwendung wird jetzt nach 30 Sekunden (über `APP_DB_QUERY_TIMEOUT_MS` anpassbar) abgebrochen. Bisher konnte eine einzelne sehr große oder langsame Abfrage eine Verbindung aus dem Pool unbegrenzt belegen; mehrere gleichzeitig hätten den Pool erschöpfen und die API ausbremsen können. Flyway-Migrationen sind ausgenommen (SEC-03).
+
 ## [v1.0.9](https://github.com/krt-profit/basetool/releases/tag/v1.0.9) - 2026-06-30
 
 ### Added

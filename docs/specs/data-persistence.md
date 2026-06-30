@@ -250,6 +250,35 @@ and the claim survives with a null stamp.
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`).
 
+### REQ-DATA-009 — A global statement-execution timeout bounds every query (finding SEC-03)
+
+Every Hibernate-issued query — JPQL, Spring-Data derived, `@Query` (including `nativeQuery`),
+`@Modifying` bulk updates, and pessimistic-lock waits — is bounded by a global execution timeout
+(`spring.jpa.properties.jakarta.persistence.query.timeout`, default **30 s**, overridable via
+`APP_DB_QUERY_TIMEOUT_MS`). Without it a single heavy request can hold one of the Hikari pool's
+connections for the query's full duration — the Hikari timeouts only bound pool *acquisition*, not
+query *execution* — so a handful of concurrent heavy reads can exhaust the pool and stall the API
+(SEC-03). This is the complement to the deliberately high `PaginationUtil` page ceiling
+(`MAX_PAGE_SIZE = 100_000`): the ceiling stays high because several surfaces legitimately "load all"
+in one request (the material × terminal price matrix `/api/v1/materials/matrix?size=100000`, the
+admin material / member / UEX lists, the org-unit pickers), so the *time* a fetch may run — not the
+*number of rows* it may ask for — is the enforceable bound.
+
+The timeout is a **Hibernate** property, so it applies only to application queries: **Flyway
+migrations use raw JDBC and are unaffected**, and a long migration is never killed. The value is
+generous so legitimate load-all reads and batch syncs never trip it; environments with deliberately
+long batch queries raise it via the env override.
+
+**Acceptance**
+
+- [x] A query that runs longer than the configured timeout is cancelled and surfaces as a
+  `jakarta.persistence.QueryTimeoutException` rather than pinning the connection until it completes.
+- [x] Flyway migrations are not subject to the timeout.
+
+**Enforced by:** `QueryTimeoutConfigTest` (real Postgres `pg_sleep` exceeding a short configured
+timeout) · **Code:** `spring.jpa.properties.jakarta.persistence.query.timeout` in
+`backend/src/main/resources/application.yml`, `PaginationUtil.MAX_PAGE_SIZE` · **Security:** SEC-03
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
