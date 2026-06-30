@@ -75,7 +75,7 @@ class BankManagePageControllerTest {
   }
 
   @Test
-  void manage_ShouldDefaultToAccountsTabAndFillModel() {
+  void manage_ShouldDefaultToHolderTabAndFillModel() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
@@ -113,7 +113,8 @@ class BankManagePageControllerTest {
 
     // Then
     assertEquals("bank-manage", view);
-    assertEquals("konten", model.getAttribute("activeTab"));
+    // Halter is the default-open tab (it sits first/left in the tab nav).
+    assertEquals("halter", model.getAttribute("activeTab"));
     // The holder→holder Umbuchung is fee-free (REQ-BANK-031, ADR-0052), so this page fetches no
     // transfer-fee rate and exposes no transferFeeRate attribute.
     assertNull(model.getAttribute("transferFeeRate"));
@@ -123,6 +124,22 @@ class BankManagePageControllerTest {
     List<BankHolderDto> holders = (List<BankHolderDto>) model.getAttribute("holders");
     assertNotNull(holders);
     assertEquals("greluc", holders.get(0).handle());
+  }
+
+  @Test
+  void manage_explicitKontenTab_selectsAccountsTab() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+        .thenReturn(null);
+
+    // When: an explicit ?tab=konten opens the accounts tab (the non-default branch).
+    controller.manage("konten", null, management(), oidcUser(UUID.randomUUID().toString()), model);
+
+    // Then
+    assertEquals("konten", model.getAttribute("activeTab"));
   }
 
   @Test

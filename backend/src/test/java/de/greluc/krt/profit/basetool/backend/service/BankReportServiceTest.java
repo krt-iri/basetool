@@ -356,7 +356,10 @@ class BankReportServiceTest {
     BankAccount a = new BankAccount();
     a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
     a.setName(name);
-    a.setType(BankAccountType.SPECIAL);
+    // AREA carries a free-form area name and no org-unit FK (V150/V168 owner-ref CHECK) — a
+    // justification-optional type, so the seeded withdrawals need no Begründung (REQ-BANK-045).
+    a.setType(BankAccountType.AREA);
+    a.setAreaName(name);
     a.setStatus(BankAccountStatus.ACTIVE);
     BankAccount saved = accountRepository.save(a);
     assertNotNull(saved.getId());

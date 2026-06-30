@@ -111,6 +111,7 @@ class BankRequestControllerTest {
         BankBookingRequestType.DEPOSIT,
         new BigDecimal("500"),
         "note",
+        null,
         BankBookingRequestStatus.PENDING,
         "requester",
         null,

@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param type movement enum name ({@code DEPOSIT} / {@code WITHDRAWAL} / {@code TRANSFER})
  * @param amount the requested whole-aUEC amount
  * @param note the requester's optional note, or {@code null}
+ * @param justification the requester's optional justification (Begr&uuml;ndung) for a {@code
+ *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), or {@code null}
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
@@ -73,6 +75,7 @@ public record BankBookingRequestDto(
     String type,
     BigDecimal amount,
     @Nullable String note,
+    @Nullable String justification,
     String status,
     String requesterHandle,
     @Nullable UUID holderId,

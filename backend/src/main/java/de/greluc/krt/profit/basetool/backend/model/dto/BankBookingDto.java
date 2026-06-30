@@ -35,6 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param amount the signed amount of THIS account's leg
  * @param holderHandle the holder whose stash this leg changed
  * @param note the transaction's free-text note, may be {@code null}
+ * @param justification the transaction's free-text justification (Begr&uuml;ndung) — only a {@code
+ *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045), {@code null} otherwise
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
@@ -63,6 +65,7 @@ public record BankBookingDto(
     BigDecimal amount,
     String holderHandle,
     @Nullable String note,
+    @Nullable String justification,
     Instant createdAt,
     @Nullable UUID reversedTransactionId,
     @Nullable String counterAccountNo,

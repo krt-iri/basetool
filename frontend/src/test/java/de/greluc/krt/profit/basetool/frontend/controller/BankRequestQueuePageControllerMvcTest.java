@@ -88,6 +88,7 @@ class BankRequestQueuePageControllerMvcTest {
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
+            null,
             "PENDING",
             "officerX",
             null,

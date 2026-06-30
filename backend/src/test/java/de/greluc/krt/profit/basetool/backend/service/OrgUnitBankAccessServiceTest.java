@@ -383,6 +383,7 @@ class OrgUnitBankAccessServiceTest {
             new BigDecimal("-100"),
             "greluc",
             "note",
+            "Reparatur",
             Instant.now(),
             null,
             "KB-0002",
@@ -406,6 +407,10 @@ class OrgUnitBankAccessServiceTest {
     assertThat(redacted.counterpartyOrgUnitName()).isNull();
     assertThat(redacted.counterAccountNo()).isEqualTo("KB-0002");
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
+    // REQ-BANK-045: the Begründung is not player-identifying, so it survives redaction like the
+    // note.
+    assertThat(redacted.note()).isEqualTo("note");
+    assertThat(redacted.justification()).isEqualTo("Reparatur");
   }
 
   @Test
@@ -593,6 +598,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq("from sale"),
             eq(null),
+            eq(null),
             eq(false),
             eq(null),
             eq(false),
@@ -617,6 +623,7 @@ class OrgUnitBankAccessServiceTest {
             null,
             new BigDecimal("1000"),
             "from sale",
+            null,
             true,
             new BigDecimal("30"));
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
@@ -626,6 +633,7 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("1000")),
             eq("from sale"),
+            eq(null),
             eq(null),
             eq(false),
             eq(null),
@@ -655,6 +663,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq("from sale"),
             eq(null),
+            eq(null),
             eq(false),
             eq(null),
             eq(false),
@@ -682,6 +691,7 @@ class OrgUnitBankAccessServiceTest {
             eq(accountId),
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("250")),
+            eq(null),
             eq(null),
             eq(null),
             eq(false),
@@ -715,6 +725,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("5000")),
             eq(null),
             eq(null),
+            eq(null),
             eq(false),
             eq(null),
             eq(false),
@@ -728,6 +739,7 @@ class OrgUnitBankAccessServiceTest {
             eq(accountId),
             eq(BankBookingRequestType.DEPOSIT),
             eq(new BigDecimal("5000")),
+            eq(null),
             eq(null),
             eq(null),
             eq(false),
@@ -797,6 +809,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq(null),
             eq(null),
+            eq(null),
             eq(true),
             eq(new BigDecimal("100")),
             eq(false),
@@ -812,6 +825,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq(null),
             eq(null),
+            eq(null),
             eq(true),
             eq(new BigDecimal("100")),
             eq(false),
@@ -819,8 +833,55 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
+  void createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval() {
+    // REQ-BANK-041 (amended): when NO approval limit applies to the requester (no user, role or
+    // all-members limit configured), a withdrawal/transfer ALWAYS needs the responsible holder's
+    // approval — requiresOwnerApproval=true with applicableLimit=null. (Before the amendment a
+    // missing limit meant unlimited / never-needs-approval.)
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of());
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(null),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(null),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
   void createBookingRequest_transfer_passesDestination() {
     // REQ-BANK-040: a transfer carries its destination account through to the request service.
+    // REQ-BANK-041 (amended): no approval limit is configured for this account, so the request now
+    // always needs the responsible holder's approval (requiresOwnerApproval=true, limit=null).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID destId = UUID.randomUUID();
@@ -836,8 +897,9 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.TRANSFER),
             eq(new BigDecimal("500")),
             eq(null),
+            eq(null),
             eq(destId),
-            eq(false),
+            eq(true),
             eq(null),
             eq(false),
             eq(null)))
@@ -851,8 +913,9 @@ class OrgUnitBankAccessServiceTest {
             eq(BankBookingRequestType.TRANSFER),
             eq(new BigDecimal("500")),
             eq(null),
+            eq(null),
             eq(destId),
-            eq(false),
+            eq(true),
             eq(null),
             eq(false),
             eq(null));
@@ -889,6 +952,7 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("500")),
             eq(null),
             eq(null),
+            eq(null),
             eq(true),
             eq(new BigDecimal("100")),
             eq(false),
@@ -902,6 +966,7 @@ class OrgUnitBankAccessServiceTest {
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
             eq(new BigDecimal("500")),
+            eq(null),
             eq(null),
             eq(null),
             eq(true),
@@ -1053,6 +1118,7 @@ class OrgUnitBankAccessServiceTest {
         BankBookingRequestType.DEPOSIT,
         new BigDecimal("500"),
         "from sale",
+        null,
         BankBookingRequestStatus.PENDING,
         "requester",
         null,

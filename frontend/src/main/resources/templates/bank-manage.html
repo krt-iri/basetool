@@ -54,17 +54,17 @@
     <th:block th:fragment="manageBody">
     <!-- W1 tab switcher (server-side via query param, same pattern as mission detail). -->
     <div class="tab-nav mt-2" role="tablist">
-        <a th:href="@{/bank/manage(tab='konten')}" class="tab" role="tab"
-           th:classappend="${activeTab == 'konten'} ? ' active' : ''"
-           th:aria-selected="${activeTab == 'konten'}" data-testid="bank-tab-accounts">
-            <span th:text="#{bank.manage.tab.accounts}">Konten</span>
-            <span class="tab-count" th:text="${#lists.size(accounts)}">7</span>
-        </a>
         <a th:href="@{/bank/manage(tab='halter')}" class="tab" role="tab"
            th:classappend="${activeTab == 'halter'} ? ' active' : ''"
            th:aria-selected="${activeTab == 'halter'}" data-testid="bank-tab-holders">
             <span th:text="#{bank.manage.tab.holders}">Halter</span>
             <span class="tab-count" th:text="${#lists.size(holders)}">12</span>
+        </a>
+        <a th:href="@{/bank/manage(tab='konten')}" class="tab" role="tab"
+           th:classappend="${activeTab == 'konten'} ? ' active' : ''"
+           th:aria-selected="${activeTab == 'konten'}" data-testid="bank-tab-accounts">
+            <span th:text="#{bank.manage.tab.accounts}">Konten</span>
+            <span class="tab-count" th:text="${#lists.size(accounts)}">7</span>
         </a>
     </div>
 

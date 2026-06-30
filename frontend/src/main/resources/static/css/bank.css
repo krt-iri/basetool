@@ -526,6 +526,14 @@ tr.is-inert td {
     margin-bottom: 12px;
 }
 
+/* The hidden attribute must win over the flex display above (the author-level rule outranks the UA
+   stylesheet's [hidden] { display: none }). Without this the JS-toggled conditional rows — the
+   transfer-only Zielkonto, the split-percentage row, the WITHDRAWAL/TRANSFER-only Begruendung and
+   the confirm modal's destination-holder — would stay visible even while marked hidden. */
+.bank-form-row[hidden] {
+    display: none;
+}
+
 .bank-form-row label {
     font-size: 0.66rem;
     text-transform: uppercase;

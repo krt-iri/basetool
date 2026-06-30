@@ -52,5 +52,19 @@ public enum BankAccountType {
   CARTEL_BANK,
 
   /** Dynamically created special-purpose account with a free-form display name (e.g. events). */
-  SPECIAL
+  SPECIAL;
+
+  /**
+   * Whether a debit (withdrawal or transfer) leaving an account of this type must carry a non-blank
+   * justification (REQ-BANK-045). The cartel-wide accounts — the KRT account ({@link #CARTEL}), the
+   * bank's own operating account ({@link #CARTEL_BANK}) and every special account ({@link
+   * #SPECIAL}) — hold org-wide money whose outflow needs an explicit reason; org-unit and area
+   * accounts ({@link #ORG_UNIT}, {@link #AREA}) leave the justification optional.
+   *
+   * @return {@code true} for {@code CARTEL}, {@code CARTEL_BANK} and {@code SPECIAL}; {@code false}
+   *     for {@code ORG_UNIT} and {@code AREA}
+   */
+  public boolean requiresDebitJustification() {
+    return this == CARTEL || this == CARTEL_BANK || this == SPECIAL;
+  }
 }

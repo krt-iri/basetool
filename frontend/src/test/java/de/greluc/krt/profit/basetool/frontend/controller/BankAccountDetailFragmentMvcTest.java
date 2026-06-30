@@ -86,6 +86,7 @@ class BankAccountDetailFragmentMvcTest {
             new BigDecimal("250000"),
             "alpha",
             "Fragment note",
+            "Fragment reason",
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
             null,
@@ -103,6 +104,8 @@ class BankAccountDetailFragmentMvcTest {
         .perform(get("/bank/accounts/" + accountId).param("fragment", "bookings"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Fragment note")))
+        // REQ-BANK-045: the Begründung column renders alongside the note.
+        .andExpect(content().string(containsString("Fragment reason")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/bank/accounts/" + accountId + "?page=1")))
         // Wrapper div and the page's modals live outside the fragment.

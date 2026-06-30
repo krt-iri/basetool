@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
 > **Status:** Implemented — epic
 > [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
@@ -142,7 +142,9 @@ identity).
 ### REQ-BANK-004 — Append-only double-entry ledger
 
 All value movements are recorded on **two append-only ledgers** (ADR-0039) sharing one
-`bank_transaction` header (type, initiator, note, timestamp): `bank_posting` rows carry the
+`bank_transaction` header (type, initiator, note, justification, timestamp — the optional
+`justification`/Begründung is captured only for a `WITHDRAWAL` / `TRANSFER`, REQ-BANK-045):
+`bank_posting` rows carry the
 **account** dimension (account, signed amount) and `bank_holder_posting` rows the **holder**
 dimension (holder, signed amount). Transaction types and the legs they co-record:
 `DEPOSIT` (one `+` account leg + one `+` holder leg), `WITHDRAWAL` (one `−` account leg +
@@ -436,7 +438,8 @@ For every account they can see, bank staff can export an **account statement PDF
 **user-selected period** (from/to, reusing the `datetime-split-group` filter pattern):
 header with account number/name/type/status, opening balance at period start, every
 booking in the period (timestamp, type, counter-account where applicable, holder, note,
-signed amount, running balance) and the closing balance. The per-account **holder
+justification (REQ-BANK-045), signed amount, running balance) and the closing balance. The
+per-account **holder
 distribution** is **removed** (ADR-0039: custody is no longer per-account); each booking row
 keeps its holder annotation, derived from the transaction's holder leg. The PDF is generated backend-side with OpenPDF, follows
 the KRT design system (page background, KRT orange `#E77E23`, **embedded Lato** — the
@@ -1266,14 +1269,27 @@ confirmable even when the employee cannot see the destination; capability gate o
 > **withdrawal and transfer** requests only (money *leaving* an account). A **deposit** is never
 > subject to an approval limit: `requires_owner_approval` is always `false` and `applicable_limit`
 > always `null` for a deposit, whatever the amount and whoever the requester.
+>
+> **Amended (owner-approved):** the **missing-limit** semantics are **inverted** on every account that
+> supports approval limits (`ORG_UNIT` / `AREA` / `CARTEL`). When **no** limit applies to the requester
+> — no per-user limit, no role-tier limit (e.g. KL / `KOMMANDOLEITER`) and no all-members limit — a
+> withdrawal/transfer request now **always** requires the responsible holder's approval
+> (`requires_owner_approval = true`, `applicable_limit = null`); a **configured** limit still only
+> triggers approval **above** its ceiling. Approval is thus the **safe default**: a requester acts
+> approval-free only **within a limit explicitly granted** to them (directly or via a role). The
+> snapshot computation is `requires_owner_approval = (applicable_limit == null) || amount >
+> applicable_limit`. (`CARTEL_BANK` and `SPECIAL` stay non-request-capable, so this never reaches
+> them.)
 
 Each request-capable account may carry **per-tier approval limits** (`bank_account_approval_limit`,
 V193): a whole-aUEC ceiling (>= 0) up to which a tier may request **without** the responsible holder's
 explicit approval. The tiers mirror the configurable visibility buckets of REQ-BANK-035 (squadron /
 Bereich sub-ranks, all-members, individual users). A **missing** limit for a requester's tier means
-unlimited — preserving the pre-feature behaviour (no regression). The limit a requester is subject to
-is resolved **at request creation** in the seam: an individual-user limit wins; otherwise the maximum
-of the limits for the role tiers they hold; otherwise the all-members limit; otherwise unlimited. The
+the request **always needs the responsible holder's approval** (amended above — approval is the safe
+default; the pre-amendment "missing = unlimited" behaviour is retired). The limit a requester is
+subject to is resolved **at request creation** in the seam: an individual-user limit wins; otherwise
+the maximum of the limits for the role tiers they hold; otherwise the all-members limit; otherwise
+**none applies and approval is required**. The
 **all-members tier is the catch-all ceiling for every eligible requester** who matches no more
 specific tier — *not only* org-unit members: because request eligibility = view eligibility
 (REQ-BANK-039), it applies equally to an outsider holding only a per-user view grant and to any KRT
@@ -1289,8 +1305,9 @@ boolean.
 to everyone who may open them. Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` /
 `APPROVAL_LIMIT_CLEARED`).
 
-**Two-step approval.** When a request exceeds the requester's limit it is flagged
-`requires_owner_approval`; the requester sees a live warning that it must be approved first. (1) The
+**Two-step approval.** When a request exceeds the requester's limit — **or when no limit applies to
+the requester at all** (amended) — it is flagged `requires_owner_approval`; the requester sees a live
+warning that it must be approved first. (1) The
 responsible holder may **grant approval in-app** from the new "Fremde Anträge" tab — the requests
 raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
 who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
@@ -1309,7 +1326,9 @@ project concurrency rules, not a defect.
 **Enforced by:** `OrgUnitBankAccessServiceTest` (limit resolution incl. the all-members ceiling
 applying to a non-member per-user view-grant holder; `canConfigureApprovalLimits` matrix —
 holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner approval, incl.
-a non-responsible-holder being rejected), `BankBookingRequestServiceTest` (snapshot at create;
+a non-responsible-holder being rejected; **the no-limit case always flags approval**,
+`createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval`),
+`BankBookingRequestServiceTest` (snapshot at create;
 confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest` · **Code:**
 `model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
@@ -1519,6 +1538,59 @@ reaches `/memberships`) · **Code:**
 `db/migration/V197`, frontend `controller/BankPageController`, `controller/UserProxyController`,
 `templates/bank-account-detail.html`, `static/js/bank.js` · **ADR:**
 [ADR-0054](../adr/0054-bank-transaction-counterparty.md) · **Issues:** —
+
+### REQ-BANK-045 — Conditional Begründung (justification) on withdrawals & transfers
+
+A **withdrawal** or **account↔account transfer** — both the direct bank-staff booking and the
+confirm-before-post **request** — carries an optional free-text **Begründung** (`justification`,
+`VARCHAR(500)`, V198), a sibling of the existing `note` captured **only** for these two debit kinds (a
+**deposit never** captures one — it is neither shown nor stored, REQ-BANK-042). The field is
+**required** (service-enforced, not a DB CHECK — the rule depends on the source account's *type*) when
+the debited account is one of the cartel-wide accounts whose outflow needs an explicit reason — the
+**KRT** account (`CARTEL`), the **bank's own** account (`CARTEL_BANK`) and every **Sonderkonto**
+(`SPECIAL`) — and **optional** for `ORG_UNIT` (Staffel/SK) and `AREA` (Bereich) accounts (where the
+note is likewise optional). The predicate is `BankAccountType.requiresDebitJustification()`; a blank
+justification on a mandating account is rejected with **409 `BANK_JUSTIFICATION_REQUIRED`** at every
+debit entry point (`BankLedgerService.bookWithdrawal` / `bookTransfer` and the request
+`BankBookingRequestService.create`), surfaced inline at the `justification` field (frontend
+`CODE_FIELD`).
+
+The justification is **persisted** on the append-only ledger header (`bank_transaction.justification`)
+and the off-ledger request (`bank_booking_request.justification`), **carried request → confirmation**
+onto the booking, and **displayed everywhere the note is** — the account-detail booking history, the
+account-statement PDF and the management-export PDF (a dedicated column carved out of the wide note
+column so no other column narrows). It is **not** player-identifying, so — unlike the holder and the
+counterparty — it is **kept** on the member-facing redacted Kontoauszug and the org-unit read-only
+history (REQ-BANK-038), exactly like the note. Per REQ-BANK-012 it is **never** written into the audit
+`details` payload (no user free text / no PII in audit details); it lives only as business data on the
+transaction/request. Adding it introduces **no** new `AuditEventType` — it is a field on existing
+movements (`WITHDRAWAL_BOOKED` / `TRANSFER_BOOKED` / `BOOKING_REQUEST_CREATED` / `…_CONFIRMED`), not a
+new audited activity.
+
+**Acceptance**
+
+- [x] A withdrawal/transfer (direct booking **and** request) leaving a `CARTEL` / `CARTEL_BANK` /
+  `SPECIAL` account with a blank justification is rejected with `BANK_JUSTIFICATION_REQUIRED`; the same
+  from an `ORG_UNIT` / `AREA` account succeeds with a null justification.
+- [x] A non-blank justification is persisted on the ledger transaction and the request, carried onto
+  the booking at confirmation, and rendered in the booking history and both PDFs.
+- [x] A deposit never captures, stores or shows a justification.
+- [x] The justification survives the member-facing redaction (it is not player-identifying) and is
+  never placed in the audit `details` payload.
+
+**Enforced by:** `BankLedgerServiceTest` (direct withdrawal from a mandating account rejected when
+blank, persisted when present), `BankBookingRequestServiceTest` (request rejected/optional/persisted by
+source-account type), `OrgUnitBankAccessServiceTest` (justification kept through redaction),
+`BankReportServiceTest` (statement renders it), frontend `BankAccountDetailFragmentMvcTest` (history
+column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/BankTransaction`,
+`model/BankBookingRequest`, `model/dto/request/Bank{Withdrawal,Transfer}Request`,
+`model/dto/request/CreateBankBookingRequest`, `service/BankLedgerService`,
+`service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
+`service/Bank{Statement,Management}ReportService`, `model/projection/BankBookingRow`,
+`repository/BankPostingRepository`, `model/dto/Bank{Booking,BookingRequest}Dto`,
+`exception/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
+`templates/bank-account-detail.html`, `templates/bank-requests.html`, `static/js/bank.js`,
+`static/css/bank.css` · **Issues:** —
 
 ## Out of scope
 

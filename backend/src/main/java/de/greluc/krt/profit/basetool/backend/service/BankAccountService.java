@@ -490,6 +490,7 @@ public class BankAccountService {
         row.amount(),
         holderHandle,
         row.note(),
+        row.justification(),
         row.createdAt(),
         row.reversedTransactionId(),
         counterAccountNo,

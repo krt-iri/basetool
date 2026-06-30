@@ -968,8 +968,17 @@ public final class BackendSeeder {
    */
   public int bankWithdraw(
       String username, String password, String accountId, String holderId, long amount) {
-    return postForStatus(
-        username, password, "/api/v1/bank/withdrawals", bookingBody(accountId, holderId, amount));
+    // REQ-BANK-045: the e2e booking accounts are SPECIAL (justification-mandating), so a withdrawal
+    // must carry a non-blank Begründung.
+    String body =
+        "{\"accountId\":\""
+            + accountId
+            + "\",\"holderId\":\""
+            + holderId
+            + "\",\"amount\":"
+            + amount
+            + ",\"justification\":\"E2E withdrawal reason\"}";
+    return postForStatus(username, password, "/api/v1/bank/withdrawals", body);
   }
 
   /**

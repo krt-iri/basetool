@@ -217,13 +217,15 @@ public class BankStatementReportService {
       // Org-unit viewers get the same history without the player-custody column (REQ-BANK-038): the
       // redacted layout drops both the "Halter" and the counterparty "Gegenseite" column, since the
       // latter likewise names a player. Bank staff get both.
-      int columns = redactHolders ? 5 : 7;
+      int columns = redactHolders ? 6 : 8;
       PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
+      // The Begründung column (REQ-BANK-045) is carved out of the wide note column so every other
+      // column keeps its original width — the type/holder labels must not narrow into a wrap.
       table.setWidths(
           redactHolders
-              ? new float[] {1.6f, 1.3f, 2.7f, 1.3f, 1.4f}
-              : new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.9f, 1.2f, 1.3f});
+              ? new float[] {1.6f, 1.3f, 1.4f, 1.3f, 1.3f, 1.4f}
+              : new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.0f, 0.9f, 1.2f, 1.3f});
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
       if (!redactHolders) {
@@ -231,6 +233,7 @@ public class BankStatementReportService {
         KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
       }
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
+      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.justification"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.balance"));
 
@@ -252,6 +255,8 @@ public class BankStatementReportService {
           KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
         }
         KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
+        KrtPdfSupport.addTableCell(
+            table, row.justification() != null ? row.justification() : "", bg, false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         alt = !alt;

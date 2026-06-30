@@ -115,6 +115,14 @@ public class BankConflictException extends RuntimeException {
    */
   public static final String CODE_BANK_SPLIT_TOO_SMALL = "BANK_SPLIT_TOO_SMALL";
 
+  /**
+   * Withdrawal/transfer (request or direct booking) leaving a {@link
+   * de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
+   * justification-mandating} account ({@code CARTEL}, {@code CARTEL_BANK}, {@code SPECIAL}) without
+   * a non-blank justification (Begr&uuml;ndung). REQ-BANK-045.
+   */
+  public static final String CODE_BANK_JUSTIFICATION_REQUIRED = "BANK_JUSTIFICATION_REQUIRED";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

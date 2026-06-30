@@ -59,7 +59,7 @@ public class BankManagePageController {
    * zero-balance rule disables the close button server-knowledge-first) and the holder registry
    * with custody totals. The org-unit list and the user lookup feed the two creation modals.
    *
-   * @param tab the active tab ({@code konten} default, {@code halter})
+   * @param tab the active tab ({@code halter} default/first, {@code konten})
    * @param fragment when {@code "manageBody"} only the tab-nav + active panel are re-rendered after
    *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
    *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
@@ -99,7 +99,9 @@ public class BankManagePageController {
     // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
     // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
     model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
-    model.addAttribute("activeTab", "halter".equalsIgnoreCase(tab) ? "halter" : "konten");
+    // Halter is the default-open tab (it sits first/left in the tab nav); only an explicit
+    // ?tab=konten opens the accounts tab.
+    model.addAttribute("activeTab", "konten".equalsIgnoreCase(tab) ? "konten" : "halter");
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";
     }

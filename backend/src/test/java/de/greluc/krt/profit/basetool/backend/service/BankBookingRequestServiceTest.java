@@ -109,6 +109,24 @@ class BankBookingRequestServiceTest {
     return account;
   }
 
+  /**
+   * Builds an active {@code CARTEL} account — a {@linkplain
+   * BankAccountType#requiresDebitJustification() justification-mandating} type with no owning org
+   * unit — for the REQ-BANK-045 Begr&uuml;ndung tests.
+   *
+   * @param id the account id
+   * @return an active CARTEL account
+   */
+  private static BankAccount cartelAccount(UUID id) {
+    BankAccount account = new BankAccount();
+    account.setId(id);
+    account.setAccountNo("KB-0002");
+    account.setName("KRT");
+    account.setType(BankAccountType.CARTEL);
+    account.setStatus(BankAccountStatus.ACTIVE);
+    return account;
+  }
+
   private static BankBookingRequest pending(
       UUID id, BankAccount account, BankBookingRequestType type, UUID requestedBy, long version) {
     BankBookingRequest request = new BankBookingRequest();
@@ -147,6 +165,7 @@ class BankBookingRequestServiceTest {
             BankBookingRequestType.DEPOSIT,
             new BigDecimal("500"),
             "from sale",
+            null,
             null,
             false,
             null,
@@ -198,6 +217,7 @@ class BankBookingRequestServiceTest {
         new BigDecimal("1000"),
         "from sale",
         null,
+        null,
         false,
         null,
         true,
@@ -224,12 +244,109 @@ class BankBookingRequestServiceTest {
                     new BigDecimal("500"),
                     null,
                     null,
+                    null,
                     false,
                     null,
                     false,
                     null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_ACCOUNT_CLOSED);
     verify(requestRepository, never()).save(any());
+  }
+
+  @Test
+  void create_withdrawalFromMandatingAccount_blankJustification_rejected() {
+    // REQ-BANK-045: a withdrawal/transfer request leaving a CARTEL / CARTEL_BANK / SPECIAL account
+    // must carry a non-blank Begründung; a blank one is rejected with BANK_JUSTIFICATION_REQUIRED
+    // and nothing is persisted.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = cartelAccount(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    BankConflictException ex =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                service.create(
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    "   ",
+                    null,
+                    true,
+                    null,
+                    false,
+                    null));
+    assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED);
+    verify(requestRepository, never()).save(any());
+  }
+
+  @Test
+  void create_withdrawalFromOrgUnitAccount_blankJustification_succeeds() {
+    // REQ-BANK-045: an ORG_UNIT (or AREA) account leaves the Begründung optional — a withdrawal
+    // request without one is accepted and persists a null justification.
+    UUID accountId = UUID.randomUUID();
+    UUID requesterSub = UUID.randomUUID();
+    BankAccount account = account(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
+    when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
+    ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
+    when(requestRepository.save(saved.capture()))
+        .thenAnswer(
+            invocation -> {
+              BankBookingRequest r = invocation.getArgument(0);
+              r.setId(UUID.randomUUID());
+              return r;
+            });
+
+    service.create(
+        accountId,
+        BankBookingRequestType.WITHDRAWAL,
+        new BigDecimal("500"),
+        null,
+        null,
+        null,
+        true,
+        null,
+        false,
+        null);
+
+    assertThat(saved.getValue().getJustification()).isNull();
+  }
+
+  @Test
+  void create_withdrawalFromMandatingAccount_persistsJustification() {
+    // REQ-BANK-045: a non-blank Begründung is snapshotted on the request so it can be carried onto
+    // the booking at confirmation.
+    UUID accountId = UUID.randomUUID();
+    UUID requesterSub = UUID.randomUUID();
+    BankAccount account = cartelAccount(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
+    when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
+    ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
+    when(requestRepository.save(saved.capture()))
+        .thenAnswer(
+            invocation -> {
+              BankBookingRequest r = invocation.getArgument(0);
+              r.setId(UUID.randomUUID());
+              return r;
+            });
+
+    service.create(
+        accountId,
+        BankBookingRequestType.WITHDRAWAL,
+        new BigDecimal("500"),
+        null,
+        "Reparaturkosten",
+        null,
+        true,
+        null,
+        false,
+        null);
+
+    assertThat(saved.getValue().getJustification()).isEqualTo("Reparaturkosten");
   }
 
   @Test

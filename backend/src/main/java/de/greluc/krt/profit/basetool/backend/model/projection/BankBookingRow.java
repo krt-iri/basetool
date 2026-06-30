@@ -36,6 +36,8 @@ import java.util.UUID;
  * @param type the transaction type driving the row's chip rendering
  * @param amount the signed amount of THIS account's leg
  * @param note the transaction's free-text note, may be {@code null}
+ * @param justification the transaction's free-text justification (Begr&uuml;ndung) — only a {@code
+ *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045), {@code null} otherwise
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
@@ -53,6 +55,7 @@ public record BankBookingRow(
     BankTransactionType type,
     BigDecimal amount,
     String note,
+    String justification,
     Instant createdAt,
     UUID reversedTransactionId,
     BigDecimal transferFee,

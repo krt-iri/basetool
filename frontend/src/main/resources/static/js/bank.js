@@ -40,6 +40,8 @@
         // Split deposit conflicts (REQ-BANK-043): surface at the percentage field.
         BANK_SPLIT_NO_TARGETS: 'splitPercent',
         BANK_SPLIT_TOO_SMALL: 'splitPercent',
+        // Missing Begründung on a debit from a justification-mandating account (REQ-BANK-045).
+        BANK_JUSTIFICATION_REQUIRED: 'justification',
     };
 
     /**
@@ -556,10 +558,13 @@
     }
 
     /**
-     * Live over-limit warning on the org-unit request modal (REQ-BANK-041): shows the warning when
-     * the entered amount exceeds the requester's approval limit for the chosen source account. The
-     * per-account limit rides on each source-account <option> as `data-limit` (absent = unlimited).
-     * Advisory only — it never blocks submission; the request is still filed and then flagged.
+     * Live owner-approval warning on the org-unit request modal (REQ-BANK-041, amended): shows the
+     * warning whenever the withdrawal/transfer will need the responsible holder's approval. The
+     * per-account limit rides on each source-account <option> as `data-limit`. Semantics: a configured
+     * limit warns only when the entered amount exceeds it; a MISSING limit (`data-limit` absent/empty,
+     * i.e. no per-user/role/all-members limit applies) means approval is ALWAYS required, so it warns
+     * for any positive amount. Advisory only — it never blocks submission; the request is still filed
+     * and then flagged for the responsible holder.
      *
      * @param {HTMLFormElement} form the org-unit request form carrying a `[data-limit-warning]` block
      */
@@ -577,12 +582,16 @@
             return;
         }
         const amount = Number(amountEl.value);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            warning.hidden = true;
+            return;
+        }
         const option = accountEl.options[accountEl.selectedIndex];
         const rawLimit = option ? option.getAttribute('data-limit') : null;
         const limit = rawLimit === null || rawLimit === '' ? null : Number(rawLimit);
-        const exceeds =
-            limit !== null && Number.isFinite(limit) && Number.isFinite(amount) && amount > limit;
-        warning.hidden = !exceeds;
+        // No configured limit => approval is always required; a configured limit => only above it.
+        const needsApproval = limit === null || !Number.isFinite(limit) || amount > limit;
+        warning.hidden = !needsApproval;
     }
 
     /**
@@ -594,6 +603,46 @@
         const form = target && target.closest ? target.closest('form') : null;
         if (form && form.querySelector('[data-limit-warning]')) {
             updateLimitWarning(form);
+        }
+    }
+
+    /**
+     * Recomputes the Begründung field's `required` flag on the ORG-UNIT request modal (REQ-BANK-045):
+     * the field is required only for a WITHDRAWAL/TRANSFER whose selected source account mandates a
+     * reason — its <option> carries `data-requires-justification="true"` (set for CARTEL / CARTEL_BANK
+     * / SPECIAL). For a deposit, or a source account that does not mandate a reason, it is optional.
+     * The bank-employee withdraw/transfer modals are NOT touched here — they have no
+     * `[data-request-justification-only]` wrapper and carry a server-rendered `required` flag instead.
+     *
+     * @param {HTMLFormElement} form the org-unit request form
+     */
+    function updateJustificationRequired(form) {
+        const input = form.querySelector('input[name="justification"]');
+        if (!input) {
+            return;
+        }
+        const typeEl = form.querySelector('select[data-role="org-unit-request-type"]');
+        const type = typeEl ? typeEl.value : null;
+        if (type !== 'WITHDRAWAL' && type !== 'TRANSFER') {
+            input.required = false;
+            return;
+        }
+        const accountEl = form.querySelector('select[name="sourceAccountId"]');
+        const option = accountEl ? accountEl.options[accountEl.selectedIndex] : null;
+        input.required = !!option && option.getAttribute('data-requires-justification') === 'true';
+    }
+
+    /**
+     * Recomputes the org-unit request modal's justification-required flag for the form the edited
+     * field belongs to. Scoped to that modal via its `[data-request-justification-only]` wrapper so a
+     * field edit in a bank-employee modal never clears its server-set `required`.
+     *
+     * @param {EventTarget} target the field that fired the event
+     */
+    function recomputeJustificationRequiredFrom(target) {
+        const form = target && target.closest ? target.closest('form') : null;
+        if (form && form.querySelector('[data-request-justification-only]')) {
+            updateJustificationRequired(form);
         }
     }
 
@@ -734,6 +783,7 @@
     function onBankFieldEdit(target) {
         recomputeFeePreviewFrom(target);
         recomputeLimitWarningFrom(target);
+        recomputeJustificationRequiredFrom(target);
         recomputeSplitPreviewFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
             updateBalanceCalc(target);
@@ -1016,6 +1066,23 @@
                 toggleSplitRow(splitToggle);
             }
         }
+        // Begründung (REQ-BANK-045): shown + enabled only for a WITHDRAWAL/TRANSFER; disabled while
+        // hidden so a deposit request omits it from the body entirely. The required flag is then
+        // recomputed from the selected source account's type.
+        const justificationRow = form.querySelector('[data-request-justification-only]');
+        if (justificationRow) {
+            const isDebit = type === 'WITHDRAWAL' || type === 'TRANSFER';
+            justificationRow.hidden = !isDebit;
+            const input = justificationRow.querySelector('input[name="justification"]');
+            if (input) {
+                input.disabled = !isDebit;
+                if (!isDebit) {
+                    input.value = '';
+                    input.required = false;
+                }
+            }
+        }
+        updateJustificationRequired(form);
         updateLimitWarning(form);
     }
 
@@ -1077,6 +1144,20 @@
                     ).toLocaleString('de-DE');
                 }
             }
+        }
+
+        // Requester's Begründung (REQ-BANK-045): show it read-only when the request carries one. The
+        // trigger omits data-field-justification entirely when there is none (a deposit, or an
+        // optional reason the requester left blank), so an absent attribute hides the block.
+        const justificationNotice = form.querySelector('[data-confirm-justification]');
+        if (justificationNotice) {
+            const justification = trigger.getAttribute('data-field-justification');
+            const present = justification != null && justification.trim() !== '';
+            const valueEl = justificationNotice.querySelector('[data-bank-label="justification"]');
+            if (valueEl) {
+                valueEl.textContent = present ? justification : '';
+            }
+            justificationNotice.hidden = !present;
         }
 
         const destRow = form.querySelector('[data-confirm-destination-holder]');

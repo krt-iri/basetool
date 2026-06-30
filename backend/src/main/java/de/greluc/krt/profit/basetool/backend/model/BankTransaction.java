@@ -89,6 +89,16 @@ public class BankTransaction {
   private String note;
 
   /**
+   * Optional free-text justification (Begr&uuml;ndung) shown in the booking history and on
+   * statements, captured only for a {@code WITHDRAWAL} / {@code TRANSFER} (never a deposit) and
+   * required when the source account type {@linkplain BankAccountType#requiresDebitJustification()
+   * mandates a reason}; {@code null} otherwise (REQ-BANK-045).
+   */
+  @Nullable
+  @Column(length = 500)
+  private String justification;
+
+  /**
    * The member on the far side of a {@link BankTransactionType#DEPOSIT} (the Einzahler who handed
    * the money in) or {@link BankTransactionType#WITHDRAWAL} (the Empf&auml;nger who received the
    * payout), distinct from the {@code BankHolderPosting} holder (the bank custodian who physically

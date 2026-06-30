@@ -155,7 +155,8 @@ class BankBookingE2eTest {
             + dest
             + "\",\"destinationHolderId\":\""
             + holderBId
-            + "\",\"amount\":200}";
+            // REQ-BANK-045: SPECIAL source account mandates a Begründung on a transfer.
+            + "\",\"amount\":200,\"justification\":\"E2E transfer reason\"}";
     assertEquals(
         201,
         seeder.postForStatus(MGMT_USER, MGMT_PASSWORD, "/api/v1/bank/transfers", body),

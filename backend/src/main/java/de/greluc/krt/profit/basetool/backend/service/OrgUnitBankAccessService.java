@@ -776,6 +776,8 @@ public class OrgUnitBankAccessService {
           BankBookingRequestType.DEPOSIT,
           request.amount(),
           request.note(),
+          // REQ-BANK-045: a deposit never captures a justification.
+          null,
           null,
           false,
           null,
@@ -803,15 +805,19 @@ public class OrgUnitBankAccessService {
     }
     // REQ-BANK-041: resolve the requester's applicable limit now and snapshot whether the request
     // needs the responsible holder's approval; the org-unit-blind confirm path only reads the flag.
+    // When NO limit applies to the requester (no per-user, role or all-members limit configured),
+    // the request ALWAYS needs the responsible holder's approval; a configured limit only triggers
+    // approval above its ceiling. All request-capable account types support approval limits.
     BigDecimal applicableLimit = resolveApplicableLimit(account);
     boolean requiresOwnerApproval =
-        applicableLimit != null && request.amount().compareTo(applicableLimit) > 0;
+        applicableLimit == null || request.amount().compareTo(applicableLimit) > 0;
     // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
         account.getId(),
         request.type(),
         request.amount(),
         request.note(),
+        request.justification(),
         targetAccountId,
         requiresOwnerApproval,
         applicableLimit,
@@ -1675,6 +1681,7 @@ public class OrgUnitBankAccessService {
         booking.amount(),
         null,
         booking.note(),
+        booking.justification(),
         booking.createdAt(),
         booking.reversedTransactionId(),
         booking.counterAccountNo(),
