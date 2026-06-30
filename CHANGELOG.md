@@ -10,6 +10,12 @@
 
 - **Datenbank: Globales Abfrage-Zeitlimit verhindert das Blockieren von Verbindungen durch einzelne schwere Anfragen.** Jede Datenbankabfrage der Anwendung wird jetzt nach 30 Sekunden (über `APP_DB_QUERY_TIMEOUT_MS` anpassbar) abgebrochen. Bisher konnte eine einzelne sehr große oder langsame Abfrage eine Verbindung aus dem Pool unbegrenzt belegen; mehrere gleichzeitig hätten den Pool erschöpfen und die API ausbremsen können. Flyway-Migrationen sind ausgenommen (SEC-03).
 
+## [v1.0.10](https://github.com/krt-profit/basetool/releases/tag/v1.0.10) - 2026-06-30
+
+### Changed
+
+- **Org-Einheits-Bank: „Verantwortung & Sichtbarkeit"-Kacheln breiter, Inhalt bricht nicht mehr um.** Im Reiter „Verantwortung & Sichtbarkeit" einer Konto-Detailseite (`/org-unit-bank/accounts/{id}`) sind die drei Einstellungskacheln jetzt breit genug, dass ihr Inhalt (etwa die Freigabe-Limit-Zeilen) auf einer Zeile bleibt; passen nicht mehr zwei nebeneinander, brechen sie in die nächste Zeile um, statt den Inhalt zu quetschen. „Kontostandsziel" steht jetzt als letzte Kachel (REQ-BANK-038).
+
 ## [v1.0.9](https://github.com/krt-profit/basetool/releases/tag/v1.0.9) - 2026-06-30
 
 ### Added
