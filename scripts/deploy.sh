@@ -2,12 +2,13 @@
 # =============================================================================
 # Profit Basetool — Server-side deploy script
 #
-# Pulls the production backend + frontend + ingest images AND the host config
-# bundle (basetool-config: docker-compose.yml + maintenance page + Keycloak
-# theme) from GHCR (the version tag defaults to `:stable`, which is moved
-# atomically by the `promote.yml` GitHub Actions workflow), resolves them to
-# immutable digests, applies them via docker-compose with `--wait`, and rolls
-# back to the previous digest set AND the previous config tree if the
+# Pulls the production backend + frontend + ingest images, the host config bundle
+# (basetool-config: docker-compose.yml + maintenance page + Keycloak theme) AND
+# the Keycloak provider-JAR bundle (basetool-keycloak-spi: keycloak-spi.jar) from
+# GHCR (the version tag defaults to `:stable`, which is moved atomically by the
+# `promote.yml` GitHub Actions workflow), resolves them to immutable digests,
+# applies them via docker-compose with `--wait`, and rolls back to the previous
+# digest set, the previous config tree AND the previous provider JAR if the
 # health-check fails within IRI_HEALTH_TIMEOUT seconds.
 #
 # The config bundle travels the SAME pull-only, digest-pinned, deliberately
@@ -18,6 +19,14 @@
 # it is operator-gated (stateful migration / provider+keystore choreography),
 # never auto-applied. deploy.sh and the systemd units are NOT part of the bundle
 # (self-update hazard) and stay a manual bootstrap concern.
+#
+# The Keycloak provider JAR (basetool-keycloak-spi) rides the SAME channel as its
+# own SEPARATE artifact — REQ-OPS-005 bars provider JARs from the config bundle,
+# so it gets its own promotable, cosign-signed bundle (ADR-0055). When its digest
+# moves, the JAR is staged into keycloak/providers and ONLY keycloak is recreated
+# (health-gated; the JAR is rolled back on failure). A combined Keycloak-image +
+# provider-JAR change stays operator-gated by the postgres/Keycloak carve-out
+# above — the image change blocks the tick until the operator runs --force.
 #
 # Invoked periodically by the `iri-deploy.timer` systemd unit, or manually:
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh                  # apply :stable
@@ -32,13 +41,15 @@
 #                                          flip in GHCR does NOT silently move
 #                                          the running stack underneath us.
 #   /var/lib/iri/previous-digest-pin.yml   the prior pin, restored on rollback.
-#   /var/lib/iri/last-deployed.digests     idempotence marker — when ALL target
-#                                          digests (backend|frontend|ingest plus
-#                                          the config-bundle digest) match this
-#                                          file, the script exits 0 without
-#                                          restarting. The config digest is part
-#                                          of the marker so a config-only change
-#                                          (e.g. a redis pin bump) is NOT skipped.
+#   /var/lib/iri/last-deployed.digests     idempotence marker — a fixed 5-field
+#                                          record backend|frontend|ingest|config|
+#                                          keycloak-spi. When ALL target digests
+#                                          match this file, the script exits 0
+#                                          without restarting. The config and
+#                                          keycloak-spi digests are part of the
+#                                          marker so a config-only change (e.g. a
+#                                          redis pin bump) or a provider-JAR-only
+#                                          change is NOT skipped.
 #   /var/lib/iri/failed.digests            a digest set whose health check
 #                                          failed, plus a failure counter, so
 #                                          the SAME broken target is retried
@@ -60,6 +71,11 @@
 #                                          alerts once, then skips subsequent
 #                                          ticks quietly until a new promotion or
 #                                          a --force run. Cleared on apply.
+#   /var/lib/iri/keycloak-spi-previous.jar snapshot of the live provider JAR taken
+#                                          before a provider-JAR swap; restored on
+#                                          rollback if the keycloak recreate is
+#                                          unhealthy (the provider-JAR analogue of
+#                                          previous-digest-pin.yml).
 #
 # Locking: a single `flock` on /var/lock/iri-deploy.lock prevents the systemd
 # timer and a manual invocation from racing each other.
@@ -260,6 +276,27 @@ apply_config_tree() {
   fi
 }
 
+# Extract the promoted Keycloak provider JAR (/providers/keycloak-spi.jar inside
+# the scratch basetool-keycloak-spi image) onto the host as the mounted provider
+# JAR. Like the config bundle the image has no entrypoint/command, so `docker
+# create` needs a placeholder argument; the container is never started. The JAR is
+# installed 0644 (and its parent dir created) so the uid-1000 Keycloak runtime can
+# read it through the providers bind mount.
+extract_keycloak_spi_jar() {
+  local ref="$1" dest_jar="$2" cid stage
+  stage="${STATE_DIR}/keycloak-spi-stage.jar"
+  rm -f "${stage}"
+  cid="$(docker create "${ref}" /bundle 2>/dev/null)" \
+    || fail "cannot create container from keycloak-spi image ${ref}"
+  if ! docker cp "${cid}:/providers/keycloak-spi.jar" "${stage}" >/dev/null 2>&1; then
+    docker rm -f "${cid}" >/dev/null 2>&1 || true
+    fail "cannot extract /providers/keycloak-spi.jar from ${ref}"
+  fi
+  docker rm -f "${cid}" >/dev/null 2>&1 || true
+  install -D -m 0644 "${stage}" "${dest_jar}"
+  rm -f "${stage}"
+}
+
 # --- Pre-flight -------------------------------------------------------------
 require_file "${COMPOSE_DIR}/docker-compose.yml"
 require_file "${COMPOSE_DIR}/.env"
@@ -307,6 +344,10 @@ FAILED_FILE="${STATE_DIR}/failed.digests"
 CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
+# The live Keycloak provider JAR (mounted into the keycloak container) and the
+# rollback snapshot of it taken before a provider-JAR swap.
+KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
+KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 
 # --- Lock -------------------------------------------------------------------
 exec 200>"${LOCKFILE}"
@@ -328,6 +369,7 @@ BACKEND_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-backend"
 FRONTEND_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-frontend"
 INGEST_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-ingest"
 CONFIG_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-config"
+KEYCLOAK_SPI_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-keycloak-spi"
 
 resolve_digest() {
   # buildx imagetools resolves a tag to its manifest digest without pulling
@@ -351,36 +393,54 @@ INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
 # behaviour for this tick (3-field marker, no config staging).
 CONFIG_DIGEST="$(resolve_digest "${CONFIG_IMAGE}:${TARGET_TAG}")" || CONFIG_DIGEST=""
 
+# The Keycloak provider-JAR artifact is resolved BEST-EFFORT too (same rationale
+# as the config bundle): a host running before the first keycloak-spi:stable
+# promotion, or a transient hiccup on just this tag, must not brick the deploy
+# loop. When absent, this tick simply makes no provider-JAR change.
+KEYCLOAK_SPI_DIGEST="$(resolve_digest "${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG}")" || KEYCLOAK_SPI_DIGEST=""
+
 log "target backend  ${BACKEND_DIGEST}"
 log "target frontend ${FRONTEND_DIGEST}"
 log "target ingest   ${INGEST_DIGEST}"
 
-# Single whitespace-free token (digests carry no spaces), so the failed.digests
-# `read -r REC_MARKER REC_COUNT REC_EPOCH` parsing below stays a single field.
-# The config digest is the 4th field so a config-only change still moves the
-# marker (and a stale app-only deploy never silently drops a promoted compose).
+# The idempotence marker is a single whitespace-free token (digests carry no
+# spaces), so the failed.digests `read -r REC_MARKER REC_COUNT REC_EPOCH` parsing
+# below stays a single field. It is a FIXED 5-field positional record —
+#   backend|frontend|ingest|config|keycloak-spi
+# so a change to ANY component (incl. a config-only or provider-JAR-only change)
+# moves the marker, and a stale app-only deploy never silently drops a promoted
+# compose or provider JAR. The config + keycloak-spi digests are resolved
+# best-effort: an unavailable one is an empty field (nothing to (re)stage for that
+# component this tick — the legacy app-only behaviour).
 if [[ -n "${CONFIG_DIGEST}" ]]; then
   log "target config   ${CONFIG_DIGEST}"
-  EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}|${INGEST_DIGEST}|${CONFIG_DIGEST}"
 else
-  log "target config   unavailable (${CONFIG_IMAGE}:${TARGET_TAG} not resolvable) — app-only deploy this tick"
-  EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}|${INGEST_DIGEST}"
+  log "target config   unavailable (${CONFIG_IMAGE}:${TARGET_TAG} not resolvable) — no config change this tick"
 fi
+if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]]; then
+  log "target kc-spi   ${KEYCLOAK_SPI_DIGEST}"
+else
+  log "target kc-spi   unavailable (${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG} not resolvable) — no provider-JAR change this tick"
+fi
+EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}|${INGEST_DIGEST}|${CONFIG_DIGEST}|${KEYCLOAK_SPI_DIGEST}"
 
-# Decide whether the *config* component changed since the last successful deploy
-# — used to skip config re-staging on an app-only deploy. An older 3-field marker
-# (pre-config-artifact, or a tick where config was unavailable) has no config
-# digest → treat as changed so the first tick that sees the artifact stages it.
+# Decide whether the config and/or keycloak-spi components changed since the last
+# successful deploy — used to skip re-staging an unchanged component. Parse the
+# last marker positionally; a shorter legacy marker (pre-config or
+# pre-keycloak-spi) leaves the missing fields empty, so a present-but-unrecorded
+# digest reads as changed and is staged on the first tick that sees it.
+LAST_CONFIG_DIGEST=""
+LAST_KEYCLOAK_SPI_DIGEST=""
+if [[ -f "${LAST_DEPLOYED_FILE}" ]]; then
+  IFS='|' read -r _ _ _ LAST_CONFIG_DIGEST LAST_KEYCLOAK_SPI_DIGEST < "${LAST_DEPLOYED_FILE}" || true
+fi
 CONFIG_CHANGED=false
-if [[ -n "${CONFIG_DIGEST}" ]]; then
+if [[ -n "${CONFIG_DIGEST}" ]] && [[ "${CONFIG_DIGEST}" != "${LAST_CONFIG_DIGEST}" ]]; then
   CONFIG_CHANGED=true
-  if [[ -f "${LAST_DEPLOYED_FILE}" ]]; then
-    LAST_MARKER="$(cat "${LAST_DEPLOYED_FILE}")"
-    if [[ "${LAST_MARKER}" == *"|"*"|"*"|"* ]] \
-       && [[ "${LAST_MARKER##*|}" == "${CONFIG_DIGEST}" ]]; then
-      CONFIG_CHANGED=false
-    fi
-  fi
+fi
+KEYCLOAK_SPI_CHANGED=false
+if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_KEYCLOAK_SPI_DIGEST}" ]]; then
+  KEYCLOAK_SPI_CHANGED=true
 fi
 
 # --- Idempotence check ------------------------------------------------------
@@ -516,6 +576,61 @@ if docker compose \
         --remove-orphans \
         --wait \
         --wait-timeout "${HEALTH_TIMEOUT}"; then
+
+  # The app stack is healthy. If the promoted provider JAR moved, swap it in and
+  # recreate ONLY keycloak so its `start` re-runs the provider build and loads the
+  # new JAR — health-gated, with a JAR rollback on failure. A Keycloak IMAGE pin
+  # change is NOT handled here: that arrives via the config bundle and is already
+  # operator-gated by the infra_image_pins carve-out above, so a combined
+  # image+JAR change never reaches this auto-apply path without --force.
+  if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+    log "keycloak-spi changed → staging provider JAR + recreating keycloak"
+    if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
+      cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+      KEYCLOAK_SPI_HAD_PREVIOUS=true
+    else
+      rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+      KEYCLOAK_SPI_HAD_PREVIOUS=false
+    fi
+    extract_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" "${KEYCLOAK_SPI_JAR}"
+
+    if ! docker compose \
+           -f docker-compose.yml \
+           -f "${PIN_FILE_CURRENT}" \
+           --profile "${PROFILE}" \
+           up -d --no-deps --force-recreate \
+              --wait --wait-timeout "${HEALTH_TIMEOUT}" keycloak; then
+      log "keycloak did not become healthy with the new provider JAR — rolling back the JAR"
+      if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
+        install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}"
+      else
+        rm -f "${KEYCLOAK_SPI_JAR}"
+      fi
+      docker compose \
+        -f docker-compose.yml \
+        -f "${PIN_FILE_CURRENT}" \
+        --profile "${PROFILE}" \
+        up -d --no-deps --force-recreate \
+           --wait --wait-timeout "${HEALTH_TIMEOUT}" keycloak >/dev/null 2>&1 \
+        || log "WARNING: keycloak did not return to health on the previous JAR — manual check needed"
+
+      # Record the failure so the backoff throttles re-attempts of this exact
+      # target, the same mechanism as a failed app deploy. The app images stay on
+      # the new (healthy) version; only the provider JAR was reverted, so the
+      # marker is deliberately NOT written and the next tick retries (backed off).
+      FAIL_COUNT=1
+      if [[ -f "${FAILED_FILE}" ]]; then
+        read -r PREV_MARKER PREV_COUNT _ < "${FAILED_FILE}" || true
+        if [[ "${PREV_MARKER:-}" == "${EXPECTED_MARKER}" ]] && [[ "${PREV_COUNT:-}" =~ ^[0-9]+$ ]]; then
+          FAIL_COUNT=$(( 10#${PREV_COUNT} + 1 ))
+        fi
+      fi
+      printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+      log "recorded keycloak-spi health-check failure #${FAIL_COUNT} for this target"
+      exit 1
+    fi
+    log "keycloak-spi provider JAR applied"
+  fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
   rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}"

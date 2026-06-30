@@ -554,3 +554,168 @@ jobs:
           done
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
+
+  # The Keycloak provider-JAR bundle: a `FROM scratch` image (docker/keycloak-spi/
+  # Dockerfile) carrying ONLY the keycloak-spi provider JAR. It is a SEPARATE
+  # artifact from basetool-config because REQ-OPS-005 bars keycloak/providers JARs
+  # from the config bundle. The JAR is architecture-independent Java-21 bytecode,
+  # so it is compiled ONCE natively (no QEMU Gradle) and copied to the build-context
+  # root before the scratch image is built multi-arch for parity. Same tag scheme +
+  # same cosign keyless signature as the app images, so promote.yml flips it to
+  # :stable through the identical verify-and-retag path (REQ-OPS-007, ADR-0055).
+  build-keycloak-spi:
+    name: Build & sign keycloak-spi bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-read-only: true
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Plain library JAR (compileOnly Keycloak SPIs, Java-21 bytecode via
+      # `--release 21` in keycloak-spi/build.gradle.kts). `:keycloak-spi:jar` runs
+      # compile + jar only — no tests, no Checkstyle/Spotless (ci.yml covers those).
+      # The artifact is moved to the build-context root because .dockerignore bars
+      # `**/build`, so the scratch image cannot COPY from keycloak-spi/build/libs.
+      - name: Build keycloak-spi provider JAR
+        run: |
+          set -euo pipefail
+          ./gradlew :keycloak-spi:jar --no-daemon
+          mapfile -t jars < <(find keycloak-spi/build/libs -maxdepth 1 -type f \
+            -name 'keycloak-spi-*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar')
+          if [ "${#jars[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one keycloak-spi JAR, found ${#jars[@]}: ${jars[*]:-<none>}" >&2
+            ls -la keycloak-spi/build/libs >&2 || true
+            exit 1
+          fi
+          cp "${jars[0]}" keycloak-spi.jar
+          ls -l keycloak-spi.jar
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata (tags + OCI labels)
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi
+          # Identical tag scheme to the app images so a release's provider JAR is
+          # addressable as :1.4.3 and promotable to :stable in lock-step.
+          tags: |
+            type=edge,branch=main
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+          labels: |
+            org.opencontainers.image.title=basetool-keycloak-spi
+            org.opencontainers.image.description=Profit Basetool Keycloak provider JAR (Discord federation + first-login gate)
+            org.opencontainers.image.vendor=KRT IRIDIUM
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
+            org.opencontainers.image.licenses=GPL-3.0-only
+
+      - name: Build & push keycloak-spi bundle (multi-arch)
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: docker/keycloak-spi/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
+          # Parity with the app images: max-mode SLSA provenance + SPDX SBOM so an
+          # auditor can prove which commit produced this exact provider JAR.
+          provenance: mode=max
+          sbom: true
+
+      # Defence in depth: pull the pushed bundle back and FAIL the release if it
+      # carries anything other than the provider JAR (no secret-shaped file), and
+      # assert the JAR is present where deploy.sh expects it.
+      - name: Assert keycloak-spi bundle carries only the provider JAR
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi:${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          cid=$(docker create "$IMAGE" /bundle)
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          rm -rf /tmp/spi-bundle && mkdir -p /tmp/spi-bundle
+          docker cp "$cid:/providers/." /tmp/spi-bundle/
+          test -f /tmp/spi-bundle/keycloak-spi.jar \
+            || { echo "::error::keycloak-spi bundle is missing /providers/keycloak-spi.jar" >&2; exit 1; }
+          if find /tmp/spi-bundle \
+               \( -name '.env' -o -name '*.p12' -o -name '*.jks' \
+                  -o -name '*.pem' -o -name '*.key' -o -name 'realm-export.json' \) \
+               -print | grep -q .; then
+            echo "::error::keycloak-spi bundle contains a forbidden secret-shaped file" >&2
+            exit 1
+          fi
+          # The bundle must contain exactly the provider JAR and nothing else.
+          if find /tmp/spi-bundle -type f ! -name 'keycloak-spi.jar' -print | grep -q .; then
+            echo "::error::keycloak-spi bundle carries unexpected files:" >&2
+            find /tmp/spi-bundle -type f ! -name 'keycloak-spi.jar' -print >&2
+            exit 1
+          fi
+          echo "keycloak-spi bundle OK: only keycloak-spi.jar present"
+
+      - name: Inspect pushed manifest
+        id: inspect
+        run: |
+          set -eu
+          digest=$(docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi:${{ steps.meta.outputs.version }}" \
+            --format '{{.Manifest.Digest}}')
+          if [ -z "$digest" ]; then
+            echo "::error::could not resolve keycloak-spi manifest digest" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Same keyless signature + retry rationale as the app-image / config sign
+      # steps. Pinned to the manifest digest, so promote.yml's :stable flip is
+      # covered without a re-sign.
+      - name: Sign keycloak-spi bundle (keyless / OIDC)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi@${{ steps.inspect.outputs.digest }}
+        run: |
+          set -eu
+          attempts=5
+          delay=10
+          for i in $(seq 1 "$attempts"); do
+            if cosign sign --yes "$IMAGE"; then
+              exit 0
+            fi
+            if [ "$i" -lt "$attempts" ]; then
+              echo "::warning::cosign sign attempt ${i}/${attempts} failed; retrying in ${delay}s" >&2
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
+          echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
+          exit 1

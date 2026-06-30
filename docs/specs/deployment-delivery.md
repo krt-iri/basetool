@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)
 
 # Deployment delivery & promotion
 
@@ -10,9 +10,10 @@ delivery must never violate. The operational runbook (the *how-to*) lives in
 [`docs/deployment.md`](../deployment.md); this spec pins the *binding requirements* (the
 *what-must-hold*) behind it so they are testable, referenceable, and cannot be silently
 eroded. The implementation is `scripts/deploy.sh` driven by `scripts/iri-deploy.{service,timer}`,
-the GitHub Actions workflows `release-images.yml` / `promote.yml`, and the
-`basetool-config` artifact built from `docker/config/Dockerfile`. See ADR-0049 for the
-decision record behind the config-artifact delivery.
+the GitHub Actions workflows `release-images.yml` / `promote.yml`, the
+`basetool-config` artifact built from `docker/config/Dockerfile`, and the
+`basetool-keycloak-spi` provider-JAR artifact built from `docker/keycloak-spi/Dockerfile`.
+See ADR-0049 / ADR-0055 for the decision records behind the artifact delivery.
 
 These requirements are the first numbered `REQ-OPS-*` ids; the deployment area previously
 existed only as a runbook.
@@ -39,16 +40,16 @@ not be able to drive code execution on prod — at most it can read images alrea
 
 Neither application images nor host configuration reach production on a `main` merge or a
 release build. Production moves **only** when an operator runs `promote.yml`, which re-tags an
-existing, already-validated digest to `:stable`. The app images and the `basetool-config`
-bundle are promoted **in lock-step**, so the compose file the host applies always matches the
-image versions it references.
+existing, already-validated digest to `:stable`. The app images, the `basetool-config` bundle
+and the `basetool-keycloak-spi` provider-JAR bundle are promoted **in lock-step**, so the compose
+file, the Keycloak provider JAR and the image versions the host applies always match each other.
 
 **Acceptance**
 
-- [ ] `release-images.yml` never writes the `:stable` tag for any image (backend/frontend/
-  ingest/config).
-- [ ] `promote.yml` is `workflow_dispatch`-only and promotes `backend`, `frontend`, `ingest`
-  and `config` together (`fail-fast: true`).
+- [ ] `release-images.yml` never writes the `:stable` tag for any artifact (backend/frontend/
+  ingest/config/keycloak-spi).
+- [ ] `promote.yml` is `workflow_dispatch`-only and promotes `backend`, `frontend`, `ingest`,
+  `config` and `keycloak-spi` together (`fail-fast: true`).
 
 **Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
@@ -83,8 +84,9 @@ app-image idempotence check. No manual `cp docker-compose.yml` or hand-run
 
 - [ ] After a promotion whose only change is an infra pin bump, the next timer tick applies
   the new compose and recreates the affected container without operator file copying.
-- [ ] `deploy.sh`'s idempotence marker carries four fields (`backend|frontend|ingest|config`);
-  a changed config digest alone makes the marker differ and triggers an apply.
+- [ ] `deploy.sh`'s idempotence marker carries five fields
+  (`backend|frontend|ingest|config|keycloak-spi`); a changed config OR provider-JAR digest alone
+  makes the marker differ and triggers an apply.
 - [ ] A missing/unresolvable `basetool-config` artifact degrades to the legacy app-only deploy
   rather than failing the loop.
 
@@ -126,6 +128,40 @@ image bumps are auto-applied.
 - [ ] A redis or npm image bump (no postgres/Keycloak change) is auto-applied.
 
 **Enforced by:** `scripts/deploy.sh` (`infra_image_pins`, carve-out block) · **Runbook:** `docs/deployment.md` → *Stateful-infra upgrades*
+
+### REQ-OPS-007 — Keycloak provider JAR delivered as a separate promotable artifact
+
+The Keycloak custom provider JAR (`keycloak-spi` — the Discord federation SPI plus the
+first-login membership / account-existence gate) is delivered to the host **automatically**, over
+the same pull-only, digest-pinned, deliberately-promoted GHCR channel as the app images and the
+config bundle, as its **own** signed `basetool-keycloak-spi` OCI artifact (a `FROM scratch` image
+carrying only `keycloak-spi.jar`). It is a **separate** artifact from `basetool-config` precisely
+because REQ-OPS-005 bars `keycloak/providers/` JARs from the config bundle — that ban is on the
+config bundle, not on automated provider delivery. The JAR is architecture-independent Java-21
+bytecode (it must load under Keycloak's JDK), built once and cosign-signed like the app images.
+
+When the promoted `keycloak-spi` digest moves, `deploy.sh` (after the app stack is healthy) stages
+the JAR into `keycloak/providers/keycloak-spi.jar` and recreates **only** the keycloak container
+(`up -d --no-deps --force-recreate keycloak`) so its `start` re-runs the provider build and loads
+the new JAR — **health-gated**: on failure the previous JAR is restored, keycloak is brought back,
+and the bad target backs off (the marker is not advanced). A provider-JAR-only change
+**auto-applies**; a combined Keycloak-**image** + provider-JAR change stays operator-gated by the
+postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the tick until `--force`). A
+missing/unresolvable `basetool-keycloak-spi` artifact degrades to no provider-JAR change for that
+tick (the manual-staging fallback in the runbook still applies).
+
+**Acceptance**
+
+- [ ] `release-images.yml` builds, asserts (only the JAR, no secret-shaped file) and cosign-signs
+  a `basetool-keycloak-spi` artifact; it never writes `:stable` (REQ-OPS-002).
+- [ ] `promote.yml` promotes `keycloak-spi` in lock-step with the four other artifacts.
+- [ ] `deploy.sh` resolves + cosign-trusts the `keycloak-spi:stable` digest, stages the JAR into
+  `keycloak/providers/`, and recreates only keycloak (health-gated) when the digest changes.
+- [ ] A provider-JAR-only promotion auto-applies; a combined Keycloak-image + JAR promotion is
+  gated until `--force`.
+- [ ] A failed keycloak recreate restores the previous JAR and records the failure for backoff.
+
+**Enforced by:** `.github/workflows/release-images.yml` (`build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak custom providers* · **Decision:** ADR-0055
 
 ## Out of scope
 
