@@ -273,7 +273,7 @@ public class OrgUnitBankAccessService {
   public OrgUnitBankAccountDetailDto getViewableAccountDetail(@NotNull UUID accountId) {
     BankAccount account = requireViewableAccount(accountId);
     BankAccountDetailDto detail =
-        bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES, false);
+        bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES);
     // REQ-BANK-039: any viewer of a request-capable account may request against it.
     boolean canRequest = isRequestCapable(account);
     BigDecimal applicableLimit = canRequest ? resolveApplicableLimit(account) : null;

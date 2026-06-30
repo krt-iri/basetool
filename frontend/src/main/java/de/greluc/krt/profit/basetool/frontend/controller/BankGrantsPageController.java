@@ -106,7 +106,10 @@ public class BankGrantsPageController {
     }
 
     model.addAttribute(
-        "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
+        "accounts",
+        accounts == null
+            ? List.<BankAccountDto>of()
+            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
     model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
     model.addAttribute("grantees", grantees);
     model.addAttribute("byEmployee", byEmployee);
