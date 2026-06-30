@@ -5,9 +5,10 @@ name: Promote to stable
 # digest, so the production deploy that follows is by definition identical to
 # what `release-images.yml` validated (built, scanned, signed) earlier.
 #
-# Promotes the three app images (backend/frontend/ingest) AND the
-# `basetool-config` host-configuration bundle together, so the compose file the
-# host applies always matches the app images it references (see ADR-0049).
+# Promotes the three app images (backend/frontend/ingest), the `basetool-config`
+# host-configuration bundle AND the `basetool-keycloak-spi` provider-JAR bundle
+# together, so the compose file, the Keycloak provider JAR and the app images the
+# host applies always match each other (see ADR-0049, ADR-0055).
 #
 # Trigger: workflow_dispatch only. Promotion is an intentional human decision,
 # never automatic from a CI build.
@@ -75,7 +76,12 @@ jobs:
       # together and the host applies them atomically.
       fail-fast: true
       matrix:
-        module: [backend, frontend, ingest, config]
+        # `config` is the host-configuration bundle and `keycloak-spi` is the
+        # Keycloak provider-JAR bundle (docker/keycloak-spi/Dockerfile); both are
+        # promoted in lock-step with the app images so the compose file, the
+        # provider JAR and the images they reference always move together and the
+        # host applies them atomically (ADR-0049, ADR-0055).
+        module: [backend, frontend, ingest, config, keycloak-spi]
 
     steps:
       - name: Set up Docker Buildx
