@@ -1192,6 +1192,22 @@ public class MissionService {
         throw new IllegalArgumentException(
             "Planned JobType " + jt.getName() + " is not of archetype MISSION");
       }
+      // A mission may have only one "Einsatzleiter" (the participant whose planned job type is the
+      // designated mission-lead type, JobType.isMissionLead). Reject assigning it to a second
+      // participant (REQ-MISSION-013) — the editor must first clear the existing one.
+      if (jt.isMissionLead()) {
+        boolean alreadyTaken =
+            mission.getParticipants().stream()
+                .anyMatch(
+                    other ->
+                        !other.getId().equals(participant.getId())
+                            && other.getPlannedMissionJobType() != null
+                            && other.getPlannedMissionJobType().isMissionLead());
+        if (alreadyTaken) {
+          throw new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
+              "A mission can have only one Einsatzleiter (mission lead).");
+        }
+      }
       participant.setPlannedMissionJobType(jt);
     } else {
       participant.setPlannedMissionJobType(null);

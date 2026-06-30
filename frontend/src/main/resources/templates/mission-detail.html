@@ -307,7 +307,8 @@
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-headset"/></svg><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
             <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.end}">Ende</span><span id="facts-planned-end" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-party-lead" class="fact-v" th:text="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))}">&mdash;</span></span>
+            <span class="fact" th:if="${!#strings.isEmpty(mission.meetingPoint)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-map-pin"/></svg><span class="fact-k" th:text="#{mission.meeting_point}">Treffpunkt</span><span class="fact-v" th:text="${mission.meetingPoint}">&mdash;</span></span>
+            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-leader" class="fact-v" th:text="${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')}">&mdash;</span></span>
             <span class="fact" th:title="#{mission.participants.count.tooltip}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span class="fact-v"><span id="facts-registered" th:text="${mission.registeredParticipants}">0</span><span class="facts-checked-in-suffix"> &middot; <span id="facts-checked-in" th:text="${mission.checkedInParticipants}">0</span> <span th:text="#{mission.facts.checked_in_suffix}">eingecheckt</span></span></span></span>
         </div>
         <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
@@ -335,7 +336,7 @@
                            data-planned-start-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'},
                            data-planned-end-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'},
                            data-meeting-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'},
-                           data-party-lead=${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : (mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty() ? mission.partyLeadGuestName : #messages.msg('general.none'))},
+                           data-leader=${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')},
                            data-owning-org-unit-shorthand=${mission.owningSquadron != null ? mission.owningSquadron.shorthand() : ''},
                            data-owning-org-unit-name=${mission.owningSquadron != null ? mission.owningSquadron.name() : ''}"></span>
             <!-- Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
@@ -2029,10 +2030,12 @@
         patchFact('facts-planned-start', 'data-planned-start-utc');
         patchFact('facts-planned-end', 'data-planned-end-utc');
         patchFact('facts-ts', 'data-meeting-utc');
-        // The "Leiter" fact (party lead) mirrors the overview party-lead row — patch it from the
-        // fresh name the fragment exposes so a peer's party-lead change shows in the header too.
-        const lead = meta.getAttribute('data-party-lead');
-        const leadEl = document.getElementById('facts-party-lead');
+        // The "Leiter" fact shows the Einsatzleiter (the participant designated as mission lead),
+        // else the mission owner — computed server-side and exposed on the fragment as data-leader, so
+        // a peer's participant / planned-job-type change updates the header too (it lives outside the
+        // overview fragment).
+        const lead = meta.getAttribute('data-leader');
+        const leadEl = document.getElementById('facts-leader');
         if (leadEl && lead != null) {
             leadEl.textContent = lead;
         }
@@ -3069,7 +3072,10 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(editForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection(['crew', 'finance']);
+                        // 'overview' too: editing a participant's planned mission job type can change
+                        // who the Einsatzleiter is, and the facts-bar "Leiter" is patched off the
+                        // overview fragment's data-leader (REQ-MISSION-013).
+                        window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                     }
                 });
             }
@@ -3116,7 +3122,9 @@
                     });
                     if (res.ok) {
                         window.krtModalClose(dForm.closest('.krt-modal-overlay'));
-                        window.krtRefreshMissionSection(['crew', 'finance']);
+                        // 'overview' too: unregistering a participant may remove the Einsatzleiter, so
+                        // the facts-bar "Leiter" (patched off the overview's data-leader) must refresh.
+                        window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                     }
                 });
             }
@@ -3407,10 +3415,8 @@
                     : (dto.partyLeadGuestName || noneLabel);
                 if (display) display.textContent = resolvedName;
                 if (overview) overview.textContent = resolvedName;
-                // Keep the sticky facts-bar "Leiter" fact in sync — it lives outside the overview
-                // fragment, so the local patch must touch it directly (peers get it via the swap).
-                const factLead = document.getElementById('facts-party-lead');
-                if (factLead) factLead.textContent = resolvedName;
+                // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not
+                // the party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
                 if (versionInput && dto.partyLeadVersion != null) {
                     versionInput.value = dto.partyLeadVersion;
                 }

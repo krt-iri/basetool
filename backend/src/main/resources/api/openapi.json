@@ -49692,6 +49692,9 @@
           "isLeadershipRole" : {
             "type" : "boolean"
           },
+          "isMissionLead" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -55576,6 +55579,9 @@
           },
           "owningSquadron" : {
             "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "meetingPoint" : {
+            "type" : "string"
           },
           "version" : {
             "type" : "integer",

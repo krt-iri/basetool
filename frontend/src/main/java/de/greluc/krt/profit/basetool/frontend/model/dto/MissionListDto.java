@@ -37,4 +37,5 @@ public record MissionListDto(
     Boolean isInternal,
     OperationDto operation,
     SquadronReferenceDto owningSquadron,
+    String meetingPoint,
     Long version) {}

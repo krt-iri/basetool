@@ -36,6 +36,7 @@ public interface JobTypeMapper {
    */
   @Mapping(target = "parentId", source = "parent.id")
   @Mapping(target = "isLeadershipRole", source = "leadershipRole")
+  @Mapping(target = "isMissionLead", source = "missionLead")
   JobTypeDto toDto(JobType entity);
 
   /**
@@ -47,6 +48,7 @@ public interface JobTypeMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "leadershipRole", source = "isLeadershipRole")
+  @Mapping(target = "missionLead", source = "isMissionLead")
   JobType toEntity(JobTypeDto dto);
 
   /**

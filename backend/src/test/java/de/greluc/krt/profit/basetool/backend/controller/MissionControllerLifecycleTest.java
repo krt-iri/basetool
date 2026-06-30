@@ -223,6 +223,7 @@ class MissionControllerLifecycleTest {
             false,
             null,
             null,
+            null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     // Post-fix #1: authenticated callers now go through searchMissions so the service-layer
@@ -273,6 +274,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             1L);
@@ -346,6 +348,7 @@ class MissionControllerLifecycleTest {
             false,
             null,
             null,
+            null,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -396,6 +399,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             1L);

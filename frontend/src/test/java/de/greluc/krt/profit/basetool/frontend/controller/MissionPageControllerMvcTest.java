@@ -2548,7 +2548,7 @@ class MissionPageControllerMvcTest {
 
     de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto gunner =
         new de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto(
-            jobTypeId, "Gunner", null, "CREW", null, true, false, 1L);
+            jobTypeId, "Gunner", null, "CREW", null, true, false, false, 1L);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto crew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
             crewId, participantId, "Crewman", java.util.Set.of(gunner));

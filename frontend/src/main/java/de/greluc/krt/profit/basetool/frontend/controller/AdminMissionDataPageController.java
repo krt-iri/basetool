@@ -104,7 +104,7 @@ public class AdminMissionDataPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("jobTypeForm")) {
-      model.addAttribute("jobTypeForm", new JobTypeForm("", "", "", false, 0L));
+      model.addAttribute("jobTypeForm", new JobTypeForm("", "", "", false, false, 0L));
     }
     if (!model.containsAttribute("squadronForm")) {
       model.addAttribute("squadronForm", new SquadronForm("", "", "", 0L));
@@ -193,6 +193,7 @@ public class AdminMissionDataPageController {
                         parseUuid(m.get("parentId")),
                         parseBoolean(m.get("active")),
                         parseBoolean(m.get("isLeadershipRole")),
+                        parseBoolean(m.get("isMissionLead")),
                         parseLong(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     jobTypes.sort(
@@ -282,6 +283,7 @@ public class AdminMissionDataPageController {
               null,
               true,
               form.isLeadershipRole(),
+              form.isMissionLead(),
               0L);
       backendApiClient.post("/api/v1/job-types", body, Void.class);
       backendApiClient.clearStaticDataCache();
@@ -334,6 +336,7 @@ public class AdminMissionDataPageController {
               null,
               true,
               form.isLeadershipRole(),
+              form.isMissionLead(),
               form.version());
       backendApiClient.put("/api/v1/job-types/" + id, body, Void.class);
       backendApiClient.clearStaticDataCache();
@@ -750,6 +753,7 @@ public class AdminMissionDataPageController {
                     null,
                     true,
                     form.isLeadershipRole(),
+                    form.isMissionLead(),
                     0L),
                 Void.class));
   }
@@ -784,6 +788,7 @@ public class AdminMissionDataPageController {
                     null,
                     true,
                     form.isLeadershipRole(),
+                    form.isMissionLead(),
                     form.version()),
                 Void.class));
   }

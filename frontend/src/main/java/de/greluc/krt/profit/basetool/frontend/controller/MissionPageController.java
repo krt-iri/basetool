@@ -350,6 +350,30 @@ public class MissionPageController {
       model.addAttribute("participantsByLeadType", participantsByLeadType);
       model.addAttribute("missionLeadTypes", missionLeadTypes);
 
+      // Facts-bar "Leiter" (REQ-MISSION-013): the participant designated as Einsatzleiter — the one
+      // whose planned mission job type is the single mission-lead designation
+      // (JobType.isMissionLead)
+      // — else the mission owner, else "none". The owner is redacted for outsiders, so a guest with
+      // no Einsatzleiter assigned sees "none". A mission can have only one Einsatzleiter, so the
+      // first
+      // match is authoritative.
+      String factLeaderName = null;
+      for (MissionParticipantDto p : participants) {
+        JobTypeDto job = p.plannedMissionJobType();
+        if (job != null && Boolean.TRUE.equals(job.isMissionLead())) {
+          if (p.user() != null) {
+            factLeaderName = p.user().effectiveName();
+          } else if (p.guestName() != null && !p.guestName().isBlank()) {
+            factLeaderName = p.guestName();
+          }
+          break;
+        }
+      }
+      if (factLeaderName == null && mission.owner() != null) {
+        factLeaderName = mission.owner().effectiveName();
+      }
+      model.addAttribute("factLeaderName", factLeaderName);
+
       // User ids of every account-backed participant (guests have no account and thus no hangar
       // ships). The unit ADD modal offers only ships owned by these users; the EDIT modal also
       // keeps already-assigned ships (see assignedUnitShipIds) so a unit can only be crewed with a

@@ -33,4 +33,5 @@ public record JobTypeDto(
     UUID parentId,
     Boolean active,
     Boolean isLeadershipRole,
+    Boolean isMissionLead,
     Long version) {}

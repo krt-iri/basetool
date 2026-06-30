@@ -74,7 +74,15 @@ class JobTypeControllerTest {
     JobType entity = new JobType();
     JobTypeDto dto =
         new JobTypeDto(
-            UUID.randomUUID(), "Pilot", "desc", JobTypeArchetype.CREW, null, true, false, 1L);
+            UUID.randomUUID(),
+            "Pilot",
+            "desc",
+            JobTypeArchetype.CREW,
+            null,
+            true,
+            false,
+            false,
+            1L);
     when(service.getJobTypes(any(), any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(entity)));
     when(mapper.toDto(entity)).thenReturn(dto);
@@ -88,12 +96,12 @@ class JobTypeControllerTest {
   @Test
   void create_mapsDtoToEntityViaMapperAndDelegates() {
     JobTypeDto request =
-        new JobTypeDto(null, "Pilot", null, JobTypeArchetype.CREW, null, true, false, null);
+        new JobTypeDto(null, "Pilot", null, JobTypeArchetype.CREW, null, true, false, false, null);
     JobType entity = new JobType();
     JobType persisted = new JobType();
     JobTypeDto response =
         new JobTypeDto(
-            UUID.randomUUID(), "Pilot", null, JobTypeArchetype.CREW, null, true, false, 1L);
+            UUID.randomUUID(), "Pilot", null, JobTypeArchetype.CREW, null, true, false, false, 1L);
 
     when(mapper.toEntity(request)).thenReturn(entity);
     when(service.createJobType(entity)).thenReturn(persisted);
@@ -111,10 +119,10 @@ class JobTypeControllerTest {
     // which fields are mutable. The controller MUST forward the raw DTO.
     UUID id = UUID.randomUUID();
     JobTypeDto request =
-        new JobTypeDto(id, "Renamed", null, JobTypeArchetype.CREW, null, true, true, 4L);
+        new JobTypeDto(id, "Renamed", null, JobTypeArchetype.CREW, null, true, true, false, 4L);
     JobType updated = new JobType();
     JobTypeDto response =
-        new JobTypeDto(id, "Renamed", null, JobTypeArchetype.CREW, null, true, true, 5L);
+        new JobTypeDto(id, "Renamed", null, JobTypeArchetype.CREW, null, true, true, false, 5L);
 
     when(service.updateJobType(id, request)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);

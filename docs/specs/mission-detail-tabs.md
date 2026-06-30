@@ -238,3 +238,36 @@ the **kind enum** — **never** the goal title (free text), per REQ-AUDIT-001. M
 (`mission_objective` table + `mission.objectives_version`), which also drops the legacy
 `mission.objective` column after migrating each existing non-empty value into one `PRIMARY` goal.
 Decision: [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md).
+
+### REQ-MISSION-013 — Facts-bar leader (Einsatzleiter) and Treffpunkt
+
+**Leader.** The sticky facts-bar **"Leiter"** cell shows the mission's **Einsatzleiter** — the
+participant whose `plannedMissionJobType` is the single designated **mission-lead** job type
+(`JobType.isMissionLead`) — falling back to the mission **owner** when no Einsatzleiter is assigned,
+and to "none" otherwise (the owner is redacted for outsiders, so a guest with no Einsatzleiter sees
+"none"). This **replaces** the former behaviour where the facts bar mirrored the built-in
+**Partyleiter** (`partyLeadUser`); the Partyleiter remains a separate field shown in the "Mission auf
+einen Blick" panel and is no longer reflected in the facts bar. The leader name is computed
+server-side, rendered into the facts cell and exposed on the `#overview-head-meta` fragment as
+`data-leader`; the `krt:swapped` handler patches the cell (which lives outside the overview fragment)
+on every overview refresh. Because the leader derives from a participant's planned job type, the
+participant **edit** and **unregister** flows additionally refresh `['…','overview']` so the cell never
+goes stale (REQ-FE-010).
+
+**Einsatzleiter designation.** "Einsatzleiter" is **not** hard-coded: it is a single, admin-set
+designation on the job-type reference data. `JobType` carries a `isMissionLead` flag; **at most one**
+job type may hold it (DB-enforced by a partial unique index, V200) and only a `MISSION`-archetype
+**leadership** role may be designated. The flag is set on the job-type admin page (`/admin/mission-data`);
+re-designating moves it (the service clears the previous holder, and rejects a non-MISSION/non-leadership
+designation with 400).
+
+**Single Einsatzleiter per mission.** A mission may have only **one** Einsatzleiter: assigning the
+designated mission-lead `plannedMissionJobType` to a second participant is rejected with **HTTP 409**
+(`BusinessConflictException`) — the editor must first clear the existing one. JobType is not an audited
+area, so no audit event is added.
+
+**Treffpunkt.** The mission's `meetingPoint` (Treffpunkt) is surfaced in two more places: a facts-bar
+cell (map-pin icon) **after the planned-end time** on the detail page, and on the **home-page mission
+tile** (Einsatzkachel) **between the status and the TeamSpeak meeting time**. The latter requires
+`meetingPoint` on `MissionListDto` (backend + frontend, auto-mapped from the entity). Both render only
+when a meeting point is set. Migration: V200 (`job_type.is_mission_lead`).

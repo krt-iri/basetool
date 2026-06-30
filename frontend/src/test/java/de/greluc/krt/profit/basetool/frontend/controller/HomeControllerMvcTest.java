@@ -196,6 +196,7 @@ class HomeControllerMvcTest {
             false,
             null,
             new SquadronReferenceDto(UUID.randomUUID(), "Alpha Staffel", "ALF"),
+            null,
             0L);
     when(backendApiClient.get(
             startsWith("/api/v1/missions/search"),
@@ -230,6 +231,7 @@ class HomeControllerMvcTest {
             false,
             null,
             // owningSquadron null → ownerless mission (mirrors the serialized DTO).
+            null,
             null,
             0L);
     when(backendApiClient.get(
@@ -291,6 +293,7 @@ class HomeControllerMvcTest {
             false,
             null,
             myStaffel,
+            null,
             0L);
     when(backendApiClient.get(
             startsWith("/api/v1/missions/search"),
@@ -350,6 +353,7 @@ class HomeControllerMvcTest {
             false,
             null,
             new SquadronReferenceDto(UUID.randomUUID(), "Falke Staffel", "FLK"),
+            null,
             0L);
     when(backendApiClient.get(
             startsWith("/api/v1/missions/search"),
@@ -414,6 +418,7 @@ class HomeControllerMvcTest {
             false,
             null,
             new SquadronReferenceDto(specialCommandId, "Phantom SK", "PHA"),
+            null,
             0L);
     when(backendApiClient.get(
             startsWith("/api/v1/missions/search"),

@@ -6,7 +6,11 @@
 
 - **Einsatz: Strukturierte, klassifizierte Ziele statt einzelnem Kurz-Ziel.** Ziele werden jetzt — wie der Ablauf — als einzelne Punkte im Verwaltung-Tab gepflegt und als Hauptziel, Nebenziel oder Nicht-Ziel (ausdrücklich kein Ziel des Einsatzes) klassifiziert. In der Übersicht erscheinen sie in einer eigenen „Ziele"-Box, gruppiert (Hauptziele, dann Nebenziele, dann Nicht-Ziele). Das bisherige einzelne Kurz-Ziel entfällt; vorhandene Texte werden automatisch in ein Hauptziel überführt (REQ-MISSION-012, ADR-0057).
 
+- **Einsatz: Treffpunkt zusätzlich in der Fakten-Leiste und auf der Startseiten-Kachel.** Der Treffpunkt erscheint nun auch in der Fakten-Leiste oben (hinter der Ende-Uhrzeit) und auf der Startseite in der Einsatzkachel zwischen Status und „Treffen Teamspeak" — jeweils nur, wenn er gesetzt ist.
+
 ### Changed
+
+- **Einsatz: Die Fakten-Leiste „Leiter" zeigt jetzt den Einsatzleiter statt des Partyleiters.** Oben im Einsatz wird als „Leiter" der Einsatzleiter angezeigt — der Teilnehmer mit der als Einsatzleiter ausgewiesenen Führungsposition; ist keiner gesetzt, der Ersteller des Einsatzes. Die Führungsposition „Einsatzleiter" wird in der Missions-Stammdaten-Verwaltung an genau einer MISSION-Führungsposition markiert; pro Einsatz kann es nur einen Einsatzleiter geben (eine zweite Zuweisung wird abgelehnt) (REQ-MISSION-013).
 
 - **Einsatz-Übersicht: Spalten der Kästen getauscht.** Links stehen jetzt Ziele, Ablauf, Teilnehmer und Kalender, rechts „Mission auf einen Blick", weitere Leads und Funk.
 
