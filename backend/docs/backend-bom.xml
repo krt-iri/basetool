@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:220c8b94-fe8f-4a68-b372-648ddfd61c32" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:389cb8c8-c333-4348-a7f1-23274c26e97c" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-07-01T08:39:31Z</timestamp>
+    <timestamp>2026-07-01T09:20:26Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/28504765746</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/28507088864</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>

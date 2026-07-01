@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -123,7 +122,12 @@ class HangarPaginationE2eTest {
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
             "paging must not reload the page");
-        assertTrue(page.url().contains("page=1"), "address bar must reflect the new page");
+        // The address bar is updated via history.replaceState inside the swap's response handler,
+        // which runs AFTER waitForResponse resolves (the fetch body still has to be read and the
+        // fragment swapped in first). Reading page.url() once here races that continuation — a
+        // window Firefox widens enough to flake — so poll for the new page marker instead. A
+        // timeout means the address bar never reflected the page click (the real regression).
+        page.waitForURL(url -> url.contains("page=1"));
 
         // Server-side search: a term that matches no ship empties the table in place (the backend
         // re-pages the matching set, here zero), still without a navigation.

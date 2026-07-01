@@ -228,6 +228,38 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("name=\"meetingPoint\"")));
   }
 
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_omitsEmptyGoalAndProcedureTiles_andOpensDescription() throws Exception {
+    // Owner request 2026-07-01 (REQ-MISSION-004/-009/-012): when no goals + no Ablauf steps are
+    // authored, the read-only Übersicht Ziele and Ablauf tiles are omitted entirely — no "Noch
+    // keine …" placeholder — and the detailed-description <details> opens by default.
+    // minimalMission
+    // carries empty objectives + empty steps; here it also gets a description so the collapsible
+    // renders. The Verwaltung drag-editors (canEdit fixture) stay regardless of emptiness.
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(minimalMission(missionId, "**Briefing** folgt."));
+    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        // Empty goals/steps: the read-only overview tiles and their placeholders are gone.
+        .andExpect(content().string(not(containsString("class=\"ablauf\""))))
+        .andExpect(content().string(not(containsString("class=\"ziele\""))))
+        .andExpect(content().string(not(containsString("Noch keine Ziele"))))
+        .andExpect(content().string(not(containsString("Noch keine Schritte"))))
+        // The Verwaltung editors remain reachable even with nothing authored yet.
+        .andExpect(content().string(containsString("id=\"mission-step-list\"")))
+        .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
+        // The detailed-description card renders expanded by default.
+        .andExpect(content().string(containsString("<details class=\"more\" open")));
+  }
+
   /**
    * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus one goal (Ziel) and
    * a meeting point (Treffpunkt), so the per-step checklist/editor, the Ziele box/editor and the
@@ -291,20 +323,34 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable)
-   * for the mission-detail template tests, so the 32-argument constructor lives in one place.
+   * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable,
+   * no description) for the mission-detail template tests, so the 38-argument constructor lives in
+   * one place.
    *
    * @param missionId the id to stamp on the mission
-   * @return a minimal mission fixture
+   * @return a minimal mission fixture with no description
    */
   private MissionDto minimalMission(UUID missionId) {
+    return minimalMission(missionId, null);
+  }
+
+  /**
+   * Builds a minimal renderable {@link MissionDto} carrying the given (possibly {@code null})
+   * Markdown description, so a test can exercise the collapsible detailed-description card while
+   * still leaving the goals + Ablauf collections empty.
+   *
+   * @param missionId the id to stamp on the mission
+   * @param description the Markdown description to render, or {@code null} for none
+   * @return a minimal mission fixture with the given description
+   */
+  private MissionDto minimalMission(UUID missionId, String description) {
     de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto manager =
         new de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto(
             UUID.randomUUID(), "manager", null, "Test Manager", 0);
     return new MissionDto(
         missionId,
         "Test Mission",
-        null,
+        description,
         null,
         "PLANNED",
         null,
