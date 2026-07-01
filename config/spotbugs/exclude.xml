@@ -62,4 +62,23 @@
       <Bug pattern="EI_EXPOSE_REP2"/>
     </Or>
   </Match>
+
+  <!--
+    ==========================================================================
+    SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING on BasetoolErrorController
+    ==========================================================================
+
+    The error controller maps `${server.error.path:/error}` with a plain
+    `@RequestMapping` (all HTTP methods) on purpose: the servlet container
+    re-dispatches the ORIGINAL request method to the error path, so restricting
+    it to GET would drop the RFC-7807 body for a POST/PUT/DELETE that errors.
+    It is a read-only renderer — it reads the `jakarta.servlet.error.*`
+    attributes and returns a problem+json body, mutating no state — so the
+    CSRF-unrestricted-mapping detector is a false positive here (Spring Boot's
+    own BasicErrorController, which this replaces, has the identical shape).
+  -->
+  <Match>
+    <Class name="de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController"/>
+    <Bug pattern="SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING"/>
+  </Match>
 </FindBugsFilter>

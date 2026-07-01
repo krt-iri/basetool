@@ -6,6 +6,7 @@
 
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
 - **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).
+- **API/Fehler: Einheitliches RFC-7807-Fehlerformat auch an den Rändern.** Abgewiesene Anfragen der Sicherheitsschicht (fehlendes/ungültiges Token → 401, fehlende Berechtigung → 403), die Sperre noch nicht freigeschalteter Konten (403) und Container-Fehler liefern jetzt wie alle übrigen Fehler ein `application/problem+json` mit stabilem `code` und `correlationId` (auch als `X-Correlation-Id`-Header) statt der Spring-Standardantworten. Die Fehlerseite des Frontends zeigt die `correlationId` als Referenzcode zum Nennen beim Support an.
 
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
 

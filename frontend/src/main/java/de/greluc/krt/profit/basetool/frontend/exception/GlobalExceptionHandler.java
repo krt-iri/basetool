@@ -27,6 +27,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -160,6 +161,13 @@ public class GlobalExceptionHandler {
       body.put("status", HttpStatus.UNAUTHORIZED.value());
       body.put("reauthenticate", Boolean.TRUE);
       body.put("location", reauthUrl);
+      // Carry the request-scoped correlation id (set by CorrelationIdFilter) so an AJAX caller can
+      // quote it to support, mirroring the general BackendServiceException JSON branch — RFC-7807
+      // hardening.
+      String correlationId = MDC.get("correlationId");
+      if (correlationId != null && !correlationId.isBlank()) {
+        body.put("correlationId", correlationId);
+      }
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header("X-Reauthenticate", reauthUrl)
           .contentType(MediaType.APPLICATION_JSON)

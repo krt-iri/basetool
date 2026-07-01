@@ -21,6 +21,15 @@ client** (browser SSO + bearer-token relay to the backend).
 Authorization lives in `@PreAuthorize` annotations on services/controllers — never in
 business logic. Roles mapped from the JWT are prefixed `ROLE_` and uppercased.
 
+Filter-level rejections (a missing/invalid bearer token, an access-denied verdict at the
+authorization filter) render the same RFC 7807 `application/problem+json` as method-security
+denials: `SecurityConfig` wires `SecurityProblemResponseHandler` as both the
+`AuthenticationEntryPoint` and the `AccessDeniedHandler` (globally and on the resource server),
+which delegates to the MVC `handlerExceptionResolver` so `GlobalExceptionHandler` emits the 401
+(`UNAUTHENTICATED`) / 403 (`ACCESS_DENIED`) with a `code` and a `correlationId` — never Spring's
+default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
+[`api-conventions.md`](api-conventions.md) REQ-API-004).
+
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
 The following must always hold and are enforced as ArchUnit rules in

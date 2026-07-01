@@ -25,6 +25,13 @@ header. The frontend's `WebClientLoggingFilter` propagates the same id to outbou
 calls so both modules share one id per user interaction. `userId` is the JWT `sub`, or
 `anonymous`.
 
+Errors raised **before** `CorrelationIdFilter` runs — the rate-limit 429, the pending-approval 403,
+and the Spring Security filter-level 401/403 — mint their own `correlationId`, put it in the MDC (so
+the problem body and the WARN log line share it), and echo it as the `X-Correlation-Id` response
+header themselves, because that filter never runs to echo it on a short-circuited request. Every
+error response therefore carries the header, not just the ones that reach the servlet. See
+[`api-conventions.md`](api-conventions.md) REQ-API-004 for the full producer list.
+
 ### REQ-OBS-003 — Prod JSON appender
 
 In `prod`, a `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`; errors

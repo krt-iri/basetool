@@ -98,6 +98,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    */
   private static final String CODE_RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
 
+  /**
+   * App-wide correlation-id response header. Hardcoded rather than read from {@code
+   * LoggingProperties} on purpose: that config bean lives in the {@code config} package and {@code
+   * RateLimitingConfig} already constructs this filter ({@code config -> filter}), so a {@code
+   * filter -> config} dependency would close a package cycle (ADR-0047). The name mirrors {@code
+   * LoggingProperties}' default; it is a wire constant, not a per-deployment override.
+   */
+  private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
   private final RateLimitProperties properties;
   private final AppProblemProperties problemProperties;
   private final MessageSource messageSource;
@@ -499,6 +508,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     response.setHeader("X-Rate-Limit-Limit", String.valueOf(rejectedLimit));
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfterSeconds));
+    // Echo the minted correlationId as the app-wide response header. This filter rejects before
+    // CorrelationIdFilter runs, so that filter never gets to echo it — mirror its contract here so
+    // a 429 response still carries X-Correlation-Id (RFC-7807 hardening, REQ-OBS).
+    response.setHeader(CORRELATION_ID_HEADER, correlationId);
 
     // Localize title/detail from the request's Accept-Language (LocaleContextHolder is not yet
     // populated this early in the filter chain, so request.getLocale() is the authoritative source
