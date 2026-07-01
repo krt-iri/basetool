@@ -69,7 +69,7 @@ public class WebClientLoggingFilter {
       }
       ClientRequest propagated =
           ClientRequest.from(request)
-              .header(loggingProperties.getCorrelationIdHeader(), correlationId)
+              .header(loggingProperties.correlationIdHeader(), correlationId)
               .build();
       return next.exchange(propagated);
     };
@@ -102,7 +102,7 @@ public class WebClientLoggingFilter {
       int status,
       long startNanos) {
     long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
-    if (durationMs >= loggingProperties.getSlowBackendCallThresholdMs() || status >= 500) {
+    if (durationMs >= loggingProperties.slowBackendCallThresholdMs() || status >= 500) {
       log.warn("Backend call {} {}{} -> {} in {} ms", method, host, path, status, durationMs);
     } else if (log.isInfoEnabled()) {
       log.info("Backend call {} {}{} -> {} in {} ms", method, host, path, status, durationMs);

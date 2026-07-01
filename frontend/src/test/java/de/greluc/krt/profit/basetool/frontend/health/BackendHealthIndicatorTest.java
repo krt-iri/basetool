@@ -223,8 +223,7 @@ class BackendHealthIndicatorTest {
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
             .setBody("{\"status\":\"UP\"}"));
-    AppBackendProperties props = new AppBackendProperties();
-    props.setBackendUrl(backendUrl);
+    AppBackendProperties props = new AppBackendProperties(backendUrl);
     SslBundles sslBundles = mock(SslBundles.class);
     when(sslBundles.getBundle("backend-trust"))
         .thenThrow(

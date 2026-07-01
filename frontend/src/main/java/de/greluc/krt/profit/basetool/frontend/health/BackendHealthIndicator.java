@@ -124,7 +124,7 @@ public class BackendHealthIndicator implements HealthIndicator {
   public BackendHealthIndicator(
       AppBackendProperties backendProperties, SslBundles sslBundles, Environment environment) {
     this(
-        backendProperties.getBackendUrl(),
+        backendProperties.backendUrl(),
         CONNECT_TIMEOUT,
         READ_TIMEOUT,
         backendTls(sslBundles, environment));

@@ -87,7 +87,7 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
    * @param properties the validated client-IP configuration; never {@code null}.
    */
   public ClientIpContextFilter(@NotNull ClientIpProperties properties) {
-    this.trustedProxyMatchers = compileTrustedProxies(properties.getTrustedProxies());
+    this.trustedProxyMatchers = compileTrustedProxies(properties.trustedProxies());
   }
 
   /**

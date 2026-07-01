@@ -154,8 +154,7 @@ class ClientIpContextFilterTest {
 
   @Test
   void doFilterInternal_bindsResolvedClientIpForTheChainAndClearsAfter() throws Exception {
-    ClientIpProperties props = new ClientIpProperties();
-    props.setTrustedProxies(List.of("172.18.0.0/16"));
+    ClientIpProperties props = new ClientIpProperties(List.of("172.18.0.0/16"));
     ClientIpContextFilter filter = new ClientIpContextFilter(props);
 
     MockHttpServletRequest request = new MockHttpServletRequest();
