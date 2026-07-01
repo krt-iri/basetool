@@ -25,9 +25,11 @@ import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,8 @@ class MissionFrequencyServiceTest {
   @Autowired private MissionRepository missionRepository;
 
   @Autowired private FrequencyTypeRepository frequencyTypeRepository;
+
+  @Autowired private MissionFrequencyRepository missionFrequencyRepository;
 
   @Test
   void testAddMissionFrequency() {
@@ -63,5 +67,121 @@ class MissionFrequencyServiceTest {
     MissionFrequency freq = updatedMission.getFrequencies().iterator().next();
     assertEquals("VHF", freq.getFrequencyType().getName());
     assertEquals(new BigDecimal("123.45"), freq.getValue());
+  }
+
+  @Test
+  void testAddCustomMissionFrequency() {
+    Mission mission = newPlannedMission("Custom Freq Add Mission");
+
+    Mission updated =
+        missionService.addCustomMissionFrequency(
+            mission.getId(), "  Bergungsteam  ", new BigDecimal("42.10"));
+
+    assertEquals(1, updated.getFrequencies().size());
+    MissionFrequency freq = updated.getFrequencies().iterator().next();
+    // Custom rows carry a trimmed label and no global type.
+    assertNull(freq.getFrequencyType());
+    assertEquals("Bergungsteam", freq.getName());
+    assertEquals(new BigDecimal("42.10"), freq.getValue());
+  }
+
+  @Test
+  void testUpdateCustomMissionFrequency() {
+    Mission mission = newPlannedMission("Custom Freq Update Mission");
+    missionService.addCustomMissionFrequency(mission.getId(), "Recon", new BigDecimal("10.00"));
+    MissionFrequency freq = onlyFrequency(mission.getId());
+
+    Mission updated =
+        missionService.updateCustomMissionFrequency(
+            mission.getId(), freq.getId(), "Recon 2", new BigDecimal("11.11"), freq.getVersion());
+
+    MissionFrequency after = onlyFrequency(mission.getId());
+    assertEquals("Recon 2", after.getName());
+    assertEquals(new BigDecimal("11.11"), after.getValue());
+    assertNull(after.getFrequencyType());
+    assertEquals(1, updated.getFrequencies().size());
+  }
+
+  @Test
+  void testUpdateCustomMissionFrequencyStaleVersionThrows() {
+    Mission mission = newPlannedMission("Custom Freq Stale Mission");
+    missionService.addCustomMissionFrequency(mission.getId(), "Alpha", new BigDecimal("1.00"));
+    MissionFrequency freq = onlyFrequency(mission.getId());
+
+    // First edit succeeds and bumps the row version to 1 (flushed below).
+    missionService.updateCustomMissionFrequency(
+        mission.getId(), freq.getId(), "Alpha", new BigDecimal("2.00"), freq.getVersion());
+    missionFrequencyRepository.flush();
+
+    // A second edit echoing the now-stale original version (0) surfaces as a 409.
+    UUID freqId = freq.getId();
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () ->
+            missionService.updateCustomMissionFrequency(
+                mission.getId(), freqId, "Alpha", new BigDecimal("3.00"), 0L));
+  }
+
+  @Test
+  void testUpdateCustomRejectsTypedRow() {
+    Mission mission = newPlannedMission("Custom Freq Typed Reject Mission");
+    FrequencyType type = new FrequencyType();
+    type.setName("UHF");
+    type = frequencyTypeRepository.save(type);
+    missionService.addOrUpdateMissionFrequency(
+        mission.getId(), type.getId(), new BigDecimal("50.00"));
+    MissionFrequency typed = onlyFrequency(mission.getId());
+
+    // Reaching a typed (global) row through the custom endpoint is rejected.
+    UUID typedId = typed.getId();
+    Long v = typed.getVersion();
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            missionService.updateCustomMissionFrequency(
+                mission.getId(), typedId, "Hijack", new BigDecimal("9.99"), v));
+  }
+
+  @Test
+  void testRemoveCustomMissionFrequency() {
+    Mission mission = newPlannedMission("Custom Freq Remove Mission");
+    missionService.addCustomMissionFrequency(mission.getId(), "Temp", new BigDecimal("7.00"));
+    MissionFrequency freq = onlyFrequency(mission.getId());
+
+    Mission updated = missionService.removeMissionFrequency(mission.getId(), freq.getId());
+
+    assertTrue(updated.getFrequencies().isEmpty());
+  }
+
+  @Test
+  void testAddTypedFrequencyWhenCustomExistsDoesNotNpe() {
+    Mission mission = newPlannedMission("Mixed Freq Mission");
+    // A custom row (frequencyType == null) is present first.
+    missionService.addCustomMissionFrequency(mission.getId(), "Recon", new BigDecimal("10.00"));
+
+    FrequencyType type = new FrequencyType();
+    type.setName("Tac");
+    type = frequencyTypeRepository.save(type);
+
+    // Upserting a NEW typed frequency must scan past the custom row without dereferencing its null
+    // frequencyType (regression guard for the V201 nullable-type change).
+    Mission updated =
+        missionService.addOrUpdateMissionFrequency(
+            mission.getId(), type.getId(), new BigDecimal("122.00"));
+
+    assertEquals(2, updated.getFrequencies().size());
+  }
+
+  private Mission newPlannedMission(String name) {
+    Mission mission = new Mission();
+    mission.setName(name);
+    mission.setStatus("PLANNED");
+    return missionRepository.save(mission);
+  }
+
+  private MissionFrequency onlyFrequency(UUID missionId) {
+    Mission mission = missionService.getMissionById(missionId);
+    assertEquals(1, mission.getFrequencies().size());
+    return mission.getFrequencies().iterator().next();
   }
 }

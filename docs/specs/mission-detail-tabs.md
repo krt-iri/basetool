@@ -44,10 +44,11 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    einen Blick" (planned/actual times, meeting time, `Treffpunkt`, operation, internal chip, party lead
    as a `.kv-list`, plus the caller's personal participation chip — the former single short objective
    `Ziel` row was removed, replaced by the Ziele box), "Weitere Leads" (the leadership-position rows)
-   and "Funk" (the dynamic frequencies — the central, unit-less frequencies that carry a value,
-   followed by the per-unit frequencies of the units that have one, each unit row tagged with a muted
-   "Einheit" qualifier; central types without a value and units without a frequency are omitted and the
-   whole panel collapses when nothing is set, #816). The long **Markdown**
+   and "Funk" (the dynamic frequencies — the central, unit-less frequencies that carry a value, then
+   the custom mission-specific frequencies (REQ-MISSION-014), followed by the per-unit frequencies of
+   the units that have one, each unit row tagged with a muted "Einheit" qualifier; central types
+   without a value and units without a frequency are omitted and the whole panel collapses when
+   nothing is set, #816). The long **Markdown**
    description moves into a collapsible gray-card `<details class="more">` below the grid — the same
    `--color-bg-dark-gray` panel surface as the other overview cards (owner request 2026-06-27, #818
    follow-up), with a chevron that flips on open, replacing the former bare `hud-details` summary that
@@ -67,11 +68,15 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
    table (public; participation % authenticated-only), and the Wirtschaft `<details>` sections
    (authenticated + data-present gates unchanged).
-4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. Contains the
-   mission details form, organisation (party lead, frequencies), owner & manager administration,
-   the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes the mission to a
-   different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018), and the delete action (ADMIN only).
-   The reassignment select offers the caller's assignable org units plus "Keine";
+4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. The left column is
+   the mission **details** form (the "Link zum Kalendereintrag" sits **last**, after the actual
+   start/end); the right column stacks four cards in the order **Ziele → Ablauf → Organisation →
+   Verwaltungsrechte** (owner decision). "Organisation" holds the party lead, the typed
+   "Frequenzübersicht" (per-mission values for the global "Frequenztypen") and the custom
+   "Weitere Frequenzen" editor (REQ-MISSION-014). "Verwaltungsrechte" carries owner & manager
+   administration, the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes
+   the mission to a different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018), and the delete
+   action (ADMIN only). The reassignment select offers the caller's assignable org units plus "Keine";
    saving it swaps the `#mission-mgmt-results` panel in place and repaints the sticky-head
    owning-squadron badge without a reload (REQ-FE-001).
 
@@ -271,3 +276,36 @@ cell (map-pin icon) **after the planned-end time** on the detail page, and on th
 tile** (Einsatzkachel) **between the status and the TeamSpeak meeting time**. The latter requires
 `meetingPoint` on `MissionListDto` (backend + frontend, auto-mapped from the entity). Both render only
 when a meeting point is set. Migration: V200 (`job_type.is_mission_lead`).
+
+### REQ-MISSION-014 — Custom (mission-specific) radio frequencies
+
+Beyond the shared "Frequenztypen" reference data (the global `FrequencyType`s a mission can assign a
+per-mission value to), a mission may carry any number of **custom, mission-specific radio
+frequencies** — a free-text label plus a value. This makes the `MissionFrequency` row **dual-mode**:
+it is either **typed** (references a global `FrequencyType`, no `name`) or **custom** (carries a
+`name`, no `frequencyType`). The invariant is DB-enforced by a `frequency_type_id XOR name` check
+constraint (V201, which also makes `frequency_type_id` nullable and adds the `name VARCHAR(100)`
+column); the existing `(mission_id, frequency_type_id)` unique constraint still bounds typed rows to
+one per type, while multiple custom rows are allowed (each NULL `frequency_type_id` is distinct).
+
+The **value carries the same input limits as the typed frequencies** — up to three integer digits and
+two decimals (0 – 999.99), matching the `precision = 5, scale = 2` column and the frontend
+`^\d{1,3}([.,]\d{1,2})?$` pattern; the label is required and ≤100 chars. Custom channels are authored
+in the **Verwaltung** tab's "Organisation" card under a "Weitere Frequenzen" editor (a list with an
+"Frequenz hinzufügen" button plus per-row edit/delete, add/edit through a shared KRT modal — no native
+dialogs) and shown **read-only** in the Übersicht "Funk" panel alongside the typed and per-unit
+channels. They are non-PII planning data, forwarded to outsiders/guests like the typed frequencies,
+units and Ablauf steps.
+
+The three mutations go through dedicated slim endpoints: `POST …/missions/{id}/frequencies/custom/slim`
+(add) and `PUT …/missions/{id}/frequencies/custom/{freqId}/slim` (edit) each return the updated slim
+frequency list; delete reuses the generic `DELETE …/missions/{id}/frequencies/{freqId}/slim`. All are
+`@PreAuthorize @missionSecurityService.canManageMission`. The edit path optimistic-locks on the
+frequency row's own `@Version` (a stale echo surfaces as HTTP 409) and rejects reaching a typed row
+through the custom path; the mission's `frequencies` collection is `@OptimisticLock(excluded = true)`,
+so a frequency change never 409s a concurrent core/schedule/flags edit. The editor and overview Funk
+fragments re-render in place via `krtFetch`/`krtRefreshMissionSection(['frequencies','overview'])` (no
+reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an audited
+area: add/edit record `MISSION_FREQUENCY_CHANGED` and delete records `MISSION_FREQUENCY_REMOVED`,
+carrying only the row id — **never** the free-text label — per REQ-AUDIT-001. Migration: V201
+(`mission_frequency.name` + nullable `frequency_type_id` + the XOR check constraint).

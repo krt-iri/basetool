@@ -22,6 +22,17 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Frequency payload. */
+/**
+ * Data transfer record carrying Mission Frequency payload.
+ *
+ * <p>Exactly one of {@code frequencyType} (a global type) or {@code name} (a custom,
+ * mission-specific label) is populated, mirroring the dual-mode {@code MissionFrequency} entity.
+ *
+ * @param id the frequency row id.
+ * @param frequencyType the referenced global frequency type, or {@code null} for a custom channel.
+ * @param name the custom channel label, or {@code null} for a typed channel.
+ * @param value the frequency value (max 999.99, two decimals).
+ * @param version the optimistic-lock version echoed back on edits.
+ */
 public record MissionFrequencyDto(
-    UUID id, FrequencyTypeDto frequencyType, BigDecimal value, Long version) {}
+    UUID id, FrequencyTypeDto frequencyType, String name, BigDecimal value, Long version) {}

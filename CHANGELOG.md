@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Einsatz: Weitere, einsatzspezifische Funkfrequenzen.** Im Verwaltung-Tab eines Einsatzes lassen sich jetzt neben den allgemeinen Frequenztypen beliebige eigene Funkfrequenzen mit Bezeichnung und Wert anlegen, bearbeiten und löschen. Es gelten dieselben Eingabegrenzen wie für die allgemeinen Frequenzen (0–999,99, zwei Nachkommastellen). Sie erscheinen zusätzlich in der „Funk"-Box der Einsatzübersicht (REQ-MISSION-014, ADR-0058).
+
+### Changed
+
+- **Einsatz-Verwaltung: Kacheln neu sortiert, Kalenderlink ans Ende der Details.** Im Verwaltung-Tab stehen die Kacheln rechts jetzt in der Reihenfolge Ziele, Ablauf, Organisation, Verwaltungsrechte; der „Link zum Kalendereintrag" steht in der Details-Karte nun ganz am Ende.
+
 ### Security
 
 - **Raffinerie: Nutzerbezogene Auftragsliste wird jetzt streng auf den eigenen Sichtbarkeitsbereich gefiltert.** Rief ein Logistiker die Raffinerie-Auftragsliste eines Mitglieds ab (`GET /api/v1/refinery-orders/users/{userId}`), bekam er bisher alle Aufträge des Mitglieds — auch solche, die einer Staffel zugeordnet sind, die der Logistiker selbst nicht sieht (möglich, weil ein Mitglied zu zwei Staffeln gehören kann). Die Liste wird jetzt pro Zeile auf den Org-Einheits-Sichtbarkeitsbereich des Aufrufers eingeschränkt und gibt keine fremden Staffel-Aufträge mehr preis (SEC-01).

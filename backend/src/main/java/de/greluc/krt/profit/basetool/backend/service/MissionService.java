@@ -2284,8 +2284,12 @@ public class MissionService {
             .findById(frequencyTypeId)
             .orElseThrow(() -> new NotFoundException("FrequencyType not found"));
 
+    // Null-guard the type reference: since REQ-MISSION-014 the frequencies collection also holds
+    // custom rows (frequencyType == null), so an unguarded getFrequencyType().getId() would NPE
+    // when the mission already carries a custom frequency and a typed one is upserted.
     Optional<MissionFrequency> existingOpt =
         mission.getFrequencies().stream()
+            .filter(f -> f.getFrequencyType() != null)
             .filter(f -> f.getFrequencyType().getId().equals(frequencyTypeId))
             .findFirst();
 
@@ -2308,6 +2312,107 @@ public class MissionService {
         mission.getName(),
         null,
         "frequencyType=" + frequencyTypeId);
+    return mission;
+  }
+
+  /**
+   * Adds a custom (mission-specific) radio frequency — a free-text label plus a value — to a
+   * mission (REQ-MISSION-014). The new row leaves {@link MissionFrequency#getFrequencyType()} null;
+   * the check constraint added in V201 enforces the typed-XOR-named invariant at the data layer.
+   *
+   * <p>The mission's {@code frequencies} collection is {@code @OptimisticLock(excluded = true)}, so
+   * persisting the child neither bumps the mission's global {@code @Version} nor any section
+   * counter — a frequency change never 409s a concurrent core/schedule/flags edit, matching the
+   * typed upsert.
+   *
+   * @param missionId the mission to attach the channel to.
+   * @param name the free-text channel label (validated non-blank ≤100 chars at the boundary).
+   * @param value the frequency value (range-validated 0 – 999.99 at the boundary).
+   * @return the managed mission with the new custom frequency attached.
+   * @throws NotFoundException when the mission is unknown.
+   */
+  @Transactional
+  public Mission addCustomMissionFrequency(
+      @NotNull UUID missionId, @NotNull String name, @NotNull BigDecimal value) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+
+    MissionFrequency freq = new MissionFrequency();
+    freq.setMission(mission);
+    freq.setName(name.trim());
+    freq.setValue(value);
+    mission.getFrequencies().add(freq);
+    MissionFrequency saved = missionFrequencyRepository.save(freq);
+
+    // Audit finding parity with the typed path: the label is user free text, so log only the row id
+    // (never the name), per REQ-AUDIT-001's "no free text / no PII in the details payload" rule.
+    auditService.record(
+        AuditEventType.MISSION_FREQUENCY_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "custom=" + saved.getId());
+    return mission;
+  }
+
+  /**
+   * Updates the label and value of an existing custom frequency (REQ-MISSION-014). Optimistic-locks
+   * on the frequency row's own {@code @Version} (echoed back from the rendered row); a stale
+   * version surfaces as HTTP 409. Rejects an attempt to reach a typed (global) frequency row
+   * through this path so the two families cannot be crossed.
+   *
+   * @param missionId the owning mission id.
+   * @param frequencyId the custom frequency row id.
+   * @param name the new channel label.
+   * @param value the new frequency value.
+   * @param expectedVersion the optimistic-lock version the caller echoed back.
+   * @return the managed mission with the updated custom frequency.
+   * @throws NotFoundException when the mission or a matching custom frequency is unknown.
+   * @throws IllegalArgumentException when the target row is a typed (global) frequency.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
+   *     version is stale.
+   */
+  @Transactional
+  public Mission updateCustomMissionFrequency(
+      @NotNull UUID missionId,
+      @NotNull UUID frequencyId,
+      @NotNull String name,
+      @NotNull BigDecimal value,
+      @NotNull Long expectedVersion) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(() -> new NotFoundException("Mission not found"));
+
+    MissionFrequency freq =
+        mission.getFrequencies().stream()
+            .filter(f -> f.getId() != null && f.getId().equals(frequencyId))
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Frequency not found in this mission"));
+
+    if (freq.getFrequencyType() != null) {
+      throw new IllegalArgumentException(
+          "Cannot edit a typed frequency through the custom-frequency endpoint");
+    }
+
+    long current = freq.getVersion() == null ? 0L : freq.getVersion();
+    if (!expectedVersion.equals(current)) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          MissionFrequency.class, frequencyId);
+    }
+
+    freq.setName(name.trim());
+    freq.setValue(value);
+    missionFrequencyRepository.save(freq);
+
+    auditService.record(
+        AuditEventType.MISSION_FREQUENCY_CHANGED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        "custom=" + frequencyId);
     return mission;
   }
 

@@ -230,6 +230,104 @@ class MissionControllerSlimEndpointsTest {
         .andExpect(jsonPath("$[0].id").value(frequencyId.toString()));
   }
 
+  private Mission missionWithCustomFrequency(UUID frequencyId, String name) {
+    Mission mission = new Mission();
+    MissionFrequency freq = new MissionFrequency();
+    freq.setId(frequencyId);
+    freq.setName(name);
+    freq.setValue(new BigDecimal("42.10"));
+    Set<MissionFrequency> freqs = new LinkedHashSet<>();
+    freqs.add(freq);
+    mission.setFrequencies(freqs);
+    return mission;
+  }
+
+  @Test
+  void addCustomFrequencySlim_returnsSlimFrequencyList() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID frequencyId = UUID.randomUUID();
+
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+    when(missionService.addCustomMissionFrequency(any(), any(), any()))
+        .thenReturn(missionWithCustomFrequency(frequencyId, "Recon"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Recon\",\"value\":42.10}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isArray())
+        .andExpect(jsonPath("$[0].id").value(frequencyId.toString()))
+        .andExpect(jsonPath("$[0].name").value("Recon"));
+  }
+
+  @Test
+  void updateCustomFrequencySlim_returnsSlimFrequencyList() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID frequencyId = UUID.randomUUID();
+
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+    when(missionService.updateCustomMissionFrequency(any(), any(), any(), any(), any()))
+        .thenReturn(missionWithCustomFrequency(frequencyId, "Recon 2"));
+
+    mockMvc
+        .perform(
+            put("/api/v1/missions/{id}/frequencies/custom/{fid}/slim", missionId, frequencyId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Recon 2\",\"value\":42.10,\"version\":0}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].name").value("Recon 2"));
+  }
+
+  @Test
+  void addCustomFrequencySlim_blankName_isBadRequest() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"  \",\"value\":42.10}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+        .addCustomMissionFrequency(any(), any(), any());
+  }
+
+  @Test
+  void addCustomFrequencySlim_valueOutOfRange_isBadRequest() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+
+    // 1000.00 exceeds the shared 999.99 / three-integer-digit limit.
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Recon\",\"value\":1000.00}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void addCustomFrequencySlim_withoutPermission_returns403() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Recon\",\"value\":42.10}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
+  }
+
   @Test
   void deleteUnitSlim_withoutPermission_returns403() throws Exception {
     UUID missionId = UUID.randomUUID();

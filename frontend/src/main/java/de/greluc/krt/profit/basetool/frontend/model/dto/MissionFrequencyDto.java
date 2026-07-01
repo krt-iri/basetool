@@ -22,14 +22,34 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Frequency payload. */
+/**
+ * Data transfer record carrying Mission Frequency payload.
+ *
+ * <p>Exactly one of {@code frequencyType} (a global type) or {@code name} (a custom,
+ * mission-specific label) is populated, mirroring the dual-mode backend entity (REQ-MISSION-014).
+ *
+ * @param id the frequency row id.
+ * @param frequencyType the referenced global frequency type, or {@code null} for a custom channel.
+ * @param name the custom channel label, or {@code null} for a typed channel.
+ * @param value the frequency value.
+ * @param version the optimistic-lock version echoed back on edits.
+ */
 public record MissionFrequencyDto(
-    UUID id, FrequencyTypeRef frequencyType, BigDecimal value, Long version) {
+    UUID id, FrequencyTypeRef frequencyType, String name, BigDecimal value, Long version) {
   /** Immutable record carrying Frequency Type Ref data. */
   public record FrequencyTypeRef(UUID id, String name) {}
 
   /** Convenience accessor returning the nested {@code frequencyType.id()}, or {@code null}. */
   public UUID frequencyTypeId() {
     return frequencyType != null ? frequencyType.id() : null;
+  }
+
+  /**
+   * Whether this row is a custom (mission-specific) channel rather than a global typed one.
+   *
+   * @return {@code true} when no global {@code frequencyType} is bound.
+   */
+  public boolean isCustom() {
+    return frequencyType == null;
   }
 }
