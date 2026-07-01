@@ -37,10 +37,15 @@ mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO; break circular r
 
 ### REQ-API-004 — RFC 7807 error format
 
-Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`;
-validation errors add an `errors` object (field → message). Extend `GlobalExceptionHandler`
-rather than throwing into the void; problem-type URIs come from `AppProblemProperties`, not
-hardcoded strings. Document the format in OpenAPI and keep frontend error display in sync.
+Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, a
+stable machine-readable `code`, and a per-request `correlationId`; validation errors add an
+`errors` object (field → message). Titles and details are localized via `MessageSource`. Extend
+`GlobalExceptionHandler` rather than throwing into the void; problem-type URIs come from
+`AppProblemProperties`, not hardcoded strings. The one sanctioned producer outside
+`GlobalExceptionHandler` is `RateLimitingFilter`: it rejects abusive traffic before request
+dispatch and therefore hand-builds an equivalent problem+json 429 body — localized `title`/`detail`,
+`code = RATE_LIMIT_EXCEEDED`, and a minted `correlationId` (also logged) — rather than routing
+through the handler. Document the format in OpenAPI and keep frontend error display in sync.
 
 ### REQ-API-005 — Pagination & sorting
 

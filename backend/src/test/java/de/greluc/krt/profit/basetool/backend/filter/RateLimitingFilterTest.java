@@ -34,6 +34,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
+import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -58,6 +60,12 @@ class RateLimitingFilterTest {
   private AppProblemProperties problemProperties;
   private RateLimitingFilter filter;
 
+  /**
+   * Empty message source: unresolved keys fall back to the English default passed at the call site,
+   * so the 429 body carries the hardcoded English title/detail the assertions expect.
+   */
+  private final MessageSource messageSource = new StaticMessageSource();
+
   @BeforeEach
   void setUp() {
     properties = new RateLimitProperties();
@@ -70,7 +78,7 @@ class RateLimitingFilterTest {
     problemProperties = new AppProblemProperties();
     problemProperties.setBaseUri("https://profit-base.online/problems/");
 
-    filter = new RateLimitingFilter(properties, problemProperties);
+    filter = new RateLimitingFilter(properties, problemProperties, messageSource);
   }
 
   // ---------------------------------------------------------------
@@ -185,7 +193,7 @@ class RateLimitingFilterTest {
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> new RateLimitingFilter(bad, problemProperties),
+              () -> new RateLimitingFilter(bad, problemProperties, messageSource),
               "an unparseable global pattern must abort startup");
       assertTrue(
           ex.getMessage().contains("/api/**/legacy/**"),
@@ -210,7 +218,8 @@ class RateLimitingFilterTest {
 
       IllegalStateException ex =
           assertThrows(
-              IllegalStateException.class, () -> new RateLimitingFilter(bad, problemProperties));
+              IllegalStateException.class,
+              () -> new RateLimitingFilter(bad, problemProperties, messageSource));
       assertTrue(
           ex.getMessage().contains("broken-rule"),
           "the failure must name the offending rule: " + ex.getMessage());
@@ -222,7 +231,8 @@ class RateLimitingFilterTest {
       bad.setPaths(List.of("   "));
 
       assertThrows(
-          IllegalStateException.class, () -> new RateLimitingFilter(bad, problemProperties));
+          IllegalStateException.class,
+          () -> new RateLimitingFilter(bad, problemProperties, messageSource));
     }
 
     @Test
@@ -240,7 +250,7 @@ class RateLimitingFilterTest {
       rule.setRefillPeriod(Duration.ofMinutes(1));
       ok.setRules(List.of(rule));
 
-      assertNotNull(new RateLimitingFilter(ok, problemProperties));
+      assertNotNull(new RateLimitingFilter(ok, problemProperties, messageSource));
     }
 
     private RateLimitProperties newValidProperties() {
@@ -484,6 +494,12 @@ class RateLimitingFilterTest {
       assertTrue(
           body.contains(problemProperties.getBaseUri() + "rate-limit-exceeded"),
           "type URI must be built off AppProblemProperties.baseUri");
+      assertTrue(
+          body.contains("\"code\":\"RATE_LIMIT_EXCEEDED\""),
+          "body must carry the stable machine-readable code");
+      assertTrue(
+          body.matches("(?s).*\"correlationId\":\"[0-9a-fA-F-]{36}\".*"),
+          "body must carry a per-response UUID correlationId: " + body);
     }
 
     private MockHttpServletRequest copyRequest(MockHttpServletRequest src) {

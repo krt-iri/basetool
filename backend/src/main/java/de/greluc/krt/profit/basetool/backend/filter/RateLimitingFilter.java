@@ -31,15 +31,19 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
@@ -78,7 +82,10 @@ import tools.jackson.core.io.JsonStringEncoder;
  * app.rate-limit.trusted-proxies}; blanket trust (the literal {@code "*"}) is explicitly rejected
  * because it would let any client spoof the header and get a fresh bucket per request. Rejected
  * requests get a 429 with an RFC&nbsp;7807 body and rate-limit headers ({@code X-Rate-Limit-Limit},
- * {@code X-Rate-Limit-Remaining}, {@code X-Rate-Limit-Retry-After-Seconds}).
+ * {@code X-Rate-Limit-Remaining}, {@code X-Rate-Limit-Retry-After-Seconds}). The body mirrors
+ * GlobalExceptionHandler's contract: a stable {@code code} of {@code RATE_LIMIT_EXCEEDED}, a
+ * per-response {@code correlationId} (also logged) for traceability, and a {@code title}/{@code
+ * detail} localized from the request's {@code Accept-Language} rather than hardcoded English.
  */
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -86,8 +93,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final Duration BUCKET_EXPIRE_AFTER_ACCESS = Duration.ofHours(1);
   private static final long BUCKET_MAX_ENTRIES = 100_000L;
 
+  /**
+   * Stable machine-readable error code echoed in the 429 body, mirroring GlobalExceptionHandler.
+   */
+  private static final String CODE_RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
+
   private final RateLimitProperties properties;
   private final AppProblemProperties problemProperties;
+  private final MessageSource messageSource;
   private final PathPatternParser pathPatternParser = new PathPatternParser();
   private final Map<String, Optional<PathPattern>> compiledPatterns = new ConcurrentHashMap<>();
   private final Cache<String, Bucket> bucketCache;
@@ -108,13 +121,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param properties bucket capacity/refill configuration plus path patterns, endpoint-specific
    *     rules and trusted proxies
    * @param problemProperties RFC&nbsp;7807 problem-type base URI used in the 429 response body
+   * @param messageSource resolves the localized 429 {@code title}/{@code detail} from the request's
+   *     {@code Accept-Language}, mirroring GlobalExceptionHandler's i18n so the rate limiter is no
+   *     longer the only RFC&nbsp;7807 producer emitting hardcoded English
    * @throws IllegalStateException when any configured rate-limit pattern is blank or not valid
    *     {@link PathPattern} syntax
    */
   public RateLimitingFilter(
-      RateLimitProperties properties, AppProblemProperties problemProperties) {
+      RateLimitProperties properties,
+      AppProblemProperties problemProperties,
+      MessageSource messageSource) {
     this.properties = properties;
     this.problemProperties = problemProperties;
+    this.messageSource = messageSource;
     this.bucketCache =
         Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
@@ -269,13 +288,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       if (!probe.isConsumed()) {
         long nanosToWait = probe.getNanosToWaitForRefill();
         long secondsToWait = (long) Math.ceil(nanosToWait / 1_000_000_000.0);
+        // The rate limiter runs before CorrelationIdFilter, so no request-scoped correlation id
+        // exists yet. Mint one here and thread it through both the log line and the response body
+        // so a user reporting a 429 can be traced to this exact log entry.
+        String correlationId = UUID.randomUUID().toString();
         log.warn(
-            "Rate limit exceeded: ip={}, slot={}, path={}, retryAfterSeconds={}",
+            "Rate limit exceeded: ip={}, slot={}, path={}, retryAfterSeconds={}, correlationId={}",
             clientIp,
             slot.key(),
             request.getRequestURI(),
-            secondsToWait);
-        writeTooManyRequests(response, request, slot.capacity(), secondsToWait);
+            secondsToWait,
+            correlationId);
+        writeTooManyRequests(response, request, slot.capacity(), secondsToWait, correlationId);
         return;
       }
       if (slot.capacity() < tightestLimit) {
@@ -467,7 +491,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       HttpServletResponse response,
       HttpServletRequest request,
       int rejectedLimit,
-      long retryAfterSeconds)
+      long retryAfterSeconds,
+      String correlationId)
       throws IOException {
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
@@ -475,34 +500,74 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfterSeconds));
 
+    // Localize title/detail from the request's Accept-Language (LocaleContextHolder is not yet
+    // populated this early in the filter chain, so request.getLocale() is the authoritative source
+    // here). Fall back to the hardcoded English strings when the bundle key is missing.
+    Locale locale = request.getLocale();
+    String title =
+        messageSource.getMessage("problem.rate_limit.title", null, "Too Many Requests", locale);
+    String detail =
+        messageSource.getMessage(
+            "problem.rate_limit.detail",
+            new Object[] {String.valueOf(retryAfterSeconds)},
+            "Rate limit exceeded. Try again in " + retryAfterSeconds + " seconds.",
+            locale);
+
     // The {@code instance} field reflects the request URI, which is fully attacker-controlled.
     // String concatenation directly into a JSON literal would let a crafted path like
     // {@code /api/v1/x","fake":"injected} break out of the quoted value and append arbitrary
     // top-level fields, polluting the RFC 7807 contract a client may rely on (JSON-injection,
     // CodeQL: java/xss). Escape via Jackson's {@link JsonStringEncoder} so that {@code "},
-    // {@code \}, control chars and unicode separators land as proper JSON escapes.
+    // {@code \}, control chars and unicode separators land as proper JSON escapes. The localized
+    // title/detail are bundle-controlled, but escape them the same way for uniform safety.
     // Jackson 3 dropped the String -> char[] overload; quote into a StringBuilder instead.
-    JsonStringEncoder jsonEncoder = JsonStringEncoder.getInstance();
-    StringBuilder instanceEscapedBuilder = new StringBuilder();
-    jsonEncoder.quoteAsString(request.getRequestURI(), instanceEscapedBuilder);
-    String instanceEscaped = instanceEscapedBuilder.toString();
+    String instanceEscaped = jsonEscape(request.getRequestURI());
+    String titleEscaped = jsonEscape(title);
+    String detailEscaped = jsonEscape(detail);
+    String correlationIdEscaped = jsonEscape(correlationId);
     String body =
         "{"
             + "\"type\":\""
             + problemProperties.getBaseUri()
             + "rate-limit-exceeded\","
-            + "\"title\":\"Too Many Requests\","
+            + "\"title\":\""
+            + titleEscaped
+            + "\","
             + "\"status\":"
             + HttpStatus.TOO_MANY_REQUESTS.value()
             + ","
-            + "\"detail\":\"Rate limit exceeded. Try again in "
-            + retryAfterSeconds
-            + " seconds.\","
+            + "\"detail\":\""
+            + detailEscaped
+            + "\","
             + "\"instance\":\""
             + instanceEscaped
+            + "\","
+            + "\"code\":\""
+            + CODE_RATE_LIMIT_EXCEEDED
+            + "\","
+            + "\"correlationId\":\""
+            + correlationIdEscaped
             + "\""
             + "}";
-    response.getWriter().write(body);
+    // Write UTF-8 bytes directly rather than through getWriter(): the localized title/detail may
+    // contain non-ASCII (e.g. German umlauts) and the servlet writer defaults to ISO-8859-1, which
+    // would mangle them. Going through the byte stream keeps the Content-Type as the app-standard
+    // application/problem+json (no ;charset= suffix) while still emitting valid UTF-8 JSON.
+    response.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Escapes a raw string into a JSON string-literal body (without surrounding quotes) via Jackson's
+   * {@link JsonStringEncoder}, so quotes, backslashes, control characters and unicode separators
+   * cannot break out of the quoted value in the hand-built RFC&nbsp;7807 document.
+   *
+   * @param raw the raw value to escape
+   * @return the JSON-escaped value, ready to be wrapped in double quotes
+   */
+  private static String jsonEscape(String raw) {
+    StringBuilder builder = new StringBuilder();
+    JsonStringEncoder.getInstance().quoteAsString(raw, builder);
+    return builder.toString();
   }
 
   /**

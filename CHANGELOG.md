@@ -5,6 +5,7 @@
 ### Changed
 
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
+- **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).
 
 ## [v1.0.11](https://github.com/krt-profit/basetool/releases/tag/v1.0.11) - 2026-07-01
 
