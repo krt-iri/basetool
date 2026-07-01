@@ -63,11 +63,8 @@
         <span id="pi-total-meta" hidden
               th:attr="data-total=${page != null ? page.totalElements : items.size()}"></span>
 
-        <div th:if="${#lists.isEmpty(items)}" class="empty-state">
-            <span class="empty-title" th:text="#{personalInventory.collection.emptyTitle}">Noch keine Eintr&auml;ge</span>
-            <span class="empty-text" th:text="#{personalInventory.empty}">Noch keine Eintr&auml;ge vorhanden.</span>
-            <span class="empty-text" th:if="${filterQuery != null and !filterQuery.isBlank()}" th:text="#{personalInventory.collection.emptyFilterHint}">Filter aktiv &mdash; eine leere Suche zeigt alle Eintr&auml;ge.</span>
-        </div>
+        <div th:if="${#lists.isEmpty(items)}" class="empty-state"
+             th:insert="~{fragments/components :: emptyStateBody('personalInventory.collection.emptyTitle', 'personalInventory.empty', 'personalInventory.collection.emptyFilterHint')}"></div>
 
         <div th:unless="${#lists.isEmpty(items)}" class="table-responsive krt-pi-table-wrapper">
             <table class="krt-table krt-pi-table">
