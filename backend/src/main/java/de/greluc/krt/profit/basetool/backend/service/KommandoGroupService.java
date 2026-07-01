@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -146,9 +147,7 @@ public class KommandoGroupService {
   public KommandoGroupDto updateGroup(
       @NotNull UUID groupId, @NotNull UpdateKommandoGroupRequest request) {
     KommandoGroup group =
-        kommandoGroupRepository
-            .findById(groupId)
-            .orElseThrow(() -> new NotFoundException("Kommandogruppe not found"));
+        Entities.require(kommandoGroupRepository.findById(groupId), "Kommandogruppe not found");
     assertVersionMatches(group, request.version());
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
@@ -172,9 +171,7 @@ public class KommandoGroupService {
   @Transactional
   public void deleteGroup(@NotNull UUID groupId) {
     KommandoGroup group =
-        kommandoGroupRepository
-            .findById(groupId)
-            .orElseThrow(() -> new NotFoundException("Kommandogruppe not found"));
+        Entities.require(kommandoGroupRepository.findById(groupId), "Kommandogruppe not found");
     if (membershipRepository.existsByKommandoGroupId(groupId)) {
       throw new BadRequestException(
           "Kommandogruppe still has assigned members — reassign them before deleting it");
@@ -196,10 +193,7 @@ public class KommandoGroupService {
    */
   @NotNull
   private OrgUnit requireSquadron(@NotNull UUID squadronId) {
-    OrgUnit unit =
-        orgUnitRepository
-            .findById(squadronId)
-            .orElseThrow(() -> new NotFoundException("Squadron not found"));
+    OrgUnit unit = Entities.require(orgUnitRepository.findById(squadronId), "Squadron not found");
     if (unit.getKind() != OrgUnitKind.SQUADRON) {
       throw new BadRequestException("Org unit " + squadronId + " is not a Staffel");
     }

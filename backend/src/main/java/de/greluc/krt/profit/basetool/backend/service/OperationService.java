@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
@@ -226,9 +227,7 @@ public class OperationService {
    * @throws NotFoundException when no match
    */
   public Operation getOperationById(@NotNull UUID id) {
-    return operationRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Operation not found"));
+    return Entities.require(operationRepository.findById(id), "Operation not found");
   }
 
   /**
@@ -315,10 +314,7 @@ public class OperationService {
   @Transactional
   public Operation updateOperation(
       @NotNull UUID id, @NotNull OperationUpdateDto updateDto, boolean canOverrideStatus) {
-    Operation operation =
-        operationRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+    Operation operation = Entities.require(operationRepository.findById(id), "Operation not found");
 
     if (updateDto.version() != null && !operation.getVersion().equals(updateDto.version())) {
       throw new ObjectOptimisticLockingFailureException(Operation.class, id);
@@ -367,10 +363,7 @@ public class OperationService {
   @Transactional
   public void deleteOperation(@NotNull UUID id) {
     log.info("Deleting operation with ID: {}", id);
-    Operation operation =
-        operationRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+    Operation operation = Entities.require(operationRepository.findById(id), "Operation not found");
 
     // Unlink missions instead of cascading the delete. The mission itself,
     // its participants, finance entries, inventory items and refinery orders
@@ -432,9 +425,8 @@ public class OperationService {
    */
   public List<OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
     Operation operation =
-        operationRepository
-            .findWithMissionsAndParticipantsById(id)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+        Entities.require(
+            operationRepository.findWithMissionsAndParticipantsById(id), "Operation not found");
 
     List<UUID> missionIds = operation.getMissions().stream().map(Mission::getId).toList();
     List<MissionFinanceEntry> allEntries =
@@ -609,16 +601,11 @@ public class OperationService {
     // Re-render the full row so the caller can patch its DOM without a second round-trip. We use
     // the same canonical path as the read endpoint to guarantee the displayed amount stays in
     // lock-step with what the backend just persisted.
-    return getOperationPayouts(operationId).stream()
-        .filter(dto -> participantKey.equals(dto.participantId()))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new NotFoundException(
-                    "Participant '"
-                        + participantKey
-                        + "' is not part of operation "
-                        + operationId));
+    return Entities.require(
+        getOperationPayouts(operationId).stream()
+            .filter(dto -> participantKey.equals(dto.participantId()))
+            .findFirst(),
+        () -> "Participant '" + participantKey + "' is not part of operation " + operationId);
   }
 
   /**
