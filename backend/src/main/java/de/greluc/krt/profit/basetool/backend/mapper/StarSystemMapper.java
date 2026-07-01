@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Star System entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface StarSystemMapper {
   /** Maps a {@link StarSystem} entity to its outbound DTO. */
   StarSystemDto toDto(StarSystem starSystem);

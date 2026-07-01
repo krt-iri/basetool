@@ -20,18 +20,17 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
-/** Type-safe App Backend configuration properties. */
-@Data
-@Configuration
+/**
+ * Type-safe App Backend configuration properties. Registered via
+ * {@code @ConfigurationPropertiesScan} on {@code FrontendApplication} and bound through the
+ * canonical record constructor.
+ *
+ * @param backendUrl base URL of the backend API used by the frontend
+ */
 @Validated
 @ConfigurationProperties(prefix = "app")
-public class AppBackendProperties {
-  /** Base URL of the backend API used by the frontend. */
-  @NotBlank @URL private String backendUrl;
-}
+public record AppBackendProperties(@NotBlank @URL String backendUrl) {}

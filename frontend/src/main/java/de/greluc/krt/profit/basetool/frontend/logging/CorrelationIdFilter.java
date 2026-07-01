@@ -67,24 +67,24 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     final String correlationId = resolveCorrelationId(request);
     final String userId = resolveUserId();
 
-    MDC.put(loggingProperties.getCorrelationIdMdcKey(), correlationId);
-    MDC.put(loggingProperties.getUserIdMdcKey(), userId);
-    response.setHeader(loggingProperties.getCorrelationIdHeader(), correlationId);
+    MDC.put(loggingProperties.correlationIdMdcKey(), correlationId);
+    MDC.put(loggingProperties.userIdMdcKey(), userId);
+    response.setHeader(loggingProperties.correlationIdHeader(), correlationId);
     // Expose correlation id to the current thread so WebClient filters / downstream code
     // can propagate it towards the backend without re-reading the request.
     CorrelationContext.set(correlationId);
     try {
       filterChain.doFilter(request, response);
     } finally {
-      MDC.remove(loggingProperties.getCorrelationIdMdcKey());
-      MDC.remove(loggingProperties.getUserIdMdcKey());
+      MDC.remove(loggingProperties.correlationIdMdcKey());
+      MDC.remove(loggingProperties.userIdMdcKey());
       CorrelationContext.clear();
     }
   }
 
   @NotNull
   private String resolveCorrelationId(@NotNull HttpServletRequest request) {
-    String inbound = request.getHeader(loggingProperties.getCorrelationIdHeader());
+    String inbound = request.getHeader(loggingProperties.correlationIdHeader());
     if (inbound != null && !inbound.isBlank() && isSafe(inbound)) {
       return inbound.length() > MAX_ID_LENGTH ? inbound.substring(0, MAX_ID_LENGTH) : inbound;
     }

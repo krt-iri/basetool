@@ -66,7 +66,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -134,6 +133,62 @@ public class JobOrderPageController {
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 100;
+
+  /** Response type for the paginated order-list pull ({@code GET /api/v1/orders}). */
+  private static final ParameterizedTypeReference<PageResponse<JobOrderDto>> PAGE_OF_JOB_ORDER =
+      new ParameterizedTypeReference<PageResponse<JobOrderDto>>() {};
+
+  /**
+   * Response type for the inventory-item lists — the order's orphaned-inventory warning ({@code GET
+   * /api/v1/orders/{id}/inventory/orphaned}) and the per-material link picker ({@code GET
+   * /api/v1/orders/{id}/materials/{matId}/inventory}).
+   */
+  private static final ParameterizedTypeReference<List<InventoryItemDto>> LIST_OF_INVENTORY_ITEM =
+      new ParameterizedTypeReference<List<InventoryItemDto>>() {};
+
+  /**
+   * Response type for the item-order blueprint picker ({@code GET
+   * /api/v1/orders/item-catalog/{gameItemId}/blueprints}).
+   */
+  private static final ParameterizedTypeReference<List<BlueprintReferenceDto>>
+      LIST_OF_BLUEPRINT_REFERENCE =
+          new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {};
+
+  /**
+   * Response type for the orderable-item catalog page ({@code GET /api/v1/orders/item-catalog}),
+   * used by both the live item search and the has-orderable-items probe.
+   */
+  private static final ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>
+      PAGE_OF_GAME_ITEM_REFERENCE =
+          new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {};
+
+  /**
+   * Response type for the user-list pull backing the assignee picker ({@code GET /api/v1/users}).
+   */
+  private static final ParameterizedTypeReference<PageResponse<UserDto>> PAGE_OF_USER =
+      new ParameterizedTypeReference<PageResponse<UserDto>>() {};
+
+  /**
+   * Response type for the job-order material catalog ({@code GET /api/v1/materials/job-order})
+   * feeding the create/edit material picker.
+   */
+  private static final ParameterizedTypeReference<List<MaterialDto>> LIST_OF_MATERIAL =
+      new ParameterizedTypeReference<List<MaterialDto>>() {};
+
+  /**
+   * Response type for the squadron-list pull ({@code GET /api/v1/squadrons}) feeding the
+   * logistician squadron picker.
+   */
+  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> PAGE_OF_SQUADRON =
+      new ParameterizedTypeReference<PageResponse<SquadronDto>>() {};
+
+  /**
+   * Response type for the active-org-unit catalogs backing the two owner-pickers ({@code GET
+   * /api/v1/org-units/active} and {@code GET /api/v1/org-units/active-all-kinds}).
+   */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION =
+          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
 
   /**
    * Renders the job-order list ({@code /orders}). Two persisted filters drive the view:
@@ -256,7 +311,7 @@ public class JobOrderPageController {
                   + "&sort=priority,asc&status="
                   + statusParam
                   + squadronParam,
-              new ParameterizedTypeReference<>() {});
+              PAGE_OF_JOB_ORDER);
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
         // The nested walk exists purely to emit a per-material debug line; skip the whole
@@ -482,8 +537,7 @@ public class JobOrderPageController {
           model.addAttribute(
               "orphanedInventory",
               backendApiClient.get(
-                  "/api/v1/orders/" + id + "/inventory/orphaned",
-                  new ParameterizedTypeReference<List<InventoryItemDto>>() {}));
+                  "/api/v1/orders/" + id + "/inventory/orphaned", LIST_OF_INVENTORY_ITEM));
         } catch (Exception e) {
           log.debug("Orphaned inventory unavailable for order {}: {}", id, e.getMessage());
         }
@@ -597,10 +651,10 @@ public class JobOrderPageController {
                                   m ->
                                       new CreateJobOrderItemMaterialDto(
                                           m.getMaterialId(), m.getQuality()))
-                              .collect(Collectors.toList()),
+                              .toList(),
                           l.getClientLineId(),
                           l.getParentClientLineId()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
@@ -664,10 +718,10 @@ public class JobOrderPageController {
                             m ->
                                 new CreateJobOrderItemMaterialDto(
                                     m.getMaterialId(), m.getQuality()))
-                        .collect(Collectors.toList()),
+                        .toList(),
                     l.getClientLineId(),
                     l.getParentClientLineId()))
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /**
@@ -849,10 +903,10 @@ public class JobOrderPageController {
                                   m ->
                                       new CreateJobOrderItemMaterialDto(
                                           m.getMaterialId(), m.getQuality()))
-                              .collect(Collectors.toList()),
+                              .toList(),
                           l.getClientLineId(),
                           l.getParentClientLineId()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
@@ -932,7 +986,7 @@ public class JobOrderPageController {
       List<BlueprintReferenceDto> result =
           backendApiClient.get(
               "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
-              new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {},
+              LIST_OF_BLUEPRINT_REFERENCE,
               true);
       return result != null ? result : List.of();
     } catch (Exception e) {
@@ -982,7 +1036,7 @@ public class JobOrderPageController {
       PageResponse<GameItemReferenceDto> page =
           backendApiClient.getPublic(
               "/api/v1/orders/item-catalog?search={q}&size=25&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
+              PAGE_OF_GAME_ITEM_REFERENCE,
               q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
@@ -1032,7 +1086,7 @@ public class JobOrderPageController {
                   m ->
                       new CreateJobOrderMaterialDto(
                           m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -1103,7 +1157,7 @@ public class JobOrderPageController {
         .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
         .map(
             m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /**
@@ -1383,7 +1437,7 @@ public class JobOrderPageController {
                   m ->
                       new CreateJobOrderMaterialDto(
                           m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -1435,7 +1489,7 @@ public class JobOrderPageController {
                 m ->
                     new CreateJobOrderMaterialDto(
                         m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (materials.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -1565,7 +1619,7 @@ public class JobOrderPageController {
                   item ->
                       new JobOrderHandoverItemCreateDto(
                           item.getInventoryItemId(), item.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (items.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
@@ -1644,7 +1698,7 @@ public class JobOrderPageController {
                   e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
               .map(
                   e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (entries.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
@@ -1747,7 +1801,7 @@ public class JobOrderPageController {
             .map(
                 item ->
                     new JobOrderHandoverItemCreateDto(item.getInventoryItemId(), item.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (items.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -1796,7 +1850,7 @@ public class JobOrderPageController {
             .filter(
                 e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
             .map(e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (entries.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -2063,8 +2117,7 @@ public class JobOrderPageController {
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
       return backendApiClient.get(
-          "/api/v1/orders/" + id + "/materials/" + matId + "/inventory",
-          new ParameterizedTypeReference<>() {});
+          "/api/v1/orders/" + id + "/materials/" + matId + "/inventory", LIST_OF_INVENTORY_ITEM);
     } catch (Exception e) {
       log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
       throw new org.springframework.web.server.ResponseStatusException(
@@ -2075,10 +2128,7 @@ public class JobOrderPageController {
 
   private List<UserDto> fetchUsers() {
     try {
-      PageResponse<UserDto> p =
-          backendApiClient.get(
-              "/api/v1/users?size=1000",
-              new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+      PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", PAGE_OF_USER);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -2091,10 +2141,7 @@ public class JobOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       List<MaterialDto> list =
-          backendApiClient.getCached(
-              "/api/v1/materials/job-order",
-              new ParameterizedTypeReference<List<MaterialDto>>() {},
-              true);
+          backendApiClient.getCached("/api/v1/materials/job-order", LIST_OF_MATERIAL, true);
       if (list != null) {
         return new ArrayList<>(list);
       }
@@ -2120,7 +2167,7 @@ public class JobOrderPageController {
       PageResponse<GameItemReferenceDto> page =
           backendApiClient.getCached(
               "/api/v1/orders/item-catalog?size=1&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {},
+              PAGE_OF_GAME_ITEM_REFERENCE,
               true);
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
@@ -2183,9 +2230,7 @@ public class JobOrderPageController {
     try {
       PageResponse<SquadronDto> p =
           backendApiClient.getCached(
-              "/api/v1/squadrons?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<>() {},
-              true);
+              "/api/v1/squadrons?size=1000&sort=name,asc", PAGE_OF_SQUADRON, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -2212,7 +2257,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/org-units/active", new ParameterizedTypeReference<>() {}, true);
+              "/api/v1/org-units/active", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
@@ -2240,7 +2285,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/org-units/active-all-kinds", new ParameterizedTypeReference<>() {});
+              "/api/v1/org-units/active-all-kinds", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
       return options != null ? options : fetchActiveOrgUnitOptions();
     } catch (Exception e) {
       log.warn(
@@ -2298,9 +2343,7 @@ public class JobOrderPageController {
   private void applyOwnerPickerOptions(
       Model model, List<OrgUnitMembershipOptionDto> requestingOptions) {
     List<OrgUnitMembershipOptionDto> responsibleOptions =
-        requestingOptions.stream()
-            .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))
-            .collect(Collectors.toList());
+        requestingOptions.stream().filter(o -> Boolean.TRUE.equals(o.isProfitEligible())).toList();
     model.addAttribute("responsibleOptions", responsibleOptions);
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);

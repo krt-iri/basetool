@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.event;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -91,7 +92,7 @@ public record BankBookingRequestRejectedEvent(
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("accountNo", accountNo);
-    params.put("amount", amount.stripTrailingZeros().toPlainString());
+    params.put("amount", BankAmounts.plain(amount));
     if (reason != null && !reason.isBlank()) {
       params.put("reason", reason);
     }

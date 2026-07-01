@@ -27,7 +27,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Squadron entities and DTOs. */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface SquadronMapper {
   /**
    * Maps a {@link Squadron} entity to its outbound DTO. {@code isPromotionEnabled} is taken from

@@ -37,14 +37,13 @@ import java.util.List;
 import java.util.Objects;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * MapStruct mapper from the blueprint recipe-graph entities to their read-side DTOs. Ingredient
  * names come from the always-present {@code wikiNameSnapshot} (so mapping a page never triggers a
  * material / game-item lazy load); the owned collections map element-wise via the per-type methods.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface BlueprintMapper {
 
   /**

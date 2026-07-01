@@ -81,6 +81,88 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class InventoryPageController {
 
+  /**
+   * Response type for the squadron-wide aggregated inventory page ({@code
+   * /api/v1/inventory/aggregated}), decoding the paginated per-material summary rows the {@code
+   * /inventory} index renders.
+   */
+  private static final ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>
+      AGGREGATED_INVENTORY_PAGE =
+          new ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>() {};
+
+  /**
+   * Response type for paginated individual inventory rows — shared by the per-material drilldown
+   * ({@code /api/v1/inventory/material/{id}}) and the two stack-entries drill-down endpoints.
+   */
+  private static final ParameterizedTypeReference<PageResponse<InventoryItemDto>>
+      INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<PageResponse<InventoryItemDto>>() {};
+
+  /**
+   * Response type for the grouped {@code /my} and {@code /all} list views ({@code .../grouped}),
+   * decoding the Material-to-Stack grouping records the personal and admin Lager tables render.
+   */
+  private static final ParameterizedTypeReference<List<GroupedInventoryDto>>
+      GROUPED_INVENTORY_LIST = new ParameterizedTypeReference<List<GroupedInventoryDto>>() {};
+
+  /**
+   * Response type for the owner-picker option lookups ({@code /api/v1/users/{id}/memberships} and
+   * {@code /api/v1/users/me/pickable-org-units}) that populate the inventory-input R5.d owner
+   * picker.
+   */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_MEMBERSHIP_OPTION_LIST =
+          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
+
+  /**
+   * Response type for the user lookup ({@code /api/v1/users/lookup}) that fills the admin
+   * target-user dropdown on the create form and the list-view user filter.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto>>
+      USER_REFERENCE_LIST =
+          new ParameterizedTypeReference<
+              List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto>>() {};
+
+  /**
+   * Response type for the cached material catalog lookup ({@code /api/v1/materials/lookup}) that
+   * feeds every inventory view's material filter and the create form's material dropdown.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto>>
+      MATERIAL_REFERENCE_LIST =
+          new ParameterizedTypeReference<
+              List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto>>() {};
+
+  /**
+   * Response type for the cached location catalog lookup ({@code /api/v1/locations/lookup}) that
+   * feeds the storage-location dropdowns on the list and create views.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>
+      LOCATION_REFERENCE_LIST =
+          new ParameterizedTypeReference<
+              List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>() {};
+
+  /**
+   * Response type for the active-job-order lookup ({@code /api/v1/orders/lookup}) that populates
+   * the job-order filter and the inline item-to-order re-assignment dropdowns.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>>
+      JOB_ORDER_REFERENCE_LIST =
+          new ParameterizedTypeReference<
+              List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>>() {};
+
+  /**
+   * Response type for the mission lookup ({@code /api/v1/missions/lookup}) that populates the
+   * mission filter and the per-entry mission-association dropdowns.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>>
+      MISSION_REFERENCE_LIST =
+          new ParameterizedTypeReference<
+              List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>>() {};
+
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
@@ -115,7 +197,7 @@ public class InventoryPageController {
       uri.append("sort=material.name,asc;quality,desc;amount,desc");
 
       PageResponse<AggregatedInventoryDto> p =
-          backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
+          backendApiClient.get(uri.toString(), AGGREGATED_INVENTORY_PAGE);
       if (p != null) {
         if (p.content() != null) {
           aggregated = new ArrayList<>(p.content());
@@ -153,8 +235,7 @@ public class InventoryPageController {
     try {
       PageResponse<InventoryItemDto> p =
           backendApiClient.get(
-              "/api/v1/inventory/material/" + materialId + "?size=1000",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/inventory/material/" + materialId + "?size=1000", INVENTORY_ITEM_PAGE);
       if (p != null && p.content() != null) {
         items = new ArrayList<>(p.content());
       }
@@ -269,8 +350,7 @@ public class InventoryPageController {
         uriBuilder.queryParam("personalOnly", true);
       }
       String url = uriBuilder.build().toUriString();
-      List<GroupedInventoryDto> res =
-          backendApiClient.get(url, new ParameterizedTypeReference<>() {});
+      List<GroupedInventoryDto> res = backendApiClient.get(url, GROUPED_INVENTORY_LIST);
       if (res != null) {
         groupedItems = res;
       }
@@ -353,8 +433,7 @@ public class InventoryPageController {
         }
       }
       String url = uriBuilder.build().toUriString();
-      List<GroupedInventoryDto> res =
-          backendApiClient.get(url, new ParameterizedTypeReference<>() {});
+      List<GroupedInventoryDto> res = backendApiClient.get(url, GROUPED_INVENTORY_LIST);
       if (res != null) {
         groupedItems = res;
       }
@@ -521,7 +600,7 @@ public class InventoryPageController {
   private void fetchStackEntriesIntoModel(@NotNull String uri, Model model) {
     PageResponse<InventoryItemDto> p = null;
     try {
-      p = backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+      p = backendApiClient.get(uri, INVENTORY_ITEM_PAGE);
     } catch (Exception e) {
       log.error("Failed to fetch stack entries", e);
       model.addAttribute("error", "inventory.stack.entries.error");
@@ -615,7 +694,7 @@ public class InventoryPageController {
         List<OrgUnitMembershipOptionDto> options =
             backendApiClient.get(
                 "/api/v1/users/" + form.getUserId() + "/memberships",
-                new ParameterizedTypeReference<>() {});
+                ORG_UNIT_MEMBERSHIP_OPTION_LIST);
         return options != null ? options : List.of();
       } catch (Exception e) {
         log.warn("Failed to fetch memberships for owner-picker", e);
@@ -628,7 +707,7 @@ public class InventoryPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for owner-picker", e);
@@ -1119,7 +1198,7 @@ public class InventoryPageController {
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto> fetchUsers() {
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto> content =
-          backendApiClient.get("/api/v1/users/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
       if (content != null) {
         return content;
       }
@@ -1135,8 +1214,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> content =
-          backendApiClient.getCached(
-              "/api/v1/materials/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/materials/lookup", MATERIAL_REFERENCE_LIST);
       if (content != null) {
         materials.addAll(content);
       }
@@ -1152,8 +1230,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto> content =
-          backendApiClient.getCached(
-              "/api/v1/locations/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/locations/lookup", LOCATION_REFERENCE_LIST);
       if (content != null) {
         locations.addAll(content);
       }
@@ -1169,7 +1246,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> content =
-          backendApiClient.get("/api/v1/orders/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/orders/lookup", JOB_ORDER_REFERENCE_LIST);
       if (content != null) {
         orders.addAll(content);
       }
@@ -1183,7 +1260,7 @@ public class InventoryPageController {
       fetchMissions() {
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto> content =
-          backendApiClient.get("/api/v1/missions/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/missions/lookup", MISSION_REFERENCE_LIST);
       if (content != null) {
         return content;
       }

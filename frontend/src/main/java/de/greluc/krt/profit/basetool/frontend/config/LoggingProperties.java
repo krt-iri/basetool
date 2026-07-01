@@ -21,41 +21,35 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
  * Type-safe configuration for structured logging, MDC correlation, slow-request detection and slow
  * WebClient call detection in the frontend module. Bound under {@code app.logging.*} in {@code
- * application*.yml}. Invalid values fail the context start early.
+ * application*.yml} through the canonical record constructor; invalid values fail the context start
+ * early. Component-level {@link DefaultValue} annotations preserve the previous field-initializer
+ * defaults when a key is absent.
+ *
+ * @param correlationIdHeader HTTP header used to accept an inbound correlation id and echo the
+ *     effective one back
+ * @param correlationIdMdcKey MDC key for the correlation id; must match the {@code
+ *     %X{correlationId}} pattern
+ * @param userIdMdcKey MDC key for the JWT {@code sub} claim (intentionally no emails/names)
+ * @param slowRequestThresholdMs requests slower than this are logged at WARN by {@code
+ *     RequestLoggingFilter}
+ * @param slowBackendCallThresholdMs WebClient calls slower than this are logged at WARN by {@code
+ *     WebClientLoggingFilter}
+ * @param structuredEnabled feature flag for structured (JSON) logging, activated in {@code
+ *     logback-spring.xml}
  */
-@Getter
-@Setter
-@ToString
 @Validated
 @ConfigurationProperties(prefix = "app.logging")
-public class LoggingProperties {
-
-  /** HTTP header used to accept an inbound correlation id and echo the effective one back. */
-  @NotBlank private String correlationIdHeader = "X-Correlation-Id";
-
-  /** MDC key for the correlation id. Must match the {@code %X{correlationId}} pattern. */
-  @NotBlank private String correlationIdMdcKey = "correlationId";
-
-  /** MDC key for the JWT {@code sub} claim. Intentionally no emails/names. */
-  @NotBlank private String userIdMdcKey = "userId";
-
-  /** Requests slower than this are logged at WARN by {@code RequestLoggingFilter}. */
-  @Min(0)
-  private long slowRequestThresholdMs = 2000L;
-
-  /** WebClient calls slower than this are logged at WARN by {@code WebClientLoggingFilter}. */
-  @Min(0)
-  private long slowBackendCallThresholdMs = 1500L;
-
-  /** Feature flag for structured (JSON) logging, activated in {@code logback-spring.xml}. */
-  private boolean structuredEnabled = false;
-}
+public record LoggingProperties(
+    @NotBlank @DefaultValue("X-Correlation-Id") String correlationIdHeader,
+    @NotBlank @DefaultValue("correlationId") String correlationIdMdcKey,
+    @NotBlank @DefaultValue("userId") String userIdMdcKey,
+    @Min(0) @DefaultValue("2000") long slowRequestThresholdMs,
+    @Min(0) @DefaultValue("1500") long slowBackendCallThresholdMs,
+    @DefaultValue("false") boolean structuredEnabled) {}

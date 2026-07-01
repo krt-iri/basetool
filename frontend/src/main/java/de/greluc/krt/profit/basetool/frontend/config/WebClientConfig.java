@@ -211,7 +211,7 @@ public class WebClientConfig {
                   })
               .option(
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
-                  Math.toIntExact(httpProperties.getConnectTimeout().toMillis()));
+                  Math.toIntExact(httpProperties.connectTimeout().toMillis()));
       if (streaming) {
         // SSE relay: a long-lived response delivering sparse events. A response / read timeout
         // would sever the stream between events, so neither is applied (the backend heartbeat
@@ -221,7 +221,7 @@ public class WebClientConfig {
                 conn ->
                     conn.addHandlerLast(
                         new WriteTimeoutHandler(
-                            httpProperties.getWriteTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+                            httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
       } else {
         // Request gzip on the regular request/response path: send `Accept-Encoding` and decompress
         // transparently. The backend already advertises `server.compression.enabled=true` for
@@ -236,16 +236,15 @@ public class WebClientConfig {
         httpClient =
             httpClient
                 .compress(true)
-                .responseTimeout(httpProperties.getResponseTimeout())
+                .responseTimeout(httpProperties.responseTimeout())
                 .doOnConnected(
                     conn ->
                         conn.addHandlerLast(
                                 new ReadTimeoutHandler(
-                                    httpProperties.getReadTimeout().toMillis(),
-                                    TimeUnit.MILLISECONDS))
+                                    httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
                             .addHandlerLast(
                                 new WriteTimeoutHandler(
-                                    httpProperties.getWriteTimeout().toMillis(),
+                                    httpProperties.writeTimeout().toMillis(),
                                     TimeUnit.MILLISECONDS)));
       }
       return new ReactorClientHttpConnector(httpClient);
@@ -362,7 +361,7 @@ public class WebClientConfig {
             resilienceFilter(
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
         .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
-        .baseUrl(backendProperties.getBackendUrl())
+        .baseUrl(backendProperties.backendUrl())
         .build();
   }
 
@@ -395,7 +394,7 @@ public class WebClientConfig {
             resilienceFilter(
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
         .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
-        .baseUrl(backendProperties.getBackendUrl())
+        .baseUrl(backendProperties.backendUrl())
         .build();
   }
 
@@ -429,7 +428,7 @@ public class WebClientConfig {
         .filter(userLocaleRelayFilter.relayUserLocale())
         .defaultHeaders(
             headers -> headers.setAccept(java.util.List.of(MediaType.TEXT_EVENT_STREAM)))
-        .baseUrl(backendProperties.getBackendUrl())
+        .baseUrl(backendProperties.backendUrl())
         .build();
   }
 }

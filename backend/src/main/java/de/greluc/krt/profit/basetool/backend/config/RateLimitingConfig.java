@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -40,13 +41,17 @@ public class RateLimitingConfig {
    * @param properties typed configuration with bucket capacity, refill rate, path patterns and
    *     trusted proxies
    * @param problemProperties RFC&nbsp;7807 base URI used in the 429 problem-detail response body
+   * @param messageSource resolves the localized 429 {@code title}/{@code detail} for the response
+   *     body
    * @return the {@link RateLimitingFilter} bean injected into the servlet container registration
    *     below
    */
   @Bean
   public RateLimitingFilter rateLimitingFilter(
-      RateLimitProperties properties, AppProblemProperties problemProperties) {
-    return new RateLimitingFilter(properties, problemProperties);
+      RateLimitProperties properties,
+      AppProblemProperties problemProperties,
+      MessageSource messageSource) {
+    return new RateLimitingFilter(properties, problemProperties, messageSource);
   }
 
   /**

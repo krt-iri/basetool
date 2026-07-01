@@ -97,7 +97,7 @@ public class PersonalInventoryController {
             PersonalInventoryItemService.SORTABLE_FIELDS,
             PersonalInventoryItemService.DEFAULT_SORT_FIELD);
     Page<PersonalInventoryItemResponse> result = service.listOwn(ownerSub, q, pageable);
-    return toPageResponse(result);
+    return PageResponse.of(result);
   }
 
   /**
@@ -187,16 +187,5 @@ public class PersonalInventoryController {
       throw new AccessDeniedException("JWT does not contain a subject claim.");
     }
     return sub;
-  }
-
-  @NotNull
-  static <T> PageResponse<T> toPageResponse(Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 }

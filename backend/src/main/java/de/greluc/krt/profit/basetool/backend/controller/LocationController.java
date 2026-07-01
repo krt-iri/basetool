@@ -126,13 +126,13 @@ public class LocationController {
    * @return curated home locations as DTOs, name descending
    */
   @Operation(
-      summary = "Kuratierte Home-Locations",
+      summary = "Curated home locations",
       description =
-          "Listet die als Home-Location markierten, nicht ausgeblendeten Orte (alphabetisch"
-              + " absteigend) als Quelle für den Hangar-Bulk-Button.")
+          "Lists the locations flagged as home locations and not hidden (name descending) as"
+              + " the source for the hangar bulk button.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Liste der Home-Locations"),
-    @ApiResponse(responseCode = "401", description = "Nicht authentifiziert")
+    @ApiResponse(responseCode = "200", description = "List of home locations"),
+    @ApiResponse(responseCode = "401", description = "Not authenticated")
   })
   @GetMapping("/home-locations")
   @PreAuthorize("isAuthenticated()")

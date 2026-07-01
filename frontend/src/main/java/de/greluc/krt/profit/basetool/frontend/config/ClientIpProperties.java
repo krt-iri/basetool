@@ -19,11 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import java.util.ArrayList;
 import java.util.List;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -45,17 +43,12 @@ import org.springframework.validation.annotation.Validated;
  * client-supplied {@code X-Forwarded-For} is ignored. Production sets the Docker proxy range in
  * {@code application-prod.yml} (override via {@code APP_CLIENT_IP_TRUSTED_PROXIES} when the NPM
  * container sits on a different subnet).
+ *
+ * @param trustedProxies exact IPs / CIDR ranges of the trusted reverse proxies whose {@code
+ *     X-Forwarded-For} the frontend honours when resolving the originating client IP; empty (the
+ *     dev/test default via {@link DefaultValue}) trusts no proxy, so the raw TCP peer is used and a
+ *     client-supplied header cannot influence attribution
  */
-@Data
-@Configuration
 @Validated
 @ConfigurationProperties(prefix = "app.client-ip")
-public class ClientIpProperties {
-
-  /**
-   * Exact IPs / CIDR ranges of the trusted reverse proxies whose {@code X-Forwarded-For} the
-   * frontend honours when resolving the originating client IP. Empty (dev/test default) trusts no
-   * proxy, so the raw TCP peer is used and a client-supplied header cannot influence attribution.
-   */
-  private List<String> trustedProxies = new ArrayList<>();
-}
+public record ClientIpProperties(@DefaultValue List<String> trustedProxies) {}

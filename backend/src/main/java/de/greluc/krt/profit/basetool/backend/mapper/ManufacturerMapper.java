@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Manufacturer entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface ManufacturerMapper {
   /** Maps a {@link Manufacturer} entity to its outbound DTO. */
   ManufacturerDto toDto(Manufacturer entity);

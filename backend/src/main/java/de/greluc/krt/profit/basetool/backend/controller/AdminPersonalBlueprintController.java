@@ -109,7 +109,7 @@ public class AdminPersonalBlueprintController {
             PersonalBlueprintService.SORTABLE_FIELDS,
             PersonalBlueprintService.DEFAULT_SORT_FIELD);
     Page<PersonalBlueprintResponse> result = service.listForUser(userSub, q, pageable);
-    return toPageResponse(result);
+    return PageResponse.of(result);
   }
 
   /**
@@ -229,24 +229,5 @@ public class AdminPersonalBlueprintController {
   public BlueprintImportResultDto applyImportForUser(
       @PathVariable String userSub, @Valid @RequestBody BlueprintImportApplyRequest request) {
     return importService.applyImport(userSub, request.resolutions());
-  }
-
-  /**
-   * Wraps a Spring {@link Page} of blueprint responses into the API's {@link PageResponse}
-   * envelope.
-   *
-   * @param result the service page
-   * @return the wire-format page response
-   */
-  @NotNull
-  private static PageResponse<PersonalBlueprintResponse> toPageResponse(
-      @NotNull Page<PersonalBlueprintResponse> result) {
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
   }
 }

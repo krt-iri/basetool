@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Refining Method entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface RefiningMethodMapper {
   /** Maps a {@link RefiningMethod} entity to its outbound DTO. */
   RefiningMethodDto toDto(RefiningMethod entity);

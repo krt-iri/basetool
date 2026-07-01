@@ -234,14 +234,14 @@ public class HangarController {
    * @return 204 No Content
    */
   @Operation(
-      summary = "Alle eigenen Schiffe löschen",
+      summary = "Delete all own ships",
       description =
-          "Löscht alle Schiffe des authentifizierten Nutzers. Verknüpfungen mit"
-              + " Mission-Einheiten werden sicher aufgelöst.")
+          "Deletes all ships of the authenticated user. Links to mission units are safely"
+              + " dissolved.")
   @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "Alle Schiffe erfolgreich gelöscht"),
-    @ApiResponse(responseCode = "401", description = "Nicht authentifiziert"),
-    @ApiResponse(responseCode = "403", description = "Keine Berechtigung")
+    @ApiResponse(responseCode = "204", description = "All ships deleted successfully"),
+    @ApiResponse(responseCode = "401", description = "Not authenticated"),
+    @ApiResponse(responseCode = "403", description = "Not authorized")
   })
   @DeleteMapping("/ships")
   @PreAuthorize("hasAuthority('HANGAR_WRITE')")
@@ -366,14 +366,14 @@ public class HangarController {
    * @return the number of ships updated
    */
   @Operation(
-      summary = "Home-Location für alle eigenen Schiffe setzen",
+      summary = "Set home location for all own ships",
       description =
-          "Setzt den Ort aller Schiffe des authentifizierten Nutzers auf die gewählte,"
-              + " kuratierte Home-Location.")
+          "Sets the location of all ships of the authenticated user to the chosen, curated"
+              + " home location.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Anzahl der aktualisierten Schiffe"),
-    @ApiResponse(responseCode = "400", description = "Ungültige oder keine Home-Location"),
-    @ApiResponse(responseCode = "401", description = "Nicht authentifiziert")
+    @ApiResponse(responseCode = "200", description = "Number of ships updated"),
+    @ApiResponse(responseCode = "400", description = "Invalid or missing home location"),
+    @ApiResponse(responseCode = "401", description = "Not authenticated")
   })
   @PostMapping("/ships/home-location")
   @PreAuthorize("isAuthenticated()")

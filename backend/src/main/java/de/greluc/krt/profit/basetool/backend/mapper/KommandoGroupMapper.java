@@ -19,22 +19,24 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
+import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/** MapStruct mapper between Material Category entities and DTOs. */
+/** MapStruct mapper between {@link KommandoGroup} entities and their read model. */
 @Mapper(config = CentralMapperConfig.class)
-public interface MaterialCategoryMapper {
-  /** Maps a {@link MaterialCategory} entity to its outbound DTO. */
-  MaterialCategoryDto toDto(MaterialCategory entity);
+public interface KommandoGroupMapper {
 
   /**
-   * Builds a new {@link MaterialCategory} entity from the inbound DTO. Timestamps are owned by the
-   * persistence provider and ignored.
+   * Projects a persisted {@link KommandoGroup} into its outbound read model, flattening the owning
+   * Staffel's id into {@code squadronId}. Replaces the byte-identical hand-built mapping that was
+   * duplicated in {@code KommandoGroupService} and {@code LeitungViewService}.
+   *
+   * @param group the persisted group to project; {@code null} maps to {@code null}.
+   * @return the read-model DTO carrying the group's id, owning squadron id, name, sort index and
+   *     optimistic-lock version.
    */
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "updatedAt", ignore = true)
-  MaterialCategory toEntity(MaterialCategoryDto dto);
+  @Mapping(target = "squadronId", source = "squadron.id")
+  KommandoGroupDto toDto(KommandoGroup group);
 }

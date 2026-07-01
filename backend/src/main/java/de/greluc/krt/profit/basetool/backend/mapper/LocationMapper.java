@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Location entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface LocationMapper {
   /** Maps a {@link Location} entity to its outbound DTO. */
   LocationDto toDto(Location entity);

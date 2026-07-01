@@ -22,12 +22,11 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.Poi;
 import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * MapStruct mapper between {@link Poi} entities and their admin-facing {@link PoiDto} projection.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface PoiMapper {
   /**
    * Projects a POI entity into the slim DTO used by the admin UEX-overrides page.

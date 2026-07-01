@@ -28,7 +28,6 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * Entity ↔ DTO mapper for {@link PersonalInventoryItem}.
@@ -36,7 +35,7 @@ import org.mapstruct.ReportingPolicy;
  * <p>The {@code ownerSub} is intentionally never copied to/from the response DTO: it is an internal
  * isolation key (see AGENTS.md "MULTI-USER DATA ISOLATION") and must not leak to clients.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface PersonalInventoryItemMapper {
 
   /**

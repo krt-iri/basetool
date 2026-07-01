@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RoleDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Role entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface RoleMapper {
   /** Maps a {@link Role} entity to its outbound DTO. */
   RoleDto toDto(Role role);

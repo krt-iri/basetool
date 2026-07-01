@@ -39,7 +39,7 @@ import org.mapstruct.Mapping;
  * de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest} payloads which apply
  * to an already-loaded entity. There is no inbound DTO → entity flow that needs a mapper.
  */
-@Mapper(componentModel = "spring", imports = MembershipRole.class)
+@Mapper(config = CentralMapperConfig.class, imports = MembershipRole.class)
 public interface OrgUnitMembershipMapper {
 
   /**

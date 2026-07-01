@@ -119,7 +119,7 @@ public class MemberEvaluationController {
             sort,
             MemberEvaluationService.SORTABLE_FIELDS,
             MemberEvaluationService.DEFAULT_SORT_FIELD);
-    return toPageResponse(service.listForUserPaged(requireSub(auth), pageable));
+    return PageResponse.of(service.listForUserPaged(requireSub(auth), pageable));
   }
 
   /**
@@ -149,7 +149,7 @@ public class MemberEvaluationController {
             sort,
             MemberEvaluationService.SORTABLE_FIELDS,
             MemberEvaluationService.DEFAULT_SORT_FIELD);
-    return toPageResponse(service.listAll(pageable));
+    return PageResponse.of(service.listAll(pageable));
   }
 
   /**
@@ -260,15 +260,5 @@ public class MemberEvaluationController {
       throw new AccessDeniedException("JWT does not contain a subject claim.");
     }
     return sub;
-  }
-
-  private static <T> PageResponse<T> toPageResponse(org.springframework.data.domain.Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 }

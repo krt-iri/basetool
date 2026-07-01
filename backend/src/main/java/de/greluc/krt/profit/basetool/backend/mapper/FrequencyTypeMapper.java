@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Frequency Type entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface FrequencyTypeMapper {
   /** Maps a {@link FrequencyType} entity to its outbound DTO. */
   FrequencyTypeDto toDto(FrequencyType entity);

@@ -30,7 +30,7 @@ import org.mapstruct.Mapping;
  * records and are handled directly by {@code MaterialExternalAliasService} (no MapStruct entity
  * construction).
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface MaterialExternalAliasMapper {
 
   /**

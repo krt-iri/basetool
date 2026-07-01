@@ -57,6 +57,19 @@
      th:classappend="${'alert-' + type + (extraClass != null and extraClass != '' ? ' ' + extraClass : '')}"
      th:text="#{${msgKey}}">Alert message</div>
 
+<!-- Empty-state body — title + text + an optional filter-reset hint shown only while a filter is
+     active. Insert into a `<div class="empty-state" th:if="...">` host via th:insert: th:insert
+     (precedence 100) fills the host body first, then the host's own th:if (precedence 300) still
+     removes the whole div when the collection is non-empty, so the empty-check keeps gating it. The
+     hint reads the request-scoped `filterQuery` attribute the host page already exposes. -->
+<th:block th:fragment="emptyStateBody(titleKey, textKey, filterHintKey)">
+  <span class="empty-title" th:text="#{${titleKey}}">Noch keine Eintr&auml;ge</span>
+  <span class="empty-text" th:text="#{${textKey}}">Noch keine Eintr&auml;ge vorhanden.</span>
+  <span class="empty-text"
+        th:if="${filterHintKey != null and filterQuery != null and !filterQuery.isBlank()}"
+        th:text="#{${filterHintKey}}">Filter aktiv.</span>
+</th:block>
+
 <!-- Data table — responsive-wrapped, uppercase orange head-rule, zebra rows. -->
 <div th:fragment="dataTable(head, body)" class="table-responsive">
     <table class="krt-table">

@@ -34,7 +34,7 @@ import org.mapstruct.Mapping;
  * <p>Both methods dereference the (lazy) {@code user} association, so they must be invoked inside
  * the same read/write transaction that loaded the position with its user fetched.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface OrgChartPositionMapper {
 
   /**

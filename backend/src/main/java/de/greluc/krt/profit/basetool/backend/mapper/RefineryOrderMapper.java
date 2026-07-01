@@ -35,9 +35,8 @@ import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Refinery Order entities and DTOs. */
 @Mapper(
-    componentModel = "spring",
-    uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class},
-    unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+    config = CentralMapperConfig.class,
+    uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
 public interface RefineryOrderMapper {
   /**
    * Maps a {@link RefineryOrder} entity to its full DTO; the {@code profit} field is derived from

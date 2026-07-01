@@ -33,7 +33,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 class CorrelationIdFilterTest {
 
-  private final LoggingProperties props = new LoggingProperties();
+  private final LoggingProperties props =
+      new LoggingProperties("X-Correlation-Id", "correlationId", "userId", 2000L, 1500L, false);
   private final CorrelationIdFilter filter = new CorrelationIdFilter(props);
 
   @AfterEach

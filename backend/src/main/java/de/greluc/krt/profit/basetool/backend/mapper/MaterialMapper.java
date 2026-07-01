@@ -25,7 +25,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Material entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface MaterialMapper {
   /**
    * Maps a {@link Material} entity to its DTO. UEX-style {@code Integer} 0/1 flags ({@code

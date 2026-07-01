@@ -26,10 +26,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpda
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.ReportingPolicy;
 
 /** Entity ↔ DTO mapper for {@link PromotionLevelContent}. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface PromotionLevelContentMapper {
 
   /**

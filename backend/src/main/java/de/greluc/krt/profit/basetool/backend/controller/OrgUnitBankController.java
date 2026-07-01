@@ -45,7 +45,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -151,7 +150,7 @@ public class OrgUnitBankController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
-    return toPageResponse(orgUnitBankAccessService.getViewableAccountBookings(id, pageable));
+    return PageResponse.of(orgUnitBankAccessService.getViewableAccountBookings(id, pageable));
   }
 
   /**
@@ -499,24 +498,6 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval revoked")})
   public BankBookingRequestDto revokeOwnerApproval(@PathVariable @NotNull UUID id) {
     return orgUnitBankAccessService.revokeOwnerApproval(id);
-  }
-
-  /**
-   * Wraps a Spring {@link Page} into the API's {@link PageResponse} envelope (mirrors {@code
-   * BankAccountController}).
-   *
-   * @param page the page to wrap
-   * @param <T> the row type
-   * @return the page envelope
-   */
-  private static <T> PageResponse<T> toPageResponse(@NotNull Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 
   /**

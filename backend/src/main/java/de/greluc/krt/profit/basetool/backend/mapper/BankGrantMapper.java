@@ -29,7 +29,7 @@ import org.mapstruct.Mapping;
  * currently holds the Bank Employee role (the inert-row marker, REQ-BANK-009) is derived by the
  * service from the user's synced roles and travels as a second source parameter.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface BankGrantMapper {
 
   /**

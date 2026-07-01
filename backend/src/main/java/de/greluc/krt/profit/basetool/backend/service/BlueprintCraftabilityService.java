@@ -184,8 +184,7 @@ public class BlueprintCraftabilityService {
     // material — it is excluded exactly as the job-order bridge excludes it.
     Set<UUID> craftable =
         new HashSet<>(blueprintRepository.findCraftableOutputItemIds(itemGameItemIds));
-    List<UUID> bridgeable =
-        itemGameItemIds.stream().filter(id -> !craftable.contains(id)).collect(Collectors.toList());
+    List<UUID> bridgeable = itemGameItemIds.stream().filter(id -> !craftable.contains(id)).toList();
     if (bridgeable.isEmpty()) {
       return Map.of();
     }

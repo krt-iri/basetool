@@ -47,7 +47,8 @@ class WebClientLoggingFilterTest {
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
-    props = new LoggingProperties();
+    props =
+        new LoggingProperties("X-Correlation-Id", "correlationId", "userId", 2000L, 1500L, false);
     filter = new WebClientLoggingFilter(props);
     logger = (Logger) LoggerFactory.getLogger(WebClientLoggingFilter.class);
     appender = new ListAppender<>();
