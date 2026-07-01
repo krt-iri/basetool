@@ -30,7 +30,7 @@ import org.mapstruct.Mapper;
  * expanded to a map via {@link NotificationParamsCodec}; {@code recipientSub} is deliberately not
  * exposed.
  */
-@Mapper(componentModel = "spring", uses = NotificationParamsCodec.class)
+@Mapper(config = CentralMapperConfig.class, uses = NotificationParamsCodec.class)
 public interface NotificationMapper {
 
   /**

@@ -23,10 +23,9 @@ import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /** Entity ↔ DTO mapper for {@link MemberEvaluation}. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface MemberEvaluationMapper {
 
   /**

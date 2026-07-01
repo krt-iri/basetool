@@ -31,7 +31,7 @@ import org.mapstruct.Mapping;
  * constraint and the {@link SpecialCommand} setter override, so exposing the flag would only
  * confuse callers).
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface SpecialCommandMapper {
 
   /**

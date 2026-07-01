@@ -28,7 +28,7 @@ import org.mapstruct.Mapping;
  * MapStruct mapper from {@link ExternalSyncReport} to its read-only {@link SyncReportDto}. The two
  * enum fields are flattened to their {@code name()} so the wire shape carries plain strings.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface SyncReportMapper {
 
   /**

@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between System Setting entities and DTOs. */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface SystemSettingMapper {
   /** Maps a {@link SystemSetting} entity to its outbound DTO. */
   SystemSettingDto toDto(SystemSetting setting);

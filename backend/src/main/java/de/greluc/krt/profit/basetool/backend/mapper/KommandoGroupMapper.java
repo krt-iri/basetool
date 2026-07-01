@@ -25,7 +25,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** MapStruct mapper between {@link KommandoGroup} entities and their read model. */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface KommandoGroupMapper {
 
   /**

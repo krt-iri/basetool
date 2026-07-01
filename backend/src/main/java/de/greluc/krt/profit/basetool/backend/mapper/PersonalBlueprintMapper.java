@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * Entity → DTO mapper for {@link PersonalBlueprint}.
@@ -37,7 +36,7 @@ import org.mapstruct.ReportingPolicy;
  * is in the admin-managed default set (REQ-INV-016) — so the service computes it (from the cached
  * default-key set) and passes it in.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface PersonalBlueprintMapper {
 
   /**

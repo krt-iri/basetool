@@ -24,13 +24,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /** MapStruct mapper between Operation entities and DTOs. */
 @Mapper(
-    componentModel = "spring",
-    uses = {SquadronMapper.class},
-    unmappedTargetPolicy = ReportingPolicy.IGNORE)
+    config = CentralMapperConfig.class,
+    uses = {SquadronMapper.class})
 public interface OperationMapper {
 
   /**

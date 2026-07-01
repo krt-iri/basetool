@@ -31,7 +31,7 @@ import org.mapstruct.Mapper;
  * full-replace semantics are clearer in code than in a generated mapper), so this mapper is
  * read-only.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface NotificationRuleMapper {
 
   /**

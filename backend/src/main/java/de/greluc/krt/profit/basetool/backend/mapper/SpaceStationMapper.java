@@ -22,13 +22,12 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpaceStationDto;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * MapStruct mapper between {@link SpaceStation} entities and their admin-facing {@link
  * SpaceStationDto} projection.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface SpaceStationMapper {
   /**
    * Projects a space-station entity into the slim DTO used by the admin UEX-overrides page.

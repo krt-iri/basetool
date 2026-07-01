@@ -23,13 +23,12 @@ import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * Entity → DTO mapper for {@link DefaultBlueprint}, flattening the optional {@code outputItem}
  * association to its id for the admin default-blueprints list.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface DefaultBlueprintMapper {
 
   /**

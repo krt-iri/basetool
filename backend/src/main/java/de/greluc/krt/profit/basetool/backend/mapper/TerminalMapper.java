@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Terminal entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface TerminalMapper {
   /** Maps a {@link Terminal} entity to its outbound DTO. */
   TerminalDto toDto(Terminal entity);

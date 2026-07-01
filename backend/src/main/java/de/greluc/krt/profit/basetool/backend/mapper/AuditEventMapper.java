@@ -28,7 +28,7 @@ import org.mapstruct.Mapper;
  * copy — audit rows already carry the denormalized actor/subject snapshots, so there is nothing to
  * resolve.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface AuditEventMapper {
 
   /**

@@ -62,7 +62,7 @@ import org.springframework.web.context.request.RequestContextHolder;
  * {@link #resolveMissionManager(User)} for the membership-derived projections.
  */
 @Mapper(
-    componentModel = "spring",
+    config = CentralMapperConfig.class,
     uses = {SquadronMapper.class})
 public abstract class UserMapper {
 

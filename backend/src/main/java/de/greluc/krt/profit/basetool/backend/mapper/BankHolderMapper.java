@@ -30,7 +30,7 @@ import org.mapstruct.Mapping;
  * ledger sums (not entity state), so they travel as extra source parameters paired in by the
  * service.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface BankHolderMapper {
 
   /**

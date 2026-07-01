@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Announcement entities and DTOs. */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface AnnouncementMapper {
   /** Maps an {@link Announcement} entity to its outbound DTO. */
   AnnouncementDto toDto(Announcement announcement);
