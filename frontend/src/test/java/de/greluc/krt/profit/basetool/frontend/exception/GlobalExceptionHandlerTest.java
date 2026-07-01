@@ -36,6 +36,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -74,6 +75,7 @@ class GlobalExceptionHandlerTest {
   @AfterEach
   void tearDown() {
     SecurityContextHolder.clearContext();
+    MDC.clear();
   }
 
   private static void setAuthenticatedUser() {
@@ -649,6 +651,21 @@ class GlobalExceptionHandlerTest {
     assertEquals(401, body.get("status"));
     assertEquals(Boolean.TRUE, body.get("reauthenticate"));
     assertEquals("/oauth2/authorization/keycloak", body.get("location"));
+  }
+
+  @Test
+  void reauthRequired_ajax_carriesCorrelationIdFromMdc() {
+    MDC.put("correlationId", "corr-reauth-42");
+    Object result = handler.handleReauthenticationRequired(ajaxRequest());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) ((ResponseEntity<?>) result).getBody();
+    assertNotNull(body);
+    assertEquals(
+        "corr-reauth-42",
+        body.get("correlationId"),
+        "the reauth JSON body must echo the request-scoped correlation id for cross-tier tracing");
   }
 
   @Test

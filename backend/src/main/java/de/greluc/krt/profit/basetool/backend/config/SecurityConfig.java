@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -52,6 +54,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Backend security configuration: JWT resource-server, role hierarchy, CSRF policy and the request
@@ -194,6 +197,11 @@ public class SecurityConfig {
    * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
    * @param env active environment, used to detect the {@code test} profile so CSRF can be disabled
    *     for MockMvc tests
+   * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
+   *     problem+json (wired as both the entry point and the access-denied handler)
+   * @param messageSource localizes the {@code PendingApprovalAccessFilter} 403 problem body
+   * @param appProblemProperties supplies the RFC&nbsp;7807 {@code type} base URI for that body
+   * @param objectMapper serializes that filter's {@code ProblemDetail} to JSON
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -201,7 +209,11 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       JwtAuthenticationConverter jwtAuthenticationConverter,
-      org.springframework.core.env.Environment env)
+      org.springframework.core.env.Environment env,
+      SecurityProblemResponseHandler securityProblemResponseHandler,
+      MessageSource messageSource,
+      AppProblemProperties appProblemProperties,
+      ObjectMapper objectMapper)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -505,16 +517,30 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
+        // RFC-7807 hardening (REQ-API-004 / REQ-SEC): route filter-level 401/403 through the same
+        // problem+json handler the rest of the API uses. The global exceptionHandling entry point
+        // covers the no-token / anonymous case; the resource-server overrides cover the
+        // bearer-token-rejected case (Spring installs its own bare-401 entry point there
+        // otherwise).
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(securityProblemResponseHandler)
+                    .accessDeniedHandler(securityProblemResponseHandler))
         .oauth2ResourceServer(
-            oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+            oauth2 ->
+                oauth2
+                    .authenticationEntryPoint(securityProblemResponseHandler)
+                    .accessDeniedHandler(securityProblemResponseHandler)
+                    .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
         // REQ-SEC-017 (PR review #1): a PENDING/REJECTED registration is authenticated but carries
         // only ROLE_PENDING_APPROVAL; this filter 403s it on every /api/** endpoint (except the
         // registration-status read) so the "no access until approved" guarantee holds at the
         // backend
         // boundary, not just via the frontend redirect. Placed after the bearer-token filter so the
-        // authorities are already assembled.
+        // authorities are already assembled. Emits an RFC-7807 problem+json body with a minted
+        // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
         .addFilterAfter(
-            new PendingApprovalAccessFilter(),
+            new PendingApprovalAccessFilter(messageSource, appProblemProperties, objectMapper),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // L-11: backend is a pure JWT-bearer resource server — no HTTP session needed for any

@@ -19,15 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URI;
+import java.util.Locale;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Backend enforcement of "a PENDING/REJECTED registration has no access" (REQ-SEC-017).
@@ -43,7 +54,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>Runs after the bearer-token authentication filter (so the authorities are already assembled)
  * and is a no-op for every approved/role-bearing user, so it adds no risk to the normal path.
+ *
+ * <p>The 403 body is a full RFC&nbsp;7807 problem document mirroring {@code GlobalExceptionHandler}
+ * (RFC-7807 hardening, REQ-API-004): {@code type} built off {@link AppProblemProperties}, localized
+ * {@code title}/{@code detail}, the stable {@code code} {@code PENDING_APPROVAL}, and a {@code
+ * correlationId}. Because this filter runs before {@code CorrelationIdFilter}, no request-scoped id
+ * exists yet, so a fresh one is minted, echoed as the {@code X-Correlation-Id} response header and
+ * logged. Serialization goes through the shared {@link ObjectMapper} so every field is safely
+ * JSON-escaped (the request URI in {@code instance} is attacker-controlled).
  */
+@Slf4j
+@RequiredArgsConstructor
 public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /** The synthetic authority a PENDING/REJECTED user carries (and nothing else). */
@@ -51,6 +72,16 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /** The only {@code /api} endpoint a pending user may reach (drives the waiting-page routing). */
   static final String SELF_STATUS_PATH = "/api/v1/users/me/registration-status";
+
+  /** Stable machine-readable code the frontend maps to the waiting-page routing. */
+  static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
+
+  /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
+  static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
+  private final MessageSource messageSource;
+  private final AppProblemProperties problemProperties;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected void doFilterInternal(
@@ -77,19 +108,45 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
             .anyMatch(authority -> PENDING_AUTHORITY.equals(authority.getAuthority()));
   }
 
+  /**
+   * Writes the RFC&nbsp;7807 403 body with a minted, logged and header-echoed {@code
+   * correlationId}. Localizes {@code title}/{@code detail} from the request's {@code
+   * Accept-Language} ({@code LocaleContextHolder} is not yet populated this early in the filter
+   * chain, so {@code request.getLocale()} is the authoritative source), serializing via the shared
+   * {@link ObjectMapper} for uniform JSON escaping.
+   *
+   * @param request the rejected request (its URI becomes the {@code instance})
+   * @param response the response to write the problem body into
+   * @throws IOException if serialization or writing the body fails
+   */
   private void writeForbidden(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
+    String correlationId = UUID.randomUUID().toString();
+    Locale locale = request.getLocale();
+    String title =
+        messageSource.getMessage("problem.pending_approval.title", null, "Forbidden", locale);
+    String detail =
+        messageSource.getMessage(
+            "problem.pending_approval.detail", null, "Account is pending admin approval.", locale);
+
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, detail);
+    problem.setTitle(title);
+    problem.setType(URI.create(problemProperties.getBaseUri() + "pending-approval"));
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty("code", CODE_PENDING_APPROVAL);
+    problem.setProperty("correlationId", correlationId);
+
+    log.warn(
+        "Pending-approval user blocked on {} {} [correlationId={}]",
+        request.getMethod(),
+        request.getRequestURI(),
+        correlationId);
+
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-    response.setContentType("application/problem+json");
-    response.setCharacterEncoding("UTF-8");
-    String instance = request.getRequestURI().replace("\\", "\\\\").replace("\"", "\\\"");
-    response
-        .getWriter()
-        .write(
-            "{\"type\":\"about:blank\",\"title\":\"Forbidden\",\"status\":403,"
-                + "\"detail\":\"Account is pending admin approval.\","
-                + "\"code\":\"PENDING_APPROVAL\",\"instance\":\""
-                + instance
-                + "\"}");
+    response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    response.setHeader(CORRELATION_ID_HEADER, correlationId);
+    // Write UTF-8 bytes directly rather than through getWriter(): the localized title/detail may
+    // contain non-ASCII (German umlauts) and the servlet writer defaults to ISO-8859-1.
+    response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 }

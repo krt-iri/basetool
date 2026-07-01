@@ -20,26 +20,45 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import jakarta.servlet.FilterChain;
 import java.util.Arrays;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Unit tests for {@link PendingApprovalAccessFilter} (PR review #1: REQ-SEC-017 backend gate). */
 class PendingApprovalAccessFilterTest {
 
-  private final PendingApprovalAccessFilter filter = new PendingApprovalAccessFilter();
+  private PendingApprovalAccessFilter filter;
+
+  @BeforeEach
+  void setUp() {
+    // Message source returns the caller-supplied default (arg 2) so the assertions run against a
+    // stable, locale-independent body; the i18n wiring itself is covered by the bundle test.
+    MessageSource messageSource = mock(MessageSource.class);
+    when(messageSource.getMessage(anyString(), any(), anyString(), any()))
+        .thenAnswer(invocation -> invocation.getArgument(2));
+    filter =
+        new PendingApprovalAccessFilter(
+            messageSource, new AppProblemProperties(), JsonMapper.builder().build());
+  }
 
   @AfterEach
   void clear() {
@@ -74,6 +93,40 @@ class PendingApprovalAccessFilterTest {
     assertEquals(403, response.getStatus());
     assertTrue(response.getContentType().contains("application/problem+json"));
     verify(chain, never()).doFilter(any(), any());
+  }
+
+  @Test
+  void pendingUser_forbiddenBody_isProblemJsonWithCodeAndCorrelationId() throws Exception {
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+    FilterChain chain = mock(FilterChain.class);
+
+    MockHttpServletResponse response = run("POST", "/api/v1/inventory", chain);
+
+    String body = response.getContentAsString();
+    assertTrue(body.contains("\"status\":403"), body);
+    assertTrue(
+        body.contains("\"code\":\"" + PendingApprovalAccessFilter.CODE_PENDING_APPROVAL + "\""),
+        "body must carry the stable machine-readable code: " + body);
+    assertTrue(body.contains("\"instance\":\"/api/v1/inventory\""), body);
+    assertTrue(
+        body.matches("(?s).*\"correlationId\":\"[0-9a-fA-F-]{36}\".*"),
+        "body must carry a minted UUID correlationId (the filter runs before CorrelationIdFilter): "
+            + body);
+  }
+
+  @Test
+  void pendingUser_forbiddenResponse_echoesCorrelationIdHeaderMatchingBody() throws Exception {
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+    FilterChain chain = mock(FilterChain.class);
+
+    MockHttpServletResponse response = run("POST", "/api/v1/inventory", chain);
+
+    String header = response.getHeader(PendingApprovalAccessFilter.CORRELATION_ID_HEADER);
+    assertNotNull(
+        header, "403 must echo X-Correlation-Id since CorrelationIdFilter never runs here");
+    assertTrue(
+        response.getContentAsString().contains("\"correlationId\":\"" + header + "\""),
+        "the X-Correlation-Id header must match the body correlationId");
   }
 
   @Test

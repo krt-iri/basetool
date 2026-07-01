@@ -500,6 +500,14 @@ class RateLimitingFilterTest {
       assertTrue(
           body.matches("(?s).*\"correlationId\":\"[0-9a-fA-F-]{36}\".*"),
           "body must carry a per-response UUID correlationId: " + body);
+      // The minted correlationId is also echoed as the app-wide X-Correlation-Id response header:
+      // the rate limiter rejects before CorrelationIdFilter runs, so it must echo it here
+      // (RFC-7807 hardening, REQ-OBS).
+      String correlationHeader = resp2.getHeader("X-Correlation-Id");
+      assertNotNull(correlationHeader, "429 response must echo X-Correlation-Id");
+      assertTrue(
+          body.contains("\"correlationId\":\"" + correlationHeader + "\""),
+          "X-Correlation-Id header must match the body correlationId");
     }
 
     private MockHttpServletRequest copyRequest(MockHttpServletRequest src) {

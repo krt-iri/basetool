@@ -32,6 +32,16 @@
             color: var(--color-gray-1);
             margin-bottom: 2rem;
         }
+        .error-correlation {
+            font-size: 0.85rem;
+            color: var(--color-gray-1);
+            opacity: 0.7;
+            margin-bottom: 1.5rem;
+            word-break: break-all;
+        }
+        .error-correlation code {
+            letter-spacing: 0.05em;
+        }
         .btn-return {
             display: inline-block;
             padding: 0.8rem 1.5rem;
@@ -95,7 +105,13 @@
         <p class="error-message" th:text="${message} ?: #{error.generic.message}">
             Critical system failure detected. Technical personnel notified.
         </p>
-        
+
+        <!-- Correlation id so the user can quote it to support (RFC-7807 hardening) -->
+        <p class="error-correlation" th:if="${correlationId}">
+            <span th:text="#{error.correlationId}">Reference code</span>:
+            <code th:text="${correlationId}">00000000-0000-0000-0000-000000000000</code>
+        </p>
+
         <div class="error-actions">
             <a th:if="${unauthenticated}" th:href="@{/oauth2/authorization/keycloak}" class="btn-return btn-signin" th:text="#{error.signin}">Sign in</a>
             <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>

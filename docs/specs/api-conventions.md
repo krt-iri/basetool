@@ -41,11 +41,28 @@ Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, 
 stable machine-readable `code`, and a per-request `correlationId`; validation errors add an
 `errors` object (field → message). Titles and details are localized via `MessageSource`. Extend
 `GlobalExceptionHandler` rather than throwing into the void; problem-type URIs come from
-`AppProblemProperties`, not hardcoded strings. The one sanctioned producer outside
-`GlobalExceptionHandler` is `RateLimitingFilter`: it rejects abusive traffic before request
-dispatch and therefore hand-builds an equivalent problem+json 429 body — localized `title`/`detail`,
-`code = RATE_LIMIT_EXCEEDED`, and a minted `correlationId` (also logged) — rather than routing
-through the handler. Document the format in OpenAPI and keep frontend error display in sync.
+`AppProblemProperties`, not hardcoded strings.
+
+**Sanctioned producers outside `GlobalExceptionHandler`.** Some errors are raised before the
+`DispatcherServlet` (in a filter or the security chain) and cannot reach the `@ControllerAdvice`, so
+they produce the equivalent problem+json themselves — every one carries the same `code` +
+`correlationId` contract:
+
+- `SecurityProblemResponseHandler` — the shared `AuthenticationEntryPoint` + `AccessDeniedHandler`
+  wired into `SecurityConfig` (globally and on the resource server). It does **not** hand-build a
+  body: it delegates the `AuthenticationException` / `AccessDeniedException` to the MVC
+  `handlerExceptionResolver`, so `GlobalExceptionHandler` renders the 401 (`UNAUTHENTICATED`) / 403
+  (`ACCESS_DENIED`). It mints the `correlationId` into the MDC first (security runs before
+  `CorrelationIdFilter`) so body, log line and the echoed `X-Correlation-Id` header share one id.
+- `RateLimitingFilter` — hand-builds the 429 body (`code = RATE_LIMIT_EXCEEDED`), localized
+  `title`/`detail`, minted+logged+header-echoed `correlationId`.
+- `PendingApprovalAccessFilter` — hand-builds the 403 body (`code = PENDING_APPROVAL`), localized,
+  minted+logged+header-echoed `correlationId`, serialized via the shared Jackson `ObjectMapper`.
+- `BasetoolErrorController` — replaces Boot's `BasicErrorController` at `/error` so servlet-container
+  error dispatches (an error escaping a filter, a `sendError`) render problem+json with a
+  status-derived `code` and a `correlationId` (body + header) instead of Boot's plain-JSON map.
+
+Document the format in OpenAPI and keep frontend error display in sync.
 
 Service-layer repository lookups raise their 404 through the fetch-or-throw helper
 `exception.Entities.require(optional, message)` (S1, #907) rather than a hand-written
