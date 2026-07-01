@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
+
 ### Changed
 
 - **Einsatz-Übersicht: Leere „Ziele"- und „Ablauf"-Kacheln werden ausgeblendet; Beschreibung standardmäßig aufgeklappt.** In der Einsatz-Übersicht erscheinen die Kacheln „Ziele" und „Ablauf" nur noch, wenn auch Einträge hinterlegt sind — ohne Daten entfällt die Kachel ganz statt einen leeren Platzhalter zu zeigen. Die „Detaillierte Beschreibung" ist jetzt standardmäßig aufgeklappt (REQ-MISSION-004/-009/-012).
