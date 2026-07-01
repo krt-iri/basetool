@@ -47,6 +47,13 @@ dispatch and therefore hand-builds an equivalent problem+json 429 body — local
 `code = RATE_LIMIT_EXCEEDED`, and a minted `correlationId` (also logged) — rather than routing
 through the handler. Document the format in OpenAPI and keep frontend error display in sync.
 
+Service-layer repository lookups raise their 404 through the fetch-or-throw helper
+`exception.Entities.require(optional, message)` (S1, #907) rather than a hand-written
+`find*(id).orElseThrow(() -> new NotFoundException(…))`. The not-found `detail` stays
+**caller-supplied, never auto-derived from the type** — `GlobalExceptionHandler.resolveDetail`
+treats the message as a translation key (sentinel-guarded), so an auto-derived message would change
+the wire `detail` and break the future i18n-key migration seam.
+
 ### REQ-API-005 — Pagination & sorting
 
 All list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total

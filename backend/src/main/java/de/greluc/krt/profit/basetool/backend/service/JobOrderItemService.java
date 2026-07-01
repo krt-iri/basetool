@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -121,13 +122,13 @@ public class JobOrderItemService {
   @NotNull
   public JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line) {
     GameItem gameItem =
-        gameItemRepository
-            .findById(line.gameItemId())
-            .orElseThrow(() -> new NotFoundException("GameItem not found: " + line.gameItemId()));
+        Entities.require(
+            gameItemRepository.findById(line.gameItemId()),
+            () -> "GameItem not found: " + line.gameItemId());
     Blueprint blueprint =
-        blueprintRepository
-            .findById(line.blueprintId())
-            .orElseThrow(() -> new NotFoundException("Blueprint not found: " + line.blueprintId()));
+        Entities.require(
+            blueprintRepository.findById(line.blueprintId()),
+            () -> "Blueprint not found: " + line.blueprintId());
 
     if (blueprint.getOutputItem() == null
         || !gameItem.getId().equals(blueprint.getOutputItem().getId())) {
@@ -408,9 +409,8 @@ public class JobOrderItemService {
   @NotNull
   public ItemDerivationDto deriveForPreview(@NotNull UUID blueprintId, int amount) {
     Blueprint blueprint =
-        blueprintRepository
-            .findById(blueprintId)
-            .orElseThrow(() -> new NotFoundException("Blueprint not found: " + blueprintId));
+        Entities.require(
+            blueprintRepository.findById(blueprintId), () -> "Blueprint not found: " + blueprintId);
     int scaledBy = Math.max(1, amount);
 
     List<DerivedMaterialDto> materials = new ArrayList<>();
