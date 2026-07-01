@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.beans.PropertyEditorSupport;
-import java.text.Normalizer;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -50,10 +50,6 @@ public class NormalizedStringEditor extends PropertyEditorSupport {
       setValue(null);
       return;
     }
-    String normalized = Normalizer.normalize(trimmed, Normalizer.Form.NFC);
-    if (normalized.length() > maxLength) {
-      throw new IllegalArgumentException("String exceeds maximum allowed length of " + maxLength);
-    }
-    setValue(normalized);
+    setValue(StringNormalization.normalizeAndCap(trimmed, maxLength));
   }
 }
