@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -689,12 +690,7 @@ public class InventoryItemService {
       }
     }
 
-    if (dto.version() != null
-        && item.getVersion() != null
-        && !item.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          InventoryItem.class, id);
-    }
+    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
     Boolean isPersonal = dto.personal() != null ? dto.personal() : item.getPersonal();
     item.setPersonal(isPersonal);
@@ -822,12 +818,8 @@ public class InventoryItemService {
           "You are not allowed to modify the note of this inventory item");
     }
 
-    if (request.version() != null
-        && item.getVersion() != null
-        && !item.getVersion().equals(request.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          InventoryItem.class, id);
-    }
+    OptimisticLock.checkOptionalClient(
+        item.getVersion(), request.version(), InventoryItem.class, id);
 
     String normalizedNote = request.note();
     if (normalizedNote != null) {
@@ -882,12 +874,7 @@ public class InventoryItemService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
-    if (dto.version() != null
-        && item.getVersion() != null
-        && !item.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          InventoryItem.class, id);
-    }
+    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
     if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
       throw new AccessDeniedException("You are not allowed to book out this inventory item");
@@ -1148,12 +1135,7 @@ public class InventoryItemService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
-    if (dto.version() != null
-        && item.getVersion() != null
-        && !item.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          InventoryItem.class, id);
-    }
+    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
     if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
       throw new AccessDeniedException("You are not allowed to rebook this inventory item");
@@ -1392,10 +1374,7 @@ public class InventoryItemService {
       throw new AccessDeniedException("You are not allowed to update this inventory item");
     }
 
-    if (item.getVersion() != null && !item.getVersion().equals(request.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          InventoryItem.class, id);
-    }
+    OptimisticLock.check(item.getVersion(), request.version(), InventoryItem.class, id);
 
     item.setDelivered(request.delivered());
     // saveAndFlush so the response carries the flushed @Version — the material-collection delivered

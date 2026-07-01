@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestReposi
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
@@ -640,9 +641,8 @@ public class BankBookingRequestService {
    * @throws ObjectOptimisticLockingFailureException on a mismatch
    */
   private void requireVersion(@NotNull BankBookingRequest request, long version) {
-    if (request.getVersion() == null || request.getVersion() != version) {
-      throw new ObjectOptimisticLockingFailureException(BankBookingRequest.class, request.getId());
-    }
+    OptimisticLock.checkRequired(
+        request.getVersion(), version, BankBookingRequest.class, request.getId());
   }
 
   /**

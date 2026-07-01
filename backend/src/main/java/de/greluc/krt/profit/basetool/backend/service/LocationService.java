@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -157,9 +158,7 @@ public class LocationService {
     }
     Location location = getLocation(id);
 
-    if (location.getVersion() != null && !location.getVersion().equals(locationDto.version())) {
-      throw new ObjectOptimisticLockingFailureException(Location.class, id);
-    }
+    OptimisticLock.check(location.getVersion(), locationDto.version(), Location.class, id);
 
     location.setName(locationDto.name());
     location.setDescription(locationDto.description());

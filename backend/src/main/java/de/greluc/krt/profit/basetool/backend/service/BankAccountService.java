@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -536,9 +537,7 @@ public class BankAccountService {
    * @param version the client-echoed version
    */
   private static void requireVersionMatch(@NotNull BankAccount account, @NotNull Long version) {
-    if (account.getVersion() != null && !account.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(BankAccount.class, account.getId());
-    }
+    OptimisticLock.check(account.getVersion(), version, BankAccount.class, account.getId());
   }
 
   /**

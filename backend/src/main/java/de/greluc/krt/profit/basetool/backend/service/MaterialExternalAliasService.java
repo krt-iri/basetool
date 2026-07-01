@@ -28,8 +28,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasCrea
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -192,10 +192,7 @@ public class MaterialExternalAliasService {
   @Transactional
   public MaterialExternalAlias update(UUID id, MaterialExternalAliasUpdateRequest request) {
     MaterialExternalAlias alias = findById(id);
-    if (!Objects.equals(alias.getVersion(), request.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          MaterialExternalAlias.class, id);
-    }
+    OptimisticLock.check(alias.getVersion(), request.version(), MaterialExternalAlias.class, id);
     MaterialExternalAliasSource source =
         MaterialExternalAliasSource.valueOf(request.sourceSystem());
     Material material =

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrganisationsleitungRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -177,9 +178,7 @@ public class OrgHierarchyService {
         orgUnitRepository
             .findById(orgUnitId)
             .orElseThrow(() -> new NotFoundException("Org unit not found"));
-    if (child.getVersion() != null && !child.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(OrgUnit.class, orgUnitId);
-    }
+    OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     if (parentOrgUnitId == null) {
       child.setParent(null);
       // saveAndFlush (not save): the controller is class-@Transactional, so without an explicit

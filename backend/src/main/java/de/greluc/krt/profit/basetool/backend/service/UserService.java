@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -537,9 +538,7 @@ public class UserService {
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "User not found"));
 
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(User.class, id);
-    }
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
 
     if (rank != null) {
       boolean isOfficer =
@@ -591,9 +590,7 @@ public class UserService {
                 () ->
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "User not found"));
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(User.class, id);
-    }
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     if (description != null) {
       user.setDescription(description);
     }
@@ -635,9 +632,7 @@ public class UserService {
                 () ->
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "User not found"));
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(User.class, id);
-    }
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setDefaultPayoutPreference(preference);
     // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
     // dropdown writes the returned version back in place via syncAllVersions (no reload), so a
@@ -673,9 +668,7 @@ public class UserService {
                 () ->
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "User not found"));
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(User.class, id);
-    }
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
     // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
     // toggle writes the returned version back in place via syncAllVersions (no reload), so a stale
@@ -1125,9 +1118,7 @@ public class UserService {
                 () ->
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "User not found"));
-    if (version != null && user.getVersion() != null && !user.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(User.class, userId);
-    }
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
     // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
     // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap
     // them on the waiting page; an already-REJECTED row is a stale double-action. Either is a 409.

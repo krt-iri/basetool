@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -155,9 +156,7 @@ public class SpecialCommandService {
     }
     SpecialCommand sc = getSpecialCommandById(id);
 
-    if (sc.getVersion() != null && !sc.getVersion().equals(dto.version())) {
-      throw new ObjectOptimisticLockingFailureException(SpecialCommand.class, id);
-    }
+    OptimisticLock.check(sc.getVersion(), dto.version(), SpecialCommand.class, id);
 
     sc.setName(dto.name());
     sc.setShorthand(dto.shorthand());

@@ -31,10 +31,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -334,9 +334,8 @@ public class PersonalBlueprintService {
   @NotNull
   private PersonalBlueprintResponse applyUpdate(
       @NotNull PersonalBlueprint entity, @NotNull PersonalBlueprintUpdateRequest request) {
-    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
-      throw new ObjectOptimisticLockingFailureException(PersonalBlueprint.class, entity.getId());
-    }
+    OptimisticLock.check(
+        entity.getVersion(), request.version(), PersonalBlueprint.class, entity.getId());
     entity.setAcquiredAt(request.acquiredAt());
     entity.setNote(request.note());
     return toResponse(repository.save(entity));

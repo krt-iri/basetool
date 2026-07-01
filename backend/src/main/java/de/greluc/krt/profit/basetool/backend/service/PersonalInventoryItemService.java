@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.Comparator;
 import java.util.List;
@@ -340,10 +341,8 @@ public class PersonalInventoryItemService {
   private PersonalInventoryItemResponse applyUpdate(
       @NotNull PersonalInventoryItem entity, @NotNull PersonalInventoryItemUpdateRequest request) {
     // Manual optimistic-lock check; mirrored from AnnouncementService convention.
-    if (entity.getVersion() != null && !Objects.equals(entity.getVersion(), request.version())) {
-      throw new ObjectOptimisticLockingFailureException(
-          PersonalInventoryItem.class, entity.getId());
-    }
+    OptimisticLock.check(
+        entity.getVersion(), request.version(), PersonalInventoryItem.class, entity.getId());
     // Re-resolve the location snapshot if the location reference changed.
     boolean locationChanged =
         !Objects.equals(entity.getLocationUexId(), request.locationUexId())

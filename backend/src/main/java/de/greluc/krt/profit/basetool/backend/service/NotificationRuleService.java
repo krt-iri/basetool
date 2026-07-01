@@ -27,9 +27,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -108,9 +108,7 @@ public class NotificationRuleService {
   public NotificationRuleDto update(
       @NotNull UUID id, @NotNull NotificationRuleWriteRequest request) {
     NotificationRule rule = load(id);
-    if (rule.getVersion() != null && !Objects.equals(rule.getVersion(), request.version())) {
-      throw new ObjectOptimisticLockingFailureException(NotificationRule.class, id);
-    }
+    OptimisticLock.check(rule.getVersion(), request.version(), NotificationRule.class, id);
     applyScalars(rule, request);
     rule.clearSelectors();
     applySelectors(rule, request);

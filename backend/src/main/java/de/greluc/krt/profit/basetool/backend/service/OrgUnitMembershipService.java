@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -1228,9 +1229,7 @@ public class OrgUnitMembershipService {
    * the SK administration endpoints.
    */
   private void assertVersionMatches(OrgUnitMembership m, Long version) {
-    if (m.getVersion() != null && !m.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(OrgUnitMembership.class, null);
-    }
+    OptimisticLock.check(m.getVersion(), version, OrgUnitMembership.class, null);
   }
 
   /**
