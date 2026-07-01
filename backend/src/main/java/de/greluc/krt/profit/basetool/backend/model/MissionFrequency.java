@@ -36,7 +36,23 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-/** Mission Frequency JPA entity. */
+/**
+ * Mission Frequency JPA entity — one radio channel value scoped to a single mission.
+ *
+ * <p>A row is <strong>dual-mode</strong> and carries its label in exactly one of two ways
+ * (DB-enforced by the {@code frequency_type_id XOR name} check constraint added in V201):
+ *
+ * <ul>
+ *   <li><b>Typed</b> — {@link #frequencyType} references a global {@link FrequencyType} (e.g.
+ *       "Einsatzleitung", "Umschlagplatz") and {@link #name} is {@code null}. The mission supplies
+ *       only the per-mission {@link #value} for that shared type; the {@code (mission_id,
+ *       frequency_type_id)} unique constraint keeps at most one typed row per type.
+ *   <li><b>Custom</b> — {@link #name} holds a free-text, mission-specific label and {@link
+ *       #frequencyType} is {@code null}. These are the "weitere Frequenzen" a mission planner adds
+ *       ad hoc (REQ-MISSION-014). The unique constraint does not apply (PostgreSQL treats each NULL
+ *       {@code frequency_type_id} as distinct), so a mission may carry several custom channels.
+ * </ul>
+ */
 @Entity
 @Getter
 @Setter
@@ -56,9 +72,20 @@ public class MissionFrequency extends AbstractEntity<UUID> {
   @com.fasterxml.jackson.annotation.JsonIgnore
   private Mission mission;
 
-  @ManyToOne(optional = false)
-  @JoinColumn(name = "frequency_type_id", nullable = false)
+  /**
+   * The global frequency type this row supplies a value for, or {@code null} for a custom
+   * (mission-specific) channel. Nullable since V201; mutually exclusive with {@link #name}.
+   */
+  @ManyToOne
+  @JoinColumn(name = "frequency_type_id")
   private FrequencyType frequencyType;
+
+  /**
+   * The free-text, mission-specific label for a custom channel, or {@code null} when this row is
+   * bound to a global {@link #frequencyType}. Mutually exclusive with {@link #frequencyType}.
+   */
+  @Column(name = "name", length = 100)
+  private String name;
 
   @Column(name = "frequency_value", nullable = false, precision = 5, scale = 2)
   private BigDecimal value;

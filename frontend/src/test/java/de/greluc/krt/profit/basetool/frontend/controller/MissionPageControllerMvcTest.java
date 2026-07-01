@@ -1097,6 +1097,94 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
+  // --- Custom (mission-specific) frequencies AJAX endpoints (REQ-MISSION-014) -----
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void addCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID freqId = UUID.randomUUID();
+    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+    Map<String, Object> freq = new java.util.HashMap<>();
+    freq.put("id", freqId.toString());
+    freq.put("name", "Recon");
+    freq.put("value", 42.10);
+    freq.put("version", 0);
+    slimResponse.add(freq);
+
+    when(backendApiClient.post(
+            eq("/api/v1/missions/" + missionId + "/frequencies/custom/slim"),
+            any(),
+            eq(Object.class),
+            eq(false)))
+        .thenReturn(slimResponse);
+
+    String body = "{\"name\":\"Recon\",\"value\":42.10}";
+    mockMvc
+        .perform(
+            post("/missions/" + missionId + "/frequencies/custom/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Recon")));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void updateCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID freqId = UUID.randomUUID();
+    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
+    Map<String, Object> freq = new java.util.HashMap<>();
+    freq.put("id", freqId.toString());
+    freq.put("name", "Recon 2");
+    freq.put("value", 43.00);
+    freq.put("version", 1);
+    slimResponse.add(freq);
+
+    when(backendApiClient.put(
+            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
+            any(),
+            eq(Object.class),
+            eq(false)))
+        .thenReturn(slimResponse);
+
+    String body = "{\"name\":\"Recon 2\",\"value\":43.00,\"version\":0}";
+    mockMvc
+        .perform(
+            put("/missions/" + missionId + "/frequencies/custom/" + freqId + "/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Recon 2")));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void updateCustomFrequencyAjax_WithBackendConflict_ShouldPropagateStatus() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID freqId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
+            any(),
+            eq(Object.class),
+            eq(false)))
+        .thenThrow(
+            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+                "Conflict", null, 409));
+
+    String body = "{\"name\":\"Recon\",\"value\":42.10,\"version\":0}";
+    mockMvc
+        .perform(
+            put("/missions/" + missionId + "/frequencies/custom/" + freqId + "/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isConflict());
+  }
+
   // --- Paket 3C: Units AJAX endpoints -----------------------------------
 
   @Test
@@ -2139,6 +2227,7 @@ class MissionPageControllerMvcTest {
             UUID.randomUUID(),
             new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto
                 .FrequencyTypeRef(befehlTypeId, "Befehl"),
+            null,
             new java.math.BigDecimal("121.50"),
             1L);
 
@@ -2293,6 +2382,7 @@ class MissionPageControllerMvcTest {
             UUID.randomUUID(),
             new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto
                 .FrequencyTypeRef(befehlTypeId, "Befehl"),
+            null,
             new java.math.BigDecimal("121.50"),
             1L);
 

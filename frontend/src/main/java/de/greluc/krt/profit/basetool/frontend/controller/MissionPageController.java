@@ -485,16 +485,25 @@ public class MissionPageController {
       }
       model.addAttribute("participationPercentages", participationPercentages);
 
-      // Build frequency lookup
+      // Build frequency lookup for the typed (global) channels, plus the ordered list of custom
+      // (mission-specific) channels (REQ-MISSION-014) rendered in the "Weitere Frequenzen" editor
+      // and the overview Funk panel. Custom rows carry a free-text name and no frequencyType; they
+      // are sorted case-insensitively by label for a stable, reload-independent order.
       Map<String, MissionFrequencyDto> frequencyByTypeId = new java.util.HashMap<>();
+      List<MissionFrequencyDto> customFrequencies = new java.util.ArrayList<>();
       if (mission.frequencies() != null) {
         for (MissionFrequencyDto f : mission.frequencies()) {
           if (f.frequencyTypeId() != null) {
             frequencyByTypeId.put(f.frequencyTypeId().toString(), f);
+          } else if (f.name() != null) {
+            customFrequencies.add(f);
           }
         }
       }
+      customFrequencies.sort(
+          java.util.Comparator.comparing(MissionFrequencyDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("frequencyByTypeId", frequencyByTypeId);
+      model.addAttribute("customFrequencies", customFrequencies);
 
       // Fetch all users for manager selection
       if (principal != null) {
@@ -764,6 +773,7 @@ public class MissionPageController {
         case "overview" -> "mission-detail :: overviewSection";
         case "steps-editor" -> "mission-detail :: stepsEditor";
         case "objectives-editor" -> "mission-detail :: objectivesEditor";
+        case "frequencies-editor" -> "mission-detail :: frequenciesEditor";
         default -> "mission-detail";
       };
     }
@@ -2073,6 +2083,83 @@ public class MissionPageController {
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that adds a custom (mission-specific) frequency (REQ-MISSION-014) via the slim
+   * backend endpoint and returns the resulting slim frequency list so the "Weitere Frequenzen"
+   * editor and the overview Funk panel refresh in place without a reload.
+   *
+   * @param id the mission id
+   * @param body the JSON payload ({@code name} + {@code value})
+   * @return the updated frequency list, or the propagated backend error
+   */
+  @PostMapping(
+      value = "/{id}/frequencies/custom/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  public org.springframework.http.ResponseEntity<Object> addCustomFrequencyAjax(
+      @PathVariable @NotNull UUID id,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.post(
+              "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class, false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Add custom frequency (AJAX) failed: status={}, msg={}",
+          e.getStatusCode(),
+          e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug("UNEXPECTED ERROR in addCustomFrequencyAjax for mission {}", id, e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that updates a custom (mission-specific) frequency (REQ-MISSION-014) via the slim
+   * backend endpoint and returns the resulting slim frequency list. Optimistic-locked on the row's
+   * version; a stale echo surfaces as HTTP 409 from the backend and is propagated verbatim.
+   *
+   * @param id the mission id
+   * @param frequencyId the custom frequency row id
+   * @param body the JSON payload ({@code name} + {@code value} + {@code version})
+   * @return the updated frequency list, or the propagated backend error
+   */
+  @org.springframework.web.bind.annotation.PutMapping(
+      value = "/{id}/frequencies/custom/{frequencyId}/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  public org.springframework.http.ResponseEntity<Object> updateCustomFrequencyAjax(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID frequencyId,
+      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+    try {
+      Object result =
+          backendApiClient.put(
+              "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
+              body,
+              Object.class,
+              false);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Update custom frequency (AJAX) failed: status={}, msg={}",
+          e.getStatusCode(),
+          e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.debug(
+          "UNEXPECTED ERROR in updateCustomFrequencyAjax for mission {} freq {}",
+          id,
+          frequencyId,
+          e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

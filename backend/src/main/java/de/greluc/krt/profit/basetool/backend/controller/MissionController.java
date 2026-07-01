@@ -2438,6 +2438,59 @@ public class MissionController {
     return ResponseEntity.noContent().build();
   }
 
+  /**
+   * Adds a custom (mission-specific) frequency — a free-text label plus a value — and returns the
+   * updated frequency list as slim DTOs (REQ-MISSION-014). The generic {@code DELETE
+   * /{id}/frequencies/{frequencyId}/slim} above removes typed and custom rows alike.
+   *
+   * @param id mission id
+   * @param request the custom-frequency payload (name + value)
+   * @return the updated frequency list
+   */
+  @PostMapping("/{id}/frequencies/custom/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Add a custom (mission-specific) frequency (slim response)",
+      description =
+          "Adds a free-text mission frequency and returns the updated frequency list as slim DTOs.")
+  public List<MissionFrequencyDto> addCustomFrequencySlim(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.profit.basetool.backend.model.dto.request.AddCustomFrequencyRequest
+              request) {
+    var mission = missionService.addCustomMissionFrequency(id, request.name(), request.value());
+    return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
+  }
+
+  /**
+   * Updates a custom (mission-specific) frequency's label + value and returns the updated frequency
+   * list as slim DTOs (REQ-MISSION-014). Optimistic-locked on the frequency row's own version; a
+   * stale echo surfaces as HTTP 409.
+   *
+   * @param id mission id
+   * @param frequencyId the custom frequency row id
+   * @param request the custom-frequency payload (name + value + version)
+   * @return the updated frequency list
+   */
+  @PutMapping("/{id}/frequencies/custom/{frequencyId}/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Update a custom (mission-specific) frequency (slim response)",
+      description =
+          "Updates a free-text mission frequency and returns the updated frequency list as slim"
+              + " DTOs.")
+  public List<MissionFrequencyDto> updateCustomFrequencySlim(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull UUID frequencyId,
+      @RequestBody @jakarta.validation.Valid
+          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateCustomFrequencyRequest
+              request) {
+    var mission =
+        missionService.updateCustomMissionFrequency(
+            id, frequencyId, request.name(), request.value(), request.version());
+    return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
+  }
+
   // --- Managers ---
 
   /**
