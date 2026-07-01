@@ -373,60 +373,7 @@ public class RefineryOrderService {
 
     // Handle Goods relationships
     if (order.getGoods() != null) {
-      order
-          .getGoods()
-          .forEach(
-              good -> {
-                if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
-                  de.greluc.krt.profit.basetool.backend.model.Material inMat =
-                      materialRepository
-                          .findById(good.getInputMaterial().getId())
-                          .orElseThrow(
-                              () ->
-                                  new de.greluc.krt.profit.basetool.backend.exception
-                                      .NotFoundException("error.material.input.not_found"));
-
-                  if (inMat.getType()
-                          != de.greluc.krt.profit.basetool.backend.model.MaterialType.RAW
-                      && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
-                    throw new IllegalArgumentException(
-                        "Refinery goods input must be of type RAW. Material '"
-                            + inMat.getName()
-                            + "' is "
-                            + inMat.getType());
-                  }
-                  good.setInputMaterial(inMat);
-
-                  if (good.getOutputMaterial() != null
-                      && good.getOutputMaterial().getId() != null) {
-                    de.greluc.krt.profit.basetool.backend.model.Material outMat =
-                        materialRepository
-                            .findById(good.getOutputMaterial().getId())
-                            .orElseThrow(
-                                () ->
-                                    new de.greluc.krt.profit.basetool.backend.exception
-                                        .NotFoundException("error.material.output.not_found"));
-
-                    if (inMat.getRefinedMaterial() != null
-                        && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
-                      throw new IllegalArgumentException(
-                          "Output material must match the refined material of the input material.");
-                    }
-
-                    good.setOutputMaterial(outMat);
-                  } else {
-                    if (inMat.getRefinedMaterial() != null) {
-                      good.setOutputMaterial(inMat.getRefinedMaterial());
-                    } else {
-                      good.setOutputMaterial(inMat);
-                    }
-                  }
-                } else {
-                  throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
-                      "error.refinery_order.input_material_required");
-                }
-                good.setRefineryOrder(order);
-              });
+      order.getGoods().forEach(good -> resolveGood(good, order));
     }
 
     if (order.getStartedAt() == null) {
@@ -550,55 +497,7 @@ public class RefineryOrderService {
           .getGoods()
           .forEach(
               good -> {
-                if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
-                  de.greluc.krt.profit.basetool.backend.model.Material inMat =
-                      materialRepository
-                          .findById(good.getInputMaterial().getId())
-                          .orElseThrow(
-                              () ->
-                                  new de.greluc.krt.profit.basetool.backend.exception
-                                      .NotFoundException("error.material.input.not_found"));
-
-                  if (inMat.getType()
-                          != de.greluc.krt.profit.basetool.backend.model.MaterialType.RAW
-                      && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
-                    throw new IllegalArgumentException(
-                        "Refinery goods input must be of type RAW. Material '"
-                            + inMat.getName()
-                            + "' is "
-                            + inMat.getType());
-                  }
-                  good.setInputMaterial(inMat);
-
-                  if (good.getOutputMaterial() != null
-                      && good.getOutputMaterial().getId() != null) {
-                    de.greluc.krt.profit.basetool.backend.model.Material outMat =
-                        materialRepository
-                            .findById(good.getOutputMaterial().getId())
-                            .orElseThrow(
-                                () ->
-                                    new de.greluc.krt.profit.basetool.backend.exception
-                                        .NotFoundException("error.material.output.not_found"));
-
-                    if (inMat.getRefinedMaterial() != null
-                        && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
-                      throw new IllegalArgumentException(
-                          "Output material must match the refined material of the input material.");
-                    }
-
-                    good.setOutputMaterial(outMat);
-                  } else {
-                    if (inMat.getRefinedMaterial() != null) {
-                      good.setOutputMaterial(inMat.getRefinedMaterial());
-                    } else {
-                      good.setOutputMaterial(inMat);
-                    }
-                  }
-                } else {
-                  throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
-                      "error.refinery_order.input_material_required");
-                }
-                good.setRefineryOrder(order);
+                resolveGood(good, order);
                 order.getGoods().add(good);
               });
     }
@@ -620,6 +519,68 @@ public class RefineryOrderService {
             + "->"
             + saved.getStatus());
     return saved;
+  }
+
+  /**
+   * Resolves and validates one refinery good's material references against the catalog and wires
+   * its back-reference to the owning order, leaving collection membership to the caller. Shared
+   * verbatim by the create and update paths, which differ only in whether the good is already in
+   * the order's set (create) or the set is cleared and each good re-added (update). The input
+   * material must resolve and be {@code RAW} (or a manual raw material); the output material either
+   * matches the input's refined material or is derived from it.
+   *
+   * @param good the transient good carrying id-only input/output material references; resolved and
+   *     mutated in place
+   * @param order the owning order wired as the good's back-reference
+   */
+  private void resolveGood(RefineryGood good, RefineryOrder order) {
+    if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
+      de.greluc.krt.profit.basetool.backend.model.Material inMat =
+          materialRepository
+              .findById(good.getInputMaterial().getId())
+              .orElseThrow(
+                  () ->
+                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
+                          "error.material.input.not_found"));
+
+      if (inMat.getType() != de.greluc.krt.profit.basetool.backend.model.MaterialType.RAW
+          && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
+        throw new IllegalArgumentException(
+            "Refinery goods input must be of type RAW. Material '"
+                + inMat.getName()
+                + "' is "
+                + inMat.getType());
+      }
+      good.setInputMaterial(inMat);
+
+      if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
+        de.greluc.krt.profit.basetool.backend.model.Material outMat =
+            materialRepository
+                .findById(good.getOutputMaterial().getId())
+                .orElseThrow(
+                    () ->
+                        new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
+                            "error.material.output.not_found"));
+
+        if (inMat.getRefinedMaterial() != null
+            && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
+          throw new IllegalArgumentException(
+              "Output material must match the refined material of the input material.");
+        }
+
+        good.setOutputMaterial(outMat);
+      } else {
+        if (inMat.getRefinedMaterial() != null) {
+          good.setOutputMaterial(inMat.getRefinedMaterial());
+        } else {
+          good.setOutputMaterial(inMat);
+        }
+      }
+    } else {
+      throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+          "error.refinery_order.input_material_required");
+    }
+    good.setRefineryOrder(order);
   }
 
   /**
