@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.11](https://github.com/krt-profit/basetool/releases/tag/v1.0.11) - 2026-07-01
+
 ### Added
 
 - **Einsatz: Weitere, einsatzspezifische Funkfrequenzen.** Im Verwaltung-Tab eines Einsatzes lassen sich jetzt neben den allgemeinen Frequenztypen beliebige eigene Funkfrequenzen mit Bezeichnung und Wert anlegen, bearbeiten und löschen. Es gelten dieselben Eingabegrenzen wie für die allgemeinen Frequenzen (0–999,99, zwei Nachkommastellen). Sie erscheinen zusätzlich in der „Funk"-Box der Einsatzübersicht (REQ-MISSION-014, ADR-0058).
