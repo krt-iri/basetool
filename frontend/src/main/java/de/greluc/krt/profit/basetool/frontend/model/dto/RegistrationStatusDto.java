@@ -26,4 +26,4 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
  * @param approvalStatus the caller's approval lifecycle state ({@code PENDING}/{@code
  *     ACTIVE}/{@code REJECTED})
  */
-public record RegistrationStatusDto(String approvalStatus) {}
+public record RegistrationStatusDto(@BackendEnumAsString String approvalStatus) {}

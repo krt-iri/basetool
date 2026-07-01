@@ -34,4 +34,7 @@ import java.util.UUID;
  * @param amount the claimed partial quantity (strictly positive)
  */
 public record CreateClaimDto(
-    UUID materialId, String qualityRequirement, UUID claimingOrgUnitId, Double amount) {}
+    UUID materialId,
+    @BackendEnumAsString String qualityRequirement,
+    UUID claimingOrgUnitId,
+    Double amount) {}

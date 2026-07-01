@@ -42,7 +42,7 @@ public record OrgUnitNodeDto(
     UUID id,
     String name,
     String shorthand,
-    String kind,
+    @BackendEnumAsString String kind,
     UUID parentOrgUnitId,
-    String department,
+    @BackendEnumAsString String department,
     Long version) {}

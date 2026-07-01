@@ -26,7 +26,7 @@ public record JobTypeDto(
     UUID id,
     String name,
     String description,
-    String archetype,
+    @BackendEnumAsString String archetype,
     UUID parentId,
     Boolean active,
     Boolean isLeadershipRole,

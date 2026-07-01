@@ -30,4 +30,5 @@ import java.util.UUID;
  * @param name the account's display name
  * @param type account-type enum name
  */
-public record BankAccountRefDto(UUID id, String accountNo, String name, String type) {}
+public record BankAccountRefDto(
+    UUID id, String accountNo, String name, @BackendEnumAsString String type) {}
