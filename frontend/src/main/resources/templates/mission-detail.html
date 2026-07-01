@@ -505,8 +505,9 @@
                          central rows iterate frequencyTypes, so they can only render when it is present. -->
                     <th:block th:with="unitsWithFreq=${mission.assignedUnits != null ? mission.assignedUnits.?[frequency != null] : null},
                                        hasCentralTypes=${frequencyTypes != null and !frequencyTypes.isEmpty()},
-                                       hasCentralFreq=${frequencyByTypeId != null and !frequencyByTypeId.isEmpty()}">
-                    <div class="kpanel" th:if="${(hasCentralFreq and hasCentralTypes) or (unitsWithFreq != null and !unitsWithFreq.isEmpty())}">
+                                       hasCentralFreq=${frequencyByTypeId != null and !frequencyByTypeId.isEmpty()},
+                                       hasCustomFreq=${customFrequencies != null and !customFrequencies.isEmpty()}">
+                    <div class="kpanel" th:if="${(hasCentralFreq and hasCentralTypes) or hasCustomFreq or (unitsWithFreq != null and !unitsWithFreq.isEmpty())}">
                         <div class="kpanel-head" th:text="#{mission.overview.radio}">Funk</div>
                         <div class="kpanel-body">
                             <dl class="kv-list">
@@ -517,6 +518,13 @@
                                     <dt th:text="${freqType.name}">Funk</dt>
                                     <dd>
                                         <span class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                    </dd>
+                                </th:block>
+                                <!-- Custom, mission-specific frequencies (REQ-MISSION-014) — free-text label + value. -->
+                                <th:block th:each="cf : ${customFrequencies}">
+                                    <dt th:text="${cf.name}">Funk</dt>
+                                    <dd>
+                                        <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
                                     </dd>
                                 </th:block>
                                 <!-- Per-unit frequencies — only units that carry one. -->
@@ -895,18 +903,6 @@
             </div>
 
             <div class="form-group">
-                <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
-                <div class="flex-gap-sm">
-                    <input type="url" name="calendarLink" th:value="*{calendarLink}" class="flex-1"
-                           th:disabled="${!isNew and !mission.canEdit}">
-                    <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}"
-                       th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer"
-                       class="btn btn-ghost nowrap"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
-                </div>
-                <div class="field-error" data-error-for="calendarLink" th:text="${#fields.hasErrors('calendarLink') ? #fields.errors('calendarLink')[0] : ''}"></div>
-            </div>
-
-            <div class="form-group">
                 <label th:text="#{mission.meeting_point}">Treffpunkt</label>
                 <input type="text" name="meetingPoint" maxlength="200" th:value="*{meetingPoint}"
                        th:disabled="${!isNew and !mission.canEdit}">
@@ -1010,109 +1006,24 @@
                 <div th:if="${#fields.hasErrors('actualEndTime')}" th:errors="*{actualEndTime}" class="field-error"></div>
             </div>
             </div>
+
+            <!-- Calendar link moved to the end of the Details card (owner request). -->
+            <div class="form-group">
+                <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
+                <div class="flex-gap-sm">
+                    <input type="url" name="calendarLink" th:value="*{calendarLink}" class="flex-1"
+                           th:disabled="${!isNew and !mission.canEdit}">
+                    <a th:if="${!isNew and !#strings.isEmpty(missionForm.calendarLink)}"
+                       th:href="*{calendarLink}" target="_blank" rel="noopener noreferrer"
+                       class="btn btn-ghost nowrap"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{mission.calendar_link_open}">&Ouml;ffnen</span></a>
+                </div>
+                <div class="field-error" data-error-for="calendarLink" th:text="${#fields.hasErrors('calendarLink') ? #fields.errors('calendarLink')[0] : ''}"></div>
+            </div>
                     </form>
                     </div>
                 </div>
 
                 <div class="pane-col">
-                    <!-- Organisation: party lead + frequencies (edit) -->
-                    <div class="kpanel" th:if="${!isNew}">
-                        <div class="kpanel-head" th:text="#{mission.organisation}">Organisation</div>
-                        <div class="kpanel-body">
-                            <div class="form-group">
-                                <label th:text="#{mission.party_lead}">Partyleiter</label>
-                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                                    <div id="party-lead-display" class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;" th:data-none-label="#{general.none}">
-                                        <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
-                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
-                                        <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
-                                    </div>
-                                    <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
-                                          th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
-                                          style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start;">
-                                        <input type="hidden" id="party-lead-version" name="version" th:value="${mission.partyLeadVersion}">
-                                        <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
-                                        <div style="position: relative; flex: 1; min-width: 12rem;">
-                                            <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
-                                                   th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : mission.partyLeadGuestName}"
-                                                   th:placeholder="#{mission.party_lead.placeholder}">
-                                            <div id="party-lead-search-results" class="autocomplete-items"></div>
-                                        </div>
-                                        <button type="submit" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
-                                        <button type="button" class="btn btn-quiet-danger" id="party-lead-clear-btn" th:text="#{mission.party_lead.clear}">Entfernen</button>
-                                    </form>
-                                </div>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label th:text="#{admin.mission_data.frequency_types}">Frequenz&uuml;bersicht</label>
-                                <div class="flex-col-gap">
-                                    <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
-                                        <div>
-                                            <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Freq</strong>
-                                        </div>
-                                        <div class="flex-gap-sm"
-                                             th:with="f=${frequencyByTypeId[freqType.id]}"
-                                             th:attr="data-freq-type-id=${freqType.id}, data-version=${f != null ? f.version : ''}">
-                                            <span class="freq-value-display data-value data-value--mono"
-                                                  th:attr="data-freq-type-id=${freqType.id}"
-                                                  th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
-                                                  th:style="${f != null ? '' : 'display:none;'}">123.45</span>
-
-                                            <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon set-freq-btn"
-                                                    th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
-                                                    th:data-type-id="${freqType.id}"
-                                                    th:data-current-value="${f != null ? f.value : ''}"
-                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Ablauf editor (final Einsatz design): drag-sortable procedure steps. In-place
-                         AJAX swap container — a step add/edit/remove/reorder re-renders this
-                         stepsEditor fragment via ?fragment=steps-editor AND the overview checklist via
-                         ?fragment=overview. Handlers are delegated on document so they survive swaps.
-                         The dedicated mission.stepsVersion section counter keeps the Ablauf lock
-                         narrow (a step edit never 409s a concurrent core/schedule/flags edit). -->
-                    <div id="mission-steps-results"><th:block th:fragment="stepsEditor">
-                    <div class="kpanel" th:if="${!isNew and mission.canEdit}"
-                         th:attr="data-steps-version=${mission.stepsVersion}"
-                         th:with="nSteps=${mission.steps != null ? mission.steps.size() : 0}">
-                        <div class="kpanel-head">
-                            <span th:text="#{mission.step.editor.title}">Ablauf &mdash; Schritte setzen</span>
-                            <span class="ph-extra" th:text="${nSteps == 1 ? #messages.msg('mission.step.count.one', nSteps) : #messages.msg('mission.step.count.other', nSteps)}">0 Schritte</span>
-                        </div>
-                        <div class="kpanel-body">
-                            <div class="ae-list" id="mission-step-list">
-                                <div th:each="s, st : ${mission.steps}" class="ae-row" draggable="true"
-                                     th:attr="data-step-id=${s.id}">
-                                    <span class="ae-grip" th:title="#{mission.step.drag}" aria-hidden="true">&#x283F;</span>
-                                    <span class="ae-num" th:text="${st.count}">1</span>
-                                    <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="200" th:value="${s.title}"
-                                               th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
-                                        <input class="ae-meta" type="text" maxlength="200" th:value="${s.meta}"
-                                               th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
-                                    </span>
-                                    <span class="ae-move">
-                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-step-up"
-                                                th:title="#{mission.step.move_up}" th:aria-label="#{mission.step.move_up}">&#x25B2;</button>
-                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-step-down"
-                                                th:title="#{mission.step.move_down}" th:aria-label="#{mission.step.move_down}">&#x25BC;</button>
-                                    </span>
-                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="mission-step-delete"
-                                            th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-ghost btn-xs2" id="mission-step-add" data-trigger="mission-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
-                            <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
-                        </div>
-                    </div>
-                    </th:block></div>
-
                     <!-- Ziele editor (REQ-MISSION-012): classified, sortable goals. In-place AJAX swap
                          container — a goal add/edit/remove/reorder re-renders this objectivesEditor
                          fragment via ?fragment=objectives-editor AND the overview Ziele box via
@@ -1157,6 +1068,135 @@
                         </div>
                     </div>
                     </th:block></div>
+
+                    <!-- Ablauf editor (final Einsatz design): drag-sortable procedure steps. In-place
+                         AJAX swap container — a step add/edit/remove/reorder re-renders this
+                         stepsEditor fragment via ?fragment=steps-editor AND the overview checklist via
+                         ?fragment=overview. Handlers are delegated on document so they survive swaps.
+                         The dedicated mission.stepsVersion section counter keeps the Ablauf lock
+                         narrow (a step edit never 409s a concurrent core/schedule/flags edit). -->
+                    <div id="mission-steps-results"><th:block th:fragment="stepsEditor">
+                    <div class="kpanel" th:if="${!isNew and mission.canEdit}"
+                         th:attr="data-steps-version=${mission.stepsVersion}"
+                         th:with="nSteps=${mission.steps != null ? mission.steps.size() : 0}">
+                        <div class="kpanel-head">
+                            <span th:text="#{mission.step.editor.title}">Ablauf &mdash; Schritte setzen</span>
+                            <span class="ph-extra" th:text="${nSteps == 1 ? #messages.msg('mission.step.count.one', nSteps) : #messages.msg('mission.step.count.other', nSteps)}">0 Schritte</span>
+                        </div>
+                        <div class="kpanel-body">
+                            <div class="ae-list" id="mission-step-list">
+                                <div th:each="s, st : ${mission.steps}" class="ae-row" draggable="true"
+                                     th:attr="data-step-id=${s.id}">
+                                    <span class="ae-grip" th:title="#{mission.step.drag}" aria-hidden="true">&#x283F;</span>
+                                    <span class="ae-num" th:text="${st.count}">1</span>
+                                    <span class="ae-fields">
+                                        <input class="ae-title" type="text" maxlength="200" th:value="${s.title}"
+                                               th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
+                                        <input class="ae-meta" type="text" maxlength="200" th:value="${s.meta}"
+                                               th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
+                                    </span>
+                                    <span class="ae-move">
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-step-up"
+                                                th:title="#{mission.step.move_up}" th:aria-label="#{mission.step.move_up}">&#x25B2;</button>
+                                        <button type="button" class="btn btn-ghost btn-icon" data-trigger="mission-step-down"
+                                                th:title="#{mission.step.move_down}" th:aria-label="#{mission.step.move_down}">&#x25BC;</button>
+                                    </span>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="mission-step-delete"
+                                            th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-ghost btn-xs2" id="mission-step-add" data-trigger="mission-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                            <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
+                        </div>
+                    </div>
+                    </th:block></div>
+
+                    <!-- Organisation: party lead + typed frequencies + custom (mission-specific)
+                         frequencies (edit). -->
+                    <div class="kpanel" th:if="${!isNew}">
+                        <div class="kpanel-head" th:text="#{mission.organisation}">Organisation</div>
+                        <div class="kpanel-body">
+                            <div class="form-group">
+                                <label th:text="#{mission.party_lead}">Partyleiter</label>
+                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                                    <div id="party-lead-display" class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;" th:data-none-label="#{general.none}">
+                                        <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
+                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                        <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
+                                    </div>
+                                    <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
+                                          th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
+                                          style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start;">
+                                        <input type="hidden" id="party-lead-version" name="version" th:value="${mission.partyLeadVersion}">
+                                        <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
+                                        <div style="position: relative; flex: 1; min-width: 12rem;">
+                                            <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
+                                                   th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : mission.partyLeadGuestName}"
+                                                   th:placeholder="#{mission.party_lead.placeholder}">
+                                            <div id="party-lead-search-results" class="autocomplete-items"></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+                                        <button type="button" class="btn btn-quiet-danger" id="party-lead-clear-btn" th:text="#{mission.party_lead.clear}">Entfernen</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label th:text="#{admin.mission_data.frequency_types}">Frequenz&uuml;bersicht</label>
+                                <div class="flex-col-gap">
+                                    <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
+                                        <div>
+                                            <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Freq</strong>
+                                        </div>
+                                        <div class="flex-gap-sm"
+                                             th:with="f=${frequencyByTypeId[freqType.id]}"
+                                             th:attr="data-freq-type-id=${freqType.id}, data-version=${f != null ? f.version : ''}">
+                                            <span class="freq-value-display data-value data-value--mono"
+                                                  th:attr="data-freq-type-id=${freqType.id}"
+                                                  th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
+                                                  th:style="${f != null ? '' : 'display:none;'}">123.45</span>
+
+                                            <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon set-freq-btn"
+                                                    th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
+                                                    th:data-type-id="${freqType.id}"
+                                                    th:data-current-value="${f != null ? f.value : ''}"
+                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels
+                                 (free-text label + value). In-place AJAX swap container — a custom
+                                 add/edit/delete re-renders this frequenciesEditor fragment via
+                                 ?fragment=frequencies-editor AND the overview Funk panel via
+                                 ?fragment=overview. Handlers are delegated on document so they survive
+                                 swaps. Persisting a frequency is @OptimisticLock(excluded) on the
+                                 mission, so it never 409s a concurrent core/schedule/flags edit. -->
+                            <div id="mission-frequencies-results"><th:block th:fragment="frequenciesEditor">
+                            <div class="form-group" style="margin-bottom: 0;" th:if="${!isNew}">
+                                <label th:text="#{mission.frequency.custom.section}">Weitere Frequenzen</label>
+                                <div class="flex-col-gap" id="mission-custom-freq-list">
+                                    <div th:each="cf : ${customFrequencies}" class="custom-freq-row" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;"
+                                         th:attr="data-custom-freq-id=${cf.id}, data-version=${cf.version}, data-name=${cf.name}, data-value=${cf.value}">
+                                        <div>
+                                            <strong th:text="${cf.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Name</strong>
+                                        </div>
+                                        <div class="flex-gap-sm">
+                                            <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
+                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon" data-trigger="custom-freq-edit"
+                                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                            <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-quiet-danger btn-icon" data-trigger="custom-freq-delete"
+                                                    th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                        </div>
+                                    </div>
+                                    <p th:if="${customFrequencies == null or customFrequencies.isEmpty()}" class="form-hint" style="margin: 0;" th:text="#{mission.frequency.custom.empty}">Noch keine weiteren Frequenzen.</p>
+                                </div>
+                                <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-xs2" id="mission-custom-freq-add" data-trigger="custom-freq-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</span></button>
+                            </div>
+                            </th:block></div>
+                        </div>
+                    </div>
 
                     <!-- Owner & Manager — in-place AJAX swap container (#571/#574): an owner change
                          or manager add/remove re-renders this fragment via ?fragment=mgmt. The
@@ -1575,6 +1615,38 @@
         </div>
     </div>
 
+    <!-- Custom (mission-specific) frequency modal (REQ-MISSION-014) — add & edit share it; the hidden
+         id/version discriminate (empty id = add). Pure-JS submit against the /frequencies/custom
+         AJAX proxies; on success the "Weitere Frequenzen" editor + overview Funk panel refresh in
+         place. Lives outside every swap fragment so its .freq-input listener persists across swaps. -->
+    <div id="custom-frequency-modal" class="krt-modal-overlay" style="display:none;" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
+        <div class="krt-modal">
+            <div class="krt-modal-head">
+                <h2 id="custom-frequency-modal-title" th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</h2>
+                <button type="button" class="btn btn-ghost btn-icon close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+            </div>
+            <form id="custom-frequency-form">
+                <div class="krt-modal-body">
+                <input type="hidden" id="custom-freq-id" value="">
+                <input type="hidden" id="custom-freq-version" value="">
+                <div class="form-group">
+                    <label th:text="#{mission.frequency.custom.name}">Bezeichnung</label>
+                    <input type="text" id="custom-freq-name" maxlength="100" required th:placeholder="#{mission.frequency.custom.name.placeholder}">
+                    <div class="field-error" id="custom-freq-name-error"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label th:text="#{mission.frequency.custom.value}">Frequenz (z.B. 123.45)</label>
+                    <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" id="custom-freq-value" required>
+                </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-modal-dismiss th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Edit Unit Modal -->
     <div id="edit-unit-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
         <div class="krt-modal krt-modal--wide"
@@ -1863,6 +1935,13 @@
         'default_title': /*[[#{mission.objective.default_title}]]*/ 'New goal',
         'delete_confirm': /*[[#{mission.objective.delete.confirm}]]*/ 'This goal will be deleted.'
     };
+    // Weitere Frequenzen (custom, mission-specific channels, REQ-MISSION-014) — modal titles for the
+    // add vs. edit mode and the delete-confirm consequence text.
+    window.MISSION_CUSTOM_FREQ_I18N = {
+        'add': /*[[#{mission.frequency.custom.add}]]*/ 'Add frequency',
+        'edit': /*[[#{mission.frequency.custom.edit}]]*/ 'Edit frequency',
+        'delete_confirm': /*[[#{mission.frequency.custom.delete.confirm}]]*/ 'This frequency will be deleted.'
+    };
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
@@ -1907,7 +1986,8 @@
             mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
             overview: { container: '#overview-results', fragmentValue: 'overview' },
             steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
-            objectives: { container: '#mission-objectives-results', fragmentValue: 'objectives-editor' }
+            objectives: { container: '#mission-objectives-results', fragmentValue: 'objectives-editor' },
+            frequencies: { container: '#mission-frequencies-results', fragmentValue: 'frequencies-editor' }
         };
         // Live multi-user sync (REQ-FE-010): tell other users viewing this mission that these
         // sections just changed, so their views re-fetch the same fragments in place. Suppressed
@@ -2766,6 +2846,100 @@
                 });
             }
         }
+
+        // ---- Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels ----------------
+        // Add / edit share one modal (empty hidden id = add), delete asks a KRT confirm (no native
+        // dialog). Every mutation goes through krtMissionWrite (CSRF + retry-once-on-403 + the shared
+        // 409 reload-confirm) against the /frequencies/custom AJAX proxies, then re-renders the editor
+        // + overview Funk fragments in place via krtRefreshMissionSection (which also broadcasts to
+        // peers, REQ-FE-010). The click handlers are delegated on document so they survive the fragment
+        // swap; the modal lives outside the swapped fragment so its listeners persist.
+        (function () {
+            const customFreqModal = document.getElementById('custom-frequency-modal');
+            const customFreqForm = document.getElementById('custom-frequency-form');
+            if (!customFreqModal || !customFreqForm) { return; }
+            const idInput = document.getElementById('custom-freq-id');
+            const versionInput = document.getElementById('custom-freq-version');
+            const nameInput = document.getElementById('custom-freq-name');
+            const valueInput = document.getElementById('custom-freq-value');
+            const titleEl = document.getElementById('custom-frequency-modal-title');
+            const dict = window.MISSION_CUSTOM_FREQ_I18N || {};
+            const mid = function () { return window.missionId; };
+
+            function openAdd() {
+                idInput.value = '';
+                versionInput.value = '';
+                nameInput.value = '';
+                valueInput.value = '';
+                if (titleEl && dict.add) { titleEl.textContent = dict.add; }
+                window.krtModalOpen(customFreqModal);
+                nameInput.focus();
+            }
+            function openEdit(row) {
+                idInput.value = row.getAttribute('data-custom-freq-id') || '';
+                versionInput.value = row.getAttribute('data-version') || '';
+                nameInput.value = row.getAttribute('data-name') || '';
+                valueInput.value = row.getAttribute('data-value') || '';
+                if (titleEl && dict.edit) { titleEl.textContent = dict.edit; }
+                window.krtModalOpen(customFreqModal);
+                nameInput.focus();
+            }
+            async function del(row) {
+                const fid = row.getAttribute('data-custom-freq-id'); if (!fid) { return; }
+                const msg = dict.delete_confirm || 'Delete this frequency?';
+                const ok = await window.showKrtConfirm(msg, msg,
+                    (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) || 'OK',
+                    (window.MISSION_SUBRES_I18N && window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) || 'Cancel');
+                if (!ok) { return; }
+                const result = await window.krtMissionWrite({
+                    method: 'DELETE',
+                    url: '/missions/' + mid() + '/frequencies/' + fid + '/ajax',
+                    sectionKey: 'frequency'
+                });
+                if (result.ok && window.krtRefreshMissionSection) {
+                    window.krtRefreshMissionSection(['frequencies', 'overview']);
+                }
+            }
+
+            document.addEventListener('click', function (e) {
+                const t = e.target.closest('[data-trigger]'); if (!t) { return; }
+                const trig = t.getAttribute('data-trigger');
+                if (trig === 'custom-freq-add') { e.preventDefault(); openAdd(); }
+                else if (trig === 'custom-freq-edit') {
+                    e.preventDefault();
+                    const r = t.closest('.custom-freq-row'); if (r) { openEdit(r); }
+                } else if (trig === 'custom-freq-delete') {
+                    e.preventDefault();
+                    const r = t.closest('.custom-freq-row'); if (r) { del(r); }
+                }
+            });
+
+            customFreqForm.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                const name = (nameInput.value || '').trim();
+                const parsed = Number.parseFloat(valueInput.value);
+                if (!name || Number.isNaN(parsed)) { return; }
+                const fid = idInput.value;
+                const isEdit = !!fid;
+                const payload = isEdit
+                    ? { name: name, value: parsed, version: Number(versionInput.value) }
+                    : { name: name, value: parsed };
+                const result = await window.krtMissionWrite({
+                    method: isEdit ? 'PUT' : 'POST',
+                    url: isEdit
+                        ? '/missions/' + mid() + '/frequencies/custom/' + fid + '/ajax'
+                        : '/missions/' + mid() + '/frequencies/custom/ajax',
+                    payload: payload,
+                    sectionKey: 'frequency'
+                });
+                if (result.ok) {
+                    window.krtModalClose(customFreqModal);
+                    if (window.krtRefreshMissionSection) {
+                        window.krtRefreshMissionSection(['frequencies', 'overview']);
+                    }
+                }
+            });
+        })();
 
         // Autocomplete Logic
         const searchInput = document.getElementById('participant-search-input');

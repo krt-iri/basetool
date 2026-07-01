@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Einsatz-Übersicht: Leere „Ziele"- und „Ablauf"-Kacheln werden ausgeblendet; Beschreibung standardmäßig aufgeklappt.** In der Einsatz-Übersicht erscheinen die Kacheln „Ziele" und „Ablauf" nur noch, wenn auch Einträge hinterlegt sind — ohne Daten entfällt die Kachel ganz statt einen leeren Platzhalter zu zeigen. Die „Detaillierte Beschreibung" ist jetzt standardmäßig aufgeklappt (REQ-MISSION-004/-009/-012).
+
+## [v1.0.11](https://github.com/krt-profit/basetool/releases/tag/v1.0.11) - 2026-07-01
+
+### Added
+
+- **Einsatz: Weitere, einsatzspezifische Funkfrequenzen.** Im Verwaltung-Tab eines Einsatzes lassen sich jetzt neben den allgemeinen Frequenztypen beliebige eigene Funkfrequenzen mit Bezeichnung und Wert anlegen, bearbeiten und löschen. Es gelten dieselben Eingabegrenzen wie für die allgemeinen Frequenzen (0–999,99, zwei Nachkommastellen). Sie erscheinen zusätzlich in der „Funk"-Box der Einsatzübersicht (REQ-MISSION-014, ADR-0058).
+
+### Changed
+
+- **Einsatz-Verwaltung: Kacheln neu sortiert, Kalenderlink ans Ende der Details.** Im Verwaltung-Tab stehen die Kacheln rechts jetzt in der Reihenfolge Ziele, Ablauf, Organisation, Verwaltungsrechte; der „Link zum Kalendereintrag" steht in der Details-Karte nun ganz am Ende.
+
 ### Security
 
 - **Raffinerie: Nutzerbezogene Auftragsliste wird jetzt streng auf den eigenen Sichtbarkeitsbereich gefiltert.** Rief ein Logistiker die Raffinerie-Auftragsliste eines Mitglieds ab (`GET /api/v1/refinery-orders/users/{userId}`), bekam er bisher alle Aufträge des Mitglieds — auch solche, die einer Staffel zugeordnet sind, die der Logistiker selbst nicht sieht (möglich, weil ein Mitglied zu zwei Staffeln gehören kann). Die Liste wird jetzt pro Zeile auf den Org-Einheits-Sichtbarkeitsbereich des Aufrufers eingeschränkt und gibt keine fremden Staffel-Aufträge mehr preis (SEC-01).
@@ -9,10 +23,6 @@
 - **Ratenbegrenzung: Die Client-IP-Erkennung im Frontend lässt sich nicht mehr per `X-Forwarded-For` fälschen.** Die anonymen Endpunkte (z. B. Auftrags-Anlage) sind pro IP ratenbegrenzt; bisher übernahm das Frontend die vom Client gesendete `X-Forwarded-For`-Adresse ungeprüft, sodass ein Angreifer mit pro Anfrage wechselnder Fälschung das Limit aushebeln konnte. Das Frontend ermittelt die echte Client-IP jetzt nur noch über vertrauenswürdige Proxys (NPM) und ignoriert vom Client gesetzte Werte (SEC-02).
 
 - **Datenbank: Globales Abfrage-Zeitlimit verhindert das Blockieren von Verbindungen durch einzelne schwere Anfragen.** Jede Datenbankabfrage der Anwendung wird jetzt nach 30 Sekunden (über `APP_DB_QUERY_TIMEOUT_MS` anpassbar) abgebrochen. Bisher konnte eine einzelne sehr große oder langsame Abfrage eine Verbindung aus dem Pool unbegrenzt belegen; mehrere gleichzeitig hätten den Pool erschöpfen und die API ausbremsen können. Flyway-Migrationen sind ausgenommen (SEC-03).
-
-### Changed
-
-- **Einsatz-Übersicht: Leere „Ziele"- und „Ablauf"-Kacheln werden ausgeblendet; Beschreibung standardmäßig aufgeklappt.** In der Einsatz-Übersicht erscheinen die Kacheln „Ziele" und „Ablauf" nur noch, wenn auch Einträge hinterlegt sind — ohne Daten entfällt die Kachel ganz statt einen leeren Platzhalter zu zeigen. Die „Detaillierte Beschreibung" ist jetzt standardmäßig aufgeklappt (REQ-MISSION-004/-009/-012).
 
 ## [v1.0.10](https://github.com/krt-profit/basetool/releases/tag/v1.0.10) - 2026-06-30
 
