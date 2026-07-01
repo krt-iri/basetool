@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -128,9 +129,7 @@ public class SquadronService {
     }
     Squadron squadron = getSquadronById(id);
 
-    if (squadron.getVersion() != null && !squadron.getVersion().equals(squadronDto.version())) {
-      throw new ObjectOptimisticLockingFailureException(Squadron.class, id);
-    }
+    OptimisticLock.check(squadron.getVersion(), squadronDto.version(), Squadron.class, id);
 
     squadron.setName(squadronDto.name());
     squadron.setShorthand(squadronDto.shorthand());

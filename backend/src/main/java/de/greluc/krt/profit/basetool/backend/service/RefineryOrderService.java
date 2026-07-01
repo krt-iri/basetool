@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -431,10 +432,8 @@ public class RefineryOrderService {
       boolean isLogistician) {
     RefineryOrder order = getRefineryOrder(orderId);
 
-    if (details.getVersion() != null && !order.getVersion().equals(details.getVersion())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          RefineryOrder.class, orderId);
-    }
+    OptimisticLock.checkOptionalClient(
+        order.getVersion(), details.getVersion(), RefineryOrder.class, orderId);
 
     if (!isLogistician
         && (order.getOwner() == null

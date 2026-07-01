@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -517,11 +518,7 @@ public class JobOrderService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
-    if (dto.version() != null
-        && jobOrder.getVersion() != null
-        && !jobOrder.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
-    }
+    OptimisticLock.checkOptionalClient(jobOrder.getVersion(), dto.version(), JobOrder.class, id);
 
     JobOrderStatus status = dto.status();
     final JobOrderStatus previousStatus = jobOrder.getStatus();
@@ -679,11 +676,7 @@ public class JobOrderService {
       throw new BadRequestException("Blueprint variant counting applies only to item orders");
     }
 
-    if (version != null
-        && jobOrder.getVersion() != null
-        && !jobOrder.getVersion().equals(version)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
-    }
+    OptimisticLock.checkOptionalClient(jobOrder.getVersion(), version, JobOrder.class, id);
 
     if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
       // No change: skip the @Version bump (which would needlessly 409 a concurrent edit) and the
@@ -725,11 +718,8 @@ public class JobOrderService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
 
-    if (updateDto.version() != null
-        && jobOrder.getVersion() != null
-        && !jobOrder.getVersion().equals(updateDto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
-    }
+    OptimisticLock.checkOptionalClient(
+        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
 
     // The responsible org unit is NOT changed on the regular update path — it is only mutated
     // through
@@ -837,11 +827,8 @@ public class JobOrderService {
       throw new BadRequestException(
           "Order " + id + " is not an item order; use the material-order update endpoint.");
     }
-    if (updateDto.version() != null
-        && jobOrder.getVersion() != null
-        && !jobOrder.getVersion().equals(updateDto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(JobOrder.class, id);
-    }
+    OptimisticLock.checkOptionalClient(
+        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
     if (jobOrder.getItemHandovers() != null && !jobOrder.getItemHandovers().isEmpty()) {
       throw new BadRequestException(
           "Item order " + id + " already has handovers and can no longer be edited.");
@@ -1126,12 +1113,8 @@ public class JobOrderService {
                     new NotFoundException(
                         "Assignee not found on job order " + jobOrderId + ": " + userId));
 
-    if (version != null
-        && assignee.getVersion() != null
-        && !assignee.getVersion().equals(version)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          JobOrderAssignee.class, assignee.getId());
-    }
+    OptimisticLock.checkOptionalClient(
+        assignee.getVersion(), version, JobOrderAssignee.class, assignee.getId());
 
     String trimmed = (note == null || note.isBlank()) ? null : note.strip();
     assignee.setNote(trimmed);

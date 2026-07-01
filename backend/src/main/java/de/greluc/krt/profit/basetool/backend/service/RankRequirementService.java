@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementUpdateRequ
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -203,9 +204,7 @@ public class RankRequirementService {
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
     assertCallerMayEdit(entity);
-    if (!entity.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(RankRequirement.class, id);
-    }
+    OptimisticLock.check(entity.getVersion(), request.version(), RankRequirement.class, id);
     mapper.updateEntity(entity, request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());

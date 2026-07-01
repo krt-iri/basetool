@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationPayoutStatusRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -316,9 +317,8 @@ public class OperationService {
       @NotNull UUID id, @NotNull OperationUpdateDto updateDto, boolean canOverrideStatus) {
     Operation operation = Entities.require(operationRepository.findById(id), "Operation not found");
 
-    if (updateDto.version() != null && !operation.getVersion().equals(updateDto.version())) {
-      throw new ObjectOptimisticLockingFailureException(Operation.class, id);
-    }
+    OptimisticLock.checkOptionalClient(
+        operation.getVersion(), updateDto.version(), Operation.class, id);
 
     if (!canOverrideStatus && !operation.getStatus().canTransitionTo(updateDto.status())) {
       throw new BadRequestException(

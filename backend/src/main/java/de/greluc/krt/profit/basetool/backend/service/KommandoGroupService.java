@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupReques
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -208,9 +209,7 @@ public class KommandoGroupService {
    * @param version the client-held version, or {@code null} to skip the check.
    */
   private static void assertVersionMatches(@NotNull KommandoGroup group, java.lang.Long version) {
-    if (group.getVersion() != null && !group.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(KommandoGroup.class, group.getId());
-    }
+    OptimisticLock.check(group.getVersion(), version, KommandoGroup.class, group.getId());
   }
 
   /**

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -284,10 +285,8 @@ public class MaterialService {
   public Material updateMaterial(@NotNull UUID id, @NotNull Material materialDetails) {
     Material material = getMaterial(id);
 
-    if (materialDetails.getVersion() != null
-        && !materialDetails.getVersion().equals(material.getVersion())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Material.class, id);
-    }
+    OptimisticLock.checkOptionalClient(
+        material.getVersion(), materialDetails.getVersion(), Material.class, id);
 
     material.setName(materialDetails.getName());
     material.setType(materialDetails.getType());

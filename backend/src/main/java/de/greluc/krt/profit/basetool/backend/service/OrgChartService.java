@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronChartDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -372,9 +373,7 @@ public class OrgChartService {
         positionRepository
             .findById(id)
             .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
-    if (position.getVersion() != null && !position.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
-    }
+    OptimisticLock.check(position.getVersion(), request.version(), OrgChartPosition.class, id);
     // The chart editor may not assign an account, nor touch a seat the rank mirror manages — an
     // account-held or kommando_group-linked position reflects the functional ranks and is edited
     // under Organisation -> Leitung (epic #800, REQ-ROLE-006). Free-text holders and leaderless /
@@ -453,9 +452,7 @@ public class OrgChartService {
     if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_VACATE_NOT_COMMAND);
     }
-    if (position.getVersion() != null && !position.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(OrgChartPosition.class, id);
-    }
+    OptimisticLock.check(position.getVersion(), version, OrgChartPosition.class, id);
     // A kommando_group-linked Kommando mirrors a functional rank — its Kommandoleiter is vacated by
     // removing the rank under Organisation -> Leitung (epic #800, REQ-ROLE-006), not here.
     if (position.getKommandoGroup() != null) {

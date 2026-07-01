@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
@@ -277,9 +278,7 @@ public class BankHolderService {
         holderRepository
             .findById(holderId)
             .orElseThrow(() -> new NotFoundException("Bank holder not found"));
-    if (holder.getVersion() != null && !holder.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(BankHolder.class, holderId);
-    }
+    OptimisticLock.check(holder.getVersion(), request.version(), BankHolder.class, holderId);
     boolean wasActive = holder.isActive();
     holder.setActive(request.active());
     BankHolder saved = holderRepository.save(holder);

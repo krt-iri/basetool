@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -146,9 +147,7 @@ public class JobTypeService {
                     new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                         "JobType not found"));
 
-    if (jobType.getVersion() != null && !jobType.getVersion().equals(jobTypeDto.version())) {
-      throw new ObjectOptimisticLockingFailureException(JobType.class, id);
-    }
+    OptimisticLock.check(jobType.getVersion(), jobTypeDto.version(), JobType.class, id);
 
     jobType.setName(jobTypeDto.name());
     jobType.setDescription(jobTypeDto.description());

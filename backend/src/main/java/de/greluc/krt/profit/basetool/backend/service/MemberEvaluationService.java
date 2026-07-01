@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -37,7 +38,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -135,8 +135,9 @@ public class MemberEvaluationService {
             .findByUserIdAndCategoryId(userId, categoryId)
             .orElseGet(() -> MemberEvaluation.builder().userId(userId).category(category).build());
 
-    if (entity.getId() != null && !entity.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(MemberEvaluation.class, entity.getId());
+    if (entity.getId() != null) {
+      OptimisticLock.check(
+          entity.getVersion(), request.version(), MemberEvaluation.class, entity.getId());
     }
 
     boolean isNew = entity.getId() == null;

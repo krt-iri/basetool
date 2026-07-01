@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateReque
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -188,9 +189,7 @@ public class PromotionTopicService {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
-    if (!entity.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(PromotionTopic.class, id);
-    }
+    OptimisticLock.check(entity.getVersion(), request.version(), PromotionTopic.class, id);
     mapper.updateEntity(entity, request);
     PromotionTopic saved = repository.save(entity);
     auditService.record(

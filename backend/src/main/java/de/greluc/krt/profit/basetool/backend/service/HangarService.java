@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
@@ -256,11 +257,7 @@ public class HangarService {
     Ship ship =
         shipRepository.findById(shipId).orElseThrow(() -> new NotFoundException("Ship not found"));
 
-    if (dto.version() != null
-        && ship.getVersion() != null
-        && !ship.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Ship.class, shipId);
-    }
+    OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
 
     if (ship.getOwner() == null
         || ship.getOwner().getId() == null

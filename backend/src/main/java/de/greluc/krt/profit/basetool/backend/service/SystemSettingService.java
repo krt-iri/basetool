@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -99,10 +100,7 @@ public class SystemSettingService {
             .findById(key)
             .orElseThrow(() -> new NotFoundException("Setting not found: " + key));
 
-    if (!setting.getVersion().equals(dto.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          SystemSetting.class, key);
-    }
+    OptimisticLock.check(setting.getVersion(), dto.version(), SystemSetting.class, key);
 
     setting.setValue(dto.value());
     // saveAndFlush so the bumped @Version is mapped into the response DTO — the admin-settings form

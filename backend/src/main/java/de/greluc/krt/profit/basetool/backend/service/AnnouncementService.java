@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.Announcement;
 import de.greluc.krt.profit.basetool.backend.repository.AnnouncementRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -95,11 +96,8 @@ public class AnnouncementService {
   @Transactional
   public Announcement updateAnnouncement(@NotNull String content, @Nullable Long version) {
     Announcement announcement = getAdminAnnouncement();
-    if (version != null
-        && announcement.getVersion() != null
-        && !announcement.getVersion().equals(version)) {
-      throw new ObjectOptimisticLockingFailureException(Announcement.class, announcement.getId());
-    }
+    OptimisticLock.checkOptionalClient(
+        announcement.getVersion(), version, Announcement.class, announcement.getId());
     announcement.setContent(content);
     return announcementRepository.save(announcement);
   }

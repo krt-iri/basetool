@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankGrantRe
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -160,10 +161,11 @@ public class BankGrantService {
   public BankGrantDto updateGrant(
       @NotNull UUID userId, @NotNull UUID accountId, @NotNull UpdateBankGrantRequest request) {
     BankAccountGrant grant = requireGrant(userId, accountId);
-    if (grant.getVersion() != null && !grant.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(
-          BankAccountGrant.class, new BankAccountGrantId(userId, accountId));
-    }
+    OptimisticLock.check(
+        grant.getVersion(),
+        request.version(),
+        BankAccountGrant.class,
+        new BankAccountGrantId(userId, accountId));
     final String before = flagString(grant);
     grant.setCanDeposit(request.canDeposit());
     grant.setCanWithdraw(request.canWithdraw());

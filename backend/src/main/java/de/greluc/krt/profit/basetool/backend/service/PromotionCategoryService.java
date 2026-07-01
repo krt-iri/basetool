@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -184,9 +185,7 @@ public class PromotionCategoryService {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());
-    if (!entity.getVersion().equals(request.version())) {
-      throw new ObjectOptimisticLockingFailureException(PromotionCategory.class, id);
-    }
+    OptimisticLock.check(entity.getVersion(), request.version(), PromotionCategory.class, id);
     PromotionTopic topic =
         topicRepository
             .findById(request.topicId())
