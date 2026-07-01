@@ -94,11 +94,8 @@
         <span id="krt-bp-total-meta" hidden
               th:attr="data-total=${blueprints.size()},
                        data-notecount=${blueprints.?[note != null and !note.isBlank()].size()}"></span>
-        <div th:if="${#lists.isEmpty(blueprints)}" class="empty-state">
-            <span class="empty-title" th:text="#{personalInventory.blueprints.collection.emptyTitle}">Noch keine Blueprints</span>
-            <span class="empty-text" th:text="#{personalInventory.blueprints.empty}">Du hast noch keine Blueprints hinzugef&uuml;gt.</span>
-            <span class="empty-text" th:if="${filterQuery != null and !filterQuery.isBlank()}" th:text="#{personalInventory.blueprints.collection.emptyFilterHint}">Filter aktiv &mdash; Suche zur&uuml;cksetzen?</span>
-        </div>
+        <div th:if="${#lists.isEmpty(blueprints)}" class="empty-state"
+             th:insert="~{fragments/components :: emptyStateBody('personalInventory.blueprints.collection.emptyTitle', 'personalInventory.blueprints.empty', 'personalInventory.blueprints.collection.emptyFilterHint')}"></div>
 
         <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail krt-bp-md" id="krt-bp-md">
             <!-- Master list -->

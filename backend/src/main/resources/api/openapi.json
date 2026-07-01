@@ -24357,12 +24357,12 @@
       },
       "delete" : {
         "tags" : [ "hangar-controller" ],
-        "summary" : "Alle eigenen Schiffe löschen",
-        "description" : "Löscht alle Schiffe des authentifizierten Nutzers. Verknüpfungen mit Mission-Einheiten werden sicher aufgelöst.",
+        "summary" : "Delete all own ships",
+        "description" : "Deletes all ships of the authenticated user. Links to mission units are safely dissolved.",
         "operationId" : "deleteAllMyShips",
         "responses" : {
           "204" : {
-            "description" : "Alle Schiffe erfolgreich gelöscht"
+            "description" : "All ships deleted successfully"
           },
           "401" : {
             "description" : "Unauthorized",
@@ -24501,8 +24501,8 @@
     "/api/v1/hangar/ships/home-location" : {
       "post" : {
         "tags" : [ "hangar-controller" ],
-        "summary" : "Home-Location für alle eigenen Schiffe setzen",
-        "description" : "Setzt den Ort aller Schiffe des authentifizierten Nutzers auf die gewählte, kuratierte Home-Location.",
+        "summary" : "Set home location for all own ships",
+        "description" : "Sets the location of all ships of the authenticated user to the chosen, curated home location.",
         "operationId" : "setHomeLocationForMyShips",
         "requestBody" : {
           "content" : {
@@ -24516,7 +24516,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "Anzahl der aktualisierten Schiffe",
+            "description" : "Number of ships updated",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -41502,12 +41502,12 @@
     "/api/v1/locations/home-locations" : {
       "get" : {
         "tags" : [ "location-controller" ],
-        "summary" : "Kuratierte Home-Locations",
-        "description" : "Listet die als Home-Location markierten, nicht ausgeblendeten Orte (alphabetisch absteigend) als Quelle für den Hangar-Bulk-Button.",
+        "summary" : "Curated home locations",
+        "description" : "Lists the locations flagged as home locations and not hidden (name descending) as the source for the hangar bulk button.",
         "operationId" : "getHomeLocations",
         "responses" : {
           "200" : {
-            "description" : "Liste der Home-Locations",
+            "description" : "List of home locations",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",

@@ -26,6 +26,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapperImpl;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
@@ -66,6 +69,8 @@ class LeitungViewServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private KommandoGroupRepository kommandoGroupRepository;
+
+  @Spy private KommandoGroupMapper kommandoGroupMapper = new KommandoGroupMapperImpl();
 
   @InjectMocks private LeitungViewService service;
 

@@ -22,13 +22,12 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
 import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
 
 /**
  * MapStruct mapper between {@link Outpost} entities and their admin-facing {@link OutpostDto}
  * projection.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(config = CentralMapperConfig.class)
 public interface OutpostMapper {
   /**
    * Projects an outpost entity into the slim DTO used by the admin UEX-overrides page.

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -66,6 +67,7 @@ public class LeitungViewService {
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
   private final KommandoGroupRepository kommandoGroupRepository;
+  private final KommandoGroupMapper kommandoGroupMapper;
 
   /**
    * Builds the caller's delegated Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos
@@ -151,14 +153,7 @@ public class LeitungViewService {
     List<KommandoGroupDto> groups =
         orgUnit.getKind() == OrgUnitKind.SQUADRON
             ? kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(orgUnit.getId()).stream()
-                .map(
-                    g ->
-                        new KommandoGroupDto(
-                            g.getId(),
-                            g.getSquadron().getId(),
-                            g.getName(),
-                            g.getSortIndex(),
-                            g.getVersion()))
+                .map(kommandoGroupMapper::toDto)
                 .toList()
             : List.of();
     return new LeitungUnitDto(

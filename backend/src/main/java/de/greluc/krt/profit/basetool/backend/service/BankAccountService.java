@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -366,7 +367,7 @@ public class BankAccountService {
         saved.getId(),
         null,
         null,
-        target == null ? null : "target=" + target.stripTrailingZeros().toPlainString());
+        target == null ? null : "target=" + BankAmounts.plain(target));
     return bankAccountMapper.toDto(saved, postingRepository.accountBalance(accountId));
   }
 
@@ -391,11 +392,7 @@ public class BankAccountService {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_ACCOUNT_NOT_EMPTY,
           "Only an account with a zero balance can be closed",
-          Map.of(
-              "accountNo",
-              account.getAccountNo(),
-              "balance",
-              balance.stripTrailingZeros().toPlainString()));
+          Map.of("accountNo", account.getAccountNo(), "balance", BankAmounts.plain(balance)));
     }
     if (bankBookingRequestService.hasOpenRequests(accountId)) {
       throw new BankConflictException(

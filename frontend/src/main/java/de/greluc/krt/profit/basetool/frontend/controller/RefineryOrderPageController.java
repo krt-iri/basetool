@@ -86,6 +86,48 @@ public class RefineryOrderPageController {
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 50;
 
+  /** Captured generic type for decoding a paged {@code /refinery-orders} list response. */
+  private static final ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>
+      REFINERY_ORDER_LIST_PAGE =
+          new ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>() {};
+
+  /** Captured generic type for the per-material UEX yield map ({@code materialId -> percent}). */
+  private static final ParameterizedTypeReference<Map<String, Integer>> STRING_INTEGER_MAP =
+      new ParameterizedTypeReference<Map<String, Integer>>() {};
+
+  /** Captured generic type for decoding the cached paged materials catalog. */
+  private static final ParameterizedTypeReference<PageResponse<MaterialDto>> MATERIAL_PAGE =
+      new ParameterizedTypeReference<PageResponse<MaterialDto>>() {};
+
+  /** Captured generic type for decoding the cached paged refining-methods catalog. */
+  private static final ParameterizedTypeReference<PageResponse<RefiningMethodDto>>
+      REFINING_METHOD_PAGE = new ParameterizedTypeReference<PageResponse<RefiningMethodDto>>() {};
+
+  /** Captured generic type for decoding the cached paged locations catalog. */
+  private static final ParameterizedTypeReference<PageResponse<LocationDto>> LOCATION_PAGE =
+      new ParameterizedTypeReference<PageResponse<LocationDto>>() {};
+
+  /** Captured generic type for the cached refinery-locations list. */
+  private static final ParameterizedTypeReference<List<LocationDto>> LOCATION_LIST =
+      new ParameterizedTypeReference<List<LocationDto>>() {};
+
+  /** Captured generic type for decoding the paged missions catalog. */
+  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_LIST_PAGE =
+      new ParameterizedTypeReference<PageResponse<MissionListDto>>() {};
+
+  /** Captured generic type for the OrgUnit-membership option rows backing the owner pickers. */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_MEMBERSHIP_OPTION_LIST =
+          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
+
+  /** Captured generic type for decoding the paged users catalog. */
+  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE =
+      new ParameterizedTypeReference<PageResponse<UserDto>>() {};
+
+  /** Captured generic type for the active job-order reference projections (store dropdown). */
+  private static final ParameterizedTypeReference<List<JobOrderReferenceDto>>
+      JOB_ORDER_REFERENCE_LIST = new ParameterizedTypeReference<List<JobOrderReferenceDto>>() {};
+
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final IngestHandoffService ingestHandoffService;
@@ -183,7 +225,7 @@ public class RefineryOrderPageController {
               + effectiveSize
               + "&sort=startedAt,desc&status="
               + statusParam;
-      p = backendApiClient.get(url, new ParameterizedTypeReference<>() {});
+      p = backendApiClient.get(url, REFINERY_ORDER_LIST_PAGE);
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
       }
@@ -729,8 +771,7 @@ public class RefineryOrderPageController {
     try {
       Map<String, Integer> yields =
           backendApiClient.get(
-              "/api/v1/refinery-orders/locations/" + locationId + "/yields",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/refinery-orders/locations/" + locationId + "/yields", STRING_INTEGER_MAP);
       return yields != null ? yields : Map.of();
     } catch (Exception e) {
       log.warn("Failed to fetch refinery yields for location {}: {}", locationId, e.getMessage());
@@ -1137,8 +1178,7 @@ public class RefineryOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       PageResponse<MaterialDto> p =
-          backendApiClient.getCached(
-              "/api/v1/materials?size=1000", new ParameterizedTypeReference<>() {}, true);
+          backendApiClient.getCached("/api/v1/materials?size=1000", MATERIAL_PAGE, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1152,7 +1192,7 @@ public class RefineryOrderPageController {
     try {
       PageResponse<RefiningMethodDto> p =
           backendApiClient.getCached(
-              "/api/v1/refining-methods?size=1000", new ParameterizedTypeReference<>() {}, true);
+              "/api/v1/refining-methods?size=1000", REFINING_METHOD_PAGE, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1165,8 +1205,7 @@ public class RefineryOrderPageController {
   private List<LocationDto> fetchAllLocations() {
     try {
       PageResponse<LocationDto> p =
-          backendApiClient.getCached(
-              "/api/v1/locations?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/locations?size=1000", LOCATION_PAGE);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1179,8 +1218,7 @@ public class RefineryOrderPageController {
   private List<LocationDto> fetchLocations() {
     try {
       List<LocationDto> locs =
-          backendApiClient.getCached(
-              "/api/v1/locations/refineries", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/locations/refineries", LOCATION_LIST);
       if (locs != null) {
         return locs;
       }
@@ -1209,7 +1247,7 @@ public class RefineryOrderPageController {
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
       PageResponse<MissionListDto> p =
-          backendApiClient.get("/api/v1/missions?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/missions?size=1000", MISSION_LIST_PAGE);
       if (p == null) {
         return new ArrayList<>();
       }
@@ -1301,7 +1339,7 @@ public class RefineryOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for refinery-order owner-picker", e);
@@ -1326,7 +1364,7 @@ public class RefineryOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + userId + "/memberships", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/" + userId + "/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch memberships for refinery org-unit picker", e);
@@ -1336,10 +1374,7 @@ public class RefineryOrderPageController {
 
   private List<UserDto> fetchUsers() {
     try {
-      PageResponse<UserDto> p =
-          backendApiClient.get(
-              "/api/v1/users?size=1000",
-              new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+      PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", USER_PAGE);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1365,7 +1400,7 @@ public class RefineryOrderPageController {
   private List<JobOrderReferenceDto> fetchActiveJobOrders() {
     try {
       List<JobOrderReferenceDto> content =
-          backendApiClient.get("/api/v1/orders/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/orders/lookup", JOB_ORDER_REFERENCE_LIST);
       if (content != null) {
         return new ArrayList<>(content);
       }

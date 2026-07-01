@@ -20,7 +20,39 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.util.List;
+import java.util.Locale;
+import org.springframework.data.domain.Page;
 
 /** Outbound response payload for the Page operation. */
 public record PageResponse<T>(
-    List<T> content, int page, int size, long totalElements, int totalPages, List<String> sort) {}
+    List<T> content, int page, int size, long totalElements, int totalPages, List<String> sort) {
+
+  /**
+   * Wraps a Spring Data {@link Page} into the outbound envelope, rendering each active sort order
+   * as a {@code field,asc|desc} token with a lowercase direction so the client receives the same
+   * syntax {@code PaginationUtil.createPageRequest} accepts on the next request. Replaces the
+   * per-controller {@code toPageResponse} helpers that were copy-pasted across the controller layer
+   * (two of which rendered the direction in uppercase; this factory unifies them on lowercase).
+   *
+   * @param page the Spring Data page to wrap, must not be {@code null}
+   * @param <T> the element type of the page content
+   * @return an envelope carrying the page's content, paging metadata and lowercase sort tokens
+   */
+  public static <T> PageResponse<T> of(Page<T> page) {
+    List<String> sort =
+        page.getSort().stream()
+            .map(
+                order ->
+                    order.getProperty()
+                        + ","
+                        + order.getDirection().name().toLowerCase(Locale.ROOT))
+            .toList();
+    return new PageResponse<>(
+        page.getContent(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages(),
+        sort);
+  }
+}

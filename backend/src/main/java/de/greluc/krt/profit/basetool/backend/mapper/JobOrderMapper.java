@@ -33,7 +33,7 @@ import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Job Order entities and DTOs. */
 @Mapper(
-    componentModel = "spring",
+    config = CentralMapperConfig.class,
     uses = {
       InventoryItemMapper.class,
       UserMapper.class,

@@ -30,7 +30,7 @@ import org.mapstruct.Mapping;
 
 /** MapStruct mapper between item-handover entities and DTOs. */
 @Mapper(
-    componentModel = "spring",
+    config = CentralMapperConfig.class,
     uses = {UserMapper.class, SquadronMapper.class})
 public interface JobOrderItemHandoverMapper {
 

@@ -28,7 +28,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 /** MapStruct mapper between Job Type entities and DTOs. */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface JobTypeMapper {
 
   /**

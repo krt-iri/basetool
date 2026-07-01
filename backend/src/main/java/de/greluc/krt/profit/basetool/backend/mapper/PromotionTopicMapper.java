@@ -26,12 +26,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateReque
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.ReportingPolicy;
 
 /** Entity ↔ DTO mapper for {@link PromotionTopic}. */
 @Mapper(
-    componentModel = "spring",
-    unmappedTargetPolicy = ReportingPolicy.IGNORE,
+    config = CentralMapperConfig.class,
     uses = {SquadronMapper.class})
 public interface PromotionTopicMapper {
 

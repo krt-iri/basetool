@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContextFilter;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.Ordered;
@@ -42,7 +43,8 @@ class ForwardedHeaderConfigTest {
   @Test
   void forwardedHeaderFilter_runsExactlyOneSlotAfterClientIpContextFilter() {
     FilterRegistrationBean<ForwardedHeaderFilter> registration = config.forwardedHeaderFilter();
-    int clientIpFilterOrder = new ClientIpContextFilter(new ClientIpProperties()).getOrder();
+    int clientIpFilterOrder =
+        new ClientIpContextFilter(new ClientIpProperties(List.of())).getOrder();
 
     assertThat(clientIpFilterOrder)
         .as("ClientIpContextFilter must be at the very highest precedence")

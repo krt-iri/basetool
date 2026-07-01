@@ -30,7 +30,7 @@ import org.mapstruct.Mapping;
  * display number is resolved batch-wise by the service (audit rows keep plain UUID references so
  * they outlive every aggregate) and travels as a second source parameter.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface BankAuditEventMapper {
 
   /**

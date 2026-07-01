@@ -21,22 +21,24 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
-/** Type-safe App Http configuration properties. */
-@Data
-@Configuration
+/**
+ * Type-safe App Http configuration properties, bound through the canonical record constructor.
+ * Component-level {@link DefaultValue} annotations preserve the previous field-initializer defaults
+ * (connect 3s, the rest 5s) when the corresponding {@code app.http.*} key is absent.
+ *
+ * @param connectTimeout WebClient connect timeout
+ * @param responseTimeout overall WebClient response timeout
+ * @param readTimeout WebClient socket read timeout
+ * @param writeTimeout WebClient socket write timeout
+ */
 @Validated
 @ConfigurationProperties(prefix = "app.http")
-public class AppHttpProperties {
-  @NotNull private Duration connectTimeout = Duration.ofSeconds(3);
-
-  @NotNull private Duration responseTimeout = Duration.ofSeconds(5);
-
-  @NotNull private Duration readTimeout = Duration.ofSeconds(5);
-
-  @NotNull private Duration writeTimeout = Duration.ofSeconds(5);
-}
+public record AppHttpProperties(
+    @NotNull @DefaultValue("3s") Duration connectTimeout,
+    @NotNull @DefaultValue("5s") Duration responseTimeout,
+    @NotNull @DefaultValue("5s") Duration readTimeout,
+    @NotNull @DefaultValue("5s") Duration writeTimeout) {}

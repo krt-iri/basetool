@@ -456,7 +456,7 @@ public class JobOrderService {
                 .thenComparing(
                     item -> item.amount() != null ? item.amount() : 0.0,
                     java.util.Comparator.reverseOrder()))
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /**

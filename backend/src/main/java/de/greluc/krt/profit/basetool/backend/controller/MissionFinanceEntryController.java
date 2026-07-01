@@ -107,7 +107,7 @@ public class MissionFinanceEntryController {
     // it must never travel to a peer through the finance ledger (there is no business need for a
     // peer's contact data here). redactUserPii keeps only the public name tuple.
     entries = entries.map(this::redactParticipantPii);
-    return toPageResponse(entries);
+    return PageResponse.of(entries);
   }
 
   /**
@@ -252,15 +252,5 @@ public class MissionFinanceEntryController {
         null, // joinDate
         null // discordLinked – not exposed to guests
         );
-  }
-
-  private <T> PageResponse<T> toPageResponse(Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        page.getSort().stream().map(o -> o.getProperty() + "," + o.getDirection()).toList());
   }
 }

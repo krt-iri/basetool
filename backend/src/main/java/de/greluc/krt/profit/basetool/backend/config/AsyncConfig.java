@@ -103,17 +103,7 @@ public class AsyncConfig {
    */
   @Bean(name = UEX_EXECUTOR)
   public Executor uexExecutor() {
-    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(2);
-    executor.setMaxPoolSize(4);
-    executor.setQueueCapacity(100);
-    executor.setThreadNamePrefix("uex-async-");
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-    executor.setWaitForTasksToCompleteOnShutdown(true);
-    executor.setAwaitTerminationSeconds(20);
-    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
-    executor.initialize();
-    return executor;
+    return buildExecutor(2, 4, 100, "uex-async-", 20);
   }
 
   /**
@@ -137,17 +127,7 @@ public class AsyncConfig {
    */
   @Bean(name = SCWIKI_EXECUTOR)
   public Executor scWikiExecutor() {
-    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(2);
-    executor.setMaxPoolSize(2);
-    executor.setQueueCapacity(0);
-    executor.setThreadNamePrefix("scwiki-async-");
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-    executor.setWaitForTasksToCompleteOnShutdown(true);
-    executor.setAwaitTerminationSeconds(20);
-    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
-    executor.initialize();
-    return executor;
+    return buildExecutor(2, 2, 0, "scwiki-async-", 20);
   }
 
   /**
@@ -172,17 +152,7 @@ public class AsyncConfig {
    */
   @Bean(name = IMPORT_EXECUTOR)
   public Executor importExecutor() {
-    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(1);
-    executor.setMaxPoolSize(1);
-    executor.setQueueCapacity(20);
-    executor.setThreadNamePrefix("p4k-import-");
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-    executor.setWaitForTasksToCompleteOnShutdown(true);
-    executor.setAwaitTerminationSeconds(60);
-    executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
-    executor.initialize();
-    return executor;
+    return buildExecutor(1, 1, 20, "p4k-import-", 60);
   }
 
   /**
@@ -204,14 +174,37 @@ public class AsyncConfig {
    */
   @Bean(name = NOTIFICATION_EXECUTOR)
   public Executor notificationExecutor() {
+    return buildExecutor(2, 4, 200, "notification-async-", 20);
+  }
+
+  /**
+   * Builds a bounded {@link ThreadPoolTaskExecutor} carrying the abort-policy, graceful-shutdown
+   * and MDC-propagation configuration common to every {@code @Async} pool in this class; only the
+   * sizing, thread-name prefix and shutdown-await window vary per pool. Extracted so the four bean
+   * factories share one construction path instead of repeating the nine setter calls.
+   *
+   * @param corePoolSize the number of always-alive worker threads
+   * @param maxPoolSize the hard ceiling on worker threads before a full queue triggers rejection
+   * @param queueCapacity the bounded work-queue depth ({@code 0} hands off directly and rejects at
+   *     max threads)
+   * @param threadNamePrefix the prefix applied to this pool's worker thread names
+   * @param awaitTerminationSeconds the graceful-shutdown window granted to in-flight tasks
+   * @return an initialised executor ready to accept work
+   */
+  private Executor buildExecutor(
+      int corePoolSize,
+      int maxPoolSize,
+      int queueCapacity,
+      String threadNamePrefix,
+      int awaitTerminationSeconds) {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(2);
-    executor.setMaxPoolSize(4);
-    executor.setQueueCapacity(200);
-    executor.setThreadNamePrefix("notification-async-");
+    executor.setCorePoolSize(corePoolSize);
+    executor.setMaxPoolSize(maxPoolSize);
+    executor.setQueueCapacity(queueCapacity);
+    executor.setThreadNamePrefix(threadNamePrefix);
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.setWaitForTasksToCompleteOnShutdown(true);
-    executor.setAwaitTerminationSeconds(20);
+    executor.setAwaitTerminationSeconds(awaitTerminationSeconds);
     executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
     executor.initialize();
     return executor;

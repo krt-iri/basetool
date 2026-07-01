@@ -100,6 +100,55 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class MissionPageController {
 
+  /** Response type for the {@code /api/v1/operations/lookup} reference-list read. */
+  private static final ParameterizedTypeReference<List<OperationReferenceDto>>
+      OPERATION_REFERENCE_LIST = new ParameterizedTypeReference<List<OperationReferenceDto>>() {};
+
+  /** Response type for the paged {@code /api/v1/missions/search} mission-overview read. */
+  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_LIST_PAGE =
+      new ParameterizedTypeReference<PageResponse<MissionListDto>>() {};
+
+  /** Response type for the single-mission {@code /api/v1/missions/{id}} read. */
+  private static final ParameterizedTypeReference<MissionDto> MISSION =
+      new ParameterizedTypeReference<MissionDto>() {};
+
+  /** Response type for the {@code /api/v1/users/lookup} manager-picker reference-list read. */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
+      new ParameterizedTypeReference<List<UserReferenceDto>>() {};
+
+  /**
+   * Response type for the paged job-type / squadron / frequency-type catalog reads, whose rows are
+   * consumed as untyped {@code Map} attributes by the mission-detail template.
+   */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
+      STRING_OBJECT_MAP_PAGE =
+          new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {};
+
+  /** Response type for the {@code /api/v1/missions/{id}/unit-ship-options} ship-picker read. */
+  private static final ParameterizedTypeReference<List<ShipDto>> SHIP_LIST =
+      new ParameterizedTypeReference<List<ShipDto>>() {};
+
+  /** Response type for the paged {@code /api/v1/ship-types} catalog read. */
+  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE =
+      new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {};
+
+  /** Response type for the paged {@code /api/v1/missions/{id}/finance-entries} ledger read. */
+  private static final ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>
+      MISSION_FINANCE_ENTRY_PAGE =
+          new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {};
+
+  /** Response type for the {@code /api/v1/refinery-orders/mission/{id}} order-list read. */
+  private static final ParameterizedTypeReference<List<RefineryOrderListDto>> REFINERY_ORDER_LIST =
+      new ParameterizedTypeReference<List<RefineryOrderListDto>>() {};
+
+  /** Response type for the untyped-JSON {@code participants/unassigned} passthrough read. */
+  private static final ParameterizedTypeReference<Object> OBJECT =
+      new ParameterizedTypeReference<Object>() {};
+
+  /** Response type for the single-setting {@code /api/v1/settings/{key}} read. */
+  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP =
+      new ParameterizedTypeReference<Map<String, Object>>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -138,10 +187,7 @@ public class MissionPageController {
     }
     try {
       List<OperationReferenceDto> operations =
-          backendApiClient.get(
-              "/api/v1/operations/lookup",
-              new ParameterizedTypeReference<List<OperationReferenceDto>>() {},
-              false);
+          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST, false);
       model.addAttribute("operationsList", operations);
     } catch (Exception e) {
       log.warn("Could not load operations", e);
@@ -266,10 +312,7 @@ public class MissionPageController {
       boolean isPublic = (principal == null);
 
       PageResponse<MissionListDto> missionsPage =
-          backendApiClient.get(
-              uri.toString(),
-              new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
-              isPublic);
+          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, isPublic);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
       model.addAttribute("search", search);
@@ -316,10 +359,7 @@ public class MissionPageController {
       @RequestParam(required = false) String fragment) {
     try {
       MissionDto mission =
-          backendApiClient.get(
-              "/api/v1/missions/" + id,
-              new ParameterizedTypeReference<MissionDto>() {},
-              principal == null);
+          backendApiClient.get("/api/v1/missions/" + id, MISSION, principal == null);
 
       // Sort participants and build groupings
       List<MissionParticipantDto> participants = new java.util.ArrayList<>(mission.participants());
@@ -509,10 +549,7 @@ public class MissionPageController {
       if (principal != null) {
         try {
           List<UserReferenceDto> allUsers =
-              backendApiClient.get(
-                  "/api/v1/users/lookup",
-                  new ParameterizedTypeReference<List<UserReferenceDto>>() {},
-                  false);
+              backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST, false);
           model.addAttribute("allUsers", allUsers);
         } catch (Exception e) {
           log.warn("Could not load users for manager selection", e);
@@ -556,9 +593,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
             backendApiClient.getCached(
-                "/api/v1/job-types?archetype=MISSION&size=1000",
-                new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
-                true);
+                "/api/v1/job-types?archetype=MISSION&size=1000", STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception e) {
         // Ignore if job types fail
@@ -568,9 +603,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> crewJobTypesPage =
             backendApiClient.getCached(
-                "/api/v1/job-types?archetype=CREW&size=1000",
-                new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
-                true);
+                "/api/v1/job-types?archetype=CREW&size=1000", STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -579,10 +612,7 @@ public class MissionPageController {
       // Fetch Squadrons
       try {
         PageResponse<Map<String, Object>> squadronsPage =
-            backendApiClient.getCached(
-                "/api/v1/squadrons?size=1000",
-                new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
-                true);
+            backendApiClient.getCached("/api/v1/squadrons?size=1000", STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception e) {
         // Ignore
@@ -610,7 +640,7 @@ public class MissionPageController {
         PageResponse<Map<String, Object>> freqTypesPage =
             backendApiClient.getCached(
                 "/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc",
-                new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {},
+                STRING_OBJECT_MAP_PAGE,
                 true);
         model.addAttribute("frequencyTypes", freqTypesPage.content());
       } catch (Exception e) {
@@ -628,9 +658,7 @@ public class MissionPageController {
           try {
             List<ShipDto> unitShipOptions =
                 backendApiClient.get(
-                    "/api/v1/missions/" + id + "/unit-ship-options",
-                    new ParameterizedTypeReference<List<ShipDto>>() {},
-                    false);
+                    "/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST, false);
             model.addAttribute("unitShipOptions", unitShipOptions);
           } catch (Exception e) {
             // Ignore, e.g. if the caller cannot manage the mission
@@ -639,9 +667,7 @@ public class MissionPageController {
 
         try {
           PageResponse<ShipTypeDto> allShipTypesPage =
-              backendApiClient.getCached(
-                  "/api/v1/ship-types?size=1000",
-                  new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {});
+              backendApiClient.getCached("/api/v1/ship-types?size=1000", SHIP_TYPE_PAGE);
           model.addAttribute("allShipTypes", allShipTypesPage.content());
         } catch (Exception e) {
           // Ignore, e.g. if user has no HANGAR_READ or other issue
@@ -668,7 +694,7 @@ public class MissionPageController {
                   () ->
                       backendApiClient.get(
                           "/api/v1/missions/" + id + "/finance-entries?size=1000",
-                          new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {},
+                          MISSION_FINANCE_ENTRY_PAGE,
                           false));
           CompletableFuture<java.math.BigDecimal> financeSumFuture =
               parallelPageLoader.loadAsync(
@@ -681,9 +707,7 @@ public class MissionPageController {
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/refinery-orders/mission/" + id,
-                          new ParameterizedTypeReference<List<RefineryOrderListDto>>() {},
-                          false));
+                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST, false));
           CompletableFuture.allOf(financesFuture, financeSumFuture, refineryFuture).join();
 
           PageResponse<MissionFinanceEntryDto> financesPage = financesFuture.join();
@@ -922,9 +946,7 @@ public class MissionPageController {
       }
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class, false);
-      MissionDto mission =
-          backendApiClient.get(
-              "/api/v1/missions/" + id, new ParameterizedTypeReference<MissionDto>() {}, false);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION, false);
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
@@ -1965,9 +1987,7 @@ public class MissionPageController {
               : null);
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class, false);
-      MissionDto mission =
-          backendApiClient.get(
-              "/api/v1/missions/" + id, new ParameterizedTypeReference<MissionDto>() {}, false);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION, false);
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
@@ -2843,9 +2863,7 @@ public class MissionPageController {
     try {
       Object result =
           backendApiClient.get(
-              "/api/v1/missions/" + id + "/participants/unassigned",
-              new ParameterizedTypeReference<Object>() {},
-              false);
+              "/api/v1/missions/" + id + "/participants/unassigned", OBJECT, false);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -2915,9 +2933,7 @@ public class MissionPageController {
     try {
       Map<String, Object> setting =
           backendApiClient.get(
-              "/api/v1/settings/refinery.rounding.mode",
-              new ParameterizedTypeReference<Map<String, Object>>() {},
-              isPublic);
+              "/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP, isPublic);
       if (setting != null && setting.get("value") != null) {
         return String.valueOf(setting.get("value"));
       }

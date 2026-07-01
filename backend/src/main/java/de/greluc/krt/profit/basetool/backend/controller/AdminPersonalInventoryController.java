@@ -93,7 +93,7 @@ public class AdminPersonalInventoryController {
             PersonalInventoryItemService.SORTABLE_FIELDS,
             PersonalInventoryItemService.DEFAULT_SORT_FIELD);
     Page<PersonalInventoryItemResponse> result = service.listForUser(userSub, q, pageable);
-    return PersonalInventoryController.toPageResponse(result);
+    return PageResponse.of(result);
   }
 
   /**

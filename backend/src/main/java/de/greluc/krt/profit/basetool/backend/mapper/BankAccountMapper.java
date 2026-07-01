@@ -32,7 +32,7 @@ import org.mapstruct.Mapping;
  * property (compute-on-read, ADR-0010), so it travels as a second source parameter — the service
  * computes the balances batch-wise and pairs them in.
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = CentralMapperConfig.class)
 public interface BankAccountMapper {
 
   /**

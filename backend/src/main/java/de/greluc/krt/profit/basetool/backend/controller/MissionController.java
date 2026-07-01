@@ -173,7 +173,7 @@ public class MissionController {
                   pageable)
               .map(missionMapper::toListDto);
     }
-    return toPageResponse(pageResult);
+    return PageResponse.of(pageResult);
   }
 
   /**
@@ -247,13 +247,13 @@ public class MissionController {
           missionService
               .searchMissions(query, start, end, status, false, operationId, pageable)
               .map(missionMapper::toListDto);
-      return toPageResponse(pageResult);
+      return PageResponse.of(pageResult);
     }
     Page<MissionListDto> pageResult =
         missionService
             .searchMissions(query, start, end, status, null, operationId, pageable)
             .map(missionMapper::toListDto);
-    return toPageResponse(pageResult);
+    return PageResponse.of(pageResult);
   }
 
   /**
@@ -2528,23 +2528,5 @@ public class MissionController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     missionService.removeManager(id, userId);
     return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Wraps a {@link Page} into the API-friendly {@link PageResponse} envelope (current page, page
-   * size, totals, sort tokens).
-   *
-   * @param page Spring Data page
-   * @param <T> element type
-   * @return the page response DTO
-   */
-  private <T> PageResponse<T> toPageResponse(Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        page.getSort().stream().map(o -> o.getProperty() + "," + o.getDirection()).toList());
   }
 }

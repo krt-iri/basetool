@@ -105,7 +105,7 @@ public class BankAccountController {
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             bankSecurityService.isManagement(), currentUserId(), pageable);
-    return toPageResponse(result);
+    return PageResponse.of(result);
   }
 
   /**
@@ -237,7 +237,7 @@ public class BankAccountController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
-    return toPageResponse(bankAccountService.getBookings(id, pageable));
+    return PageResponse.of(bankAccountService.getBookings(id, pageable));
   }
 
   /**
@@ -294,22 +294,5 @@ public class BankAccountController {
     return authHelperService
         .currentUserId()
         .orElseThrow(() -> new AccessDeniedException("Authentication required"));
-  }
-
-  /**
-   * Wraps a Spring page into the project-wide {@link PageResponse} envelope.
-   *
-   * @param page the mapped page
-   * @param <T> the payload type
-   * @return the response envelope
-   */
-  private static <T> PageResponse<T> toPageResponse(Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 }

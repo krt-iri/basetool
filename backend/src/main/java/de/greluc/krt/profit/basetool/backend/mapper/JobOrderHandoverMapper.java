@@ -28,7 +28,7 @@ import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Job Order Handover entities and DTOs. */
 @Mapper(
-    componentModel = "spring",
+    config = CentralMapperConfig.class,
     uses = {MaterialMapper.class, UserMapper.class, SquadronMapper.class})
 public interface JobOrderHandoverMapper {
 
