@@ -132,9 +132,7 @@ public class HangarPageController {
         parallelPageLoader
             .<PageResponse<ShipDto>>loadAsync(
                 () -> {
-                  PageResponse<ShipDto> p =
-                      backendApiClient.get(
-                          myShipsUrl, new ParameterizedTypeReference<PageResponse<ShipDto>>() {});
+                  PageResponse<ShipDto> p = backendApiClient.get(myShipsUrl, MY_SHIPS_PAGE_TYPE);
                   return p != null
                       ? p
                       : new PageResponse<>(
@@ -154,8 +152,7 @@ public class HangarPageController {
                 () -> {
                   PageResponse<ShipTypeDto> p =
                       backendApiClient.getCached(
-                          "/api/v1/ship-types?size=1000",
-                          new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {});
+                          "/api/v1/ship-types?size=1000", SHIP_TYPE_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -171,9 +168,7 @@ public class HangarPageController {
             .<List<LocationDto>>loadAsync(
                 () -> {
                   PageResponse<LocationDto> p =
-                      backendApiClient.getCached(
-                          "/api/v1/locations?size=1000",
-                          new ParameterizedTypeReference<PageResponse<LocationDto>>() {});
+                      backendApiClient.getCached("/api/v1/locations?size=1000", LOCATION_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -190,8 +185,7 @@ public class HangarPageController {
                 () -> {
                   PageResponse<ManufacturerDto> p =
                       backendApiClient.getCached(
-                          "/api/v1/manufacturers?size=1000",
-                          new ParameterizedTypeReference<PageResponse<ManufacturerDto>>() {});
+                          "/api/v1/manufacturers?size=1000", MANUFACTURER_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -208,8 +202,7 @@ public class HangarPageController {
                 () -> {
                   List<LocationDto> hl =
                       backendApiClient.getCached(
-                          "/api/v1/locations/home-locations",
-                          new ParameterizedTypeReference<List<LocationDto>>() {});
+                          "/api/v1/locations/home-locations", HOME_LOCATION_LIST_TYPE);
                   return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
                 })
             .exceptionally(
@@ -289,8 +282,7 @@ public class HangarPageController {
       // Bereich/OL + the subordinate Staffeln/SKs they oversee). For an ordinary member this equals
       // their direct memberships, so the picker is unchanged. Resolved server-side for the caller.
       List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for hangar add-ship owner-picker", e);
@@ -308,6 +300,57 @@ public class HangarPageController {
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int HANGAR_DEFAULT_PAGE_SIZE = 50;
+
+  /**
+   * Response type for the uncached {@code /my-ships} call — one server-side-paginated page of the
+   * caller's ships (REQ-HANGAR-002).
+   */
+  private static final ParameterizedTypeReference<PageResponse<ShipDto>> MY_SHIPS_PAGE_TYPE =
+      new ParameterizedTypeReference<PageResponse<ShipDto>>() {};
+
+  /**
+   * Response type for the cached ship-type catalog page ({@code /ship-types}), unwrapped into the
+   * hangar's ship-type dropdown.
+   */
+  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE_TYPE =
+      new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {};
+
+  /**
+   * Response type for the cached location catalog page ({@code /locations}), unwrapped into the
+   * hangar's location dropdown.
+   */
+  private static final ParameterizedTypeReference<PageResponse<LocationDto>> LOCATION_PAGE_TYPE =
+      new ParameterizedTypeReference<PageResponse<LocationDto>>() {};
+
+  /**
+   * Response type for the cached manufacturer catalog page ({@code /manufacturers}), unwrapped into
+   * the hangar's manufacturer dropdown.
+   */
+  private static final ParameterizedTypeReference<PageResponse<ManufacturerDto>>
+      MANUFACTURER_PAGE_TYPE = new ParameterizedTypeReference<PageResponse<ManufacturerDto>>() {};
+
+  /**
+   * Response type for the cached curated home-locations call ({@code /locations/home-locations}),
+   * which returns a bare list (already ordered Z-&gt;A) rather than a paginated envelope.
+   */
+  private static final ParameterizedTypeReference<List<LocationDto>> HOME_LOCATION_LIST_TYPE =
+      new ParameterizedTypeReference<List<LocationDto>>() {};
+
+  /**
+   * Response type for the caller's pickable org units ({@code /users/me/pickable-org-units}) that
+   * populate the add-ship owner-picker; a bare list resolved server-side for the caller.
+   */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      PICKABLE_ORG_UNIT_LIST_TYPE =
+          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
+
+  /**
+   * Response type for the squadron-wide hangar overview page ({@code /hangar/squadron-overview}),
+   * one server-side-paginated page of per-ship-type counts (REQ-HANGAR-001).
+   */
+  private static final ParameterizedTypeReference<PageResponse<SquadronShipOverviewDto>>
+      SQUADRON_OVERVIEW_PAGE_TYPE =
+          new ParameterizedTypeReference<PageResponse<SquadronShipOverviewDto>>() {};
 
   /**
    * Renders the squadron-wide hangar overview ({@code /hangar/squadron}), server-side paginated
@@ -348,7 +391,7 @@ public class HangarPageController {
       if (effectiveSearch != null) {
         uriBuilder.queryParam("search", effectiveSearch);
       }
-      res = backendApiClient.get(uriBuilder.toUriString(), new ParameterizedTypeReference<>() {});
+      res = backendApiClient.get(uriBuilder.toUriString(), SQUADRON_OVERVIEW_PAGE_TYPE);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }

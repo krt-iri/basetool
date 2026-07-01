@@ -51,6 +51,56 @@ import org.springframework.web.bind.annotation.RequestParam;
 @PreAuthorize("isAuthenticated()")
 public class PromotionPageController {
 
+  /** Response type for the {@code /promotion/topics/all} list of promotion topics. */
+  private static final ParameterizedTypeReference<List<PromotionTopicDto>> TOPIC_LIST_TYPE =
+      new ParameterizedTypeReference<List<PromotionTopicDto>>() {};
+
+  /** Response type for the {@code /promotion/categories/by-topic/{id}/all} category list. */
+  private static final ParameterizedTypeReference<List<PromotionCategoryDto>> CATEGORY_LIST_TYPE =
+      new ParameterizedTypeReference<List<PromotionCategoryDto>>() {};
+
+  /** Response type for the paged {@code /promotion/categories} listing of all categories. */
+  private static final ParameterizedTypeReference<PageResponse<PromotionCategoryDto>>
+      CATEGORY_PAGE_TYPE = new ParameterizedTypeReference<PageResponse<PromotionCategoryDto>>() {};
+
+  /**
+   * Response type for the {@code /promotion/level-contents/by-category/{id}} level-content list.
+   */
+  private static final ParameterizedTypeReference<List<PromotionLevelContentDto>>
+      LEVEL_CONTENT_LIST_TYPE = new ParameterizedTypeReference<List<PromotionLevelContentDto>>() {};
+
+  /** Response type for the paged {@code /promotion/rank-requirements} listing. */
+  private static final ParameterizedTypeReference<PageResponse<RankRequirementDto>>
+      RANK_REQUIREMENT_PAGE_TYPE =
+          new ParameterizedTypeReference<PageResponse<RankRequirementDto>>() {};
+
+  /** Response type for the {@code /users/me} single-user lookup used to read the caller's rank. */
+  private static final ParameterizedTypeReference<
+          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>
+      USER_TYPE =
+          new ParameterizedTypeReference<
+              de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>() {};
+
+  /** Response type for the {@code /promotion/evaluations/my} personal evaluation list. */
+  private static final ParameterizedTypeReference<List<MemberEvaluationDto>>
+      MEMBER_EVALUATION_LIST_TYPE = new ParameterizedTypeReference<List<MemberEvaluationDto>>() {};
+
+  /** Response type for the paged {@code /promotion/evaluations/all} evaluation listing. */
+  private static final ParameterizedTypeReference<PageResponse<MemberEvaluationDto>>
+      MEMBER_EVALUATION_PAGE_TYPE =
+          new ParameterizedTypeReference<PageResponse<MemberEvaluationDto>>() {};
+
+  /** Response type for the paged {@code /promotion/evaluations/members} squadron-member listing. */
+  private static final ParameterizedTypeReference<
+          PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>>
+      USER_PAGE_TYPE =
+          new ParameterizedTypeReference<
+              PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>>() {};
+
+  /** Response type for the {@code /promotion/eligibility} promotion-eligibility lists. */
+  private static final ParameterizedTypeReference<List<PromotionEligibilityDto>>
+      ELIGIBILITY_LIST_TYPE = new ParameterizedTypeReference<List<PromotionEligibilityDto>>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -390,8 +440,7 @@ public class PromotionPageController {
   private List<PromotionTopicDto> fetchTopics() {
     try {
       List<PromotionTopicDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/topics/all", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/promotion/topics/all", TOPIC_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch promotion topics", e);
@@ -403,8 +452,7 @@ public class PromotionPageController {
     try {
       List<PromotionCategoryDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/categories/by-topic/" + topicId + "/all",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/promotion/categories/by-topic/" + topicId + "/all", CATEGORY_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch categories for topic {}", topicId, e);
@@ -415,8 +463,7 @@ public class PromotionPageController {
   private List<PromotionCategoryDto> fetchAllCategories() {
     try {
       PageResponse<PromotionCategoryDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/categories?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/promotion/categories?size=1000", CATEGORY_PAGE_TYPE);
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch all categories", e);
@@ -429,7 +476,7 @@ public class PromotionPageController {
       List<PromotionLevelContentDto> result =
           backendApiClient.get(
               "/api/v1/promotion/level-contents/by-category/" + categoryId,
-              new ParameterizedTypeReference<>() {});
+              LEVEL_CONTENT_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch level contents for category {}", categoryId, e);
@@ -442,7 +489,7 @@ public class PromotionPageController {
       PageResponse<RankRequirementDto> result =
           backendApiClient.get(
               "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank",
-              new ParameterizedTypeReference<>() {});
+              RANK_REQUIREMENT_PAGE_TYPE);
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch rank requirements", e);
@@ -461,7 +508,7 @@ public class PromotionPageController {
   private Integer fetchCurrentUserRank() {
     try {
       de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =
-          backendApiClient.get("/api/v1/users/me", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users/me", USER_TYPE);
       return me != null ? me.rank() : null;
     } catch (Exception e) {
       log.warn("Failed to fetch current user rank for promotion overview", e);
@@ -472,8 +519,7 @@ public class PromotionPageController {
   private List<MemberEvaluationDto> fetchMyEvaluations() {
     try {
       List<MemberEvaluationDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/evaluations/my", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/promotion/evaluations/my", MEMBER_EVALUATION_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch my evaluations", e);
@@ -485,8 +531,7 @@ public class PromotionPageController {
     try {
       PageResponse<MemberEvaluationDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/evaluations/all?size=10000",
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/promotion/evaluations/all?size=10000", MEMBER_EVALUATION_PAGE_TYPE);
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch all evaluations", e);
@@ -504,9 +549,7 @@ public class PromotionPageController {
       // Bewertungsverwaltung rather than being its subject, so neither belongs in the matrix —
       // it assesses only the ordinary members of the squadron.
       PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/evaluations/members?size=1000",
-              new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/promotion/evaluations/members?size=1000", USER_PAGE_TYPE);
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch evaluatable members", e);
@@ -517,8 +560,7 @@ public class PromotionPageController {
   private List<PromotionEligibilityDto> fetchMyEligibility() {
     try {
       List<PromotionEligibilityDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/eligibility/my", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/promotion/eligibility/my", ELIGIBILITY_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch personal promotion eligibility", e);
@@ -530,8 +572,7 @@ public class PromotionPageController {
     try {
       List<PromotionEligibilityDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/eligibility/user/" + userId,
-              new ParameterizedTypeReference<>() {});
+              "/api/v1/promotion/eligibility/user/" + userId, ELIGIBILITY_LIST_TYPE);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch promotion eligibility for member {}", userId, e);
