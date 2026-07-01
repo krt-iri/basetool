@@ -354,18 +354,22 @@
                          through the 'overview' section swap
                          (krtRefreshMissionSection(['objectives','overview'])); no version attribute
                          because the overview box carries no mutation (the editor lives in Verwaltung). -->
-                    <div class="kpanel">
+                    <!-- The whole Ziele tile is omitted when no goals are authored (owner request
+                         2026-07-01) — an empty box is noise, so the panel disappears entirely rather
+                         than showing an empty-state placeholder. The tile reappears in place when the
+                         first goal is added via the overview section swap. -->
+                    <div class="kpanel" th:if="${mission.objectives != null and !mission.objectives.isEmpty()}">
                         <div class="kpanel-head">
                             <span th:text="#{mission.objective.section}">Ziele</span>
-                            <span class="ucount" th:if="${mission.objectives != null and !mission.objectives.isEmpty()}" th:text="${mission.objectives.size()}">0</span>
+                            <span class="ucount" th:text="${mission.objectives.size()}">0</span>
                         </div>
                         <!-- Three explicit groups with string-literal kind filters (a SpEL selection
                              ?[...] re-roots on the element, so an outer loop variable is not reachable
                              inside it — hence no th:each over the kinds). Empty groups are omitted. -->
                         <div class="kpanel-body"
-                             th:with="primaryGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'PRIMARY'] : null},
-                                      secondaryGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'SECONDARY'] : null},
-                                      nonGoals=${mission.objectives != null ? mission.objectives.?[kind.name() == 'NON_GOAL'] : null}">
+                             th:with="primaryGoals=${mission.objectives.?[kind.name() == 'PRIMARY']},
+                                      secondaryGoals=${mission.objectives.?[kind.name() == 'SECONDARY']},
+                                      nonGoals=${mission.objectives.?[kind.name() == 'NON_GOAL']}">
                             <div class="ziele-group" th:if="${primaryGoals != null and !primaryGoals.isEmpty()}">
                                 <div class="ziele-group-head ziele-group-head--primary" th:text="#{mission.objective.group.primary}">Hauptziele</div>
                                 <ul class="ziele">
@@ -384,19 +388,21 @@
                                     <li th:each="o : ${nonGoals}" class="ziel ziel--non_goal"><span class="ziel-title" th:text="${o.title}">Ziel</span></li>
                                 </ul>
                             </div>
-                            <p th:if="${mission.objectives == null or mission.objectives.isEmpty()}" class="desc" th:text="#{mission.objective.empty}">Noch keine Ziele.</p>
                         </div>
                     </div>
-                    <!-- Ablauf checklist (moved from the former right column) -->
-                    <div class="kpanel">
+                    <!-- Ablauf checklist (moved from the former right column). The whole tile is
+                         omitted when no steps are authored (owner request 2026-07-01) — no empty-state
+                         placeholder; the tile reappears in place when the first step is added via the
+                         ['steps','overview'] section swap. -->
+                    <div class="kpanel" th:if="${mission.steps != null and !mission.steps.isEmpty()}">
                         <div class="kpanel-head">
                             <span th:text="#{mission.step.section}">Ablauf</span>
-                            <span class="ucount" th:if="${mission.steps != null and !mission.steps.isEmpty()}" th:text="${mission.steps.size()}">0</span>
+                            <span class="ucount" th:text="${mission.steps.size()}">0</span>
                         </div>
                         <div class="kpanel-body">
-                            <ol class="ablauf" th:if="${mission.steps != null and !mission.steps.isEmpty()}"
+                            <ol class="ablauf"
                                 th:attr="data-steps-version=${mission.stepsVersion}"
-                                th:with="firstOpen=${(mission.steps == null) ? null : mission.steps.^[!done]}">
+                                th:with="firstOpen=${mission.steps.^[!done]}">
                                 <li th:each="s : ${mission.steps}" class="step"
                                     th:classappend="${s.done} ? 'step--done' : (${firstOpen != null and firstOpen.id == s.id} ? 'step--now' : '')">
                                     <span class="step-num" th:if="${mission.canEdit}" role="button" tabindex="0"
@@ -411,7 +417,6 @@
                                     </span>
                                 </li>
                             </ol>
-                            <p th:if="${mission.steps == null or mission.steps.isEmpty()}" class="desc" th:text="#{mission.step.empty}">Noch keine Schritte.</p>
                         </div>
                     </div>
                     <!-- Teilnehmer attendance meter (moved from the former right column) -->
@@ -529,7 +534,7 @@
             </div>
             <!-- Detaillierte Beschreibung (Markdown) — collapsible gray card (.more) matching the
                  other overview panels (#818 follow-up); member+ gate unchanged. -->
-            <details class="more" sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')"
+            <details class="more" open sec:authorize="hasAnyRole('ADMIN','OFFICER','KRT_MEMBER','LOGISTICIAN','MISSION_MANAGER')"
                      th:if="${!#strings.isEmpty(mission.description)}">
                 <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
                 <div class="more-body">

@@ -48,9 +48,10 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    followed by the per-unit frequencies of the units that have one, each unit row tagged with a muted
    "Einheit" qualifier; central types without a value and units without a frequency are omitted and the
    whole panel collapses when nothing is set, #816). The long **Markdown**
-   description moves into a collapsible gray-card `<details class="more">` below the grid — the same
+   description moves into a collapsible gray-card `<details class="more" open>` below the grid — the same
    `--color-bg-dark-gray` panel surface as the other overview cards (owner request 2026-06-27, #818
-   follow-up), with a chevron that flips on open, replacing the former bare `hud-details` summary that
+   follow-up), **expanded by default** (owner request 2026-07-01) so the briefing is visible without a
+   click, with a chevron that flips on open, replacing the former bare `hud-details` summary that
    sat directly on the honeycomb backdrop (member+ gate unchanged; rendered
    server-side via the `@markdown` bean — raw HTML escaped, unsafe link protocols stripped, so
    `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
@@ -148,7 +149,10 @@ is a persisted `MissionStep` child of the mission (`title` required ≤200 chars
 authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-step-list`: per-row
 title + meta inputs, up/down + drag reorder, delete, "Schritt hinzufügen", a live "N Schritte"
 counter) and shown **read-only** in the Übersicht as an `<ol class="ablauf">` checklist whose single
-**current phase** (`step--now`) is *derived* as the first not-done step (never stored). Edit-authorised
+**current phase** (`step--now`) is *derived* as the first not-done step (never stored). **When no
+steps are authored the whole Ablauf tile is omitted** from the Übersicht — no empty
+"Noch keine Schritte." placeholder — and reappears in place through the `['steps','overview']`
+section swap once the first step is added (owner request 2026-07-01). Edit-authorised
 users (`mission.canEdit` / `@missionSecurityService.canManageMission`) toggle a step's shared `done`
 check directly on the overview checklist; the state is visible to every viewer. Outsiders/guests see
 the Ablauf read-only (it is non-PII planning data, forwarded like units/frequencies; ADR-0044).
@@ -218,8 +222,10 @@ Goals are authored in the **Verwaltung** tab through a drag-sortable editor (`#m
 per-row title input + a kind `<select>`, up/down + drag reorder, delete, "Ziel hinzufügen", a live "N
 Ziele" counter) and shown **read-only** in the Übersicht as a dedicated **"Ziele" box** — the first
 panel of the left column — that **groups** the goals by kind: all Hauptziele first, then Nebenziele,
-then Nicht-Ziele, each group under its localized header, empty groups omitted, with an empty hint when
-the mission has no goals. Edit access is the mission's `canManageMission` gate (no new permission).
+then Nicht-Ziele, each group under its localized header, empty groups omitted. **When the mission has
+no goals at all the whole Ziele box is omitted** — no empty "Noch keine Ziele." placeholder — and
+reappears in place through the `['objectives','overview']` section swap once the first goal is added
+(owner request 2026-07-01). Edit access is the mission's `canManageMission` gate (no new permission).
 Outsiders/guests see the Ziele box read-only — it is non-PII planning data, forwarded like the Ablauf
 steps, units and frequencies (ADR-0057).
 

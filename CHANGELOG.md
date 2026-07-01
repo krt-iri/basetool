@@ -10,6 +10,10 @@
 
 - **Datenbank: Globales Abfrage-Zeitlimit verhindert das Blockieren von Verbindungen durch einzelne schwere Anfragen.** Jede Datenbankabfrage der Anwendung wird jetzt nach 30 Sekunden (über `APP_DB_QUERY_TIMEOUT_MS` anpassbar) abgebrochen. Bisher konnte eine einzelne sehr große oder langsame Abfrage eine Verbindung aus dem Pool unbegrenzt belegen; mehrere gleichzeitig hätten den Pool erschöpfen und die API ausbremsen können. Flyway-Migrationen sind ausgenommen (SEC-03).
 
+### Changed
+
+- **Einsatz-Übersicht: Leere „Ziele"- und „Ablauf"-Kacheln werden ausgeblendet; Beschreibung standardmäßig aufgeklappt.** In der Einsatz-Übersicht erscheinen die Kacheln „Ziele" und „Ablauf" nur noch, wenn auch Einträge hinterlegt sind — ohne Daten entfällt die Kachel ganz statt einen leeren Platzhalter zu zeigen. Die „Detaillierte Beschreibung" ist jetzt standardmäßig aufgeklappt (REQ-MISSION-004/-009/-012).
+
 ## [v1.0.10](https://github.com/krt-profit/basetool/releases/tag/v1.0.10) - 2026-06-30
 
 ### Changed
