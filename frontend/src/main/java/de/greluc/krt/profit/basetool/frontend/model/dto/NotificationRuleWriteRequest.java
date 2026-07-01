@@ -35,8 +35,8 @@ import java.util.List;
  * @param selectors the recipient selectors (may be empty)
  */
 public record NotificationRuleWriteRequest(
-    String eventType,
-    String notificationType,
+    @BackendEnumAsString String eventType,
+    @BackendEnumAsString String notificationType,
     String description,
     boolean enabled,
     boolean excludeActor,

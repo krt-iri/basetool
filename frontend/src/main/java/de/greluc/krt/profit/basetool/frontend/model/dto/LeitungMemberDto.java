@@ -33,4 +33,8 @@ import java.util.UUID;
  * @param version the membership row's optimistic-lock version, echoed on a squadron-rank write.
  */
 public record LeitungMemberDto(
-    UUID userId, String userDisplayName, String role, UUID kommandoGroupId, long version) {}
+    UUID userId,
+    String userDisplayName,
+    @BackendEnumAsString String role,
+    UUID kommandoGroupId,
+    long version) {}

@@ -49,7 +49,7 @@ import org.jetbrains.annotations.Nullable;
 public record BankHolderBookingDto(
     UUID postingId,
     UUID transactionId,
-    String type,
+    @BackendEnumAsString String type,
     BigDecimal amount,
     @Nullable String note,
     Instant createdAt,

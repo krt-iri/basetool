@@ -29,4 +29,4 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
  * @param defaultQuality the pre-selected quality choice ({@code GOOD} or {@code NONE})
  */
 public record DerivedMaterialDto(
-    MaterialDto material, Double requiredQuantity, String defaultQuality) {}
+    MaterialDto material, Double requiredQuantity, @BackendEnumAsString String defaultQuality) {}

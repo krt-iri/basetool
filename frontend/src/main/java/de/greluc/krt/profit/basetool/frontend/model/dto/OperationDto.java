@@ -52,7 +52,7 @@ public record OperationDto(
     UUID id,
     String name,
     String description,
-    String status,
+    @BackendEnumAsString String status,
     SquadronReferenceDto owningSquadron,
     Long version,
     Instant createdAt,

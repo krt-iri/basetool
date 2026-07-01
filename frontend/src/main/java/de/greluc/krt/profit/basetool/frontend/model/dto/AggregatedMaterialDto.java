@@ -40,7 +40,7 @@ import java.util.List;
  */
 public record AggregatedMaterialDto(
     MaterialDto material,
-    String qualityRequirement,
+    @BackendEnumAsString String qualityRequirement,
     Double totalQuantity,
     Double currentStock,
     List<ClaimDto> claims,

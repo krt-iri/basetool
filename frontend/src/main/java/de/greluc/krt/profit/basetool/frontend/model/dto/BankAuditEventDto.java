@@ -41,7 +41,7 @@ public record BankAuditEventDto(
     UUID id,
     Instant occurredAt,
     String actorHandle,
-    String eventType,
+    @BackendEnumAsString String eventType,
     @Nullable UUID accountId,
     @Nullable String accountNo,
     @Nullable UUID transactionId,

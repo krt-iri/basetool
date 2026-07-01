@@ -57,4 +57,4 @@ public record CraftabilityMaterialDto(
     double missingScuWithRefinery,
     int craftable,
     int craftableWithRefinery,
-    String quantityType) {}
+    @BackendEnumAsString String quantityType) {}

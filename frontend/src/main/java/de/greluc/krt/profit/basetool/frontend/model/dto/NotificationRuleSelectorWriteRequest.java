@@ -32,4 +32,8 @@ import java.util.UUID;
  * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}
  */
 public record NotificationRuleSelectorWriteRequest(
-    String kind, UUID userSub, String roleCode, String orgRelativeRole, String contextRole) {}
+    @BackendEnumAsString String kind,
+    UUID userSub,
+    String roleCode,
+    @BackendEnumAsString String orgRelativeRole,
+    @BackendEnumAsString String contextRole) {}

@@ -57,7 +57,7 @@ import org.jetbrains.annotations.Nullable;
 public record BankBookingDto(
     UUID postingId,
     UUID transactionId,
-    String type,
+    @BackendEnumAsString String type,
     BigDecimal amount,
     String holderHandle,
     @Nullable String note,

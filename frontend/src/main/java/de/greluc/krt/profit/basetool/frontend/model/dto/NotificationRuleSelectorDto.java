@@ -35,8 +35,8 @@ import java.util.UUID;
  */
 public record NotificationRuleSelectorDto(
     UUID id,
-    String kind,
+    @BackendEnumAsString String kind,
     UUID userSub,
     String roleCode,
-    String orgRelativeRole,
-    String contextRole) {}
+    @BackendEnumAsString String orgRelativeRole,
+    @BackendEnumAsString String contextRole) {}
