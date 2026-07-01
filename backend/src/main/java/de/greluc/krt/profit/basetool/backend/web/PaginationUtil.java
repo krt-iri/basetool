@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.web;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -168,6 +167,6 @@ public final class PaginationUtil {
   public static List<String> toSortStrings(Sort sort) {
     return sort.stream()
         .map(o -> o.getProperty() + "," + o.getDirection().name().toLowerCase())
-        .collect(Collectors.toList());
+        .toList();
   }
 }

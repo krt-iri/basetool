@@ -712,8 +712,8 @@ public class HangarPageController {
       return null;
     }
     try {
-      if (o instanceof Number) {
-        return ((Number) o).longValue();
+      if (o instanceof Number number) {
+        return number.longValue();
       }
       return Long.parseLong(o.toString());
     } catch (Exception e) {

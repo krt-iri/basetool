@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialCategoryService;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,7 +55,7 @@ public class MaterialCategoryController {
    */
   @GetMapping
   public List<MaterialCategoryDto> getAll() {
-    return service.findAll().stream().map(mapper::toDto).collect(Collectors.toList());
+    return service.findAll().stream().map(mapper::toDto).toList();
   }
 
   /**

@@ -66,7 +66,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -597,10 +596,10 @@ public class JobOrderPageController {
                                   m ->
                                       new CreateJobOrderItemMaterialDto(
                                           m.getMaterialId(), m.getQuality()))
-                              .collect(Collectors.toList()),
+                              .toList(),
                           l.getClientLineId(),
                           l.getParentClientLineId()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
@@ -664,10 +663,10 @@ public class JobOrderPageController {
                             m ->
                                 new CreateJobOrderItemMaterialDto(
                                     m.getMaterialId(), m.getQuality()))
-                        .collect(Collectors.toList()),
+                        .toList(),
                     l.getClientLineId(),
                     l.getParentClientLineId()))
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /**
@@ -849,10 +848,10 @@ public class JobOrderPageController {
                                   m ->
                                       new CreateJobOrderItemMaterialDto(
                                           m.getMaterialId(), m.getQuality()))
-                              .collect(Collectors.toList()),
+                              .toList(),
                           l.getClientLineId(),
                           l.getParentClientLineId()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
@@ -1032,7 +1031,7 @@ public class JobOrderPageController {
                   m ->
                       new CreateJobOrderMaterialDto(
                           m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -1103,7 +1102,7 @@ public class JobOrderPageController {
         .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
         .map(
             m -> new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-        .collect(Collectors.toList());
+        .toList();
   }
 
   /**
@@ -1383,7 +1382,7 @@ public class JobOrderPageController {
                   m ->
                       new CreateJobOrderMaterialDto(
                           m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -1435,7 +1434,7 @@ public class JobOrderPageController {
                 m ->
                     new CreateJobOrderMaterialDto(
                         m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (materials.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -1565,7 +1564,7 @@ public class JobOrderPageController {
                   item ->
                       new JobOrderHandoverItemCreateDto(
                           item.getInventoryItemId(), item.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (items.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
@@ -1644,7 +1643,7 @@ public class JobOrderPageController {
                   e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
               .map(
                   e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
-              .collect(Collectors.toList());
+              .toList();
 
       if (entries.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.noitems");
@@ -1747,7 +1746,7 @@ public class JobOrderPageController {
             .map(
                 item ->
                     new JobOrderHandoverItemCreateDto(item.getInventoryItemId(), item.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (items.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -1796,7 +1795,7 @@ public class JobOrderPageController {
             .filter(
                 e -> e.getJobOrderItemId() != null && e.getAmount() != null && e.getAmount() > 0)
             .map(e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
-            .collect(Collectors.toList());
+            .toList();
     if (entries.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
@@ -2298,9 +2297,7 @@ public class JobOrderPageController {
   private void applyOwnerPickerOptions(
       Model model, List<OrgUnitMembershipOptionDto> requestingOptions) {
     List<OrgUnitMembershipOptionDto> responsibleOptions =
-        requestingOptions.stream()
-            .filter(o -> Boolean.TRUE.equals(o.isProfitEligible()))
-            .collect(Collectors.toList());
+        requestingOptions.stream().filter(o -> Boolean.TRUE.equals(o.isProfitEligible())).toList();
     model.addAttribute("responsibleOptions", responsibleOptions);
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
