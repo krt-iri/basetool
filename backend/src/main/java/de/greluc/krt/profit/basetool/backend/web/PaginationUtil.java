@@ -32,9 +32,29 @@ import org.springframework.data.domain.Sort;
  * Pageable} while enforcing the project's invariants: every list endpoint sorts against a fixed
  * whitelist (no user-supplied JPA paths), every page request gets {@code id} appended as a
  * tiebreaker so pages remain stable, and the {@code size} parameter is clamped so a single request
- * cannot pin the database with an unbounded fetch.
+ * cannot fetch an arbitrarily large result set.
+ *
+ * <p><b>Why the clamp is {@value #MAX_PAGE_SIZE} and not smaller (SEC-03):</b> several surfaces
+ * deliberately "load all" in one request — the material &times; terminal price matrix ({@code
+ * /api/v1/materials/matrix?size=100000}), the admin material / member / UEX lists, and the sidebar
+ * org-unit pickers. Lowering the ceiling would silently truncate those, so it stays high enough to
+ * cover them. The complementary defence against a heavy fetch <em>pinning</em> a database
+ * connection is the global statement-execution timeout (REQ-DATA-009, {@code
+ * jakarta.persistence.query.timeout}), which bounds how long any query may run regardless of how
+ * many rows it asks for.
  */
 public final class PaginationUtil {
+
+  /**
+   * Upper bound on the {@code size} query parameter. High by design so the "load all in one
+   * request" surfaces (material trade matrix, admin material / member / UEX lists, org-unit
+   * pickers) are not truncated; the query-execution timeout (REQ-DATA-009) is what bounds a heavy
+   * fetch's hold on a database connection. See the class Javadoc (SEC-03).
+   */
+  public static final int MAX_PAGE_SIZE = 100_000;
+
+  /** Default {@code size} when the caller supplies none or a non-positive value. */
+  public static final int DEFAULT_PAGE_SIZE = 50;
 
   private PaginationUtil() {}
 
@@ -65,7 +85,10 @@ public final class PaginationUtil {
       Set<String> allowedSortFields,
       String defaultSortField) {
     int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
-    int size = sizeParam == null || sizeParam <= 0 ? 50 : Math.min(sizeParam, 100000);
+    int size =
+        sizeParam == null || sizeParam <= 0
+            ? DEFAULT_PAGE_SIZE
+            : Math.min(sizeParam, MAX_PAGE_SIZE);
 
     Sort sort = resolveSort(sortParam, allowedSortFields, defaultSortField);
     // Ensure stability: always add a secondary sort by id if not already included
@@ -90,7 +113,10 @@ public final class PaginationUtil {
    */
   public static Pageable createUnsortedPageRequest(Integer pageParam, Integer sizeParam) {
     int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
-    int size = sizeParam == null || sizeParam <= 0 ? 50 : Math.min(sizeParam, 100000);
+    int size =
+        sizeParam == null || sizeParam <= 0
+            ? DEFAULT_PAGE_SIZE
+            : Math.min(sizeParam, MAX_PAGE_SIZE);
     return PageRequest.of(page, size);
   }
 

@@ -28,7 +28,15 @@ server:
   http2:
     enabled: true
   port: 18081
-  forward-headers-strategy: framework
+  # SEC-02: the forwarded-header handling is registered explicitly in ForwardedHeaderConfig instead
+  # of by the `framework` auto-config. Spring's ForwardedHeaderFilter still rebuilds scheme/host from
+  # X-Forwarded-Proto/-Host for the OAuth2 redirect URI and HSTS (identical to `framework`), but it
+  # is ordered one slot AFTER ClientIpContextFilter so the latter can read the RAW X-Forwarded-For
+  # and resolve the client IP trusted-proxy-aware (Spring Boot pins the auto-registered filter to
+  # Integer.MIN_VALUE, which no filter can precede). `framework` consumed the header and exposed only
+  # the spoofable leftmost entry, letting an unauthenticated caller mint a fresh per-IP rate-limit
+  # bucket per request. See ForwardedHeaderConfig + ClientIpContextFilter + app.client-ip.
+  forward-headers-strategy: none
   ssl:
     enabled: true
     # Default keeps backwards compatibility for local development and the test

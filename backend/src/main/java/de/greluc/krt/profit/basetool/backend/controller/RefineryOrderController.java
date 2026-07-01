@@ -296,10 +296,16 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists a specific user's refinery orders. Logistician scoped to the caller's org units: an
-   * admin, the target user themselves, or a logistician whose strict org-unit scope covers a unit
-   * the target user belongs to (epic #800 / PR #808 security review — the flat {@code
-   * ROLE_LOGISTICIAN} is no longer org-wide here, matching the per-order refinery scope).
+   * Lists a specific user's refinery orders. Two-stage org-unit scoping (epic #800 / PR #808 +
+   * finding SEC-01): the {@code @PreAuthorize} gate {@code canViewUserRefineryOrders} is a coarse
+   * user-level pre-check (admin, the target user themselves, or a logistician whose strict org-unit
+   * scope covers <em>any one</em> unit the target belongs to), and the returned page is then
+   * filtered per-row to the caller's effective scope by {@link
+   * RefineryOrderService#getUserRefineryOrdersScoped}. Because a member may belong to up to two
+   * Staffeln (REQ-ORG-017), the gate alone is not enough — without the scoped query a logistician
+   * sharing only one of the target's Staffeln would read the target's orders stamped to the other,
+   * foreign Staffel. Refinery is a strict-staffel aggregate, so the list never returns a row the
+   * per-order {@code canSeeRefineryOrder} gate would individually deny.
    *
    * @param userId target user id
    * @return paged refinery-order list DTOs
@@ -319,7 +325,7 @@ public class RefineryOrderController {
             sort,
             Set.of("startedAt", "durationMinutes", "expenses", "id"),
             "startedAt");
-    Page<RefineryOrder> p = refineryOrderService.getMyRefineryOrders(userId, pageable);
+    Page<RefineryOrder> p = refineryOrderService.getUserRefineryOrdersScoped(userId, pageable);
     List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
     return new PageResponse<>(
         dtoList,

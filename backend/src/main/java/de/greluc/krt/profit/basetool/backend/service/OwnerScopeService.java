@@ -1695,19 +1695,27 @@ public class OwnerScopeService {
   }
 
   /**
-   * {@code true} iff the caller may read the target user's refinery orders through the per-user
-   * list endpoint {@code GET /api/v1/refinery-orders/users/{userId}}. Scopes the flat-{@code
-   * ROLE_LOGISTICIAN} gate at the user level: an admin, the target user themselves, or a caller
-   * whose strict org-unit scope ({@link #canSeeSquadron(UUID)}) covers one of the target user's
-   * memberships. This mirrors the per-order {@link #canSeeRefineryOrder(RefineryOrder)} reach (also
-   * strict-staffel), making the whole refinery surface consistent and closing the org-wide gap
-   * where any oversight rank's flat {@code ROLE_LOGISTICIAN} could read every user's orders (PR
-   * #808 security review). A non-existent / membership-less target yields {@code false} for
-   * non-admins.
+   * {@code true} iff the caller may read <em>any</em> of the target user's refinery orders through
+   * the per-user list endpoint {@code GET /api/v1/refinery-orders/users/{userId}}. This is a
+   * <b>coarse user-level pre-check</b>, not a per-row gate: it passes for an admin, the target user
+   * themselves, or a caller whose strict org-unit scope ({@link #canSeeSquadron(UUID)}) covers
+   * <em>any one</em> of the target user's memberships. A non-existent / membership-less target
+   * yields {@code false} for non-admins.
+   *
+   * <p><b>Per-row scoping is NOT done here</b> (finding SEC-01). Because a member may belong to up
+   * to two Staffeln (REQ-ORG-017), a caller who shares only one of them passes this {@code
+   * anyMatch} gate yet must not see the target's orders stamped to the <em>other</em> Staffel —
+   * which the per-order {@link #canSeeRefineryOrder(RefineryOrder)} gate would individually deny.
+   * That strict-staffel filtering is enforced by the scoped list query {@code
+   * RefineryOrderRepository#findByOwnerIdScoped} (via {@code
+   * RefineryOrderService#getUserRefineryOrdersScoped}), so the page returned to the caller never
+   * contains a row {@code canSeeRefineryOrder} would reject. This gate only decides whether the
+   * caller has <em>any</em> legitimate interest in the target user at all (PR #808 / epic #800;
+   * per-row leak closed by SEC-01).
    *
    * @param targetUserId the user whose refinery orders the caller wants to read; never {@code
    *     null}.
-   * @return {@code true} iff the caller may read that user's refinery orders.
+   * @return {@code true} iff the caller may read the target user's in-scope refinery orders.
    */
   public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
     return canActOnUserRefineryOrders(targetUserId, this::canSeeSquadron);
@@ -1715,8 +1723,15 @@ public class OwnerScopeService {
 
   /**
    * Write analogue of {@link #canViewUserRefineryOrders(UUID)} for the create-on-behalf endpoint
-   * {@code POST /api/v1/refinery-orders/users/{userId}}; scopes on {@link #canEditSquadron(UUID)}
-   * exactly as the per-order {@link #canEditRefineryOrder(UUID)} does.
+   * {@code POST /api/v1/refinery-orders/users/{userId}}; the same coarse {@code anyMatch}
+   * user-level pre-check, scoped on {@link #canEditSquadron(UUID)} instead of {@link
+   * #canSeeSquadron(UUID)}. The per-row constraint that actually keeps a write in bounds is the
+   * stamp validation in {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)} → {@link
+   * #resolveStampedOrgUnit(java.util.Set, UUID)}: the new order's {@code owningOrgUnit} must be a
+   * direct membership of the target user OR a unit the caller may edit, so this gate passing on a
+   * single shared unit can never let the caller stamp a row into a unit it cannot already reach.
+   * Unlike the read path (SEC-01), a too-broad gate here is not a disclosure — a row stamped
+   * outside the caller's scope is one the caller cannot then read back.
    *
    * @param targetUserId the user the caller wants to create a refinery order for; never {@code
    *     null}.
@@ -1728,13 +1743,20 @@ public class OwnerScopeService {
 
   /**
    * Shared resolution for the per-user refinery endpoints: admin all-access, then the self escape,
-   * then the strict org-unit scope check against the target user's memberships (read straight from
-   * {@code org_unit_membership}, never a lazy association). The {@code unitScope} predicate is
+   * then a coarse strict org-unit scope check against the target user's memberships (read straight
+   * from {@code org_unit_membership}, never a lazy association). The {@code unitScope} predicate is
    * {@link #canSeeSquadron(UUID)} for reads / {@link #canEditSquadron(UUID)} for writes.
+   *
+   * <p><b>This is an {@code anyMatch} pre-check, not a per-row gate.</b> A non-admin passes as soon
+   * as the caller shares <em>one</em> of the target's (up to two, REQ-ORG-017) org units, so the
+   * caller may be in scope for some of the target's rows but not others. Callers MUST therefore
+   * apply per-row scoping themselves: reads through the scoped query {@code findByOwnerIdScoped}
+   * (SEC-01), writes through the {@link #resolveStampedOrgUnit(java.util.Set, UUID)} stamp
+   * validation. This method alone does not bound which individual rows the caller may touch.
    *
    * @param targetUserId the user being acted upon; never {@code null}.
    * @param unitScope the per-unit scope check to apply; never {@code null}.
-   * @return {@code true} iff the caller is in scope for the target user's refinery orders.
+   * @return {@code true} iff the caller shares at least one in-scope org unit with the target user.
    */
   private boolean canActOnUserRefineryOrders(
       @NotNull UUID targetUserId, @NotNull java.util.function.Predicate<UUID> unitScope) {

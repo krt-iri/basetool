@@ -93,6 +93,16 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+      # SEC-03: global statement-execution backstop. Every Hibernate-issued query (JPQL, derived,
+      # @Query incl. native, @Modifying, pessimistic-lock waits) is bounded to this many
+      # milliseconds, so a single heavy request -- e.g. a size=100000 load-all of the material
+      # trade matrix -- can never pin one of the Hikari pool's connections indefinitely, and a
+      # handful of concurrent ones cannot exhaust the pool (the Hikari timeouts only bound pool
+      # ACQUISITION, not query EXECUTION). Applies ONLY to Hibernate; Flyway migrations use raw
+      # JDBC and are unaffected, so a long migration is never killed. Generous (30s) so legitimate
+      # load-all reads and batch syncs never trip it; raise via APP_DB_QUERY_TIMEOUT_MS for
+      # environments with deliberately long batch queries.
+      jakarta.persistence.query.timeout: ${APP_DB_QUERY_TIMEOUT_MS:30000}
     hibernate:
       ddl-auto: validate
 

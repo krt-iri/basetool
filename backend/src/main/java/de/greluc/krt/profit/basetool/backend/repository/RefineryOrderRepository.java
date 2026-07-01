@@ -112,6 +112,46 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       Pageable pageable);
 
   /**
+   * Org-unit-scoped variant of {@link #findByOwnerId(UUID, Pageable)} for the cross-user oversight
+   * endpoint {@code GET /api/v1/refinery-orders/users/{userId}}: returns only the target user's
+   * refinery orders whose {@code owningOrgUnit} falls within the caller's effective scope, encoded
+   * as the standard {@code isAdminAllScope} / {@code activeOrgUnitId} / {@code memberOrgUnitIds}
+   * triple (see {@link de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). Refinery is
+   * a strict-staffel aggregate with no cross-squadron escape clause, so an order stamped to an org
+   * unit outside the caller's scope is never returned.
+   *
+   * <p>This closes finding SEC-01: the per-user {@code @PreAuthorize} gate {@code
+   * canViewUserRefineryOrders} only checks that the caller shares <em>any one</em> of the target
+   * user's (up to two, REQ-ORG-017) org units, but the pre-fix path then read the <em>unscoped</em>
+   * {@link #findByOwnerId(UUID, Pageable)} and returned every order the target owned — including
+   * rows stamped to a foreign org unit the caller has no scope over. Mirrors the BAC-004 {@link
+   * #findByMissionIdScoped} hardening so the list can never return a row the per-order {@code
+   * canSeeRefineryOrder} gate would individually deny. Eagerly fetches the configured relations via
+   * {@code @EntityGraph}.
+   *
+   * @param ownerId the target user whose orders to list; never {@code null}
+   * @param isAdminAllScope {@code true} for an admin with no active pin (sees every order)
+   * @param activeOrgUnitId the single pinned org-unit id, or {@code null} when unpinned
+   * @param memberOrgUnitIds the caller's member org-unit ids (consulted only when {@code
+   *     activeOrgUnitId} is {@code null})
+   * @param pageable the page request
+   * @return the in-scope page of the target user's refinery orders
+   */
+  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @Query(
+      "SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND ("
+          + "  :isAdminAllScope = true"
+          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
+          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
+          + " )")
+  Page<RefineryOrder> findByOwnerIdScoped(
+      @Param("ownerId") UUID ownerId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      Pageable pageable);
+
+  /**
    * Loads the caller's own refinery orders in the given statuses with their {@code goods} (and each
    * good's {@code outputMaterial}) eagerly fetched, for the blueprint craftability calculation
    * (#781). Strictly owner-scoped ({@code ownerId}), never org-unit-scoped — craftability folds in
