@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
+
 ## [v1.0.11](https://github.com/krt-profit/basetool/releases/tag/v1.0.11) - 2026-07-01
 
 ### Added

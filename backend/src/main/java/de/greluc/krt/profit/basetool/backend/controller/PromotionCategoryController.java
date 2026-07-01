@@ -86,7 +86,7 @@ public class PromotionCategoryController {
             sort,
             PromotionCategoryService.SORTABLE_FIELDS,
             PromotionCategoryService.DEFAULT_SORT_FIELD);
-    return toPageResponse(service.list(pageable));
+    return PageResponse.of(service.list(pageable));
   }
 
   /**
@@ -117,7 +117,7 @@ public class PromotionCategoryController {
             sort,
             PromotionCategoryService.SORTABLE_FIELDS,
             PromotionCategoryService.DEFAULT_SORT_FIELD);
-    return toPageResponse(service.listByTopic(topicId, pageable));
+    return PageResponse.of(service.listByTopic(topicId, pageable));
   }
 
   /**
@@ -211,15 +211,5 @@ public class PromotionCategoryController {
   })
   public void delete(@PathVariable UUID id) {
     service.delete(id);
-  }
-
-  private static <T> PageResponse<T> toPageResponse(org.springframework.data.domain.Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 }

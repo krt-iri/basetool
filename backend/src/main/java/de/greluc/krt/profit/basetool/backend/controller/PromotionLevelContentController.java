@@ -88,7 +88,7 @@ public class PromotionLevelContentController {
             sort,
             PromotionLevelContentService.SORTABLE_FIELDS,
             PromotionLevelContentService.DEFAULT_SORT_FIELD);
-    return toPageResponse(service.list(pageable));
+    return PageResponse.of(service.list(pageable));
   }
 
   /**
@@ -184,15 +184,5 @@ public class PromotionLevelContentController {
   })
   public void delete(@PathVariable UUID id) {
     service.delete(id);
-  }
-
-  private static <T> PageResponse<T> toPageResponse(org.springframework.data.domain.Page<T> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 }

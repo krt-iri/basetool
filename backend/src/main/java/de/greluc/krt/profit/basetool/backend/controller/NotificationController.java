@@ -120,7 +120,7 @@ public class NotificationController {
             NotificationService.SORTABLE_FIELDS,
             NotificationService.DEFAULT_SORT_FIELD);
     Page<NotificationDto> result = service.listOwn(recipientSub, pageable);
-    return toPageResponse(result);
+    return PageResponse.of(result);
   }
 
   /**
@@ -226,17 +226,6 @@ public class NotificationController {
     UUID recipientSub = requireSub(authentication);
     int affected = service.deleteAllRead(recipientSub);
     return new NotificationBulkResultDto(affected, service.unreadCount(recipientSub));
-  }
-
-  @NotNull
-  private static PageResponse<NotificationDto> toPageResponse(@NotNull Page<NotificationDto> page) {
-    return new PageResponse<>(
-        page.getContent(),
-        page.getNumber(),
-        page.getSize(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        PaginationUtil.toSortStrings(page.getSort()));
   }
 
   @NotNull

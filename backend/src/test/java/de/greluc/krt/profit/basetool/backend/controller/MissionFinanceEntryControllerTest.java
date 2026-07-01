@@ -131,9 +131,9 @@ class MissionFinanceEntryControllerTest {
     assertThat(result.content()).containsExactly(a, b);
     assertThat(result.totalElements()).isEqualTo(2L);
     // The sort encoding "<field>,<direction>" is what the frontend's pagination component echoes
-    // back on the next request; the controller's local toPageResponse helper must mirror the
-    // PaginationUtil contract used by every other listing endpoint or the next-page link breaks.
-    assertThat(result.sort()).containsExactly("createdAt,ASC");
+    // back on the next request; the shared PageResponse.of factory renders the direction in
+    // lowercase, matching the PaginationUtil contract used by every other listing endpoint.
+    assertThat(result.sort()).containsExactly("createdAt,asc");
     verify(service).getEntriesByMission(eq(missionId), any(Pageable.class));
   }
 

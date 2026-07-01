@@ -59,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -393,7 +394,7 @@ public class OrgUnitBankAccessService {
         accountId,
         null,
         null,
-        target == null ? null : "target=" + target.stripTrailingZeros().toPlainString());
+        target == null ? null : "target=" + BankAmounts.plain(target));
     return toSettingsDto(account);
   }
 

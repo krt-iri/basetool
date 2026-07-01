@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -73,6 +74,7 @@ public class KommandoGroupService {
   private final OrgUnitMembershipRepository membershipRepository;
   private final AuditService auditService;
   private final OrgChartService orgChartService;
+  private final KommandoGroupMapper kommandoGroupMapper;
 
   /**
    * Lists the Kommandogruppen of a Staffel in display order.
@@ -86,7 +88,7 @@ public class KommandoGroupService {
   public List<KommandoGroupDto> listGroups(@NotNull UUID squadronId) {
     requireSquadron(squadronId);
     return kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId).stream()
-        .map(KommandoGroupService::toDto)
+        .map(kommandoGroupMapper::toDto)
         .toList();
   }
 
@@ -126,7 +128,7 @@ public class KommandoGroupService {
         saved.getName(),
         null,
         "squadron=" + orgUnitLabel(squadron));
-    return toDto(saved);
+    return kommandoGroupMapper.toDto(saved);
   }
 
   /**
@@ -155,7 +157,7 @@ public class KommandoGroupService {
     orgChartService.mirrorUpdateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
-    return toDto(saved);
+    return kommandoGroupMapper.toDto(saved);
   }
 
   /**
@@ -215,22 +217,6 @@ public class KommandoGroupService {
     if (group.getVersion() != null && !group.getVersion().equals(version)) {
       throw new ObjectOptimisticLockingFailureException(KommandoGroup.class, group.getId());
     }
-  }
-
-  /**
-   * Maps a persisted group to its read model.
-   *
-   * @param group the persisted group; never {@code null}.
-   * @return the DTO.
-   */
-  @NotNull
-  private static KommandoGroupDto toDto(@NotNull KommandoGroup group) {
-    return new KommandoGroupDto(
-        group.getId(),
-        group.getSquadron().getId(),
-        group.getName(),
-        group.getSortIndex(),
-        group.getVersion());
   }
 
   /**
