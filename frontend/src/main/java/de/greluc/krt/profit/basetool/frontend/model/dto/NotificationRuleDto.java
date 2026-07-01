@@ -40,8 +40,8 @@ import java.util.UUID;
  */
 public record NotificationRuleDto(
     UUID id,
-    String eventType,
-    String notificationType,
+    @BackendEnumAsString String eventType,
+    @BackendEnumAsString String notificationType,
     String description,
     boolean enabled,
     boolean excludeActor,

@@ -40,8 +40,8 @@ public record BankDashboardAccountDto(
     UUID id,
     String accountNo,
     String name,
-    String type,
-    String status,
+    @BackendEnumAsString String type,
+    @BackendEnumAsString String status,
     BigDecimal balance,
     BigDecimal delta30d,
     List<BigDecimal> sparkline) {}

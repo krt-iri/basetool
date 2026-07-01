@@ -41,8 +41,8 @@ import org.jetbrains.annotations.Nullable;
 public record AuditEventDto(
     UUID id,
     Instant occurredAt,
-    String domain,
-    String eventType,
+    @BackendEnumAsString String domain,
+    @BackendEnumAsString String eventType,
     String actorHandle,
     @Nullable UUID subjectId,
     @Nullable String subjectLabel,

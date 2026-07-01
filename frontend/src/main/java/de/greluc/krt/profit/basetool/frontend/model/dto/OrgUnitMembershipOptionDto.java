@@ -46,5 +46,5 @@ public record OrgUnitMembershipOptionDto(
     UUID orgUnitId,
     String orgUnitName,
     String orgUnitShorthand,
-    String kind,
+    @BackendEnumAsString String kind,
     Boolean isProfitEligible) {}

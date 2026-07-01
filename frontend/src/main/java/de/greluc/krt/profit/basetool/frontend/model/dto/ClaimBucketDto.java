@@ -36,7 +36,7 @@ import java.util.List;
  */
 public record ClaimBucketDto(
     MaterialDto material,
-    String qualityRequirement,
+    @BackendEnumAsString String qualityRequirement,
     Double requiredAmount,
     Double claimedAmount,
     Double openRemaining,

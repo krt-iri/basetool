@@ -34,7 +34,7 @@ public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,
     String handle,
-    String status,
+    @BackendEnumAsString String status,
     SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds) {}

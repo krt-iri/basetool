@@ -48,8 +48,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kImportJobDto(
     String id,
-    String kind,
-    String status,
+    @BackendEnumAsString String kind,
+    @BackendEnumAsString String status,
     boolean seedNew,
     String sourceFilename,
     Long fileSizeBytes,

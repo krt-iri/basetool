@@ -697,6 +697,13 @@ directories:
 The frontend never talks to PostgreSQL or the Keycloak Admin API directly.
 The backend never serves HTML.
 
+The frontend hand-mirrors the backend's DTOs as its own records (no shared module, no code
+generation) — deliberately, to keep the module split clean. `FrontendDtoContractTest` is the drift
+gate for that duplication: it diffs every `frontend/model/dto` record against the committed
+`backend/src/main/resources/api/openapi.json` and fails the build on a shape divergence or on an
+`enum`&rarr;`String` demotion that is not explicitly opted into via `@BackendEnumAsString` (the
+frontend renders some backend enums as raw names for i18n keys — a choice the annotation records).
+
 ### 5.3 Configuration (environment variables)
 
 Both modules read configuration from environment variables. The most

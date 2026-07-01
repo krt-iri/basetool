@@ -36,5 +36,5 @@ public record JobOrderItemMaterialDto(
     UUID id,
     MaterialDto material,
     Double requiredQuantity,
-    String qualityRequirement,
+    @BackendEnumAsString String qualityRequirement,
     Long version) {}

@@ -42,7 +42,7 @@ import java.util.UUID;
  */
 public record OrgChartNodeDto(
     UUID positionId,
-    String positionType,
+    @BackendEnumAsString String positionType,
     UUID userId,
     String userName,
     String displayName,

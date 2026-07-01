@@ -44,7 +44,7 @@ public record BereichChartDto(
     UUID orgUnitId,
     String name,
     String shorthand,
-    String department,
+    @BackendEnumAsString String department,
     AreaLeadershipDto leadership,
     List<SquadronChartDto> squadrons,
     List<SpecialCommandChartDto> specialCommands) {}
