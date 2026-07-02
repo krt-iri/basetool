@@ -89,6 +89,16 @@ server-supplied `targetUrl` from the 2xx body and `window.location.assign`s it o
 `window.location.reload()` **only** as the defensive fallback for a `targetUrl` that is unexpectedly
 absent from an otherwise-successful response — never as its normal success path.
 
+**Server-side relay helpers (S11, #917).** The page controllers' in-place AJAX write handlers relay
+a backend failure to `krtFetch` as `application/problem+json` via the shared
+`support.BackendErrorResponses.propagateBackendError(BackendServiceException)` — the single copy of
+the `status`/`code`/`detail`/`correlationId` relay the controllers previously each duplicated, so
+`krtFetch` branches on the conflict semantics identically everywhere; do not re-hand-roll the relay.
+The residual non-AJAX Post/Redirect/Get handlers (e.g. the job-order drag-drop reorder and delete)
+use `support.MutationResponseHelper.mutate(…)` for the `try → successToast / catch → errorToast →
+redirect` flash pattern. Handler-specific form re-population and `409`/concurrency-conflict branching
+stay in the handler (the helper carries only the generic toast).
+
 **Acceptance**
 
 - [ ] A new write call site uses `krtFetch.write` (JSON) or `krtFetch.submitForm` (FormData) /

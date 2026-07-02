@@ -142,14 +142,8 @@
     <!-- Period PDF export (REQ-AUDIT-001): a period picker -> backend PDF via the proxy, downloaded
          as a blob (no native dialogs; errors render inline). The endpoint is the active tab's proxy
          path; audit-log.js reads the synced from/to hidden inputs and fetches the blob. -->
-    <div class="krt-modal-overlay" id="audit-export-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.audit.export.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{admin.audit.export.title}">Audit-Log exportieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="audit-export-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
-            </div>
-            <form class="audit-download-form no-track"
+    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-export-modal', titleKey='admin.audit.export.title', variant=null, body=~{::.audit-download-form})}">
+        <form class="audit-download-form no-track"
                   th:attr="data-endpoint=${exportEndpoint},data-filename='audit-' + ${activeDomain} + '.pdf',data-period-required=#{admin.audit.export.periodRequired},data-download-error=#{admin.audit.export.error}">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{admin.audit.export.hint}">Zeitraum in deiner Lokalzeit; das PDF rendert die Zeitstempel ebenfalls lokal.</p>
@@ -188,20 +182,13 @@
                             th:text="#{admin.audit.export.submit}">PDF herunterladen</button>
                 </div>
             </form>
-        </div>
     </div>
 
     <!-- Period retention purge (REQ-AUDIT-004): deletes the active tab's audit entries older than a
          cutoff. A prominent warning recommends exporting a PDF/JSON backup first; the deletion is
          irreversible and itself audit-logged. No native dialogs; validation + the deleted-count
          result render inline (audit-log.js, via krtFetch.write DELETE). -->
-    <div class="krt-modal-overlay" id="audit-purge-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.audit.purge.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{admin.audit.purge.title}">Audit-Log-Eintr&auml;ge l&ouml;schen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="audit-purge-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
-            </div>
+    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-purge-modal', titleKey='admin.audit.purge.title', variant=null, body=~{::.audit-purge-form})}">
             <form class="audit-purge-form no-track"
                   th:attr="data-endpoint=${purgeEndpoint},data-period-required=#{admin.audit.purge.beforeRequired},data-delete-error=#{admin.audit.purge.error},data-success-template=#{admin.audit.purge.success}">
                 <div class="krt-modal-body">
@@ -234,7 +221,6 @@
                             th:text="#{admin.audit.purge.submit}">Endg&uuml;ltig l&ouml;schen</button>
                 </div>
             </form>
-        </div>
     </div>
 </main>
 

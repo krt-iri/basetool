@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
+import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBulkDeleteResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityServic
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -49,9 +51,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -90,7 +90,7 @@ public class PersonalBlueprintController {
    * @param size optional page size
    * @param sort optional sort expression over the whitelist
    * @param q optional case-insensitive product-name filter
-   * @param authentication the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return paged response DTOs
    */
   @GetMapping
@@ -104,8 +104,7 @@ public class PersonalBlueprintController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String q,
-      JwtAuthenticationToken authentication) {
-    String ownerSub = requireSub(authentication);
+      @CurrentUserSub String ownerSub) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -127,7 +126,7 @@ public class PersonalBlueprintController {
    * Adds a single blueprint to the caller's owned set.
    *
    * @param request the add payload
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the persisted DTO
    */
   @PostMapping
@@ -140,8 +139,8 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "409", description = "Blueprint already owned.")
   })
   public PersonalBlueprintResponse add(
-      @Valid @RequestBody PersonalBlueprintCreateRequest request, JwtAuthenticationToken auth) {
-    return service.add(requireSub(auth), request);
+      @Valid @RequestBody PersonalBlueprintCreateRequest request, @CurrentUserSub String ownerSub) {
+    return service.add(ownerSub, request);
   }
 
   /**
@@ -149,7 +148,7 @@ public class PersonalBlueprintController {
    * skipped, not rejected; the response summarizes the outcome.
    *
    * @param request the batch of product keys
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return a summary of added vs. skipped keys
    */
   @PostMapping("/batch")
@@ -160,8 +159,8 @@ public class PersonalBlueprintController {
   })
   public PersonalBlueprintBatchResult addBatch(
       @Valid @RequestBody PersonalBlueprintBatchCreateRequest request,
-      JwtAuthenticationToken auth) {
-    return service.addBatch(requireSub(auth), request.productKeys());
+      @CurrentUserSub String ownerSub) {
+    return service.addBatch(ownerSub, request.productKeys());
   }
 
   /**
@@ -169,7 +168,7 @@ public class PersonalBlueprintController {
    *
    * @param id entry id
    * @param request the update payload (carries the expected version)
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -183,15 +182,15 @@ public class PersonalBlueprintController {
   public PersonalBlueprintResponse update(
       @PathVariable UUID id,
       @Valid @RequestBody PersonalBlueprintUpdateRequest request,
-      JwtAuthenticationToken auth) {
-    return service.update(requireSub(auth), id, request);
+      @CurrentUserSub String ownerSub) {
+    return service.update(ownerSub, id, request);
   }
 
   /**
    * Removes a blueprint from the caller's owned set.
    *
    * @param id entry id
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -200,8 +199,30 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "204", description = "Blueprint removed."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
-    service.delete(requireSub(auth), id);
+  public void delete(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
+    service.delete(ownerSub, id);
+  }
+
+  /**
+   * Clears the caller's entire <em>removable</em> owned-blueprint set in one call — the "delete all
+   * my blueprints" action (REQ-INV-023). The auto-granted, non-removable default blueprints
+   * (REQ-INV-016) are preserved. Returns the number of blueprints removed so the UI can confirm the
+   * outcome; a set that held only defaults (or was already empty) yields {@code 0}.
+   *
+   * @param ownerSub the caller's JWT {@code sub} claim
+   * @return the count of removed blueprints
+   */
+  @DeleteMapping
+  @Operation(
+      summary = "Clear the caller's removable owned blueprints (keeps auto-granted defaults).")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Removable blueprints cleared; the removed count is returned."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public PersonalBlueprintBulkDeleteResult deleteAll(@CurrentUserSub String ownerSub) {
+    return new PersonalBlueprintBulkDeleteResult(service.deleteAllOwn(ownerSub));
   }
 
   /**
@@ -210,7 +231,7 @@ public class PersonalBlueprintController {
    * &amp; Stats" detail (#327). Owner-scoped: a foreign or unknown id yields 404.
    *
    * @param id owned-blueprint entry id
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the recipe view for the owned product
    */
   @GetMapping("/{id}/recipe")
@@ -223,8 +244,8 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
   public PersonalBlueprintRecipeResponse recipe(
-      @PathVariable UUID id, JwtAuthenticationToken auth) {
-    return service.recipeForOwn(requireSub(auth), id);
+      @PathVariable UUID id, @CurrentUserSub String ownerSub) {
+    return service.recipeForOwn(ownerSub, id);
   }
 
   /**
@@ -237,6 +258,7 @@ public class PersonalBlueprintController {
    *
    * @param includeRefinery whether to fold the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
    *     yield into the {@code *WithRefinery} figures (default {@code false})
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @param auth the caller's JWT authentication
    * @return one craftability entry per owned blueprint
    */
@@ -252,8 +274,8 @@ public class PersonalBlueprintController {
   public List<BlueprintCraftabilityDto> craftability(
       @RequestParam(name = "includeRefinery", required = false, defaultValue = "false")
           boolean includeRefinery,
+      @CurrentUserSub String ownerSub,
       JwtAuthenticationToken auth) {
-    String ownerSub = requireSub(auth);
     UUID userId = userService.getUserIdFromJwt(auth.getToken());
     return craftabilityService.computeForOwner(ownerSub, userId, includeRefinery);
   }
@@ -264,7 +286,7 @@ public class PersonalBlueprintController {
    * returns per-name resolution rows for the caller to review. Nothing is persisted.
    *
    * @param file the uploaded blueprint export JSON
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the per-name preview with status counts
    */
   @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -275,8 +297,8 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
   public BlueprintImportPreviewDto previewImport(
-      @RequestParam("file") @NotNull MultipartFile file, JwtAuthenticationToken auth) {
-    return importService.previewImport(requireSub(auth), file);
+      @RequestParam("file") @NotNull MultipartFile file, @CurrentUserSub String ownerSub) {
+    return importService.previewImport(ownerSub, file);
   }
 
   /**
@@ -284,7 +306,7 @@ public class PersonalBlueprintController {
    * learns an alias for every manual pick. Blank or unresolvable choices are skipped.
    *
    * @param request the per-name resolutions
-   * @param auth the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return a summary of added / learned / skipped / already-owned counts
    */
   @PostMapping("/import/apply")
@@ -295,27 +317,7 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
   public BlueprintImportResultDto applyImport(
-      @Valid @RequestBody BlueprintImportApplyRequest request, JwtAuthenticationToken auth) {
-    return importService.applyImport(requireSub(auth), request.resolutions());
-  }
-
-  /**
-   * Extracts the non-blank JWT {@code sub} from the caller's authentication.
-   *
-   * @param auth the caller's JWT authentication
-   * @return the subject claim
-   * @throws AccessDeniedException if the token or its subject claim is missing
-   */
-  @NotNull
-  private static String requireSub(JwtAuthenticationToken auth) {
-    if (auth == null || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    Jwt jwt = auth.getToken();
-    String sub = jwt.getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
+      @Valid @RequestBody BlueprintImportApplyRequest request, @CurrentUserSub String ownerSub) {
+    return importService.applyImport(ownerSub, request.resolutions());
   }
 }

@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverFor
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -110,6 +111,7 @@ public class JobOrderPageController {
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
+  private final MutationResponseHelper mutationResponseHelper;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -1220,16 +1222,16 @@ public class JobOrderPageController {
       @PathVariable UUID id,
       @RequestParam Integer priority,
       RedirectAttributes redirectAttributes) {
-    try {
-      backendApiClient.put(
-          "/api/v1/orders/" + id + "/priority?priority=" + priority, null, JobOrderDto.class);
-      redirectAttributes.addFlashAttribute("successToast", "success.joborder.priority");
-    } catch (Exception e) {
-      log.error("Failed to update priority", e);
-      log.error("Failed to update job order priority", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.priority.failed");
-    }
-    return "redirect:/orders";
+    return mutationResponseHelper.mutate(
+        redirectAttributes,
+        "/orders",
+        "success.joborder.priority",
+        "error.joborder.priority.failed",
+        () ->
+            backendApiClient.put(
+                "/api/v1/orders/" + id + "/priority?priority=" + priority,
+                null,
+                JobOrderDto.class));
   }
 
   /**
@@ -1525,15 +1527,12 @@ public class JobOrderPageController {
   @PostMapping("/{id}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
-    try {
-      backendApiClient.delete("/api/v1/orders/" + id, Void.class);
-      redirectAttributes.addFlashAttribute("successToast", "success.joborder.delete");
-    } catch (Exception e) {
-      log.error("Failed to delete order", e);
-      log.error("Failed to delete job order", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.delete.failed");
-    }
-    return "redirect:/orders";
+    return mutationResponseHelper.mutate(
+        redirectAttributes,
+        "/orders",
+        "success.joborder.delete",
+        "error.joborder.delete.failed",
+        () -> backendApiClient.delete("/api/v1/orders/" + id, Void.class));
   }
 
   /**

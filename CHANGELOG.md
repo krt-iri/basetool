@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
+- **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
+
 ### Changed
 
 - **Bank: Kontoname in der Antragsansicht besser sichtbar.** In der Antragsübersicht (`/bank/requests`) zeigt die Konto-Spalte jetzt den Kontonamen an erster Stelle; die Kontonummer steht klein darunter, das Einheitskürzel entfällt (REQ-BANK-023).

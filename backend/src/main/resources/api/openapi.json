@@ -16666,6 +16666,86 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ]
+      },
+      "delete" : {
+        "tags" : [ "Personal Blueprints" ],
+        "summary" : "Clear the caller's removable owned blueprints (keeps auto-granted defaults).",
+        "operationId" : "deleteAll",
+        "responses" : {
+          "200" : {
+            "description" : "Removable blueprints cleared; the removed count is returned.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalBlueprintBulkDeleteResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
       }
     },
     "/api/v1/personal-blueprints/import/preview" : {
@@ -36637,7 +36717,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37370,7 +37449,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37492,7 +37570,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -43994,7 +44071,6 @@
         "parameters" : [ {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44457,7 +44533,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44830,7 +44905,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -45213,7 +45287,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -47359,6 +47432,88 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/admin/personal-blueprints" : {
+      "delete" : {
+        "tags" : [ "Admin – Personal Blueprints" ],
+        "summary" : "Clear every user's removable owned blueprints (keeps auto-granted defaults).",
+        "operationId" : "deleteAllForAllUsers",
+        "responses" : {
+          "200" : {
+            "description" : "All users' removable blueprints cleared; the removed count is returned.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalBlueprintBulkDeleteResult"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
       }
     },
     "/api/v1/admin/default-blueprints/{id}" : {
@@ -57312,6 +57467,15 @@
         }
       },
       "SyncReportPurgeResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "deleted" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PersonalBlueprintBulkDeleteResult" : {
         "type" : "object",
         "properties" : {
           "deleted" : {

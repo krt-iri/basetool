@@ -62,12 +62,16 @@ import org.springframework.boot.health.contributor.Status;
 class KeycloakHealthIndicatorTest {
 
   /**
-   * Short timeouts keep transport-failure tests millisecond-fast — the production indicator uses
-   * 2&nbsp;s / 3&nbsp;s but we do not need those margins against an in-process server.
+   * Test timeouts. These stay fast without being flaky: the transport-failure test hits a closed
+   * port, where connection-refused is surfaced immediately (not by an elapsed timeout), so a larger
+   * bound does not slow it; the happy-path and upstream-error tests make a real localhost
+   * round-trip whose first {@code JdkClientHttpRequestFactory} call can cold-start past a tight
+   * 500&nbsp;ms bound on a loaded CI runner and spuriously report {@link Status#DOWN}. 2&nbsp;s
+   * gives ample margin while staying well under the production indicator's 2&nbsp;s / 3&nbsp;s.
    */
-  private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofMillis(500);
+  private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofSeconds(2);
 
-  private static final Duration TEST_READ_TIMEOUT = Duration.ofMillis(500);
+  private static final Duration TEST_READ_TIMEOUT = Duration.ofSeconds(2);
 
   private MockWebServer server;
   private String issuerUri;

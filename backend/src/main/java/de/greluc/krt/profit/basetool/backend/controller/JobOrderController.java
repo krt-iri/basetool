@@ -46,20 +46,24 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -73,7 +77,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -171,7 +174,7 @@ public class JobOrderController {
    *
    * @param jobOrderId job-order id
    * @param handoverId item-handover id
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
@@ -197,26 +200,18 @@ public class JobOrderController {
           + "', '"
           + Roles.ADMIN
           + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> downloadItemHandoverReport(
-      @PathVariable UUID jobOrderId,
-      @PathVariable UUID handoverId,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    java.time.ZoneId userZone = null;
-    if (userTimeZone != null && !userTimeZone.isBlank()) {
-      try {
-        userZone = java.time.ZoneId.of(userTimeZone);
-      } catch (java.time.DateTimeException ex) {
-        // Invalid IANA zone in header → fall back to UTC inside the service.
-      }
-    }
+      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
     byte[] pdf =
         jobOrderItemHandoverReportService.generateItemHandoverReport(
             jobOrderId, handoverId, userZone);
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
+    return PdfResponses.pdfAttachment(pdf, filename);
   }
 
   /**
@@ -226,7 +221,7 @@ public class JobOrderController {
    *
    * @param jobOrderId job-order id
    * @param handoverId handover id
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/{jobOrderId}/handovers/{handoverId}/report")
@@ -252,25 +247,17 @@ public class JobOrderController {
           + "', '"
           + Roles.ADMIN
           + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> downloadHandoverReport(
-      @PathVariable UUID jobOrderId,
-      @PathVariable UUID handoverId,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    java.time.ZoneId userZone = null;
-    if (userTimeZone != null && !userTimeZone.isBlank()) {
-      try {
-        userZone = java.time.ZoneId.of(userTimeZone);
-      } catch (java.time.DateTimeException ex) {
-        // Invalid IANA zone in header \u2192 fall back to UTC inside the service.
-      }
-    }
+      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
     byte[] pdf =
         jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, userZone);
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
+    return PdfResponses.pdfAttachment(pdf, filename);
   }
 
   /**
@@ -308,10 +295,7 @@ public class JobOrderController {
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
     String filename = "uebergabeprotokoll-vorschau.pdf";
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
+    return PdfResponses.pdfAttachment(pdf, filename);
   }
 
   /**

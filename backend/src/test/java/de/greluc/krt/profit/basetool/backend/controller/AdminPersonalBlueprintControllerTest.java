@@ -122,6 +122,16 @@ class AdminPersonalBlueprintControllerTest {
   }
 
   @Test
+  void deleteAllForAllUsers_relaysToServiceAndReturnsCount() {
+    when(service.deleteAllForAllUsers()).thenReturn(9);
+
+    var result = controller.deleteAllForAllUsers();
+
+    assertEquals(9, result.deleted());
+    verify(service).deleteAllForAllUsers();
+  }
+
+  @Test
   void previewImportForUser_relaysFileWithTargetSub() {
     MultipartFile file =
         new MockMultipartFile("file", "scmdb.json", "application/json", "{}".getBytes());

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -56,7 +55,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.multipart.MultipartFile;
@@ -93,7 +91,7 @@ class PersonalBlueprintControllerTest {
         new PageImpl<>(List.of(sample()), PageRequest.of(0, 10), 1);
     when(service.listOwn(eq(SUB), any(), any())).thenReturn(page);
 
-    PageResponse<PersonalBlueprintResponse> result = controller.list(0, 10, null, null, auth);
+    PageResponse<PersonalBlueprintResponse> result = controller.list(0, 10, null, null, SUB);
 
     assertEquals(1, result.totalElements());
     verify(service).listOwn(eq(SUB), any(), any());
@@ -104,7 +102,7 @@ class PersonalBlueprintControllerTest {
     PersonalBlueprintCreateRequest req = new PersonalBlueprintCreateRequest("k", null, null);
     when(service.add(SUB, req)).thenReturn(sample());
 
-    controller.add(req, auth);
+    controller.add(req, SUB);
 
     verify(service).add(SUB, req);
   }
@@ -116,7 +114,7 @@ class PersonalBlueprintControllerTest {
     when(service.addBatch(eq(SUB), eq(List.of("a", "b"))))
         .thenReturn(new PersonalBlueprintBatchResult(2, 0, 0));
 
-    PersonalBlueprintBatchResult result = controller.addBatch(req, auth);
+    PersonalBlueprintBatchResult result = controller.addBatch(req, SUB);
 
     assertEquals(2, result.added());
     verify(service).addBatch(SUB, List.of("a", "b"));
@@ -128,7 +126,7 @@ class PersonalBlueprintControllerTest {
     PersonalBlueprintUpdateRequest req = new PersonalBlueprintUpdateRequest(null, "n", 1L);
     when(service.update(SUB, id, req)).thenReturn(sample());
 
-    controller.update(id, req, auth);
+    controller.update(id, req, SUB);
 
     verify(service).update(SUB, id, req);
   }
@@ -137,9 +135,19 @@ class PersonalBlueprintControllerTest {
   void delete_relaysToServiceWithSub() {
     UUID id = UUID.randomUUID();
 
-    controller.delete(id, auth);
+    controller.delete(id, SUB);
 
     verify(service).delete(SUB, id);
+  }
+
+  @Test
+  void deleteAll_relaysToServiceWithSubAndReturnsCount() {
+    when(service.deleteAllOwn(SUB)).thenReturn(3);
+
+    var result = controller.deleteAll(SUB);
+
+    assertEquals(3, result.deleted());
+    verify(service).deleteAllOwn(SUB);
   }
 
   @Test
@@ -149,7 +157,7 @@ class PersonalBlueprintControllerTest {
         new PersonalBlueprintRecipeResponse("Name", 1, List.of(), List.of());
     when(service.recipeForOwn(SUB, id)).thenReturn(recipe);
 
-    assertSame(recipe, controller.recipe(id, auth));
+    assertSame(recipe, controller.recipe(id, SUB));
     verify(service).recipeForOwn(SUB, id);
   }
 
@@ -160,16 +168,10 @@ class PersonalBlueprintControllerTest {
     List<BlueprintCraftabilityDto> expected = List.of();
     when(craftabilityService.computeForOwner(SUB, userId, true)).thenReturn(expected);
 
-    List<BlueprintCraftabilityDto> result = controller.craftability(true, auth);
+    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, auth);
 
     assertSame(expected, result);
     verify(craftabilityService).computeForOwner(SUB, userId, true);
-  }
-
-  @Test
-  void add_rejectsMissingJwtWithAccessDenied() {
-    PersonalBlueprintCreateRequest req = new PersonalBlueprintCreateRequest("k", null, null);
-    assertThrows(AccessDeniedException.class, () -> controller.add(req, null));
   }
 
   @Test
@@ -179,7 +181,7 @@ class PersonalBlueprintControllerTest {
     BlueprintImportPreviewDto preview = new BlueprintImportPreviewDto(0, 0, 0, 0, 0, 0, List.of());
     when(importService.previewImport(SUB, file)).thenReturn(preview);
 
-    BlueprintImportPreviewDto result = controller.previewImport(file, auth);
+    BlueprintImportPreviewDto result = controller.previewImport(file, SUB);
 
     assertEquals(0, result.total());
     verify(importService).previewImport(SUB, file);
@@ -193,7 +195,7 @@ class PersonalBlueprintControllerTest {
     when(importService.applyImport(SUB, List.of(res)))
         .thenReturn(new BlueprintImportResultDto(1, 0, 0, 0, 0));
 
-    BlueprintImportResultDto result = controller.applyImport(req, auth);
+    BlueprintImportResultDto result = controller.applyImport(req, SUB);
 
     assertEquals(1, result.added());
     verify(importService).applyImport(SUB, List.of(res));
