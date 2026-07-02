@@ -1,4 +1,4 @@
-# ADR-0064 — Split `OwnerScopeService` into a scope/gate/stamping trio and extract the org-unit-bank write mechanics
+# ADR-0065 — Split `OwnerScopeService` into a scope/gate/stamping trio and extract the org-unit-bank write mechanics
 
 - **Status:** Proposed
 - **Date:** 2026-07-02

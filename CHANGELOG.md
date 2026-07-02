@@ -4,12 +4,14 @@
 
 ### Added
 
+- **E-Mail-Benachrichtigung bei Freigabe oder Ablehnung der Registrierung.** Neue Nutzer werden jetzt per E-Mail informiert, sobald ein Administrator ihre Registrierung freigibt oder ablehnt; bei einer Ablehnung enthält die E-Mail die vom Administrator angegebene Begründung. Der E-Mail-Versand ist ein wiederverwendbarer Kanal (später auch für das Benachrichtigungssystem nutzbar); er ist standardmäßig aktiviert, verschickt aber erst tatsächlich Mails, sobald ein SMTP-Server konfiguriert ist (`SPRING_MAIL_HOST`, z. B. Gmail) — ohne Host bleibt er ein No-Op (REQ-NOTIF-013/-014, ADR-0064).
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
 - **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
 
 ### Changed
 
+- **Discord-Registrierung: Warteseite macht die Freigabepflicht deutlicher.** Die Warteseite nach der Discord-Anmeldung sagt neuen Nutzern jetzt klar, dass sie das Tool erst nach der Freigabe durch einen Administrator nutzen können, und weist darauf hin, dass die Freigabe manuell erfolgt und 1 bis 2 Tage dauern kann (REQ-SEC-017).
 - **Benachrichtigungen: Löschen ohne Rückfrage.** Eine einzelne Benachrichtigung im Glocken-Menü oder auf der Benachrichtigungsseite wird jetzt sofort gelöscht — die zusätzliche Bestätigungsabfrage entfällt, da Benachrichtigungen unkritisch sind. Das Sammel-Löschen „Gelesene löschen" fragt weiterhin nach (REQ-NOTIF-005).
 - **Bank: Kontoname in der Antragsansicht besser sichtbar.** In der Antragsübersicht (`/bank/requests`) zeigt die Konto-Spalte jetzt den Kontonamen an erster Stelle; die Kontonummer steht klein darunter, das Einheitskürzel entfällt (REQ-BANK-023).
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
