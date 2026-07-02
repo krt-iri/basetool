@@ -743,9 +743,9 @@ public class MissionService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@link #resolveGuestSubmittedOrgUnits(java.util.List)} (anonymous
-   *       callers cannot label a guest at all; authenticated callers may label only org units they
-   *       can edit).
+   *       authorization filter in {@code MissionParticipantService.resolveGuestSubmittedOrgUnits}
+   *       (anonymous callers cannot label a guest at all; authenticated callers may label only org
+   *       units they can edit).
    * </ul>
    *
    * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
