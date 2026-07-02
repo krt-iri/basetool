@@ -29,9 +29,8 @@ import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
@@ -155,8 +154,9 @@ class RankRequirementServiceTest {
   @Test
   void create_shouldStampOwningSquadronAndSave_global() {
     // Given: a "global" requirement (no topic, no category) — valid, scoped to the active squadron.
-    RankRequirementCreateRequest request =
-        new RankRequirementCreateRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, "Global");
+    RankRequirementWriteRequest request =
+        new RankRequirementWriteRequest(
+            20, 19, null, null, PromotionLevel.LEVEL_A, 3, "Global", null);
     RankRequirement entity =
         RankRequirement.builder()
             .fromRank(20)
@@ -188,8 +188,8 @@ class RankRequirementServiceTest {
   @Test
   void create_shouldRejectWhenNoActiveSquadron() {
     // Given: admin in "all squadrons" mode (no pin) → no squadron to stamp.
-    RankRequirementCreateRequest request =
-        new RankRequirementCreateRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, null);
+    RankRequirementWriteRequest request =
+        new RankRequirementWriteRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, null, null);
     when(ownerScopeService.currentSquadron()).thenReturn(Optional.empty());
 
     // When / Then
@@ -204,9 +204,9 @@ class RankRequirementServiceTest {
     PromotionTopic foreignTopic = new PromotionTopic();
     foreignTopic.setId(UUID.randomUUID());
     foreignTopic.setOwningSquadron(squadron(foreignSquadronId));
-    RankRequirementCreateRequest request =
-        new RankRequirementCreateRequest(
-            20, 19, foreignTopic.getId(), null, PromotionLevel.LEVEL_A, 3, null);
+    RankRequirementWriteRequest request =
+        new RankRequirementWriteRequest(
+            20, 19, foreignTopic.getId(), null, PromotionLevel.LEVEL_A, 3, null, null);
     RankRequirement entity =
         RankRequirement.builder()
             .fromRank(20)
@@ -226,8 +226,8 @@ class RankRequirementServiceTest {
   @Test
   void create_shouldRejectMultiStepPromotion() {
     // Given
-    RankRequirementCreateRequest request =
-        new RankRequirementCreateRequest(20, 18, null, null, PromotionLevel.LEVEL_A, 1, null);
+    RankRequirementWriteRequest request =
+        new RankRequirementWriteRequest(20, 18, null, null, PromotionLevel.LEVEL_A, 1, null, null);
 
     // When / Then
     BadRequestException ex = assertThrows(BadRequestException.class, () -> service.create(request));
@@ -238,8 +238,8 @@ class RankRequirementServiceTest {
   @Test
   void create_shouldRejectReversePromotion() {
     // Given: lower-numbered fromRank than toRank (would be a demotion)
-    RankRequirementCreateRequest request =
-        new RankRequirementCreateRequest(19, 20, null, null, PromotionLevel.LEVEL_A, 1, null);
+    RankRequirementWriteRequest request =
+        new RankRequirementWriteRequest(19, 20, null, null, PromotionLevel.LEVEL_A, 1, null, null);
 
     // When / Then
     assertThrows(BadRequestException.class, () -> service.create(request));
@@ -289,7 +289,7 @@ class RankRequirementServiceTest {
     entity.setOwningSquadron(squadron(SQUADRON_ID));
     entity.setVersion(1L);
     var request =
-        new RankRequirementUpdateRequest(0L, 20, 19, null, null, PromotionLevel.LEVEL_A, 3, null);
+        new RankRequirementWriteRequest(20, 19, null, null, PromotionLevel.LEVEL_A, 3, null, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(ownerScopeService.canEditSquadron(SQUADRON_ID)).thenReturn(true);
 
@@ -302,7 +302,7 @@ class RankRequirementServiceTest {
     // Given
     UUID id = UUID.randomUUID();
     var request =
-        new RankRequirementUpdateRequest(0L, 20, 18, null, null, PromotionLevel.LEVEL_A, 1, null);
+        new RankRequirementWriteRequest(20, 18, null, null, PromotionLevel.LEVEL_A, 1, null, 0L);
 
     // When / Then
     BadRequestException ex =

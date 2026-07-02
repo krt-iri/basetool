@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentWriteRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -45,16 +44,18 @@ public interface PromotionLevelContentMapper {
 
   /**
    * Builds a new {@link PromotionLevelContent} entity from a creation request. The {@code category}
-   * association is left unset and must be wired by the service layer.
+   * association is left unset and must be wired by the service layer. The request's {@code version}
+   * is ignored so a client-supplied value never seeds the JPA {@code @Version} on the transient
+   * entity.
    *
    * @param request validated payload describing the new level content
    * @return a transient entity ready to be persisted
    */
   @Mapping(target = "category", ignore = true)
-  PromotionLevelContent toEntity(PromotionLevelContentCreateRequest request);
+  PromotionLevelContent toEntity(PromotionLevelContentWriteRequest request);
 
   /**
-   * Copies the writable fields from a {@link PromotionLevelContentUpdateRequest} onto an existing
+   * Copies the writable fields from a {@link PromotionLevelContentWriteRequest} onto an existing
    * managed {@link PromotionLevelContent}. Identity, audit, and association fields are deliberately
    * ignored to preserve them across the update.
    *
@@ -67,5 +68,5 @@ public interface PromotionLevelContentMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "category", ignore = true)
   void updateEntity(
-      @MappingTarget PromotionLevelContent entity, PromotionLevelContentUpdateRequest request);
+      @MappingTarget PromotionLevelContent entity, PromotionLevelContentWriteRequest request);
 }

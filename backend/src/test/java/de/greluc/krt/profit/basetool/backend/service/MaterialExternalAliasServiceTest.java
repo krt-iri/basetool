@@ -29,8 +29,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import java.util.List;
@@ -119,9 +118,9 @@ class MaterialExternalAliasServiceTest {
 
   @Test
   void create_stampsCreatedByFromJwt_andPersistsRow() {
-    MaterialExternalAliasCreateRequest request =
-        new MaterialExternalAliasCreateRequest(
-            siliconId, "SCWIKI", "Raw Silicon", null, null, null, "verification note");
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
+            siliconId, "SCWIKI", "Raw Silicon", null, null, null, "verification note", null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
@@ -141,9 +140,9 @@ class MaterialExternalAliasServiceTest {
 
   @Test
   void create_defaultsCreatedByToSystem_whenNoAuthenticationPresent() {
-    MaterialExternalAliasCreateRequest request =
-        new MaterialExternalAliasCreateRequest(
-            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null);
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
+            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(any(), any()))
         .thenReturn(Optional.empty());
@@ -157,9 +156,9 @@ class MaterialExternalAliasServiceTest {
 
   @Test
   void create_throwsNotFound_whenMaterialMissing() {
-    MaterialExternalAliasCreateRequest request =
-        new MaterialExternalAliasCreateRequest(
-            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null);
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
+            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.empty());
 
     assertThrows(NotFoundException.class, () -> service.create(request));
@@ -168,9 +167,9 @@ class MaterialExternalAliasServiceTest {
 
   @Test
   void create_throwsDuplicate_whenAliasForSameSourceAndNameExists() {
-    MaterialExternalAliasCreateRequest request =
-        new MaterialExternalAliasCreateRequest(
-            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null);
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
+            siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
@@ -184,9 +183,9 @@ class MaterialExternalAliasServiceTest {
   // matching the case-insensitive resolution lookup and the V146 unique index.
   @Test
   void create_throwsDuplicate_whenCaseVariantOfExistingAliasIsSubmitted() {
-    MaterialExternalAliasCreateRequest request =
-        new MaterialExternalAliasCreateRequest(
-            siliconId, "SCWIKI", "STILERON (ORE)", null, null, null, null);
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
+            siliconId, "SCWIKI", "STILERON (ORE)", null, null, null, null, null);
     when(materialRepository.findById(siliconId)).thenReturn(Optional.of(silicon));
     when(repository.findBySourceSystemAndExternalNameIgnoreCase(
             MaterialExternalAliasSource.SCWIKI, "STILERON (ORE)"))
@@ -206,8 +205,8 @@ class MaterialExternalAliasServiceTest {
     existing.setVersion(5L);
     when(repository.findById(aliasId)).thenReturn(Optional.of(existing));
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, 4L);
 
     assertThrows(
@@ -228,8 +227,8 @@ class MaterialExternalAliasServiceTest {
     when(repository.saveAndFlush(any(MaterialExternalAlias.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "Raw Silicon", "wiki-key", null, "AGRI", "updated note", 7L);
 
     MaterialExternalAlias saved = service.update(aliasId, request);
@@ -253,8 +252,8 @@ class MaterialExternalAliasServiceTest {
             MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(Optional.of(other));
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, 0L);
 
     assertThrows(DuplicateEntityException.class, () -> service.update(aliasId, request));
@@ -277,8 +276,8 @@ class MaterialExternalAliasServiceTest {
             MaterialExternalAliasSource.SCWIKI, "STILERON (ORE)"))
         .thenReturn(Optional.of(other));
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "STILERON (ORE)", null, null, null, null, 0L);
 
     assertThrows(DuplicateEntityException.class, () -> service.update(aliasId, request));
@@ -300,8 +299,8 @@ class MaterialExternalAliasServiceTest {
     when(repository.saveAndFlush(any(MaterialExternalAlias.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "Stileron (Ore)", null, null, null, null, 0L);
 
     MaterialExternalAlias saved = service.update(aliasId, request);
@@ -327,8 +326,8 @@ class MaterialExternalAliasServiceTest {
         .thenReturn(Optional.empty());
     when(repository.saveAndFlush(existing)).thenReturn(existing);
 
-    MaterialExternalAliasUpdateRequest request =
-        new MaterialExternalAliasUpdateRequest(
+    MaterialExternalAliasWriteRequest request =
+        new MaterialExternalAliasWriteRequest(
             siliconId, "SCWIKI", "Raw Silicon", null, null, null, null, 7L);
 
     service.update(aliasId, request);

@@ -24,8 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
@@ -135,7 +134,7 @@ public class MaterialExternalAliasService {
    * @throws DuplicateEntityException if an alias for the same source / external name already exists
    */
   @Transactional
-  public MaterialExternalAlias create(MaterialExternalAliasCreateRequest request) {
+  public MaterialExternalAlias create(MaterialExternalAliasWriteRequest request) {
     MaterialExternalAliasSource source =
         MaterialExternalAliasSource.valueOf(request.sourceSystem());
     Material material =
@@ -190,7 +189,7 @@ public class MaterialExternalAliasService {
    *     case-insensitively with a different row (REQ-REFINERY-010)
    */
   @Transactional
-  public MaterialExternalAlias update(UUID id, MaterialExternalAliasUpdateRequest request) {
+  public MaterialExternalAlias update(UUID id, MaterialExternalAliasWriteRequest request) {
     MaterialExternalAlias alias = findById(id);
     OptimisticLock.check(alias.getVersion(), request.version(), MaterialExternalAlias.class, id);
     MaterialExternalAliasSource source =

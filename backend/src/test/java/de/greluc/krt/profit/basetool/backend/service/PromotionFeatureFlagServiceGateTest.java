@@ -37,8 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -282,7 +281,7 @@ class PromotionFeatureFlagServiceGateTest {
 
     assertThrows(
         AccessDeniedException.class,
-        () -> service.create(new PromotionTopicCreateRequest("Name", null, 0)));
+        () -> service.create(new PromotionTopicWriteRequest("Name", null, 0, null)));
     verify(topicRepository, never()).save(any());
   }
 
@@ -300,7 +299,7 @@ class PromotionFeatureFlagServiceGateTest {
         AccessDeniedException.class,
         () ->
             service.update(
-                UUID.randomUUID(), new PromotionTopicUpdateRequest(0L, "Renamed", null, 0)));
+                UUID.randomUUID(), new PromotionTopicWriteRequest("Renamed", null, 0, 0L)));
     verify(topicRepository, never()).findById(any());
   }
 

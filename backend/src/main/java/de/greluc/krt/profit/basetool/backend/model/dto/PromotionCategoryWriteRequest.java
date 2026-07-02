@@ -19,14 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
+import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
+import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-/** Write DTO for creating a {@code PromotionLevelContent}. */
-public record PromotionLevelContentCreateRequest(
-    @NotNull UUID categoryId,
-    @NotNull PromotionLevel level,
-    @NotBlank @Size(max = 4000) String description) {}
+/**
+ * Unified create/update write request for a {@code PromotionCategory}; {@code version} is required
+ * only on update via the {@code OnUpdate} group.
+ *
+ * @param topicId identifier of the parent promotion topic (required)
+ * @param name the category name (required, non-blank)
+ * @param description free-text description, or {@code null}
+ * @param sortOrder the display sort order (required)
+ * @param version optimistic-lock version; required on update, ignored on create
+ */
+public record PromotionCategoryWriteRequest(
+    @NotNull UUID topicId,
+    @NotBlank @Size(max = DtoConstraints.MAX_SHORT_NAME) String name,
+    @Size(max = DtoConstraints.MAX_DESCRIPTION) String description,
+    @NotNull Integer sortOrder,
+    @NotNull(groups = OnUpdate.class) Long version) {}

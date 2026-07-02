@@ -20,15 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialExternalAliasMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -121,7 +123,7 @@ public class MaterialExternalAliasController {
   })
   @PostMapping
   public ResponseEntity<MaterialExternalAliasDto> createAlias(
-      @RequestBody @Valid @NotNull MaterialExternalAliasCreateRequest request) {
+      @RequestBody @Valid @NotNull MaterialExternalAliasWriteRequest request) {
     MaterialExternalAliasDto dto = mapper.toDto(service.create(request));
     return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(dto);
   }
@@ -147,7 +149,8 @@ public class MaterialExternalAliasController {
   @PutMapping("/{id}")
   public MaterialExternalAliasDto updateAlias(
       @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull MaterialExternalAliasUpdateRequest request) {
+      @RequestBody @Validated({Default.class, OnUpdate.class}) @NotNull
+          MaterialExternalAliasWriteRequest request) {
     return mapper.toDto(service.update(id, request));
   }
 

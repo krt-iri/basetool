@@ -29,9 +29,8 @@ import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -137,8 +136,9 @@ class PromotionLevelContentServiceTest {
   void create_shouldThrow_whenCategoryNotFound() {
     // Given
     UUID categoryId = UUID.randomUUID();
-    PromotionLevelContentCreateRequest request =
-        new PromotionLevelContentCreateRequest(categoryId, PromotionLevel.LEVEL_A, "Beschreibung");
+    PromotionLevelContentWriteRequest request =
+        new PromotionLevelContentWriteRequest(
+            categoryId, PromotionLevel.LEVEL_A, "Beschreibung", null);
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
     // When / Then
@@ -151,8 +151,9 @@ class PromotionLevelContentServiceTest {
     UUID categoryId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
-    PromotionLevelContentCreateRequest request =
-        new PromotionLevelContentCreateRequest(categoryId, PromotionLevel.LEVEL_A, "Beschreibung");
+    PromotionLevelContentWriteRequest request =
+        new PromotionLevelContentWriteRequest(
+            categoryId, PromotionLevel.LEVEL_A, "Beschreibung", null);
     PromotionLevelContent entity =
         PromotionLevelContent.builder()
             .level(PromotionLevel.LEVEL_A)
@@ -219,9 +220,9 @@ class PromotionLevelContentServiceTest {
             "Kann jetzt besser fliegen",
             null,
             null);
-    PromotionLevelContentUpdateRequest request =
-        new PromotionLevelContentUpdateRequest(
-            4L, categoryId, PromotionLevel.LEVEL_A, "Kann jetzt besser fliegen");
+    PromotionLevelContentWriteRequest request =
+        new PromotionLevelContentWriteRequest(
+            categoryId, PromotionLevel.LEVEL_A, "Kann jetzt besser fliegen", 4L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(repository.saveAndFlush(entity)).thenReturn(entity);

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
+import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -63,7 +64,7 @@ public record CreateMissionRequest(
     @Nullable @Size(max = 10000) String description,
     @Nullable
         @Size(max = 2048)
-        @Pattern(regexp = "^(https://.*)?$", message = "must start with https://")
+        @Pattern(regexp = DtoConstraints.HTTPS_URL_REGEX, message = "must start with https://")
         String calendarLink,
     @Nullable @Size(max = 64) String status,
     @Nullable Instant meetingTime,
