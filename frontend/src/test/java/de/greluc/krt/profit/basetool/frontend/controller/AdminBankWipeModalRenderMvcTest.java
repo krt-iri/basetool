@@ -34,6 +34,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -79,16 +80,6 @@ class AdminBankWipeModalRenderMvcTest {
         .contains("data-modal-id=\"bank-wipe-modal\"");
     // projected body present; the bespoke confirm form appears exactly once (no double-render).
     assertThat(html).contains("data-testid=\"bank-wipe-submit\"");
-    assertThat(countOccurrences(html, "data-bank-wipe")).isEqualTo(1);
-  }
-
-  private static int countOccurrences(String haystack, String needle) {
-    int count = 0;
-    for (int i = haystack.indexOf(needle);
-        i >= 0;
-        i = haystack.indexOf(needle, i + needle.length())) {
-      count++;
-    }
-    return count;
+    assertThat(StringUtils.countOccurrencesOf(html, "data-bank-wipe")).isEqualTo(1);
   }
 }

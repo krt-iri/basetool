@@ -41,6 +41,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -92,25 +93,15 @@ class AdminAuditLogModalRenderMvcTest {
     // Projected body present (the PDF submit lives inside the bespoke form).
     assertThat(html).contains("data-testid=\"audit-export-submit\"");
     // No double-render: the projected form's class occurs exactly once.
-    assertThat(countOccurrences(html, "audit-download-form")).isEqualTo(1);
+    assertThat(StringUtils.countOccurrencesOf(html, "audit-download-form")).isEqualTo(1);
 
     // The purge modal on the same page uses the fragment too — shell + single projection.
     assertThat(html).contains("id=\"audit-purge-modal\"");
     assertThat(html).contains("data-modal-id=\"audit-purge-modal\"");
     assertThat(html).contains("data-testid=\"audit-purge-submit\"");
-    assertThat(countOccurrences(html, "audit-purge-form")).isEqualTo(1);
+    assertThat(StringUtils.countOccurrencesOf(html, "audit-purge-form")).isEqualTo(1);
 
     // No leftover of the former hand-rolled close convention on this page.
     assertThat(html).doesNotContain("data-modal-dismiss");
-  }
-
-  private static int countOccurrences(String haystack, String needle) {
-    int count = 0;
-    for (int i = haystack.indexOf(needle);
-        i >= 0;
-        i = haystack.indexOf(needle, i + needle.length())) {
-      count++;
-    }
-    return count;
   }
 }
