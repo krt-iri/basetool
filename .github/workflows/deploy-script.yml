@@ -1,0 +1,56 @@
+name: Deploy Script
+
+# Self-tests scripts/deploy.sh's decision logic on every PR that touches it:
+# the idempotence fast-exit, the running-stack drift verification behind it
+# (a matching marker over a manually-started stale build, a crash loop or a
+# half-down stack must re-apply instead of exiting "no change" — the
+# 2026-07-02 production incident), and the interplay with the bad-digest
+# backoff and the rollback path.
+#
+# The logic lives in scripts/deploy.test.sh, which runs deploy.sh against a
+# stubbed docker CLI — no daemon, no registry, finishes in seconds. Run it
+# locally before pushing:
+#
+#   scripts/deploy.test.sh
+#
+# Unlike flyway-migrations.yml this workflow IS path-filtered: it is not a
+# required check in the branch ruleset, so a skipped run cannot hang a PR,
+# and the script under test only changes when one of these files changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/deploy.sh"
+      - "scripts/deploy.test.sh"
+      - ".github/workflows/deploy-script.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/deploy.sh"
+      - "scripts/deploy.test.sh"
+      - ".github/workflows/deploy-script.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-script-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  selftest:
+    name: deploy.sh self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Run deploy.sh self-tests
+        shell: bash
+        run: |
+          chmod +x scripts/deploy.sh scripts/deploy.test.sh
+          scripts/deploy.test.sh
