@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
+import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBulkDeleteResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
@@ -191,6 +192,28 @@ public class AdminPersonalBlueprintController {
   })
   public void deleteForUser(@PathVariable UUID id) {
     service.deleteForUser(id);
+  }
+
+  /**
+   * Admin global purge: clears the <em>removable</em> owned blueprints of <strong>all</strong>
+   * users in one call — the "delete all users' blueprints" action (REQ-INV-024). The auto-granted,
+   * non-removable default blueprints (REQ-INV-016) are preserved. The UI guards this with a
+   * type-to-confirm warning; ADMIN is enforced at the class boundary. Returns the number of
+   * blueprints removed across all users.
+   *
+   * @return the count of removed blueprints across all users
+   */
+  @DeleteMapping
+  @Operation(
+      summary = "Clear every user's removable owned blueprints (keeps auto-granted defaults).")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "All users' removable blueprints cleared; the removed count is returned."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
+  public PersonalBlueprintBulkDeleteResult deleteAllForAllUsers() {
+    return new PersonalBlueprintBulkDeleteResult(service.deleteAllForAllUsers());
   }
 
   /**

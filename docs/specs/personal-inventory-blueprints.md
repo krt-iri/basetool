@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
 > **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
@@ -398,3 +398,80 @@ i18n) · **Code:**
 [`admin/personal-blueprints.html`](../../frontend/src/main/resources/templates/admin/personal-blueprints.html),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
 (`renderStaging`), [`personal-inventory.css`](../../frontend/src/main/resources/static/css/personal-inventory.css)
+
+### REQ-INV-023 — "Delete all my blueprints" one-click clear
+
+The blueprint page (`/personal-inventory/blueprints`) offers a single control that clears the
+caller's **entire removable owned-blueprint set** in one action, so a user who wants to start over
+(e.g. before a fresh SCMDB import) does not have to remove blueprints one by one.
+
+- **Scope = removable only.** The clear preserves the auto-granted **default blueprints**
+  (REQ-INV-016) exactly as the per-row remove guard (`requireRemovable`) does: it deletes every owned
+  row whose `product_key` is **not** in the `default_blueprint` set and leaves the defaults intact
+  (they would only be re-provisioned anyway). A set of only defaults (or an empty set) clears nothing.
+- **Owner-scoped, JWT `sub`.** `DELETE /api/v1/personal-blueprints` derives the owner from the token,
+  never the request, and removes only that caller's rows. It returns the number of removed blueprints
+  (`PersonalBlueprintBulkDeleteResult`) so the UI can confirm the outcome. Implemented as one
+  set-based bulk delete (`PersonalBlueprintRepository#deleteRemovableByOwnerSub`) — no per-row
+  `@Version` churn.
+- **Guarded, in-place, no reload.** The control opens a `.krt-modal--danger` confirm that names the
+  consequence ("removes all your blueprints; defaults are kept; cannot be undone"). On confirm the
+  form write goes through `krtFetch.submitForm` (the form-write standard, REQ-FE-002) and the
+  collection card re-renders in place (REQ-FE-001/005) with a "{n} Blueprints entfernt" toast — no
+  full-page reload; the classic `POST → redirect` is the no-JS fallback. The button hides itself once nothing removable remains (it lives outside the swapped
+  fragment, so `recountAndSync` re-toggles it on every list swap).
+- **Not audited.** Personal blueprints are not part of the audited `PERSONAL_INVENTORY` area (which
+  covers `PersonalInventoryItem` stock only); like the existing single remove, the bulk clear logs at
+  INFO and records no audit event.
+
+**Acceptance criteria:**
+
+- [ ] Given a user owns removable blueprints plus defaults, when they confirm "delete all", then the
+  removable rows are gone, the defaults remain, and the toast/return count equals the number removed.
+- [ ] Given a user owns only defaults (or nothing), then the control is hidden and a direct `DELETE`
+  removes nothing (count `0`).
+- [ ] The clear is owner-scoped: another user's blueprints are never touched.
+- [ ] On success the list re-renders in place (no full-page reload); the no-JS path redirects with a
+  success toast.
+
+**Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
+[`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
+[`PersonalBlueprintRepository#deleteRemovableByOwnerSub`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
+[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
+(`submitDeleteAll`).
+
+### REQ-INV-024 — Admin "delete all users' blueprints" global purge
+
+The admin blueprint surface (`/admin/personal-blueprints`) offers a **global purge** that clears the
+removable owned blueprints of **every** user at once — a maintenance/reset tool for administrators.
+
+- **Scope = removable only, all owners.** Like REQ-INV-023 it preserves the auto-granted defaults
+  (REQ-INV-016), deleting every user's owned rows whose `product_key` is not in the `default_blueprint`
+  set, so the purge never fights the default-provisioning sweep. One set-based bulk delete
+  (`PersonalBlueprintRepository#deleteAllRemovable`); the removed count is returned.
+- **ADMIN-gated.** `DELETE /api/v1/admin/personal-blueprints`, `@PreAuthorize("hasRole('ADMIN')")`; a
+  non-admin is rejected with 403. The service logs the purge at WARN.
+- **Explicit-warning guard (wipe-reset-grade).** Because it removes data across all users, the control
+  is a distinct danger zone (always visible, independent of the member picker) whose **type-to-confirm**
+  modal keeps the submit disabled until the administrator types the confirmation token (`LOESCHEN`),
+  mirroring the Kartellbank wipe-reset hurdle. On confirm the form write goes through
+  `krtFetch.submitForm` (the form-write standard, REQ-FE-002) with a
+  "{n} Blueprints entfernt" toast; if a member's owned list is on screen it re-renders that fragment in
+  place (REQ-FE-002) — no full-page reload; the classic `POST → redirect` is the no-JS fallback.
+- **Not audited** (see REQ-INV-023).
+
+**Acceptance criteria:**
+
+- [ ] Given several users own removable blueprints plus defaults, when an admin confirms the purge,
+  then every user's removable rows are gone, all defaults remain, and the returned/toasted count
+  equals the total removed.
+- [ ] The purge submit stays disabled until the exact token is typed; a non-admin call returns 403.
+- [ ] After the purge, a member's owned-list fragment re-renders in place (no full-page reload); the
+  no-JS path redirects with a success toast.
+
+**Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminPersonalBlueprintController.java),
+[`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
+[`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminPersonalBlueprintsPageController.java),
+[`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/admin-personal-blueprints-purge.js).

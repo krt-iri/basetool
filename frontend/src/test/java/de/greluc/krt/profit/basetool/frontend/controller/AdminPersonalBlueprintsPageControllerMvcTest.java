@@ -185,6 +185,25 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("Alice Display")));
   }
 
+  // covers REQ-INV-024 — the global "delete all users' blueprints" danger zone renders for an admin
+  // independently of the member picker, carrying the type-to-confirm token input and the purge form
+  // that targets the ADMIN purge endpoint.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_rendersGlobalPurgeDangerZone() throws Exception {
+    PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+        .thenReturn(users);
+
+    mockMvc
+        .perform(get("/admin/personal-blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"bp-purge-modal\"")))
+        .andExpect(content().string(containsString("data-bp-purge")))
+        .andExpect(content().string(containsString("data-confirm-token=\"LOESCHEN\"")))
+        .andExpect(content().string(containsString("/admin/personal-blueprints/delete-all-users")));
+  }
+
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void view_forbiddenForNonAdmin() throws Exception {

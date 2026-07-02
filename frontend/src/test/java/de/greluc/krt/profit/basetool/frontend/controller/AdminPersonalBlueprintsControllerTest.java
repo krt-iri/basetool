@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDt
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -119,6 +121,39 @@ class AdminPersonalBlueprintsControllerTest {
     assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
     verify(backendApiClient)
         .delete(contains("/api/v1/admin/personal-blueprints/items/" + id), eq(Void.class));
+  }
+
+  @Test
+  void deleteAllUsers_relaysToAdminPurgeEndpointAndRedirects() {
+    when(backendApiClient.delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class)))
+        .thenReturn(new PersonalBlueprintBulkDeleteResultDto(3));
+    RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
+
+    String view = controller.deleteAllUsers(flash);
+
+    assertEquals("redirect:/admin/personal-blueprints", view);
+    verify(backendApiClient)
+        .delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class));
+    assertEquals(
+        "admin.personalInventory.blueprints.purge.toast.done",
+        flash.getFlashAttributes().get("successToast"));
+  }
+
+  @Test
+  void deleteAllUsersAjax_relaysToAdminPurgeEndpointAndReturnsCount() {
+    when(backendApiClient.delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class)))
+        .thenReturn(new PersonalBlueprintBulkDeleteResultDto(8));
+
+    ResponseEntity<Object> response = controller.deleteAllUsersAjax();
+
+    assertEquals(200, response.getStatusCode().value());
+    assertEquals(new PersonalBlueprintBulkDeleteResultDto(8), response.getBody());
   }
 
   @Test

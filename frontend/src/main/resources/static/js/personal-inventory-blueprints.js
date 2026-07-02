@@ -25,6 +25,9 @@
     let editForm = null;
     let deleteModal = null;
     let deleteForm = null;
+    let deleteAllModal = null;
+    let deleteAllForm = null;
+    let deleteAllBtn = null;
     let debounceTimer = null;
 
     // productKey -> display name of staged (not-yet-added) blueprints.
@@ -63,6 +66,9 @@
         editForm = $('krt-bp-edit-form');
         deleteModal = $('krt-bp-delete-modal');
         deleteForm = $('krt-bp-delete-form');
+        deleteAllModal = $('krt-bp-delete-all-modal');
+        deleteAllForm = $('krt-bp-delete-all-form');
+        deleteAllBtn = $('krt-bp-delete-all-open');
 
         if (searchInput) {
             searchInput.addEventListener('input', onSearchInput);
@@ -78,6 +84,7 @@
             if (e.key === 'Escape') {
                 closeEdit();
                 closeDelete();
+                closeDeleteAll();
             }
         });
         if (addSelectedBtn) addSelectedBtn.addEventListener('click', addSelected);
@@ -85,6 +92,7 @@
         // persist and a direct submit binding survives every list re-render.
         if (editForm) editForm.addEventListener('submit', submitEditNote);
         if (deleteForm) deleteForm.addEventListener('submit', submitDeleteBp);
+        if (deleteAllForm) deleteAllForm.addEventListener('submit', submitDeleteAll);
         // After a list swap (batch add / import / remove), resync the header counts from the fresh
         // rows (recipe.js separately re-inits the master/detail wiring on the same event).
         document.addEventListener('krt:swapped', function (e) {
@@ -299,6 +307,18 @@
             subtitle.textContent =
                 total + ' ' + i.factsCount + ' · ' + withNote + ' ' + i.factsWithNote;
         }
+        // Keep the "delete all" control in step with the collection: hide it once nothing removable
+        // remains (a set of only non-removable defaults, or an empty set) so it never points at an
+        // empty clear. The button lives outside the swapped fragment, so JS owns its visibility.
+        if (deleteAllBtn) {
+            let removable = 0;
+            rows.forEach(function (r) {
+                if (r.getAttribute('data-removable') === 'true') {
+                    removable++;
+                }
+            });
+            deleteAllBtn.hidden = removable === 0;
+        }
     }
 
     // Multi-select batch add -> krtFetch (REQ-FE-002), then re-render the list in place instead of
@@ -379,6 +399,16 @@
 
     function closeDelete() {
         if (deleteModal) deleteModal.style.display = 'none';
+    }
+
+    // Delete-all confirm modal (REQ-INV-023): no per-row context, so the danger frame's server text
+    // (which names that defaults are kept) is shown as-is.
+    function openDeleteAll() {
+        if (deleteAllModal) deleteAllModal.style.display = 'flex';
+    }
+
+    function closeDeleteAll() {
+        if (deleteAllModal) deleteAllModal.style.display = 'none';
     }
 
     function setValue(id, value) {
@@ -526,6 +556,47 @@
             });
     }
 
+    // Delete-all -> krtFetch.submitForm (REQ-FE-001/002, S10 #916): the FormData twin of write() owns
+    // the CSRF header + retry-on-403; on success we toast the removed count and re-render the list in
+    // place (reswapList resyncs the counts, the empty state, and — via recountAndSync — the
+    // delete-all button's own visibility). The form keeps its th:action/method=post so a script-less
+    // browser gets the native POST->redirect fallback.
+    function submitDeleteAll(e) {
+        e.preventDefault();
+        if (!deleteAllForm) {
+            return;
+        }
+        if (!window.krtFetch) {
+            deleteAllForm.submit();
+            return;
+        }
+        const submitBtn = deleteAllForm.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        window.krtFetch
+            .submitForm({
+                form: deleteAllForm,
+                toast: false,
+                errorMessage: i18n().removeAllError,
+                conflict: conflictObj(),
+                onSuccess: function (body) {
+                    const count = body && body.deleted != null ? body.deleted : 0;
+                    if (window.showFrontendSuccessToast) {
+                        const tpl = i18n().removedAllCount || '{0}';
+                        window.showFrontendSuccessToast(String(tpl).replace('{0}', count));
+                    }
+                    closeDeleteAll();
+                    reswapList();
+                },
+            })
+            .then(function () {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+            });
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
@@ -537,5 +608,7 @@
         window.krtEvents.on('click', 'bp-close-edit', closeEdit);
         window.krtEvents.on('click', 'bp-open-delete', openDelete);
         window.krtEvents.on('click', 'bp-close-delete', closeDelete);
+        window.krtEvents.on('click', 'bp-open-delete-all', openDeleteAll);
+        window.krtEvents.on('click', 'bp-close-delete-all', closeDeleteAll);
     }
 })();
