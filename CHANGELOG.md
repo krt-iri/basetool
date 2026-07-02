@@ -6,7 +6,7 @@
 
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
-- **Monitoring: Prometheus-Metrik-Endpunkt in allen drei Modulen.** Backend, Frontend und Ingest exponieren jetzt Micrometer-Metriken (JVM, HTTP, Caches, Verbindungspools) unter `/actuator/prometheus` — abgesichert über einen fail-closed Basic-Auth-Zugang (`MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD`; ohne Konfiguration wird jeder Zugriff abgelehnt). Grundstein für den Monitoring-Stack aus Epic #936 (REQ-OBS-005, ADR-0063).
+- **Monitoring: Prometheus-Metrik-Endpunkt in allen drei Modulen.** Backend, Frontend und Ingest exponieren jetzt Micrometer-Metriken (JVM, HTTP, Caches, Verbindungspools) unter `/actuator/prometheus` — abgesichert über einen fail-closed Basic-Auth-Zugang (`MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD`; ohne Konfiguration wird jeder Zugriff abgelehnt). Grundstein für den Monitoring-Stack aus Epic #936 (REQ-OBS-005, ADR-0064).
 - **Monitoring: Verteiltes Tracing (OpenTelemetry) in allen drei Modulen vorbereitet.** Frontend-, Backend- und Ingest-Aufrufe können durchgängig als Traces verfolgt werden (W3C `traceparent`, Trace-IDs in den JSON-Logs). Query-Strings und rohe IDs werden aus Metrik-Tags und Span-Attributen entfernt. Standardmäßig vollständig inaktiv; erst `MONITORING_TRACING_ENABLED=true` plus OTLP-Endpunkt aktivieren den Export zum Monitoring-Stack (REQ-OBS-009, Epic #936 Phase 1b).
 
 ### Fixed
@@ -16,6 +16,7 @@
 
 ### Changed
 
+- **Benachrichtigungen: Löschen ohne Rückfrage.** Eine einzelne Benachrichtigung im Glocken-Menü oder auf der Benachrichtigungsseite wird jetzt sofort gelöscht — die zusätzliche Bestätigungsabfrage entfällt, da Benachrichtigungen unkritisch sind. Das Sammel-Löschen „Gelesene löschen" fragt weiterhin nach (REQ-NOTIF-005).
 - **Bank: Kontoname in der Antragsansicht besser sichtbar.** In der Antragsübersicht (`/bank/requests`) zeigt die Konto-Spalte jetzt den Kontonamen an erster Stelle; die Kontonummer steht klein darunter, das Einheitskürzel entfällt (REQ-BANK-023).
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
 - **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).

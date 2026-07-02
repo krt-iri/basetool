@@ -1,4 +1,4 @@
-# ADR-0063 — Monitoring stack: Prometheus + Grafana + Loki + Tempo + Alloy on an isolated monitoring plane
+# ADR-0064 — Monitoring stack: Prometheus + Grafana + Loki + Tempo + Alloy on an isolated monitoring plane
 
 - **Status:** Accepted
 - **Date:** 2026-07-02

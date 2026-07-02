@@ -3022,7 +3022,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionTopicUpdateRequest"
+                "$ref" : "#/components/schemas/PromotionTopicWriteRequest"
               }
             }
           },
@@ -3311,7 +3311,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RankRequirementUpdateRequest"
+                "$ref" : "#/components/schemas/RankRequirementWriteRequest"
               }
             }
           },
@@ -3600,7 +3600,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionLevelContentUpdateRequest"
+                "$ref" : "#/components/schemas/PromotionLevelContentWriteRequest"
               }
             }
           },
@@ -3997,7 +3997,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionCategoryUpdateRequest"
+                "$ref" : "#/components/schemas/PromotionCategoryWriteRequest"
               }
             }
           },
@@ -10311,7 +10311,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MaterialExternalAliasUpdateRequest"
+                "$ref" : "#/components/schemas/MaterialExternalAliasWriteRequest"
               }
             }
           },
@@ -15506,7 +15506,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionTopicCreateRequest"
+                "$ref" : "#/components/schemas/PromotionTopicWriteRequest"
               }
             }
           },
@@ -15719,7 +15719,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RankRequirementCreateRequest"
+                "$ref" : "#/components/schemas/RankRequirementWriteRequest"
               }
             }
           },
@@ -15932,7 +15932,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionLevelContentCreateRequest"
+                "$ref" : "#/components/schemas/PromotionLevelContentWriteRequest"
               }
             }
           },
@@ -16145,7 +16145,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/PromotionCategoryCreateRequest"
+                "$ref" : "#/components/schemas/PromotionCategoryWriteRequest"
               }
             }
           },
@@ -16644,6 +16644,86 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Personal Blueprints" ],
+        "summary" : "Clear the caller's removable owned blueprints (keeps auto-granted defaults).",
+        "operationId" : "deleteAll",
+        "responses" : {
+          "200" : {
+            "description" : "Removable blueprints cleared; the removed count is returned.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalBlueprintBulkDeleteResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22784,7 +22864,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MaterialExternalAliasCreateRequest"
+                "$ref" : "#/components/schemas/MaterialExternalAliasWriteRequest"
               }
             }
           },
@@ -36637,7 +36717,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37370,7 +37449,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37492,7 +37570,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -43994,7 +44071,6 @@
         "parameters" : [ {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44457,7 +44533,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44830,7 +44905,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -45213,7 +45287,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -47361,6 +47434,88 @@
         }
       }
     },
+    "/api/v1/admin/personal-blueprints" : {
+      "delete" : {
+        "tags" : [ "Admin – Personal Blueprints" ],
+        "summary" : "Clear every user's removable owned blueprints (keeps auto-granted defaults).",
+        "operationId" : "deleteAllForAllUsers",
+        "responses" : {
+          "200" : {
+            "description" : "All users' removable blueprints cleared; the removed count is returned.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PersonalBlueprintBulkDeleteResult"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/default-blueprints/{id}" : {
       "delete" : {
         "tags" : [ "Admin – Default Blueprints" ],
@@ -48198,13 +48353,9 @@
           }
         }
       },
-      "PromotionTopicUpdateRequest" : {
+      "PromotionTopicWriteRequest" : {
         "type" : "object",
         "properties" : {
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
           "name" : {
             "type" : "string",
             "maxLength" : 120,
@@ -48218,6 +48369,10 @@
           "sortOrder" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name", "sortOrder", "version" ]
@@ -48256,13 +48411,9 @@
           }
         }
       },
-      "RankRequirementUpdateRequest" : {
+      "RankRequirementWriteRequest" : {
         "type" : "object",
         "properties" : {
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
           "fromRank" : {
             "type" : "integer",
             "format" : "int32",
@@ -48294,6 +48445,10 @@
             "type" : "string",
             "maxLength" : 2000,
             "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "fromRank", "minimumLevel", "requiredCount", "toRank", "version" ]
@@ -48352,13 +48507,9 @@
           }
         }
       },
-      "PromotionLevelContentUpdateRequest" : {
+      "PromotionLevelContentWriteRequest" : {
         "type" : "object",
         "properties" : {
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
           "categoryId" : {
             "type" : "string",
             "format" : "uuid"
@@ -48371,6 +48522,10 @@
             "type" : "string",
             "maxLength" : 4000,
             "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "categoryId", "description", "level", "version" ]
@@ -48465,13 +48620,9 @@
           }
         }
       },
-      "PromotionCategoryUpdateRequest" : {
+      "PromotionCategoryWriteRequest" : {
         "type" : "object",
         "properties" : {
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
           "topicId" : {
             "type" : "string",
             "format" : "uuid"
@@ -48489,6 +48640,10 @@
           "sortOrder" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name", "sortOrder", "topicId", "version" ]
@@ -50581,7 +50736,7 @@
         },
         "required" : [ "name", "value", "version" ]
       },
-      "MaterialExternalAliasUpdateRequest" : {
+      "MaterialExternalAliasWriteRequest" : {
         "type" : "object",
         "properties" : {
           "materialId" : {
@@ -51253,107 +51408,6 @@
             "format" : "int32"
           }
         }
-      },
-      "PromotionTopicCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "description" : {
-            "type" : "string",
-            "maxLength" : 2000,
-            "minLength" : 0
-          },
-          "sortOrder" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        },
-        "required" : [ "name", "sortOrder" ]
-      },
-      "RankRequirementCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "fromRank" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
-          "toRank" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
-          "topicId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "categoryId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "minimumLevel" : {
-            "type" : "string",
-            "enum" : [ "LEVEL_A", "LEVEL_B", "LEVEL_C" ]
-          },
-          "requiredCount" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
-          },
-          "description" : {
-            "type" : "string",
-            "maxLength" : 2000,
-            "minLength" : 0
-          }
-        },
-        "required" : [ "fromRank", "minimumLevel", "requiredCount", "toRank" ]
-      },
-      "PromotionLevelContentCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "categoryId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "level" : {
-            "type" : "string",
-            "enum" : [ "LEVEL_A", "LEVEL_B", "LEVEL_C" ]
-          },
-          "description" : {
-            "type" : "string",
-            "maxLength" : 4000,
-            "minLength" : 0
-          }
-        },
-        "required" : [ "categoryId", "description", "level" ]
-      },
-      "PromotionCategoryCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "topicId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string",
-            "maxLength" : 120,
-            "minLength" : 0
-          },
-          "description" : {
-            "type" : "string",
-            "maxLength" : 2000,
-            "minLength" : 0
-          },
-          "sortOrder" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        },
-        "required" : [ "name", "sortOrder", "topicId" ]
       },
       "PersonalInventoryItemCreateRequest" : {
         "type" : "object",
@@ -52362,43 +52416,6 @@
           }
         },
         "required" : [ "name", "quantityType", "type" ]
-      },
-      "MaterialExternalAliasCreateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "materialId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "sourceSystem" : {
-            "type" : "string",
-            "minLength" : 1,
-            "pattern" : "UEX|SCWIKI|REFINERY_SCREEN"
-          },
-          "externalName" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "externalKey" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "externalUuid" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "externalCode" : {
-            "type" : "string",
-            "maxLength" : 64,
-            "minLength" : 0
-          },
-          "note" : {
-            "type" : "string"
-          }
-        },
-        "required" : [ "externalName", "materialId", "sourceSystem" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",
@@ -57312,6 +57329,15 @@
         }
       },
       "SyncReportPurgeResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "deleted" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PersonalBlueprintBulkDeleteResult" : {
         "type" : "object",
         "properties" : {
           "deleted" : {
