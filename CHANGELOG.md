@@ -14,6 +14,10 @@
 - **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).
 - **API/Fehler: Einheitliches RFC-7807-Fehlerformat auch an den Rändern.** Abgewiesene Anfragen der Sicherheitsschicht (fehlendes/ungültiges Token → 401, fehlende Berechtigung → 403), die Sperre noch nicht freigeschalteter Konten (403) und Container-Fehler liefern jetzt wie alle übrigen Fehler ein `application/problem+json` mit stabilem `code` und `correlationId` (auch als `X-Correlation-Id`-Header) statt der Spring-Standardantworten. Die Fehlerseite des Frontends zeigt die `correlationId` als Referenzcode zum Nennen beim Support an.
 
+### Fixed
+
+- **Deployment: Der Deploy-Zyklus erkennt jetzt einen abgedrifteten oder ungesunden Stack.** `deploy.sh` nimmt die „no change"-Abkürzung nur noch, wenn die laufenden Container tatsächlich den zuletzt ausgerollten Image-Digests entsprechen und gesund sind; andernfalls wird derselbe Stand automatisch neu angewendet — etwa nach einem manuellen `docker compose up` mit veraltetem lokalem `:stable`-Tag (Vorfall vom 02.07.2026). Für geplante Wartung vorher den `iri-deploy.timer` stoppen (REQ-OPS-013).
+
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
 
 ### Changed

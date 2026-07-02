@@ -44,8 +44,14 @@
 #   /var/lib/iri/last-deployed.digests     idempotence marker — a fixed 5-field
 #                                          record backend|frontend|ingest|config|
 #                                          keycloak-spi. When ALL target digests
-#                                          match this file, the script exits 0
-#                                          without restarting. The config and
+#                                          match this file AND the running stack
+#                                          is verified to actually match them
+#                                          (containers present, running and
+#                                          healthy, image RepoDigest equal to
+#                                          the target), the script exits 0
+#                                          without restarting; a matching marker
+#                                          over a drifted or unhealthy stack
+#                                          re-applies instead. The config and
 #                                          keycloak-spi digests are part of the
 #                                          marker so a config-only change (e.g. a
 #                                          redis pin bump) or a provider-JAR-only
@@ -444,14 +450,99 @@ if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_K
 fi
 
 # --- Idempotence check ------------------------------------------------------
+# The marker only records what the last SUCCESSFUL deploy applied — trusting it
+# alone is not enough. A manual `docker compose up` without the digest-pin
+# overlay resolves `:stable` from the LOCAL image cache, which this script
+# never refreshes (it always pulls by digest), so it can silently start an
+# outdated build; a crash loop or a half-down stack likewise leaves the marker
+# untouched while prod serves the wrong version or none. Incident 2026-07-02:
+# a pre-V199 backend started that way against a V201-migrated database was
+# crash-looping while this script reported "no change" and exited 0. So the
+# fast exit is taken only after verifying the RUNNING stack against the target.
+
+# Emits one `service: reason` line per divergence between the running stack
+# and the target digest set; emits nothing when every app service has a
+# container that is running, healthy (a container without a healthcheck counts
+# as healthy, mirroring `up --wait`) and created from an image whose RepoDigest
+# equals the target digest. `ps -aq` (not `-q`) so stopped/created/restarting
+# containers are judged by their state instead of being reported as absent.
+running_stack_drift() {
+  local entry svc image digest cids cid probe state img_id repo_digests
+  for entry in \
+    "backend|${BACKEND_IMAGE}|${BACKEND_DIGEST}" \
+    "frontend|${FRONTEND_IMAGE}|${FRONTEND_DIGEST}" \
+    "ingest|${INGEST_IMAGE}|${INGEST_DIGEST}"; do
+    IFS='|' read -r svc image digest <<< "${entry}"
+    cids="$(docker compose -f "${COMPOSE_DIR}/docker-compose.yml" \
+              --profile "${PROFILE}" ps -aq "${svc}" 2>/dev/null)" || cids=""
+    if [[ -z "${cids}" ]]; then
+      echo "${svc}: no container"
+      continue
+    fi
+    while IFS= read -r cid; do
+      [[ -n "${cid}" ]] || continue
+      probe="$(docker inspect --format \
+        '{{index .Config.Labels "com.docker.compose.oneoff"}}|{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' \
+        "${cid}" 2>/dev/null)" || probe="|gone"
+      # One-off `docker compose run` containers (debug shells, ad-hoc jobs) are
+      # listed by `ps -aq` alongside the service replica but are not part of
+      # the deployed stack — judging them would flag drift on every tick for
+      # as long as they exist.
+      if [[ "${probe%%|*}" == "True" ]]; then
+        continue
+      fi
+      state="${probe#*|}"
+      case "${state}" in
+        # running/starting (healthcheck still inside its start period, e.g.
+        # the restart policies bringing the stack up after a host reboot while
+        # a tick fires) counts as converged for THIS tick: `up --wait` would
+        # simply wait on it, and re-applying here could record a false backoff
+        # failure for a perfectly good target. A genuinely broken container
+        # surfaces as unhealthy/restarting on a later tick.
+        running/healthy | running/no-healthcheck | running/starting) ;;
+        *)
+          echo "${svc}: container state ${state}"
+          continue
+          ;;
+      esac
+      img_id="$(docker inspect --format '{{.Image}}' "${cid}" 2>/dev/null)" || img_id=""
+      repo_digests=""
+      if [[ -n "${img_id}" ]]; then
+        repo_digests="$(docker image inspect \
+          --format '{{join .RepoDigests " "}}' "${img_id}" 2>/dev/null)" || repo_digests=""
+      fi
+      case " ${repo_digests} " in
+        *" ${image}@${digest} "*) ;;
+        *)
+          echo "${svc}: running image [${repo_digests:-unknown}] does not match target ${digest}"
+          ;;
+      esac
+    done <<< "${cids}"
+  done
+  return 0
+}
+
+DRIFTED=false
 if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
-  log "no change — already at target digests"
-  exit 0
+  DRIFT_REPORT="$(running_stack_drift)"
+  if [[ -z "${DRIFT_REPORT}" ]]; then
+    log "no change — already at target digests (running stack verified)"
+    exit 0
+  fi
+  DRIFTED=true
+  while IFS= read -r drift_line; do
+    log "drift: ${drift_line}"
+  done <<< "${DRIFT_REPORT}"
+  log "running stack does not match the last-deployed target — re-applying"
 fi
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
-  log "check-only: would deploy"
+  if [[ "${DRIFTED}" == "true" ]]; then
+    log "check-only: would re-apply (running stack drifted from target digests)"
+  else
+    log "check-only: would deploy"
+  fi
   exit 0
 fi
 
