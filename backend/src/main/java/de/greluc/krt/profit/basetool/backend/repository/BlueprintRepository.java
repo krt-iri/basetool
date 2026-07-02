@@ -88,10 +88,12 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE Blueprint b SET b.scwikiDeletedAt = :now "
-          + "WHERE b.scwikiUuid IS NOT NULL "
-          + "AND b.scwikiUuid NOT IN :seenScwikiUuids "
-          + "AND b.scwikiDeletedAt IS NULL")
+      """
+      UPDATE Blueprint b SET b.scwikiDeletedAt = :now
+      WHERE b.scwikiUuid IS NOT NULL
+      AND b.scwikiUuid NOT IN :seenScwikiUuids
+      AND b.scwikiDeletedAt IS NULL
+      """)
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
@@ -121,9 +123,11 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return a page of matching active blueprints
    */
   @Query(
-      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL "
-          + "AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) "
-          + "OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))")
+      """
+      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
+      AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))
+      OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')))
+      """)
   Page<Blueprint> searchActive(@Param("q") String q, Pageable pageable);
 
   /**
@@ -152,8 +156,10 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    *     craftable or {@code gameItemIds} is empty
    */
   @Query(
-      "SELECT DISTINCT b.outputItem.id FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL "
-          + "AND b.outputItem.id IN :gameItemIds")
+      """
+      SELECT DISTINCT b.outputItem.id FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
+      AND b.outputItem.id IN :gameItemIds
+      """)
   java.util.List<UUID> findCraftableOutputItemIds(
       @Param("gameItemIds") Collection<UUID> gameItemIds);
 
@@ -178,19 +184,21 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   // string matches every row via the {@code %%} pattern.
   @Query(
       value =
-          "SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE EXISTS"
-              + " (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND"
-              + " b.scwikiDeletedAt IS NULL AND i.kind ="
-              + " de.greluc.krt.profit.basetool.backend.model.scwiki"
-              + ".BlueprintIngredientKind.RESOURCE"
-              + " AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))",
+          """
+          SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE EXISTS
+          (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
+          b.scwikiDeletedAt IS NULL AND i.kind =
+          de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE
+          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          """,
       countQuery =
-          "SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE"
-              + " EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi"
-              + " AND b.scwikiDeletedAt IS NULL AND i.kind ="
-              + " de.greluc.krt.profit.basetool.backend.model.scwiki"
-              + ".BlueprintIngredientKind.RESOURCE"
-              + " AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))")
+          """
+          SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE
+          EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi
+          AND b.scwikiDeletedAt IS NULL AND i.kind =
+          de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE
+          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          """)
   Page<de.greluc.krt.profit.basetool.backend.model.GameItem> findOrderableItems(
       @Param("q") String q, Pageable pageable);
 
@@ -211,11 +219,12 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return projection rows for every matching active recipe
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow("
-          + "b.outputName, b.scwikiKey, m.name, oi.id) "
-          + "FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m "
-          + "WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL "
-          + "AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
+      FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
+      WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
+      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%'))
+      """)
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 
   /**
@@ -230,8 +239,10 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    *     then Wiki key then id
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow(b.id,"
-          + " b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS"
-          + " NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow(b.id,
+      b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
+      NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC
+      """)
   List<BlueprintIdNameRow> findActiveIdNameRows();
 }

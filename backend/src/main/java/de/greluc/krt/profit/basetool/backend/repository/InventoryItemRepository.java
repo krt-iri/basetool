@@ -80,9 +80,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *     null}
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice("
-          + "i.material.id, i.quality, SUM(COALESCE(i.amount, 0.0))) FROM InventoryItem i"
-          + " WHERE i.user.id = :userId GROUP BY i.material.id, i.quality")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice(i.material.id, i.quality, SUM(COALESCE(i.amount, 0.0))) FROM InventoryItem i
+      WHERE i.user.id = :userId GROUP BY i.material.id, i.quality
+      """)
   List<OwnedStockSlice> sumOwnedStockByMaterialAndQuality(@Param("userId") UUID userId);
 
   /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
@@ -152,11 +153,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR"
-          + " i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)"
-          + " AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN"
-          + " :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id"
-          + " IN :missionIds))")
+      """
+      SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR
+      i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)
+      AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN
+      :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id
+      IN :missionIds))
+      """)
   Page<InventoryItem> findUserByFilters(
       @Param("user") User user,
       @Param("hasMaterials") boolean hasMaterials,
@@ -213,17 +216,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * and personal stacks are returned as before.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate("
-          + "i.material, i.user, i.location, i.quality, jo, m, i.personal,"
-          + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
-          + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
-          + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
-          + " WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)"
-          + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL"
-          + " OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL"
-          + " AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT"
-          + " NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
-          + " i.quality, jo, m, i.personal, oou")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
+      COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
+      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)
+      AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
+      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL
+      AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT
+      NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,
+      i.quality, jo, m, i.personal, oou
+      """)
   List<InventoryStackAggregate> findUserStacks(
       @Param("userId") UUID userId,
       @Param("hasMaterials") boolean hasMaterials,
@@ -279,13 +283,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND"
-          + " i.location.id = :locationId AND ((:quality IS NULL AND i.quality IS NULL) OR"
-          + " i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR"
-          + " i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS NULL) OR"
-          + " i.mission.id = :missionId) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL"
-          + " AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) ORDER BY"
-          + " i.createdAt ASC")
+      """
+      SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND
+      i.location.id = :locationId AND ((:quality IS NULL AND i.quality IS NULL) OR
+      i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR
+      i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS NULL) OR
+      i.mission.id = :missionId) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL
+      AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) ORDER BY
+      i.createdAt ASC
+      """)
   Page<InventoryItem> findUserStackEntries(
       @Param("userId") UUID userId,
       @Param("materialId") UUID materialId,
@@ -328,8 +334,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /** Derived Spring-Data query - returns entities matching {@code JobOrderIdOrdered}. */
   @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username"
-          + " ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC")
+      """
+      SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username
+      ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC
+      """)
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
@@ -341,10 +349,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       value =
-          "SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item "
-              + "WHERE material_id = :materialId "
-              + "AND job_order_id = :jobOrderId "
-              + "AND (:minQuality IS NULL OR quality >= :minQuality)",
+          """
+          SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item
+          WHERE material_id = :materialId
+          AND job_order_id = :jobOrderId
+          AND (:minQuality IS NULL OR quality >= :minQuality)
+          """,
       nativeQuery = true)
   Double sumAmountByMaterialAndJobOrderAndMinQuality(
       @Param("materialId") UUID materialId,
@@ -364,9 +374,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @return one {@link JobOrderMaterialStockRow} per linked inventory item, never {@code null}.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow("
-          + "i.jobOrder.id, i.material.id, i.quality, i.amount) "
-          + "FROM InventoryItem i WHERE i.jobOrder.id IN :jobOrderIds")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(i.jobOrder.id, i.material.id, i.quality, i.amount)
+      FROM InventoryItem i WHERE i.jobOrder.id IN :jobOrderIds
+      """)
   List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow>
       findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
@@ -387,8 +398,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
-      "UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND"
-          + " i.material.id = :materialId")
+      """
+      UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND
+      i.material.id = :materialId
+      """)
   void unlinkJobOrderMaterial(
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 

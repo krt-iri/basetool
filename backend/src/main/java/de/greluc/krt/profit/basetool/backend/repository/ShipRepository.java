@@ -155,37 +155,41 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Query(
       value =
-          "SELECT s FROM Ship s"
-              + " LEFT JOIN FETCH s.shipType st"
-              + " LEFT JOIN FETCH st.manufacturer m"
-              + " LEFT JOIN FETCH s.location l"
-              + " LEFT JOIN FETCH s.owner"
-              + " LEFT JOIN FETCH s.owningOrgUnit"
-              + " WHERE s.owner.id = :ownerId"
-              + " AND (cast(:search as string) IS NULL"
-              + "  OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
-              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
-              + " ) ORDER BY"
-              + "  LOWER(COALESCE(m.name, '')) ASC,"
-              + "  LOWER(COALESCE(st.name, '')) ASC,"
-              + "  CASE WHEN s.insurance = 'LTI' THEN 1"
-              + "       WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3"
-              + "       ELSE 2 END ASC,"
-              + "  CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0"
-              + "       ELSE cast(s.insurance as integer) END DESC,"
-              + "  LOWER(COALESCE(l.name, '')) ASC,"
-              + "  CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,"
-              + "  LOWER(COALESCE(s.name, '')) ASC,"
-              + "  s.id ASC",
+          """
+          SELECT s FROM Ship s
+          LEFT JOIN FETCH s.shipType st
+          LEFT JOIN FETCH st.manufacturer m
+          LEFT JOIN FETCH s.location l
+          LEFT JOIN FETCH s.owner
+          LEFT JOIN FETCH s.owningOrgUnit
+          WHERE s.owner.id = :ownerId
+          AND (cast(:search as string) IS NULL
+          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          ) ORDER BY
+          LOWER(COALESCE(m.name, '')) ASC,
+          LOWER(COALESCE(st.name, '')) ASC,
+          CASE WHEN s.insurance = 'LTI' THEN 1
+          WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
+          ELSE 2 END ASC,
+          CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
+          ELSE cast(s.insurance as integer) END DESC,
+          LOWER(COALESCE(l.name, '')) ASC,
+          CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
+          LOWER(COALESCE(s.name, '')) ASC,
+          s.id ASC
+          """,
       countQuery =
-          "SELECT COUNT(s) FROM Ship s"
-              + " LEFT JOIN s.shipType st"
-              + " LEFT JOIN st.manufacturer m"
-              + " WHERE s.owner.id = :ownerId"
-              + " AND (cast(:search as string) IS NULL"
-              + "  OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
-              + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))"
-              + " )")
+          """
+          SELECT COUNT(s) FROM Ship s
+          LEFT JOIN s.shipType st
+          LEFT JOIN st.manufacturer m
+          WHERE s.owner.id = :ownerId
+          AND (cast(:search as string) IS NULL
+          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%'))
+          )
+          """)
   Page<Ship> findByOwnerIdFiltered(
       @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
       @org.springframework.data.repository.query.Param("search") String search,

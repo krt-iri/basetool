@@ -61,8 +61,10 @@ public interface PromotionLevelContentRepository
    * @return a page of level contents visible to the caller
    */
   @Query(
-      "SELECT lc FROM PromotionLevelContent lc WHERE :owningSquadronId IS NULL OR"
-          + " lc.category.topic.owningSquadron.id = :owningSquadronId")
+      """
+      SELECT lc FROM PromotionLevelContent lc WHERE :owningSquadronId IS NULL OR
+      lc.category.topic.owningSquadron.id = :owningSquadronId
+      """)
   Page<PromotionLevelContent> findAllScoped(
       @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 
@@ -76,9 +78,11 @@ public interface PromotionLevelContentRepository
    * @return the category's level contents in level order, scoped to the caller
    */
   @Query(
-      "SELECT lc FROM PromotionLevelContent lc WHERE lc.category.id = :categoryId AND"
-          + " (:owningSquadronId IS NULL OR lc.category.topic.owningSquadron.id ="
-          + " :owningSquadronId) ORDER BY lc.level ASC")
+      """
+      SELECT lc FROM PromotionLevelContent lc WHERE lc.category.id = :categoryId AND
+      (:owningSquadronId IS NULL OR lc.category.topic.owningSquadron.id =
+      :owningSquadronId) ORDER BY lc.level ASC
+      """)
   List<PromotionLevelContent> findAllByCategoryIdScopedOrdered(
       @Param("categoryId") UUID categoryId, @Param("owningSquadronId") UUID owningSquadronId);
 

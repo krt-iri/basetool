@@ -48,8 +48,10 @@ public interface BankAccountGrantRepository
    */
   @EntityGraph(attributePaths = {"user", "account"})
   @Query(
-      "SELECT g FROM BankAccountGrant g WHERE g.id.accountId = :accountId"
-          + " ORDER BY g.user.username")
+      """
+      SELECT g FROM BankAccountGrant g WHERE g.id.accountId = :accountId
+      ORDER BY g.user.username
+      """)
   List<BankAccountGrant> findByAccountId(@Param("accountId") UUID accountId);
 
   /**
@@ -61,8 +63,10 @@ public interface BankAccountGrantRepository
    */
   @EntityGraph(attributePaths = {"user", "account"})
   @Query(
-      "SELECT g FROM BankAccountGrant g WHERE g.id.userId = :userId"
-          + " ORDER BY g.account.accountNo")
+      """
+      SELECT g FROM BankAccountGrant g WHERE g.id.userId = :userId
+      ORDER BY g.account.accountNo
+      """)
   List<BankAccountGrant> findByUserId(@Param("userId") UUID userId);
 
   /**

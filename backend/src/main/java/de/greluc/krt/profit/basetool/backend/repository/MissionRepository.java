@@ -166,10 +166,12 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * @return the matching missions in soonest-first order (at most {@code pageable} size)
    */
   @Query(
-      "SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND"
-          + " (:allowInternal = true OR m.isInternal = false) AND ((:activeOrgUnitId IS NOT NULL"
-          + " AND m.owningOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND"
-          + " m.owningOrgUnit.id IN :memberOrgUnitIds)) ORDER BY m.plannedStartTime ASC")
+      """
+      SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND
+      (:allowInternal = true OR m.isInternal = false) AND ((:activeOrgUnitId IS NOT NULL
+      AND m.owningOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND
+      m.owningOrgUnit.id IN :memberOrgUnitIds)) ORDER BY m.plannedStartTime ASC
+      """)
   List<Mission> findNextScopedMission(
       @Param("now") Instant now,
       @Param("statuses") java.util.Collection<String> statuses,
@@ -309,7 +311,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    *     {@code actualEndTime}, {@code false} otherwise (including the empty-operation case)
    */
   @Query(
-      "SELECT CASE WHEN COUNT(m) > 0 THEN TRUE ELSE FALSE END FROM Mission m WHERE m.operation.id ="
-          + " :operationId AND (m.actualStartTime IS NULL OR m.actualEndTime IS NULL)")
+      """
+      SELECT CASE WHEN COUNT(m) > 0 THEN TRUE ELSE FALSE END FROM Mission m WHERE m.operation.id =
+      :operationId AND (m.actualStartTime IS NULL OR m.actualEndTime IS NULL)
+      """)
   boolean existsByOperationIdWithUnfinishedActualTime(@Param("operationId") UUID operationId);
 }

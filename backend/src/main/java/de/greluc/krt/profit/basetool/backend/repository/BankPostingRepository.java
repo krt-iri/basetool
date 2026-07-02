@@ -65,9 +65,10 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return one balance row per account that has postings
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance("
-          + "p.account.id, SUM(p.amount))"
-          + " FROM BankPosting p WHERE p.account.id IN :accountIds GROUP BY p.account.id")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance(p.account.id, SUM(p.amount))
+      FROM BankPosting p WHERE p.account.id IN :accountIds GROUP BY p.account.id
+      """)
   List<BankAccountBalance> accountBalances(@Param("accountIds") Collection<UUID> accountIds);
 
   /**
@@ -80,9 +81,10 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return the posting slices inside the window
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice("
-          + "p.account.id, p.createdAt, p.amount)"
-          + " FROM BankPosting p WHERE p.account.id IN :accountIds AND p.createdAt >= :cutoff")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice(p.account.id, p.createdAt, p.amount)
+      FROM BankPosting p WHERE p.account.id IN :accountIds AND p.createdAt >= :cutoff
+      """)
   List<BankPostingSlice> postingSlicesSince(
       @Param("accountIds") Collection<UUID> accountIds, @Param("cutoff") Instant cutoff);
 
@@ -99,11 +101,12 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return one page of booking rows
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow("
-          + "p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,"
-          + " t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)"
-          + " FROM BankPosting p JOIN p.transaction t"
-          + " LEFT JOIN t.reversedTransaction rt WHERE p.account.id = :accountId")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
+      FROM BankPosting p JOIN p.transaction t
+      LEFT JOIN t.reversedTransaction rt WHERE p.account.id = :accountId
+      """)
   Page<BankBookingRow> findBookings(@Param("accountId") UUID accountId, Pageable pageable);
 
   /**
@@ -115,13 +118,14 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return the period's booking rows in chronological order
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow("
-          + "p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,"
-          + " t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)"
-          + " FROM BankPosting p JOIN p.transaction t"
-          + " LEFT JOIN t.reversedTransaction rt"
-          + " WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to"
-          + " ORDER BY p.createdAt ASC, p.id ASC")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
+      FROM BankPosting p JOIN p.transaction t
+      LEFT JOIN t.reversedTransaction rt
+      WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to
+      ORDER BY p.createdAt ASC, p.id ASC
+      """)
   List<BankBookingRow> findBookingsInPeriod(
       @Param("accountId") UUID accountId, @Param("from") Instant from, @Param("to") Instant to);
 
@@ -134,8 +138,10 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return the balance built from all postings strictly before {@code before}, never {@code null}
    */
   @Query(
-      "SELECT COALESCE(SUM(p.amount), 0) FROM BankPosting p"
-          + " WHERE p.account.id = :accountId AND p.createdAt < :before")
+      """
+      SELECT COALESCE(SUM(p.amount), 0) FROM BankPosting p
+      WHERE p.account.id = :accountId AND p.createdAt < :before
+      """)
   BigDecimal accountBalanceBefore(
       @Param("accountId") UUID accountId, @Param("before") Instant before);
 
@@ -149,10 +155,11 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * @return every account leg of the given transactions
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg("
-          + "t.id, p.id, a.id, a.accountNo, a.name, p.amount)"
-          + " FROM BankPosting p JOIN p.transaction t JOIN p.account a"
-          + " WHERE t.id IN :transactionIds")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg(t.id, p.id, a.id, a.accountNo, a.name, p.amount)
+      FROM BankPosting p JOIN p.transaction t JOIN p.account a
+      WHERE t.id IN :transactionIds
+      """)
   List<BankCounterLeg> findLegsByTransactionIds(
       @Param("transactionIds") Collection<UUID> transactionIds);
 

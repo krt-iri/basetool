@@ -78,10 +78,12 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
    */
   @Modifying
   @Query(
-      "UPDATE ShipType s SET s.uexDeletedAt = :now "
-          + "WHERE s.uexVehicleId IS NOT NULL "
-          + "AND s.uexVehicleId NOT IN :seenIds "
-          + "AND s.uexDeletedAt IS NULL")
+      """
+      UPDATE ShipType s SET s.uexDeletedAt = :now
+      WHERE s.uexVehicleId IS NOT NULL
+      AND s.uexVehicleId NOT IN :seenIds
+      AND s.uexDeletedAt IS NULL
+      """)
   int markUexDeletedExcept(
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
 
@@ -103,10 +105,12 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
    */
   @Modifying
   @Query(
-      "UPDATE ShipType s SET s.scwikiDeletedAt = :now "
-          + "WHERE s.scwikiSyncedAt IS NOT NULL "
-          + "AND s.externalUuid NOT IN :seenExternalUuids "
-          + "AND s.scwikiDeletedAt IS NULL")
+      """
+      UPDATE ShipType s SET s.scwikiDeletedAt = :now
+      WHERE s.scwikiSyncedAt IS NOT NULL
+      AND s.externalUuid NOT IN :seenExternalUuids
+      AND s.scwikiDeletedAt IS NULL
+      """)
   int markScwikiDeletedExcept(
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 

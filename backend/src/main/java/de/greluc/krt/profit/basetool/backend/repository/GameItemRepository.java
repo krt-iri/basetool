@@ -121,10 +121,12 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE GameItem g SET g.uexDeletedAt = :now "
-          + "WHERE g.uexItemId IS NOT NULL "
-          + "AND g.uexItemId NOT IN :seenIds "
-          + "AND g.uexDeletedAt IS NULL")
+      """
+      UPDATE GameItem g SET g.uexDeletedAt = :now
+      WHERE g.uexItemId IS NOT NULL
+      AND g.uexItemId NOT IN :seenIds
+      AND g.uexDeletedAt IS NULL
+      """)
   int markUexDeletedExcept(
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
 
@@ -147,10 +149,12 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE GameItem g SET g.scwikiDeletedAt = :now "
-          + "WHERE g.scwikiSyncedAt IS NOT NULL "
-          + "AND g.externalUuid NOT IN :seenExternalUuids "
-          + "AND g.scwikiDeletedAt IS NULL")
+      """
+      UPDATE GameItem g SET g.scwikiDeletedAt = :now
+      WHERE g.scwikiSyncedAt IS NOT NULL
+      AND g.externalUuid NOT IN :seenExternalUuids
+      AND g.scwikiDeletedAt IS NULL
+      """)
   int markScwikiDeletedExcept(
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 }

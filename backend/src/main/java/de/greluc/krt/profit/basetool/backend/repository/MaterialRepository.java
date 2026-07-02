@@ -46,8 +46,10 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * {@link Material}.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto(m.id,"
-          + " m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto(m.id,
+      m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name
+      """)
   List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
 
   /**
@@ -127,10 +129,12 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE Material m SET m.scwikiDeletedAt = :now "
-          + "WHERE m.scwikiUuid IS NOT NULL "
-          + "AND m.scwikiUuid NOT IN :seenScwikiUuids "
-          + "AND m.scwikiDeletedAt IS NULL")
+      """
+      UPDATE Material m SET m.scwikiDeletedAt = :now
+      WHERE m.scwikiUuid IS NOT NULL
+      AND m.scwikiUuid NOT IN :seenScwikiUuids
+      AND m.scwikiDeletedAt IS NULL
+      """)
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
@@ -145,8 +149,10 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * @return visible refinery-input candidates, ordered by name for deterministic matching
    */
   @Query(
-      "SELECT m FROM Material m WHERE m.isVisible = true"
-          + " AND (m.type = :rawType OR m.isManualRawMaterial = true) ORDER BY m.name")
+      """
+      SELECT m FROM Material m WHERE m.isVisible = true
+      AND (m.type = :rawType OR m.isManualRawMaterial = true) ORDER BY m.name
+      """)
   List<Material> findRefineryInputCandidates(
       @Param("rawType") de.greluc.krt.profit.basetool.backend.model.MaterialType rawType);
 
@@ -155,8 +161,10 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * useful to suppress materials with no buy/sell data in the trade UI.
    */
   @Query(
-      "SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m"
-          + " AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))")
+      """
+      SELECT m FROM Material m WHERE EXISTS (SELECT 1 FROM MaterialPrice p WHERE p.material = m
+      AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL))
+      """)
   Page<Material> findAllWithPrices(Pageable pageable);
 
   /**

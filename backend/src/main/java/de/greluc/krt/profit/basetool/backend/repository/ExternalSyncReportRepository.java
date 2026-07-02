@@ -70,8 +70,10 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
    * @return run ids newest-first
    */
   @Query(
-      "SELECT r.runId FROM ExternalSyncReport r WHERE r.sourceSystem = :source "
-          + "GROUP BY r.runId ORDER BY MAX(r.ranAt) DESC")
+      """
+      SELECT r.runId FROM ExternalSyncReport r WHERE r.sourceSystem = :source
+      GROUP BY r.runId ORDER BY MAX(r.ranAt) DESC
+      """)
   List<UUID> findRecentRunIds(@Param("source") SyncSourceSystem sourceSystem, Pageable pageable);
 
   /**
@@ -85,8 +87,10 @@ public interface ExternalSyncReportRepository extends JpaRepository<ExternalSync
    */
   @Modifying
   @Query(
-      "DELETE FROM ExternalSyncReport r WHERE r.sourceSystem = :source "
-          + "AND r.runId NOT IN :keptRunIds")
+      """
+      DELETE FROM ExternalSyncReport r WHERE r.sourceSystem = :source
+      AND r.runId NOT IN :keptRunIds
+      """)
   int deleteBySourceAndRunIdNotIn(
       @Param("source") SyncSourceSystem sourceSystem,
       @Param("keptRunIds") Collection<UUID> keptRunIds);

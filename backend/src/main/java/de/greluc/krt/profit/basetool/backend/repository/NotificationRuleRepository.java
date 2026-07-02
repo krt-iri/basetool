@@ -44,8 +44,10 @@ public interface NotificationRuleRepository extends JpaRepository<NotificationRu
    * @return the matching enabled rules (selectors fetched); never {@code null}
    */
   @Query(
-      "SELECT DISTINCT r FROM NotificationRule r LEFT JOIN FETCH r.selectors"
-          + " WHERE r.eventType = :eventType AND r.enabled = true")
+      """
+      SELECT DISTINCT r FROM NotificationRule r LEFT JOIN FETCH r.selectors
+      WHERE r.eventType = :eventType AND r.enabled = true
+      """)
   List<NotificationRule> findEnabledByEventTypeWithSelectors(
       @Param("eventType") NotificationEventType eventType);
 

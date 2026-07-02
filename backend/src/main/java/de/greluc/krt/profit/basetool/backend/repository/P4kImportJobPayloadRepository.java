@@ -41,9 +41,11 @@ public interface P4kImportJobPayloadRepository extends JpaRepository<P4kImportJo
   @Modifying
   @Query(
       value =
-          "INSERT INTO p4k_import_job_payload (job_id, content) "
-              + "SELECT :targetJobId, content FROM p4k_import_job_payload "
-              + "WHERE job_id = :sourceJobId",
+          """
+          INSERT INTO p4k_import_job_payload (job_id, content)
+          SELECT :targetJobId, content FROM p4k_import_job_payload
+          WHERE job_id = :sourceJobId
+          """,
       nativeQuery = true)
   int copyPayload(@Param("targetJobId") UUID targetJobId, @Param("sourceJobId") UUID sourceJobId);
 }
