@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -66,7 +67,7 @@ import reactor.core.publisher.Mono;
 @Controller
 @RequestMapping("/admin/p4k-import")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Slf4j
 public class AdminP4kImportPageController {
 

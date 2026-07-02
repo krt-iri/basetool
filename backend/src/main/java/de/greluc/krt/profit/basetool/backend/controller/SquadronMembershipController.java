@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -84,7 +85,7 @@ public class SquadronMembershipController {
    * @return the persisted membership DTO with the bumped version.
    */
   @PatchMapping("/{userId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Patch per-Squadron-membership role flags",
       description =

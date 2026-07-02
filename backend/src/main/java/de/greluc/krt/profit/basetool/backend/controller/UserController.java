@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.time.LocalDate;
 import java.util.List;
@@ -79,7 +80,8 @@ public class UserController {
    * @return paged user DTOs
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> getAllUsers(
       @RequestParam(required = false) Integer page,
@@ -109,7 +111,16 @@ public class UserController {
    * @return all users as reference DTOs
    */
   @GetMapping("/lookup")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE')")
+  @PreAuthorize(
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.KRT_MEMBER
+          + "', '"
+          + Roles.BANK_EMPLOYEE
+          + "')")
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> lookupUsers() {
     return userService.findAllReference();
@@ -121,7 +132,8 @@ public class UserController {
    * @return paged user DTOs
    */
   @GetMapping("/search")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> searchUsers(
       @RequestParam String query,
@@ -156,7 +168,8 @@ public class UserController {
    * @return the user DTO, peer-redacted for cross-squadron non-admin callers
    */
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
     de.greluc.krt.profit.basetool.backend.model.User user = userService.findById(id);
@@ -194,7 +207,16 @@ public class UserController {
    *     possibly empty when the user has no memberships.
    */
   @GetMapping("/{id}/memberships")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE')")
+  @PreAuthorize(
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.KRT_MEMBER
+          + "', '"
+          + Roles.BANK_EMPLOYEE
+          + "')")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getUserMemberships(
       @PathVariable @NotNull UUID id,
@@ -426,7 +448,7 @@ public class UserController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/attributes")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
@@ -453,7 +475,7 @@ public class UserController {
    * @return the user's complete post-write membership list.
    */
   @PatchMapping("/{id}/memberships")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MembershipDeltaResponse patchMemberships(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
@@ -476,7 +498,7 @@ public class UserController {
    *     wrapped in the same response shape the membership-delta PATCH returns.
    */
   @GetMapping("/{id}/memberships/detail")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
     return new MembershipDeltaResponse(
         orgUnitMembershipService.findAllMembershipsForUser(id).stream()
@@ -491,7 +513,7 @@ public class UserController {
    * @param id user id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteUser(@PathVariable @NotNull UUID id) {
     userService.deleteUser(id);
   }

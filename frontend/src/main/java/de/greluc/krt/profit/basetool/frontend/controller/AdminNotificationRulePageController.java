@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteReq
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.constraints.NotNull;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,7 +57,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 @RequestMapping("/admin/notification-rules")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Slf4j
 public class AdminNotificationRulePageController {
 

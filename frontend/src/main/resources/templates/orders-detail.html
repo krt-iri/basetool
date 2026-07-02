@@ -25,13 +25,13 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.type != 'ITEM'}" type="button" class="btn btn-outline" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
+            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.type != 'ITEM'}" type="button" class="btn btn-outline" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
             <!-- Item orders are edited on the reused create form; only while no item-handover has
                  been recorded (afterwards the lines are frozen). -->
-            <a sec:authorize="hasRole('LOGISTICIAN')"
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
                th:if="${order.type == 'ITEM' and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-outline"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <form sec:authorize="hasRole('ADMIN')" id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
+            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                 <button type="submit" class="btn btn-quiet-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Löschen</span></button>
             </form>
         </div>
@@ -158,7 +158,7 @@
         </div>
 
         <!-- Status editor — logisticians only; everyone else reads the status pill above. -->
-        <div class="od-status-row" sec:authorize="hasRole('LOGISTICIAN')">
+        <div class="od-status-row" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
             <label class="od-status-row-label" for="status-select" th:text="#{orders.index.status}">Status</label>
             <select id="status-select"
                     name="status"
@@ -526,7 +526,7 @@
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
                         th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
 
-                <div sec:authorize="hasRole('LOGISTICIAN')" th:if="${users != null and !users.isEmpty()}"
+                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${users != null and !users.isEmpty()}"
                      style="display: flex; gap: 0.5rem; align-items: center;">
                     <select id="assignee-add-select" data-krt-combobox style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
@@ -643,7 +643,7 @@
         <div id="order-handovers-results" class="mt-2"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
-        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
             <button type="button" class="btn btn-outline" data-testid="order-handover-open" data-trigger="od-open-handover"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.handover}">Übergabe protokollieren</span></button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
@@ -658,7 +658,7 @@
                         <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                         <th th:text="#{orders.detail.handover.squadron}">Staffel</th>
                         <th th:text="#{orders.detail.handover.items}">Materialien</th>
-                        <th sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"></th>
+                        <th sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -676,7 +676,7 @@
                                 </li>
                             </ul>
                         </td>
-                        <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                        <td sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <button type="button"
                                     class="btn btn-ghost btn-icon"
                                     th:data-order-id="${order.id}"
@@ -709,11 +709,11 @@
              renders for logisticians so the collection link stays reachable even after every item is
              delivered; only the handover button is gated on outstanding lines (it hides once the
              order is fully delivered). -->
-        <div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
             <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline" style="min-height: 44px;" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
-        <p sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
         <div th:if="${order.itemHandovers != null and !order.itemHandovers.isEmpty()}" class="mt-2">
             <div class="table-responsive">
@@ -723,7 +723,7 @@
                         <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
                         <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                         <th th:text="#{orders.detail.handover.items}">Items</th>
-                        <th sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"></th>
+                        <th sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -738,7 +738,7 @@
                                 </li>
                             </ul>
                         </td>
-                        <td sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                        <td sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <button type="button"
                                     class="btn btn-ghost btn-icon"
                                     th:data-order-id="${order.id}"
@@ -758,7 +758,7 @@
     </div>
 </main>
 
-<div sec:authorize="hasRole('LOGISTICIAN')" id="edit-modal" class="modal" style="display: none;">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" id="edit-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
@@ -876,7 +876,7 @@
 
 <!-- Claim ("Eintragung") create/edit modal (Phase 6, #346) — only rendered for logisticians+; the
      backend still enforces the per-squadron / responsible-SK / admin matrix on the relayed call. -->
-<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="claim-modal" class="modal" style="display: none; z-index: 1060;">
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="claim-modal" class="modal" style="display: none; z-index: 1060;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="claim-modal">&times;</button>
         <h3 id="claim-modal-title" style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
@@ -934,7 +934,7 @@
 </div>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" id="handover-modal" class="modal" style="display: none;">
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="handover-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
@@ -984,7 +984,7 @@
 <!-- Item-handover modal (ITEM orders). One row per still-outstanding ordered-item line; each row's
      amount input is capped at that line's outstanding quantity. Submits as a normal form POST so the
      page reloads on success and the refreshed @Version is picked up (no stale-version 409). -->
-<div sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>

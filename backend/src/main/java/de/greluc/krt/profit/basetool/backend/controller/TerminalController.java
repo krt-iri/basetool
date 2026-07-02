@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.service.TerminalService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -104,7 +105,7 @@ public class TerminalController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public TerminalDto updateTerminal(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull TerminalDto terminalDto) {
     // Here we just allow toggling visibility according to the requirement,
@@ -121,7 +122,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public TerminalDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setLoadingDockOverride(id, value));
@@ -136,7 +137,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public TerminalDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearLoadingDockOverride(id));
   }
@@ -150,7 +151,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/auto-load")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public TerminalDto setAutoLoadOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setAutoLoadOverride(id, value));
@@ -165,7 +166,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/auto-load-override")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public TerminalDto clearAutoLoadOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearAutoLoadOverride(id));
   }

@@ -93,7 +93,7 @@
 
             <div class="search-form-actions">
                 <button type="button" id="operations-filter-reset" class="btn btn-ghost" th:text="#{general.reset}">Reset</button>
-                <button sec:authorize="hasRole('MISSION_MANAGER')" type="button" class="btn btn--cta" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
+                <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)" type="button" class="btn btn--cta" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
             </div>
         </form>
 
@@ -123,7 +123,7 @@
                             <td class="op-desc" th:text="${op.description}">Description</td>
                             <td class="op-action">
                                 <a class="btn btn-ghost" th:href="@{/operations/{id}(id=${op.id})}" th:text="#{general.details}">Details</a>
-                                <button sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
+                                <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
                                         th:data-id="${op.id}"
                                         data-trigger="operations-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </td>

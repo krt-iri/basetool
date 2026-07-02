@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCrea
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -57,7 +58,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/personal-inventory")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Tag(
     name = "Admin – Personal Inventory",
     description = "Administrator endpoints for managing any user's personal inventory.")

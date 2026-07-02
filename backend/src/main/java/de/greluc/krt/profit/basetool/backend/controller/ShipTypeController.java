@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -98,7 +99,7 @@ public class ShipTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ShipTypeDto updateShipTypeVisibility(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
     return shipMapper.shipTypeToDto(shipTypeService.updateShipTypeVisibility(id, hidden));

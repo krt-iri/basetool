@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,7 @@ public class BankGrantsPageController {
    * @return the grants template, or its {@code grantsMatrix} fragment for an AJAX swap
    */
   @GetMapping("/bank/grants")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   public String grants(
       @RequestParam(required = false) String view,
       @RequestParam(required = false) UUID accountId,

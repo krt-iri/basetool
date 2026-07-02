@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class BankHolderReconciliationService {
 
   /** Role codes whose holders must exist as active bank holders (REQ-BANK-029). */
-  private static final List<String> BANK_ROLE_CODES = List.of("BANK_EMPLOYEE", "BANK_MANAGEMENT");
+  private static final List<String> BANK_ROLE_CODES =
+      List.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
 
   private final UserRepository userRepository;
   private final BankHolderRepository holderRepository;

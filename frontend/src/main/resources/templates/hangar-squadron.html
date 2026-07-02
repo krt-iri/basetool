@@ -151,12 +151,12 @@
                 <td th:text="${item.shipType.name}" style="vertical-align: top; padding-top: 1rem;">Typ</td>
                 <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
                 <td style="vertical-align: top; padding-top: 0.5rem;">
-                    <details sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:if="${item.details != null and !item.details.isEmpty()}">
+                    <details sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:if="${item.details != null and !item.details.isEmpty()}">
                         <summary class="btn btn-ghost" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
                     </details>
                 </td>
             </tr>
-            <tr class="details-row" sec:authorize="hasAnyRole('ADMIN', 'OFFICER')" th:if="${item.details != null and !item.details.isEmpty()}">
+            <tr class="details-row" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:if="${item.details != null and !item.details.isEmpty()}">
                 <td colspan="3" class="p-0">
                     <table class="sub-table">
                         <thead>

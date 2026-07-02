@@ -121,8 +121,8 @@
 
         <div class="actions-bar">
             <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Staffelübersicht</a>
-            <a sec:authorize="hasRole('LOGISTICIAN')" th:href="@{/inventory/input(source='admin')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
-            <button sec:authorize="hasRole('ADMIN')" type="button" id="delete-all-global-inventory-btn" class="btn btn-quiet-danger"
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
+            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" id="delete-all-global-inventory-btn" class="btn btn-quiet-danger"
                     th:text="#{inventory.deleteAll.btn}"
                     th:data-error-failed="#{inventory.deleteAll.error.failed}"
                     th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
@@ -433,7 +433,7 @@
     </div>
 </div>
 
-<div sec:authorize="hasRole('ADMIN')" id="delete-all-global-inventory-modal" class="modal" style="display:none; z-index: 3300;">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="modal" style="display:none; z-index: 3300;">
     <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
         <h2 th:text="#{inventory.deleteAll.modal.title}" class="mt-0">Globales Lager leeren</h2>
         <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>

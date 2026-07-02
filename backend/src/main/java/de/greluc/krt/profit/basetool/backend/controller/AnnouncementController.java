@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.mapper.AnnouncementMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -69,7 +70,7 @@ public class AnnouncementController {
    * @return the announcement DTO
    */
   @GetMapping("/admin")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public AnnouncementDto getAdminAnnouncement() {
     return announcementMapper.toDto(announcementService.getAdminAnnouncement());
   }
@@ -81,7 +82,7 @@ public class AnnouncementController {
    * @return the persisted DTO
    */
   @PutMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public AnnouncementDto updateAnnouncement(
       @RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
     return announcementMapper.toDto(
@@ -90,7 +91,7 @@ public class AnnouncementController {
 
   /** Removes the announcement entirely. Next PUT creates a fresh row. */
   @DeleteMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteAnnouncement() {
     announcementService.deleteAnnouncement();
   }

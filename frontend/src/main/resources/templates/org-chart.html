@@ -38,7 +38,7 @@
              title box but stays OUTSIDE #oc-chart, so an in-place chart refresh (REQ-FE-005) never
              duplicates it — pinned by OrgChartPageRenderTest#chartBodyFragment_rendersTreeWithoutPageChrome. -->
         <button type="button" class="btn btn-outline oc-edit-toggle" data-trigger="oc-toggle-edit"
-                sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}"
+                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
                 aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
     </div>
 
@@ -47,7 +47,7 @@
     <!-- Edit-mode legend: hidden until the toolbar toggle turns editing on (oc-edit-hint--on),
          so the cloud of dashed "+" affordances has context. Admins only, like the toolbar. -->
     <div id="oc-edit-hint" class="oc-edit-hint" role="note"
-         sec:authorize="hasRole('ADMIN')" th:if="${orgChart != null}"
+         sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
          th:text="#{orgChart.editHint}">Bearbeiten aktiv: Positionen zuweisen, umbenennen oder entfernen.</div>
 
     <!-- #oc-chart is the STABLE swap container (its `editing` class + the toolbar toggle survive an
@@ -84,7 +84,7 @@
                         <div class="oc-v"></div>
                         <th:block th:replace="~{fragments/org-chart-node :: ocNode(${m}, 2)}"></th:block>
                     </th:block>
-                    <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                             data-trigger="oc-add" data-position-type="OL_MEMBER"
                             th:data-org-unit-id="${ol.orgUnitId()}"
                             th:data-rank-label="#{orgChart.rank.OL_MEMBER}"
@@ -136,7 +136,7 @@
                     <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                 </div>
                 <button th:if="${area.lead() == null}" type="button" class="oc-add"
-                        sec:authorize="hasRole('ADMIN')" data-trigger="oc-add" data-position-type="AREA_LEAD"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add" data-position-type="AREA_LEAD"
                         th:data-rank-label="#{orgChart.rank.AREA_LEAD}"
                         th:text="#{orgChart.add.areaLead}">Bereichsleiter zuweisen</button>
 
@@ -152,7 +152,7 @@
                 </th:block>
 
                 <!-- one button to add a Stab member (Koordinator/Operator; the modal picks the type) -->
-                <button type="button" class="oc-add" sec:authorize="hasRole('ADMIN')"
+                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                         data-trigger="oc-add-staff" th:text="#{orgChart.add.staff}">Stab hinzufügen</button>
 
                 <!-- Tier 2: the ungrouped Staffeln + Spezialkommandos fan out under the Area Lead -->
@@ -173,7 +173,7 @@
 
 <!-- Assign / reassign / add-staff modal (admins only) -->
 <div id="oc-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
-     style="display:none;" sec:authorize="hasRole('ADMIN')">
+     style="display:none;" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <div class="modal-content hud-box">
         <button type="button" class="oc-modal-close" data-trigger="oc-modal-cancel"
                 th:aria-label="#{general.cancel}">&times;</button>

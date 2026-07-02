@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
@@ -522,7 +523,7 @@ public class OwnerScopeService {
    *     seat (SK-lead / Bereichsleitung / OL).
    */
   public boolean canAccessBlueprintOverview() {
-    if (authHelper.isAdmin() || authHelper.hasReachableRole("ROLE_OFFICER")) {
+    if (authHelper.isAdmin() || authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
       return true;
     }
     return currentCallerMemberships().stream().anyMatch(OwnerScopeService::isOversightSeat);
@@ -567,7 +568,7 @@ public class OwnerScopeService {
     }
     Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
+    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
       // REQ-ORG-017: an officer oversees ALL of their own Staffeln (up to two), not just the
       // name-sorted primary — add every SQUADRON membership rather than the single active one.
       for (OrgUnitMembership m : memberships) {
@@ -628,7 +629,7 @@ public class OwnerScopeService {
     }
     Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole("ROLE_OFFICER")) {
+    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
       // REQ-ORG-017: an officer's own-level scope is ALL of their Staffeln (up to two), not just
       // the
       // name-sorted primary.

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -62,7 +63,7 @@ public class BankSecurityService {
    * @return {@code true} iff the caller reaches the Bank Employee role
    */
   public boolean isBankStaff() {
-    return authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE");
+    return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE));
   }
 
   /**
@@ -72,7 +73,7 @@ public class BankSecurityService {
    * @return {@code true} iff the caller reaches the Bank Management role
    */
   public boolean isManagement() {
-    return authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT");
+    return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
   }
 
   /**

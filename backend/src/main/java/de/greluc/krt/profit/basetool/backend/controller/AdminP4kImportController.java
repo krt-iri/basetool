@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -74,7 +75,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/admin/import/p4k")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Tag(
     name = "Admin – P4K Import",
     description =

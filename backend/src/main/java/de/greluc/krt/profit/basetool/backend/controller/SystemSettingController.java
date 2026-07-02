@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.backend.service.SystemSettingService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class SystemSettingController {
    * @return the persisted DTO
    */
   @PutMapping("/{key}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public SystemSettingDto updateSetting(
       @PathVariable String key, @Valid @RequestBody SystemSettingUpdateDto dto) {
     return systemSettingService.updateSetting(key, dto);

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -79,7 +80,7 @@ public class BankPageController {
    * @return the dashboard template
    */
   @GetMapping("/bank")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String dashboard(Model model) {
     BankDashboardDto dashboard =
         backendApiClient.get("/api/v1/bank/dashboard", BankDashboardDto.class);
@@ -114,7 +115,7 @@ public class BankPageController {
    *     swap
    */
   @GetMapping("/bank/accounts/{id}")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String accountDetail(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) Integer page,
@@ -232,7 +233,7 @@ public class BankPageController {
    * @return the holder-detail template, or its {@code holderBookings} fragment for an AJAX swap
    */
   @GetMapping("/bank/holders/{id}")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String holderDetail(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) Integer page,

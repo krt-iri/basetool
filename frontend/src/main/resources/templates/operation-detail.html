@@ -441,7 +441,7 @@
                 </div>
             </div>
             <div class="footacts">
-                <button th:if="${canEdit}" sec:authorize="hasRole('ADMIN')" type="button" class="btn btn-quiet-danger" style="margin-right: auto;"
+                <button th:if="${canEdit}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger" style="margin-right: auto;"
                         th:data-id="${operation.id}" data-trigger="operation-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{operation.delete}">L&ouml;schen</span></button>
                 <button th:if="${canEdit}" type="submit" form="operation-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                 <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zur&uuml;ck</a>

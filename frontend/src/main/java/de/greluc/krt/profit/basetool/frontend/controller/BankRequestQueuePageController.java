@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +65,7 @@ public class BankRequestQueuePageController {
    * @return the template, or its {@code requestQueue} fragment view
    */
   @GetMapping("/bank/requests")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String queue(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String fragment,

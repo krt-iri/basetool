@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionEligibilityResponse;
 import de.greluc.krt.profit.basetool.backend.service.PromotionEligibilityService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -106,7 +107,7 @@ public class PromotionEligibilityController {
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/user/{userId}")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   @Operation(summary = "Evaluate eligibility for another member (ADMIN/OFFICER only).")
   @ApiResponses({
     @ApiResponse(

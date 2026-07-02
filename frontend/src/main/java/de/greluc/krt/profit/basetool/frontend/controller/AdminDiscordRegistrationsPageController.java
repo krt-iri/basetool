@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +60,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @RequestMapping("/admin/discord-registrations")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminDiscordRegistrationsPageController {
 
   private static final String BACKEND_BASE = "/api/v1/admin/registrations";

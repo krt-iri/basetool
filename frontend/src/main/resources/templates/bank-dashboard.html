@@ -35,7 +35,7 @@
                 <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
             </p>
         </div>
-        <div class="bank-head-actions" sec:authorize="hasRole('BANK_MANAGEMENT')">
+        <div class="bank-head-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
             <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
                 <span th:text="#{bank.dashboard.manage}">Verwaltung</span>

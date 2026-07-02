@@ -60,6 +60,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -154,11 +155,11 @@ public class OrgUnitBankAccessService {
 
   /**
    * Global-role buckets the OL may toggle for a Sonderkonto (no owning unit ⇒ no membership ranks).
-   * Stored without the {@code ROLE_} prefix; evaluated via {@code hasReachableRole("ROLE_" +
-   * code)}.
+   * Stored without the {@code ROLE_} prefix; evaluated via {@code
+   * hasReachableRole(Roles.authority(code))}.
    */
   private static final List<String> SPECIAL_GLOBAL_ROLE_BUCKETS =
-      List.of("OFFICER", "LOGISTICIAN", "MISSION_MANAGER");
+      List.of(Roles.OFFICER, Roles.LOGISTICIAN, Roles.MISSION_MANAGER);
 
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
@@ -1051,7 +1052,8 @@ public class OrgUnitBankAccessService {
     for (BankAccountViewGrant grant : grants) {
       boolean match =
           switch (grant.getGranteeKind()) {
-            case GLOBAL_ROLE -> authHelperService.hasReachableRole("ROLE_" + grant.getRoleCode());
+            case GLOBAL_ROLE ->
+                authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
             case MEMBERSHIP_ROLE -> false;
@@ -1213,7 +1215,7 @@ public class OrgUnitBankAccessService {
       case ORG_UNIT, AREA -> isResponsibleHolder(account);
       case SPECIAL ->
           ownerScopeService.currentUserIsOlMember()
-              || authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT");
+              || authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
       case CARTEL, CARTEL_BANK -> false;
     };
   }
@@ -1275,7 +1277,7 @@ public class OrgUnitBankAccessService {
       return false;
     }
     return authHelperService.isAdmin()
-        || authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")
+        || authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT))
         || isResponsibleHolder(account);
   }
 
@@ -1403,7 +1405,8 @@ public class OrgUnitBankAccessService {
                   && role != null
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
             }
-            case GLOBAL_ROLE -> authHelperService.hasReachableRole("ROLE_" + limit.getRoleCode());
+            case GLOBAL_ROLE ->
+                authHelperService.hasReachableRole(Roles.authority(limit.getRoleCode()));
             default -> false;
           };
       if (matches) {

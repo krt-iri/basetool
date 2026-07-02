@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -266,7 +267,7 @@ public class PromotionPageController {
    * allCategories}, which is what the row body relies on.
    */
   @GetMapping("/manage")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String manage(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
@@ -353,7 +354,7 @@ public class PromotionPageController {
 
   /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
   @GetMapping("/admin/topics")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminTopics(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
@@ -393,7 +394,7 @@ public class PromotionPageController {
    *     page
    */
   @GetMapping("/admin/rank-requirements")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminRankRequirements(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,

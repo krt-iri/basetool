@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +63,7 @@ public class SquadronAdminProxyController {
    * @return 204 No Content on success
    */
   @PatchMapping("/{id}/promotion-enabled")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setPromotionEnabled(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
@@ -83,7 +84,7 @@ public class SquadronAdminProxyController {
    * @return 204 No Content on success
    */
   @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setProfitEligible(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);

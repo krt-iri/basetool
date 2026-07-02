@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.Permissions;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -58,33 +60,35 @@ public class DataInitializer {
       // Lookup is by `code`, not by `name`: an admin renaming a role no longer
       // triggers a silent re-create with default permissions on the next boot.
       createRoleIfNotFound(
-          "KRT_MEMBER", "KRT Member", Set.of("HANGAR_READ", "HANGAR_WRITE", "MISSION_READ"));
+          Roles.KRT_MEMBER,
+          "KRT Member",
+          Set.of(Permissions.HANGAR_READ, Permissions.HANGAR_WRITE, Permissions.MISSION_READ));
       createRoleIfNotFound(
-          "OFFICER",
+          Roles.OFFICER,
           "Officer",
           Set.of(
-              "HANGAR_READ",
-              "HANGAR_WRITE",
-              "MISSION_READ",
-              "MISSION_WRITE",
-              "MISSION_MANAGE",
-              "USER_MANAGE"));
+              Permissions.HANGAR_READ,
+              Permissions.HANGAR_WRITE,
+              Permissions.MISSION_READ,
+              Permissions.MISSION_WRITE,
+              Permissions.MISSION_MANAGE,
+              Permissions.USER_MANAGE));
       createRoleIfNotFound(
-          "ADMIN",
+          Roles.ADMIN,
           "Admin",
           Set.of(
-              "HANGAR_READ",
-              "HANGAR_WRITE",
-              "MISSION_READ",
-              "MISSION_WRITE",
-              "MISSION_MANAGE",
-              "USER_MANAGE",
-              "ROLE_MANAGE"));
-      createRoleIfNotFound("GUEST", "Guest", Set.of());
+              Permissions.HANGAR_READ,
+              Permissions.HANGAR_WRITE,
+              Permissions.MISSION_READ,
+              Permissions.MISSION_WRITE,
+              Permissions.MISSION_MANAGE,
+              Permissions.USER_MANAGE,
+              Permissions.ROLE_MANAGE));
+      createRoleIfNotFound(Roles.GUEST, "Guest", Set.of());
       // Kartell bank (epic #556, REQ-BANK-007): two coarse roles; the fine-grained per-account
       // capabilities are app-managed grant rows (bank_account_grant), not permission strings.
-      createRoleIfNotFound("BANK_EMPLOYEE", "Bank Employee", Set.of());
-      createRoleIfNotFound("BANK_MANAGEMENT", "Bank Management", Set.of());
+      createRoleIfNotFound(Roles.BANK_EMPLOYEE, "Bank Employee", Set.of());
+      createRoleIfNotFound(Roles.BANK_MANAGEMENT, "Bank Management", Set.of());
 
       seedIridiumIfMissing();
     };

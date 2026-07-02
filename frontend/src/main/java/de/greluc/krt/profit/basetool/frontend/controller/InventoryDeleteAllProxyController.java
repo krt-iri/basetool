@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -55,7 +56,7 @@ public class InventoryDeleteAllProxyController {
    * @return 204 No Content on success
    */
   @DeleteMapping("/all")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> deleteAllGlobalInventory() {
     try {
       webClient.delete().uri("/api/v1/inventory/all").retrieve().toBodilessEntity().block();

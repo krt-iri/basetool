@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -29,6 +29,82 @@ which delegates to the MVC `handlerExceptionResolver` so `GlobalExceptionHandler
 (`UNAUTHENTICATED`) / 403 (`ACCESS_DENIED`) with a `code` and a `correlationId` — never Spring's
 default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
 [`api-conventions.md`](api-conventions.md) REQ-API-004).
+
+### REQ-SEC-002a — Central role/permission constants (backend)
+
+Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and
+the fine-grained permission strings a role's `permissions` collection carries are centralised in
+`support.Roles` / `support.Permissions` (S3, #909) rather than repeated as raw string literals.
+`SecurityConfig` (the `roleHierarchy()` chain and every `hasRole`/`hasAnyRole`/`hasAuthority`/
+`hasAnyAuthority` call in the `authorizeHttpRequests` matrix — these are plain Java method calls,
+not SpEL, so passing a `String` constant is a zero-risk substitution) and `DataInitializer` (the
+seeded role/permission values) are migrated. `Roles.authority(String)` derives the `ROLE_`-prefixed
+Spring-authority form for the few call sites that need it (the hierarchy chain,
+`hasAnyAuthority(...)` mixing a role into a permission list) instead of a duplicated `ROLE_*`
+constant per role. `LOGISTICIAN` / `MISSION_MANAGER` are hierarchy-derived only — never seeded in
+`Role` — and stay documented as such on `Roles`. Both constant holders live in the dependency-leaf
+`support` package (ADR-0047): plain `String` constants with no dependency on the security API.
+
+Every literal-role `@PreAuthorize` expression is migrated too — **266 sites across 96 backend +
+frontend controller/service files** (153 backend, 113 frontend; a ground-truth grep sweep, not the
+issue's original ~158/~322 estimates). Each `hasRole('X')` / `hasAnyRole('X','Y',…)` /
+`hasAuthority('X')` / `hasAnyAuthority('X','Y',…)` single-quoted literal is spliced into a
+compile-time-constant string-concatenation expression, e.g. `hasRole('ADMIN')` becomes `hasRole('" +
+Roles.ADMIN + "')`. This is safe by construction: `"literal" + Roles.X + "literal"` is itself a Java
+compile-time constant (JLS 4.12.4 / 15.28 — a `public static final String` field initialized from a
+literal, referenced from another compilation unit, is a constant expression), so javac folds it to
+the byte-identical original string before the annotation is even written to the class file — the
+wire behavior, and everything ArchUnit's `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` /
+`writeEndpointsMustDeclareAnAuthorisationAnnotation` inspect via the resolved annotation value, is
+unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthenticated()`,
+`permitAll()`) are untouched — only the literal-role/permission subset was in scope, matching the
+`@PreAuthorize` value's constant-concatenation seam so a role literal can sit alongside an untouched
+bean-method call in the same string (e.g. `hasRole('" + Roles.LOGISTICIAN + "') and
+@ownerScopeService.canEditJobOrder(#id)`).
+
+On the frontend, `frontend.support.Roles` mirrors the backend's bare role codes (the frontend cannot
+depend on the backend's Java classes — separate Gradle module, bearer-token relay only — so the
+values are intentionally duplicated and must stay byte-identical). `FrontendAuthHelperService` and
+every frontend `@PreAuthorize` with a literal role are migrated the same way.
+
+**Follow-up completed (originally deliberately out of scope in PR #931):**
+
+- **Programmatic authority-string comparisons** outside `@PreAuthorize` — backend
+  `AuthHelperService.hasReachableRole(...)` call sites (`BankSecurityService`,
+  `MissionSecurityService`, `OwnerScopeService`, `OrgUnitBankAccessService`) and frontend raw
+  `getAuthority().equals("ROLE_X")` / `"ROLE_X".equals(...)` checks (`BackendRoleSyncFilter`,
+  `InventoryPageController`, `JobOrderPageController`, `OperationPageController`,
+  `RefineryOrderPageController`) now reference `Roles`/`Permissions` constants and the
+  `Roles.authority(String)` helper (including the two dynamic `"ROLE_" + grant.getRoleCode()` sites
+  in `OrgUnitBankAccessService`, which became `Roles.authority(grant.getRoleCode())`). Same shape
+  as the `@PreAuthorize` sweep, without the annotation compile-time-constant constraint.
+- **Thymeleaf `sec:authorize="hasRole('X')"` template attributes** (134 occurrences across 27
+  templates at time of migration) are migrated to reference `frontend.support.Roles` via the SpEL
+  `T()` type-reference operator, e.g. `hasRole('ADMIN')` →
+  `hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)`. `sec:authorize`
+  evaluates through the same unrestricted `StandardEvaluationContext` as `@PreAuthorize` (verified
+  against the resolved `thymeleaf-extras-springsecurity6` / `spring-security-web` sources), so no
+  new Thymeleaf expression-utility object or model binding was needed — see
+  [ADR-0059](../adr/0059-thymeleaf-sec-authorize-role-constants-via-spel-type-operator.md) for the
+  full rationale and the rejected bound-expression-object alternative.
+- **Missed mixed-clause `@PreAuthorize` expressions closed (code-review follow-up).** The initial
+  266-site sweep's mechanical splice reliably handled a `@PreAuthorize` body that was *only* a role
+  check, but was inconsistent on a mixed expression combining a role with a bean-method call —
+  exactly the `hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)`
+  shape this same section cites as in scope. A review pass found the raw-literal form still present
+  in `BankBookingController` (deposit/withdraw/transfer), `JobOrderController` (7 handover/report/
+  unlink endpoints), the org-role delegation cluster (`KommandoGroupController`,
+  `OrgHierarchyController`, `SquadronRoleController`, `SpecialCommandMembershipController`),
+  `RefineryOrderController`, `OperationController` and its frontend mirror
+  `OperationPageController`, and the frontend `OrgUnitBankPageController`'s
+  `MEMBER_OR_ABOVE` constant — all now migrated. The same pass also closed four service-layer raw
+  role-code comparisons that sit outside `@PreAuthorize` entirely and were never covered by the
+  original sweep or the programmatic-comparison follow-up above: `UserService` (including the
+  Keycloak first-admin bootstrap auto-activation check), `BankGrantService`,
+  `BankHolderReconciliationService` and `RecipientResolutionService`. Finally, the ~35 sites sharing
+  the identical `hasAnyRole('ADMIN','OFFICER')` splice across the promotion/rank/evaluation surface
+  now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
+  `frontend.support.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 

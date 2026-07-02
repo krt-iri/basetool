@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryReposit
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -138,7 +139,7 @@ public class RankRequirementService {
    *     topic/category belongs to a different squadron
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
@@ -197,7 +198,7 @@ public class RankRequirementService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -232,7 +233,7 @@ public class RankRequirementService {
    * @throws EntityNotFoundException if no rank requirement exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     RankRequirement entity = load(id);

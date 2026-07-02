@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.CityService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -51,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/cities")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class CityController {
 
   private final CityService cityService;
@@ -104,7 +105,7 @@ public class CityController {
    * @return the persisted city DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public CityDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return cityMapper.toDto(cityService.setLoadingDockOverride(id, value));
@@ -118,7 +119,7 @@ public class CityController {
    * @return the persisted city DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public CityDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return cityMapper.toDto(cityService.clearLoadingDockOverride(id));
   }

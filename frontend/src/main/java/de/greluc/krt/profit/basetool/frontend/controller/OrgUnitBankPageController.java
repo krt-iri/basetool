@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,7 +65,17 @@ public class OrgUnitBankPageController {
 
   /** Any KRT member (or above) may reach the page; the backend seam scopes the data per account. */
   private static final String MEMBER_OR_ABOVE =
-      "hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER')";
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "','"
+          + Roles.OFFICER
+          + "','"
+          + Roles.LOGISTICIAN
+          + "','"
+          + Roles.MISSION_MANAGER
+          + "','"
+          + Roles.KRT_MEMBER
+          + "')";
 
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
