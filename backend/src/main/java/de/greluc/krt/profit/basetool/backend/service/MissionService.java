@@ -69,6 +69,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -491,9 +493,9 @@ public class MissionService {
 
     validateMissionTimes(mission);
 
-    bumpCoreVersion(mission);
-    bumpScheduleVersion(mission);
-    bumpFlagsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.CORE);
+    bumpSectionVersion(mission, MissionSection.SCHEDULE);
+    bumpSectionVersion(mission, MissionSection.FLAGS);
 
     Mission saved = missionRepository.save(mission);
     auditService.record(
@@ -537,7 +539,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertCoreVersion(mission, expectedCoreVersion, missionId);
+    assertSectionVersion(mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
     // Cross-section auto-stamp FIRST, before mutating mission.status — the condition reads the
     // OLD status, so it must run before the setter below. Setting actualStartTime here is safe
@@ -566,7 +568,7 @@ public class MissionService {
       mission.setOperation(null);
     }
 
-    bumpCoreVersion(mission);
+    bumpSectionVersion(mission, MissionSection.CORE);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -602,7 +604,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertScheduleVersion(mission, expectedScheduleVersion, missionId);
+    assertSectionVersion(mission, MissionSection.SCHEDULE, expectedScheduleVersion, missionId);
     mission.setMeetingTime(meetingTime);
     mission.setPlannedStartTime(plannedStartTime);
     mission.setPlannedEndTime(plannedEndTime);
@@ -620,7 +622,7 @@ public class MissionService {
     }
 
     validateMissionTimes(mission);
-    bumpScheduleVersion(mission);
+    bumpSectionVersion(mission, MissionSection.SCHEDULE);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -645,9 +647,9 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertFlagsVersion(mission, expectedFlagsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
-    bumpFlagsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.FLAGS);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -669,110 +671,116 @@ public class MissionService {
    */
   private void bumpActualStartTimeOnActivationWithinTransaction(@NotNull Mission mission) {
     mission.setActualStartTime(Instant.now());
-    bumpScheduleVersion(mission);
-  }
-
-  private void assertCoreVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void assertScheduleVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void assertFlagsVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void assertPartyLeadVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void bumpCoreVersion(@NotNull Mission mission) {
-    long current = mission.getCoreVersion() == null ? 0L : mission.getCoreVersion();
-    mission.setCoreVersion(current + 1L);
-  }
-
-  private void bumpScheduleVersion(@NotNull Mission mission) {
-    long current = mission.getScheduleVersion() == null ? 0L : mission.getScheduleVersion();
-    mission.setScheduleVersion(current + 1L);
-  }
-
-  private void bumpFlagsVersion(@NotNull Mission mission) {
-    long current = mission.getFlagsVersion() == null ? 0L : mission.getFlagsVersion();
-    mission.setFlagsVersion(current + 1L);
-  }
-
-  private void bumpPartyLeadVersion(@NotNull Mission mission) {
-    long current = mission.getPartyLeadVersion() == null ? 0L : mission.getPartyLeadVersion();
-    mission.setPartyLeadVersion(current + 1L);
-  }
-
-  private void assertStepsVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getStepsVersion() == null ? 0L : mission.getStepsVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void bumpStepsVersion(@NotNull Mission mission) {
-    long current = mission.getStepsVersion() == null ? 0L : mission.getStepsVersion();
-    mission.setStepsVersion(current + 1L);
+    bumpSectionVersion(mission, MissionSection.SCHEDULE);
   }
 
   /**
-   * Validates the expected {@code owningOrgUnitVersion} against the mission's current value,
-   * raising a 409 on mismatch so two managers racing on the owning-org-unit reassignment surface a
-   * conflict instead of one silently overwriting the other (REQ-ORG-018).
+   * Checks the expected value of a mission's fine-grained {@link MissionSection} version counter
+   * against its current value, raising a 409 on mismatch so two managers racing on the
+   * <em>same</em> section surface a conflict instead of one silently overwriting the other, while a
+   * concurrent edit to an <em>unrelated</em> section never collides (REQ-ORG-018). An absent
+   * (never-bumped) counter reads as {@code 0L}, matching the value a fresh section renders and
+   * echoes back.
+   *
+   * <p>These are the manual business-{@code Long} section counters described in CLAUDE.md: they are
+   * deliberately <strong>not</strong> the row's JPA {@code @Version} and are <strong>not</strong>
+   * routed through the {@code support.OptimisticLock} helper family — the null-{@code ->}-{@code
+   * 0L} semantics are their own.
    *
    * @param mission the managed mission whose counter to check.
+   * @param section the section the caller echoed a version back for.
    * @param expectedVersion the version the caller echoed back from the rendered page.
    * @param missionId the mission id, for the conflict exception identifier.
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the expected
    *     version is stale.
    */
-  private void assertOwningOrgUnitVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current =
-        mission.getOwningOrgUnitVersion() == null ? 0L : mission.getOwningOrgUnitVersion();
-    if (!expectedVersion.equals(current)) {
+  private void assertSectionVersion(
+      @NotNull Mission mission,
+      @NotNull MissionSection section,
+      @NotNull Long expectedVersion,
+      @NotNull UUID missionId) {
+    if (!expectedVersion.equals(section.current(mission))) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           Mission.class, missionId);
     }
   }
 
   /**
-   * Increments the mission's dedicated {@code owningOrgUnitVersion} section counter after a
-   * successful reassignment so the next echo from a now-stale form is rejected.
+   * Increments a mission's fine-grained {@link MissionSection} version counter after a successful
+   * edit of that section, so the next echo from a now-stale form for the <em>same</em> section is
+   * rejected while unrelated sections keep their counters. An absent (never-bumped) counter is
+   * treated as {@code 0L} and becomes {@code 1L}.
    *
    * @param mission the managed mission whose counter to bump.
+   * @param section the section whose counter to increment.
    */
-  private void bumpOwningOrgUnitVersion(@NotNull Mission mission) {
-    long current =
-        mission.getOwningOrgUnitVersion() == null ? 0L : mission.getOwningOrgUnitVersion();
-    mission.setOwningOrgUnitVersion(current + 1L);
+  private void bumpSectionVersion(@NotNull Mission mission, @NotNull MissionSection section) {
+    section.set(mission, section.current(mission) + 1L);
+  }
+
+  /**
+   * The mission's independently-versioned edit sections. Each constant binds the getter/setter of
+   * one manual {@code *Version} counter on {@link Mission}, letting {@link #assertSectionVersion}
+   * and {@link #bumpSectionVersion} operate on any section without a per-section helper. These back
+   * the fine-grained per-section optimistic locks (REQ-ORG-018): an edit to one section must not
+   * 409 a concurrent edit to another, so each section carries its own counter rather than sharing
+   * the row's Hibernate {@code @Version}.
+   */
+  private enum MissionSection {
+    /** The mission core (name, description, status, owner-visible identity). */
+    CORE(Mission::getCoreVersion, Mission::setCoreVersion),
+    /** The mission schedule (planned/actual start and end times). */
+    SCHEDULE(Mission::getScheduleVersion, Mission::setScheduleVersion),
+    /** The mission flags (e.g. the internal/public visibility toggle). */
+    FLAGS(Mission::getFlagsVersion, Mission::setFlagsVersion),
+    /** The mission party-lead assignment. */
+    PARTY_LEAD(Mission::getPartyLeadVersion, Mission::setPartyLeadVersion),
+    /** The Ablauf steps timeline. */
+    STEPS(Mission::getStepsVersion, Mission::setStepsVersion),
+    /** The mission objectives (Ziele). */
+    OBJECTIVES(Mission::getObjectivesVersion, Mission::setObjectivesVersion),
+    /** The owning-org-unit assignment. */
+    OWNING_ORG_UNIT(Mission::getOwningOrgUnitVersion, Mission::setOwningOrgUnitVersion);
+
+    /** Reads the raw (nullable) counter value from a mission. */
+    private final transient Function<Mission, Long> getter;
+
+    /** Writes the counter value back onto a mission. */
+    private final transient BiConsumer<Mission, Long> setter;
+
+    /**
+     * Binds a section constant to its {@code *Version} counter accessors on {@link Mission}.
+     *
+     * @param getter reads the raw (nullable) counter value.
+     * @param setter writes the counter value back.
+     */
+    MissionSection(Function<Mission, Long> getter, BiConsumer<Mission, Long> setter) {
+      this.getter = getter;
+      this.setter = setter;
+    }
+
+    /**
+     * Returns this section's current counter value for the given mission, coalescing an absent
+     * (never-bumped) {@code null} counter to {@code 0L} — the exact value a fresh section renders
+     * and echoes back, so the very first edit validates against {@code 0L}.
+     *
+     * @param mission the mission to read the counter from.
+     * @return the current section version, or {@code 0L} when the counter is null.
+     */
+    private long current(@NotNull Mission mission) {
+      Long value = getter.apply(mission);
+      return value == null ? 0L : value;
+    }
+
+    /**
+     * Writes a new value into this section's counter on the given mission.
+     *
+     * @param mission the mission to write the counter on.
+     * @param value the new counter value.
+     */
+    private void set(@NotNull Mission mission, long value) {
+      setter.accept(mission, value);
+    }
   }
 
   /**
@@ -1672,7 +1680,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertStepsVersion(mission, expectedStepsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
@@ -1682,7 +1690,7 @@ public class MissionService {
     mission.addStep(step);
     missionStepRepository.save(step);
 
-    bumpStepsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_ADDED,
@@ -1711,13 +1719,13 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertStepsVersion(mission, expectedStepsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = findStep(mission, stepId);
     step.setTitle(title == null ? null : title.trim());
     step.setMeta(normalizeStepMeta(meta));
 
-    bumpStepsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_UPDATED,
@@ -1742,7 +1750,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertStepsVersion(mission, expectedStepsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     boolean removed = mission.removeStep(stepId);
     if (!removed) {
@@ -1750,7 +1758,7 @@ public class MissionService {
     }
     repackStepOrder(mission);
 
-    bumpStepsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_REMOVED,
@@ -1781,7 +1789,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertStepsVersion(mission, expectedStepsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     Set<UUID> existingIds =
         mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
@@ -1796,7 +1804,7 @@ public class MissionService {
       byId.get(orderedStepIds.get(i)).setOrderIndex(i);
     }
 
-    bumpStepsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_REORDERED,
@@ -1825,12 +1833,12 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertStepsVersion(mission, expectedStepsVersion, missionId);
+    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = findStep(mission, stepId);
     step.setDone(done);
 
-    bumpStepsVersion(mission);
+    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_DONE_CHANGED,
@@ -1882,20 +1890,6 @@ public class MissionService {
 
   // --- Mission goals (Ziele) ---
 
-  private void assertObjectivesVersion(
-      @NotNull Mission mission, @NotNull Long expectedVersion, @NotNull UUID missionId) {
-    long current = mission.getObjectivesVersion() == null ? 0L : mission.getObjectivesVersion();
-    if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  private void bumpObjectivesVersion(@NotNull Mission mission) {
-    long current = mission.getObjectivesVersion() == null ? 0L : mission.getObjectivesVersion();
-    mission.setObjectivesVersion(current + 1L);
-  }
-
   /**
    * Appends a goal (Ziel) to a mission at the end of the list (next {@code orderIndex}) and bumps
    * {@code objectivesVersion}. Guarded by the dedicated goals-section counter so editing the goals
@@ -1922,7 +1916,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
 
     MissionObjective objective = new MissionObjective();
     objective.setTitle(title == null ? null : title.trim());
@@ -1931,7 +1925,7 @@ public class MissionService {
     mission.addObjective(objective);
     missionObjectiveRepository.save(objective);
 
-    bumpObjectivesVersion(mission);
+    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_ADDED,
@@ -1960,13 +1954,13 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
 
     MissionObjective objective = findObjective(mission, objectiveId);
     objective.setTitle(title == null ? null : title.trim());
     objective.setKind(kind);
 
-    bumpObjectivesVersion(mission);
+    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_UPDATED,
@@ -1991,7 +1985,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
 
     boolean removed = mission.removeObjective(objectiveId);
     if (!removed) {
@@ -1999,7 +1993,7 @@ public class MissionService {
     }
     repackObjectiveOrder(mission);
 
-    bumpObjectivesVersion(mission);
+    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_REMOVED,
@@ -2030,7 +2024,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertObjectivesVersion(mission, expectedObjectivesVersion, missionId);
+    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
 
     Set<UUID> existingIds =
         mission.getObjectives().stream().map(MissionObjective::getId).collect(Collectors.toSet());
@@ -2045,7 +2039,7 @@ public class MissionService {
       byId.get(orderedObjectiveIds.get(i)).setOrderIndex(i);
     }
 
-    bumpObjectivesVersion(mission);
+    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_REORDERED,
@@ -2562,12 +2556,13 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertOwningOrgUnitVersion(mission, expectedOwningOrgUnitVersion, missionId);
+    assertSectionVersion(
+        mission, MissionSection.OWNING_ORG_UNIT, expectedOwningOrgUnitVersion, missionId);
 
     OrgUnit previous = mission.getOwningOrgUnit();
     OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
     mission.setOwningOrgUnit(target);
-    bumpOwningOrgUnitVersion(mission);
+    bumpSectionVersion(mission, MissionSection.OWNING_ORG_UNIT);
     Mission saved = missionRepository.save(mission);
     // Audit detail carries org-unit identifiers + kinds only — no PII, no user free text (the
     // mission name is the entity label, handled separately by the audit record).
@@ -2633,7 +2628,7 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertPartyLeadVersion(mission, expectedPartyLeadVersion, missionId);
+    assertSectionVersion(mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
 
     if (userId != null) {
       User user =
@@ -2650,7 +2645,7 @@ public class MissionService {
       mission.setPartyLeadGuestName(null);
     }
 
-    bumpPartyLeadVersion(mission);
+    bumpSectionVersion(mission, MissionSection.PARTY_LEAD);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_PARTY_LEAD_CHANGED,
