@@ -39,6 +39,14 @@ package de.greluc.krt.profit.basetool.backend.repository;
  * JpaSpecificationExecutor} (unused anywhere in this codebase — every scoped query is a
  * hand-written {@code @Query}, not a {@code Specification}).
  *
+ * <p><b>Why {@code public} and not package-private.</b> Although every consumer lives in this same
+ * {@code repository} package, the type is declared {@code public} on purpose: its constants are
+ * referenced only inside {@code @Query} annotation values, so constant folding (see above) inlines
+ * each value and leaves no reference to this type in the compiled output. A package-private holder
+ * would therefore be reported as an unused type by reference analysis (e.g. CodeQL {@code
+ * java/unused-reference-type}) even though it backs every scoped query — declaring it {@code
+ * public} keeps that analysis correct without changing any behaviour.
+ *
  * <p><b>The alias is baked into each constant, not parameterized.</b> Each entity's repository
  * picks its own JPQL alias ({@code o} for Operation, {@code m} for Mission, {@code s} for Ship,
  * {@code r} for RefineryOrder, {@code i} for InventoryItem, {@code o} for JobOrder), and a
@@ -60,8 +68,9 @@ package de.greluc.krt.profit.basetool.backend.repository;
  * #INVENTORY_ITEM_SCOPE_TRIPLE} carry no escape tail — those three aggregates are strict-staffel
  * with no cross-squadron visibility beyond the triple (REQ-ORG-003).
  */
-final class ScopeSpecifications {
+public final class ScopeSpecifications {
 
+  /** Non-instantiable JPQL-fragment constant holder. */
   private ScopeSpecifications() {}
 
   /**

@@ -282,7 +282,7 @@ timeout) · **Code:** `spring.jpa.properties.jakarta.persistence.query.timeout` 
 ### REQ-DATA-010 — Shared repository abstractions for verbatim-duplicated query shapes (S5, #911)
 
 Two query shapes were hand-copied across the repository layer rather than shared: the
-case-insensitive-unique `name` exists-pair (22 declarations across 12 lookup-table repositories) and
+case-insensitive-unique `name` exists-pair (16 declarations across 8 lookup-table repositories) and
 the org-unit scope-predicate triple (the `:isAdminAllScope` / `:activeOrgUnitId` /
 `:memberOrgUnitIds` clause from REQ-ORG-002, copy-pasted across the 6 aggregate repositories that
 enforce it — Operation, Mission, Ship, RefineryOrder, InventoryItem, JobOrder). Both are now
