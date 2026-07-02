@@ -905,93 +905,10 @@ public class InventoryItemService {
 
     if (checkoutType == CheckoutType.TRANSFER
         && (dto.targetUserId() != null || dto.targetLocationId() != null)) {
-      User targetUser = item.getUser();
-      if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
-        targetUser =
-            userRepository
-                .findById(dto.targetUserId())
-                .orElseThrow(() -> new NotFoundException("Target user not found"));
-      }
-
-      Location targetLocation = item.getLocation();
-      if (dto.targetLocationId() != null
-          && !dto.targetLocationId().equals(item.getLocation().getId())) {
-        targetLocation =
-            locationRepository
-                .findById(dto.targetLocationId())
-                .orElseThrow(() -> new NotFoundException("Target location not found"));
-      }
-
-      if (targetUser.getId().equals(item.getUser().getId())
-          && targetLocation.getId().equals(item.getLocation().getId())) {
-        throw new BadRequestException("Transfer must change either the user or the location");
-      }
-
-      // Resolve the target stack's owning org-unit pool up front — the eighth identity dimension —
-      // so the freshly created target row is stamped with that pool.
-      final OrgUnit targetOwningOrgUnit =
-          ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-              targetUser, dto.targetOwningOrgUnitId());
-
-      // Append-only: a transfer always inserts its own row at the target and is never folded into
-      // an existing identical stack there. The view collapses rows that share a stack identity for
-      // display (group-on-read), so no duplicate is visible and no read-add-write race exists.
-      InventoryItem newItem = new InventoryItem();
-      newItem.setUser(targetUser);
-      newItem.setOwningOrgUnit(targetOwningOrgUnit);
-      newItem.setMaterial(item.getMaterial());
-      newItem.setLocation(targetLocation);
-      newItem.setQuality(item.getQuality());
-      newItem.setAmount(roundAmount(dto.amount()));
-      newItem.setPersonal(item.getPersonal());
-      newItem.setJobOrder(item.getJobOrder());
-      newItem.setMission(item.getMission());
-      InventoryItem savedNew = inventoryItemRepository.save(newItem);
-      if (remainingAmount <= QUANTITY_EPSILON) {
-        inventoryItemRepository.delete(item);
-      } else {
-        item.setAmount(remainingAmount);
-        // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
-        // the returned DTO is the new target row, but flushing keeps the source row's @Version
-        // current within the transaction so any future in-place consumer of a transfer cannot 409.
-        inventoryItemRepository.saveAndFlush(item);
-      }
-      auditService.record(
-          AuditEventType.INVENTORY_ITEM_TRANSFERRED,
-          sourceId,
-          sourceLabel,
-          targetUser.getId(),
-          AuditDetails.of("material", materialName)
-              .with("amount", dto.amount())
-              .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
-              .with("newRow", newItem.getId())
-              .with("depleted", depleted));
-      return inventoryItemMapper.toDto(savedNew);
+      return bookOutTransfer(
+          item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
-      MissionParticipant participant =
-          missionParticipantRepository
-              .findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
-              .orElseThrow(
-                  () ->
-                      new BadRequestException(
-                          "You must be a participant of the mission to sell its items"));
-
-      MissionFinanceEntry entry = new MissionFinanceEntry();
-      entry.setMission(item.getMission());
-      entry.setParticipant(participant);
-      entry.setType(FinanceType.INCOME);
-      entry.setAmount(dto.sellAmount());
-      entry.setNote(
-          "Sale of "
-              + dto.amount()
-              + "x "
-              + item.getMaterial().getName()
-              + " at "
-              + dto.terminal());
-      missionFinanceEntryRepository.save(entry);
-      // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
-      // the save() return value, which a unit-test mock leaves null.
-      financeEntryId = entry.getId();
+      financeEntryId = createSaleFinanceEntry(item, dto, currentUserId);
     }
 
     if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
@@ -1022,6 +939,131 @@ public class InventoryItemService {
           financeEntryId);
       return inventoryItemMapper.toDto(saved);
     }
+  }
+
+  /**
+   * Applies the {@code TRANSFER} book-out branch: an append-only move of {@code dto.amount()} to
+   * the resolved target user / location / owning-org-unit pool (a new row is inserted, never folded
+   * into an existing target stack), decrementing the source row (deleting it when it depletes below
+   * {@link #QUANTITY_EPSILON}), and records the transfer audit event.
+   *
+   * @param item the managed source row
+   * @param dto the book-out request (target user/location/org-unit + amount)
+   * @param remainingAmount the source's post-decrement amount (already rounded)
+   * @param sourceId the source row id snapshot
+   * @param sourceLabel the source row's {@code material @ location} label snapshot
+   * @param materialName the material name snapshot
+   * @param depleted whether the source row depletes to zero (audit detail)
+   * @return the DTO of the newly created target row
+   * @throws NotFoundException when the target user or location is unknown
+   * @throws BadRequestException when the transfer changes neither user nor location
+   */
+  private InventoryItemDto bookOutTransfer(
+      InventoryItem item,
+      InventoryItemBookOutDto dto,
+      double remainingAmount,
+      UUID sourceId,
+      String sourceLabel,
+      String materialName,
+      boolean depleted) {
+    User targetUser = item.getUser();
+    if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
+      targetUser =
+          userRepository
+              .findById(dto.targetUserId())
+              .orElseThrow(() -> new NotFoundException("Target user not found"));
+    }
+
+    Location targetLocation = item.getLocation();
+    if (dto.targetLocationId() != null
+        && !dto.targetLocationId().equals(item.getLocation().getId())) {
+      targetLocation =
+          locationRepository
+              .findById(dto.targetLocationId())
+              .orElseThrow(() -> new NotFoundException("Target location not found"));
+    }
+
+    if (targetUser.getId().equals(item.getUser().getId())
+        && targetLocation.getId().equals(item.getLocation().getId())) {
+      throw new BadRequestException("Transfer must change either the user or the location");
+    }
+
+    // Resolve the target stack's owning org-unit pool up front — the eighth identity dimension —
+    // so the freshly created target row is stamped with that pool.
+    final OrgUnit targetOwningOrgUnit =
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+            targetUser, dto.targetOwningOrgUnitId());
+
+    // Append-only: a transfer always inserts its own row at the target and is never folded into
+    // an existing identical stack there. The view collapses rows that share a stack identity for
+    // display (group-on-read), so no duplicate is visible and no read-add-write race exists.
+    InventoryItem newItem = new InventoryItem();
+    newItem.setUser(targetUser);
+    newItem.setOwningOrgUnit(targetOwningOrgUnit);
+    newItem.setMaterial(item.getMaterial());
+    newItem.setLocation(targetLocation);
+    newItem.setQuality(item.getQuality());
+    newItem.setAmount(roundAmount(dto.amount()));
+    newItem.setPersonal(item.getPersonal());
+    newItem.setJobOrder(item.getJobOrder());
+    newItem.setMission(item.getMission());
+    InventoryItem savedNew = inventoryItemRepository.save(newItem);
+    if (remainingAmount <= QUANTITY_EPSILON) {
+      inventoryItemRepository.delete(item);
+    } else {
+      item.setAmount(remainingAmount);
+      // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
+      // the returned DTO is the new target row, but flushing keeps the source row's @Version
+      // current within the transaction so any future in-place consumer of a transfer cannot 409.
+      inventoryItemRepository.saveAndFlush(item);
+    }
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_TRANSFERRED,
+        sourceId,
+        sourceLabel,
+        targetUser.getId(),
+        AuditDetails.of("material", materialName)
+            .with("amount", dto.amount())
+            .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
+            .with("newRow", newItem.getId())
+            .with("depleted", depleted));
+    return inventoryItemMapper.toDto(savedNew);
+  }
+
+  /**
+   * Creates the {@link MissionFinanceEntry} for a {@code SELL} book-out of a mission-linked row:
+   * the caller must be a participant of the item's mission, and the sale is recorded as squadron
+   * {@code INCOME} of {@code dto.sellAmount()}. The DISCARD/SELL consume tail then decrements the
+   * source row as usual.
+   *
+   * @param item the managed source row (mission-linked)
+   * @param dto the book-out request (read for sell amount, terminal, amount)
+   * @param currentUserId the selling participant's user id
+   * @return the created finance-entry id (read off the managed entity, so a unit-test mock's null
+   *     {@code save()} return does not matter)
+   * @throws BadRequestException when the caller is not a participant of the item's mission
+   */
+  private UUID createSaleFinanceEntry(
+      InventoryItem item, InventoryItemBookOutDto dto, UUID currentUserId) {
+    MissionParticipant participant =
+        missionParticipantRepository
+            .findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "You must be a participant of the mission to sell its items"));
+
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(item.getMission());
+    entry.setParticipant(participant);
+    entry.setType(FinanceType.INCOME);
+    entry.setAmount(dto.sellAmount());
+    entry.setNote(
+        "Sale of " + dto.amount() + "x " + item.getMaterial().getName() + " at " + dto.terminal());
+    missionFinanceEntryRepository.save(entry);
+    // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
+    // the save() return value, which a unit-test mock leaves null.
+    return entry.getId();
   }
 
   /**
