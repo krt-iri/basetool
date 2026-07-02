@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -61,6 +62,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceTest {
@@ -82,6 +84,41 @@ class InventoryItemServiceTest {
 
   @Mock private AuditService auditService;
   @InjectMocks private InventoryItemService inventoryItemService;
+
+  private InventoryAggregationService realAggregationService;
+  private InventoryCheckoutService realCheckoutService;
+
+  @BeforeEach
+  void wireDelegates() {
+    // The facade delegates every read/aggregation to InventoryAggregationService and every checkout
+    // write to InventoryCheckoutService (the L2 split, #921). Mockito does not inject one
+    // @InjectMocks target into another, so build the real sub-services from the same mocks and set
+    // them on the facade. createInventoryItem / updateInventoryItem / updateNote stay on the facade
+    // and use the mocks directly.
+    realAggregationService =
+        new InventoryAggregationService(
+            inventoryItemRepository,
+            userRepository,
+            materialRepository,
+            jobOrderRepository,
+            inventoryItemMapper,
+            materialMapper,
+            ownerScopeService);
+    realCheckoutService =
+        new InventoryCheckoutService(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            missionFinanceEntryRepository,
+            missionParticipantRepository,
+            inventoryItemMapper,
+            ownerScopeService,
+            auditService);
+    ReflectionTestUtils.setField(
+        inventoryItemService, "inventoryAggregationService", realAggregationService);
+    ReflectionTestUtils.setField(
+        inventoryItemService, "inventoryCheckoutService", realCheckoutService);
+  }
 
   @Test
   void updateInventoryItem_savesInPlaceWithoutMerging() {

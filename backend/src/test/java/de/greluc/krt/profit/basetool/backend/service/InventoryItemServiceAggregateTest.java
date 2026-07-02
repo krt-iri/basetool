@@ -100,7 +100,7 @@ class InventoryItemServiceAggregateTest {
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
 
-  @InjectMocks private InventoryItemService service;
+  @InjectMocks private InventoryAggregationService service;
 
   // ---------------------------------------------------------------------
   // filter routing
