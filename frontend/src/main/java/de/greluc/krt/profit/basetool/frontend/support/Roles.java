@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
+import java.util.Set;
+
 /**
  * Central constant holder for role codes on the frontend side (S3 Phase 3, part of #909), replacing
  * the raw string literals that used to be copy-pasted across {@code @PreAuthorize} expressions,
@@ -68,4 +70,23 @@ public final class Roles {
   public static String authority(String code) {
     return ROLE_PREFIX + code;
   }
+
+  /**
+   * The "registered member or above" authority set: holding any one of these marks the caller as an
+   * organisation member or above; holding none — anonymous OR an authenticated but role-less {@code
+   * GUEST} — marks a mission outsider. Kept in sync with the backend role matrix in {@code
+   * ROLES_AND_PERMISSIONS.md}.
+   *
+   * <p><b>Not "all roles."</b> {@link #GUEST}, {@link #BANK_EMPLOYEE} and {@link #BANK_MANAGEMENT}
+   * are deliberately excluded — a bank-only or guest authority does not by itself make the caller
+   * an organisation member. Do not widen this to a generic "every constant in this class" helper;
+   * that would silently admit those three into every member-or-above check.
+   */
+  public static final Set<String> MEMBER_AUTHORITIES =
+      Set.of(
+          authority(ADMIN),
+          authority(OFFICER),
+          authority(MISSION_MANAGER),
+          authority(LOGISTICIAN),
+          authority(KRT_MEMBER));
 }
