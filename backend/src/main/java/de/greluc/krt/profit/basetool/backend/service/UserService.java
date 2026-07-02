@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -1065,6 +1066,10 @@ public class UserService {
     User user = decide(userId, version, ApprovalStatus.ACTIVE, adminId);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.APPROVED, null, adminId));
+    // REQ-NOTIF-014: notify the user by e-mail after commit. Best-effort and off-thread — the
+    // after-commit listener swallows any mail failure so it never affects this approval.
+    eventPublisher.publishEvent(
+        new UserApprovalDecidedEvent(userId, true, user.getEmail(), user.getEffectiveName(), null));
     return user;
   }
 
@@ -1093,6 +1098,11 @@ public class UserService {
     User user = decide(userId, version, ApprovalStatus.REJECTED, adminId);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.REJECTED, reason, adminId));
+    // REQ-NOTIF-014: notify the user by e-mail after commit, including the admin's reason. Best-
+    // effort and off-thread — the after-commit listener swallows any mail failure.
+    eventPublisher.publishEvent(
+        new UserApprovalDecidedEvent(
+            userId, false, user.getEmail(), user.getEffectiveName(), reason));
     return user;
   }
 
