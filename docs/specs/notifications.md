@@ -98,6 +98,11 @@ is sub-scoped (404 on a foreign/unknown id) and is independent of the retention 
 (REQ-NOTIF-009): a user may remove any of their own notifications at any time regardless of age
 or read state.
 
+Deleting a **single** notification is a low-stakes action and fires **immediately with no
+confirmation dialog** (the success toast is the only feedback) — in both the bell dropdown and
+the `/notifications` page. Only the **bulk** clear-read still confirms through the
+design-system `showKrtConfirm` modal, since it removes many rows at once.
+
 **Acceptance**
 
 - [x] `POST /{id}/read`, `POST /read-all`, `DELETE /{id}`, `DELETE /read` under
