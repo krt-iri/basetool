@@ -69,9 +69,9 @@
                 <tbody>
                 <tr th:each="r : ${requests.content()}" data-testid="bank-request-row">
                     <td>
-                        <span th:text="${r.accountNo()}">KB-0001</span>
-                        <span class="text-muted" th:if="${r.orgUnitShorthand() != null}"
-                              th:text="' &middot; ' + ${r.orgUnitShorthand()}"></span>
+                        <span th:text="${r.accountName()}">Staffel IRIDIUM</span>
+                        <br>
+                        <span class="text-muted" style="font-size: 0.8rem;" th:text="${r.accountNo()}">KB-0001</span>
                     </td>
                     <td>
                         <span th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</span>

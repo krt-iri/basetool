@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
  * @param id the request id
  * @param accountId the target org-unit account id
  * @param accountNo the target account's human-readable number
+ * @param accountName the target account's display name
  * @param orgUnitId the owning org unit's id
  * @param orgUnitName the owning org unit's long-form name
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
@@ -69,6 +70,7 @@ public record BankBookingRequestDto(
     UUID id,
     UUID accountId,
     String accountNo,
+    String accountName,
     @Nullable UUID orgUnitId,
     @Nullable String orgUnitName,
     @Nullable String orgUnitShorthand,
