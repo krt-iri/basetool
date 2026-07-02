@@ -870,6 +870,12 @@ class ArchitectureTest {
    * JobOrderHandoverService} stays excluded — handover writes inherit their access gate from the
    * parent order's {@code @ownerScopeService.canEditJobOrder} controller check, and the service
    * itself only injects {@code AuthHelperService} for the audit stamp on the handover record.
+   *
+   * <p>{@code InventoryAggregationService} and {@code InventoryCheckoutService} are included as of
+   * the L2 split (#921): the org-unit scoping the {@code InventoryItemService} facade used to carry
+   * ({@code OwnerScopeService.currentScopePredicate()}) moved wholesale into these two extracted
+   * services, so the guard follows the scoped data rather than staying pinned to the now-thin
+   * facade.
    */
   @Test
   void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
@@ -882,6 +888,15 @@ class ArchitectureTest {
         Set.of(
             "MissionService",
             "InventoryItemService",
+            // L2 split (#921): the org-unit scoping the facade used to carry moved into these two
+            // extracted services — InventoryAggregationService runs every scoped read
+            // (currentScopePredicate on the aggregated / grouped / flat / drilldown views) and
+            // InventoryCheckoutService the scoped global wipe. The facade now only wires
+            // OwnerScopeService for the create-time stamp, so both must be whitelisted here or a
+            // maintainer dropping the dependency would silently un-scope every squadron-wide
+            // inventory read across org units without failing the build.
+            "InventoryAggregationService",
+            "InventoryCheckoutService",
             "RefineryOrderService",
             "HangarService",
             "OperationService",
