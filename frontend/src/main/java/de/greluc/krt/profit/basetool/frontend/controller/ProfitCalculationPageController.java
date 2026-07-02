@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +62,8 @@ public class ProfitCalculationPageController {
    * @return the {@code materials-profit-calculation} view name
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
     try {

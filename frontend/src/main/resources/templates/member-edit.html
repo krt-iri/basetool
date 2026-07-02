@@ -109,7 +109,7 @@
                  (REQ-SEC-005). SquadronContextAdvice injects `availableSquadrons`. The two fixed slots
                  bind to staffel1*/staffel2* fields; the Save button folds the non-empty slots into one
                  PATCH /api/v1/users/{id}/memberships reconcile. -->
-            <div class="form-group" sec:authorize="hasRole('ADMIN')" id="staffel-section">
+            <div class="form-group" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="staffel-section">
                 <label th:text="#{members.staffel.title}">Staffeln</label>
 
                 <!-- REQ-ORG-017: the authoritative Staffel-membership detail (each Staffel's own
@@ -199,7 +199,7 @@
          the corresponding management surface: Staffel rows to /admin/mission-data (squadron CRUD)
          or /members/{id}/edit (this page) for flag-toggles; SK rows to /admin/special-commands/{id}
          for the full roster UI. Full in-form delta-edit is a follow-up release. -->
-    <div class="hud-box mt-2" sec:authorize="hasRole('ADMIN')">
+    <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
         <h2 th:text="#{members.memberships.title}">Mitgliedschaften</h2>
         <p th:if="${memberMemberships == null or memberMemberships.isEmpty()}"
            th:text="#{members.memberships.none}">Keine Mitgliedschaften.</p>

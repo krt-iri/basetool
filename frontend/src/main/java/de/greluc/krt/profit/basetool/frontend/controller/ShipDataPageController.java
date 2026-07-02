@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipTypeForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -128,7 +129,7 @@ public class ShipDataPageController {
    * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
    */
   @PostMapping("/manufacturers/{id}/visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleManufacturerVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,
@@ -154,7 +155,7 @@ public class ShipDataPageController {
    * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
    */
   @PostMapping("/ship-types/{id}/visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleShipTypeVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,
@@ -181,7 +182,7 @@ public class ShipDataPageController {
    * @return redirect to {@code /ship-data}
    */
   @PostMapping("/reset-fitted")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String resetAllFitted(RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
@@ -204,7 +205,7 @@ public class ShipDataPageController {
    * @return {@code 204} on success, or the relayed backend {@code problem+json}
    */
   @PostMapping(value = "/reset-fitted", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> resetAllFittedAjax() {
     try {
@@ -229,7 +230,7 @@ public class ShipDataPageController {
    * @return {@code 204} on success, or the relayed backend {@code problem+json}
    */
   @PostMapping(value = "/ship-types/{id}/visibility", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> toggleShipTypeVisibilityAjax(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
@@ -258,7 +259,7 @@ public class ShipDataPageController {
   @PostMapping(
       value = "/manufacturers/{id}/visibility",
       headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> toggleManufacturerVisibilityAjax(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {

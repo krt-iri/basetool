@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -204,7 +205,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       // Sync roles from backend database
       if (user.roles() != null) {
         for (String roleName : user.roles()) {
-          String formattedRole = "ROLE_" + roleName.toUpperCase().replace(" ", "_");
+          String formattedRole = Roles.authority(roleName.toUpperCase().replace(" ", "_"));
           if (updatedAuthorities.stream().noneMatch(a -> a.getAuthority().equals(formattedRole))) {
             log.debug(
                 "Adding {} from backend to user: {}",
@@ -233,19 +234,19 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       // Sync special flags
       if (Boolean.TRUE.equals(user.isLogistician())
           && updatedAuthorities.stream()
-              .noneMatch(a -> a.getAuthority().equals("ROLE_LOGISTICIAN"))) {
+              .noneMatch(a -> a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN)))) {
         log.info(
             "Adding ROLE_LOGISTICIAN from backend to user: {}", maskPrincipal(token.getName()));
-        updatedAuthorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
+        updatedAuthorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.LOGISTICIAN)));
         modified = true;
       }
 
       if (Boolean.TRUE.equals(user.isMissionManager())
           && updatedAuthorities.stream()
-              .noneMatch(a -> a.getAuthority().equals("ROLE_MISSION_MANAGER"))) {
+              .noneMatch(a -> a.getAuthority().equals(Roles.authority(Roles.MISSION_MANAGER)))) {
         log.info(
             "Adding ROLE_MISSION_MANAGER from backend to user: {}", maskPrincipal(token.getName()));
-        updatedAuthorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
+        updatedAuthorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.MISSION_MANAGER)));
         modified = true;
       }
 

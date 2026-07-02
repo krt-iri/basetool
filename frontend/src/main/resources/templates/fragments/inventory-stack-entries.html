@@ -174,11 +174,11 @@
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <!-- Read-only text for users without association rights -->
-                        <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                        <div sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <span th:if="${entry.jobOrderId != null}" th:text="'Auftrag #' + ${entry.jobOrderDisplayId}">Zugewiesen</span>
                             <span th:if="${entry.jobOrderId == null}" class="text-muted">-</span>
                         </div>
-                        <select sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" class="association-select"
+                        <select sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="association-select"
                                 th:data-id="${entry.id}"
                                 th:data-material-id="${entry.material.id}"
                                 th:data-location-id="${entry.location.id}"
@@ -200,11 +200,11 @@
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.tree.field.mission}">Einsatz</span>
                         <!-- Read-only text for users without association rights -->
-                        <div sec:authorize="!hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')">
+                        <div sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <span th:if="${entry.missionId != null}" th:text="${entry.missionName}">Einsatz</span>
                             <span th:if="${entry.missionId == null}" class="text-muted">-</span>
                         </div>
-                        <select sec:authorize="hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')" class="association-select"
+                        <select sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="association-select"
                                 th:data-id="${entry.id}"
                                 th:data-material-id="${entry.material.id}"
                                 th:data-location-id="${entry.location.id}"
@@ -233,7 +233,7 @@
                 <span th:case="'PIECE'"><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
-            <div class="tree-cell tree-cell--actions" sec:authorize="hasRole('LOGISTICIAN')">
+            <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
                 <button type="button" class="btn btn-outline btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"

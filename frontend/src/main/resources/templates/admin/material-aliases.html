@@ -60,7 +60,7 @@
     <div class="hud-box mt-2">
         <div class="data-section">
             <h2 th:text="#{admin.materialAlias.section.add}">Neuen Alias anlegen</h2>
-            <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases}" class="form-grid" data-alias-create>
+            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases}" class="form-grid" data-alias-create>
                 <div class="form-group">
                     <label for="newSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
                     <select id="newSourceSystem" name="sourceSystem" required>
@@ -130,7 +130,7 @@
                         <td th:text="${a.createdBy}">system</td>
                         <td>
                             <div class="flex-gap-xs">
-                                <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
+                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
                                     <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{admin.materialAlias.action.delete}" th:aria-label="#{admin.materialAlias.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </form>
                             </div>
@@ -146,7 +146,7 @@
 
         <div class="data-section" th:if="${aliasToEdit != null}">
             <h2 th:text="#{admin.materialAlias.section.edit}">Alias bearbeiten</h2>
-            <form sec:authorize="hasRole('ADMIN')" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
+            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
                 <input type="hidden" name="version" th:value="${aliasToEdit.version}">
                 <div class="form-group">
                     <label for="editSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>

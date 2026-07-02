@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -98,7 +99,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
     var toCreate = starSystemMapper.toEntity(starSystem);
     // L-7: never honour a client-supplied id/version on create — a non-null id routes save() to
@@ -116,7 +117,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public StarSystemDto updateStarSystem(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
     return starSystemMapper.toDto(
@@ -129,7 +130,7 @@ public class StarSystemController {
    * @param id star system id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteStarSystem(@PathVariable @NotNull UUID id) {
     starSystemService.deleteStarSystem(id);
   }

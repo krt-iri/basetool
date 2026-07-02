@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankGrantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.service.BankGrantService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -51,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/bank/grants")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('BANK_MANAGEMENT')")
+@PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
 public class BankGrantController {
 
   private final BankGrantService bankGrantService;

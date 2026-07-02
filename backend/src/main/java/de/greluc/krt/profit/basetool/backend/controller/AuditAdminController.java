@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
@@ -58,7 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AuditAdminController {
 
   private static final Set<String> AUDIT_SORT_FIELDS = Set.of("occurredAt", "id");

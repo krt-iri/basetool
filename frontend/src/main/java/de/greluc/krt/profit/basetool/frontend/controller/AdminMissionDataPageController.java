@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.SquadronForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -73,7 +74,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/mission-data")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMissionDataPageController {
 
   private final BackendApiClient backendApiClient;
@@ -398,7 +399,7 @@ public class AdminMissionDataPageController {
    * @return redirect to {@code /admin/mission-data}
    */
   @PostMapping("/job-types/{id}/activate")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String activateJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -547,7 +548,7 @@ public class AdminMissionDataPageController {
    * @return redirect to {@code /admin/mission-data}
    */
   @PostMapping("/squadrons/{id}/activate")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String activateSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -813,7 +814,7 @@ public class AdminMissionDataPageController {
    */
   @ResponseBody
   @PostMapping(value = "/job-types/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateJobTypeAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> backendApiClient.post("/api/v1/job-types/" + id + "/activate", null, Void.class));
@@ -897,7 +898,7 @@ public class AdminMissionDataPageController {
    */
   @ResponseBody
   @PostMapping(value = "/squadrons/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> backendApiClient.post("/api/v1/squadrons/" + id + "/activate", null, Void.class));

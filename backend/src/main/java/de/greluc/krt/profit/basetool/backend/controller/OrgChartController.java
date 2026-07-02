@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateReq
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgChartService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -88,7 +89,7 @@ public class OrgChartController {
    * @return the persisted position as a flat DTO.
    */
   @PostMapping("/positions")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Assign a user to an org-chart position",
       description =
@@ -126,7 +127,7 @@ public class OrgChartController {
    * @return the updated position with the bumped version.
    */
   @PutMapping("/positions/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Reassign or reorder an org-chart position",
       description =
@@ -158,7 +159,7 @@ public class OrgChartController {
    * @return the updated, now-leaderless Kommando with the bumped version.
    */
   @DeleteMapping("/positions/{id}/leader")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Vacate a Kommando's Kommandoleiter",
       description =
@@ -186,7 +187,7 @@ public class OrgChartController {
    * @param id the position id.
    */
   @DeleteMapping("/positions/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Remove an org-chart position",
       description =

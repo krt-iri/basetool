@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankDashboardDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankDashboardService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +55,7 @@ public class BankDashboardController {
    */
   @Operation(summary = "Read the bank dashboard for the caller")
   @GetMapping
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   @Transactional(readOnly = true)
   public BankDashboardDto getDashboard() {
     UUID userId =

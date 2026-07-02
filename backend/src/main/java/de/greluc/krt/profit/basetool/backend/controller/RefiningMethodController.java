@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -100,7 +101,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public RefiningMethodDto createRefiningMethod(
       @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     var toCreate = refiningMethodMapper.toEntity(refiningMethod);
@@ -120,7 +121,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public RefiningMethodDto updateRefiningMethod(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     return refiningMethodMapper.toDto(
@@ -134,7 +135,7 @@ public class RefiningMethodController {
    * @param id refining method id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteRefiningMethod(@PathVariable @NotNull UUID id) {
     refiningMethodService.deleteRefiningMethod(id);
   }

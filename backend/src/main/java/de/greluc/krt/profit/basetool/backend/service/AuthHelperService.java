@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
@@ -67,11 +68,11 @@ public class AuthHelperService {
    */
   private static final Set<String> MEMBER_OR_ABOVE_ROLES =
       Set.of(
-          "ROLE_ADMIN",
-          "ROLE_OFFICER",
-          "ROLE_MISSION_MANAGER",
-          "ROLE_LOGISTICIAN",
-          "ROLE_KRT_MEMBER");
+          Roles.authority(Roles.ADMIN),
+          Roles.authority(Roles.OFFICER),
+          Roles.authority(Roles.MISSION_MANAGER),
+          Roles.authority(Roles.LOGISTICIAN),
+          Roles.authority(Roles.KRT_MEMBER));
 
   /**
    * Returns the current {@link Authentication}, or empty if no security context is bound, the
@@ -129,7 +130,7 @@ public class AuthHelperService {
    * ROLE_LOGISTICIAN}, this returns {@code true} for any of the three elevated roles.
    */
   public boolean isLogisticianOrAbove() {
-    return hasReachableRole("ROLE_LOGISTICIAN");
+    return hasReachableRole(Roles.authority(Roles.LOGISTICIAN));
   }
 
   /**
@@ -138,7 +139,7 @@ public class AuthHelperService {
    * {@code ROLE_ADMIN} downward, so this is a clean "is admin" check.
    */
   public boolean isAdmin() {
-    return hasReachableRole("ROLE_ADMIN");
+    return hasReachableRole(Roles.authority(Roles.ADMIN));
   }
 
   /**

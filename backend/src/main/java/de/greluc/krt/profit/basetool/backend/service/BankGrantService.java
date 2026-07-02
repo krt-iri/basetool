@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantReposito
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,7 +67,7 @@ public class BankGrantService {
    * (REQ-BANK-008).
    */
   private static final Set<String> ELIGIBLE_ROLE_CODES =
-      Set.of("BANK_EMPLOYEE", "BANK_MANAGEMENT", "ADMIN");
+      Set.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.ADMIN);
 
   private final BankAccountGrantRepository grantRepository;
   private final BankAccountRepository accountRepository;

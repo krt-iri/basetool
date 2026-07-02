@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -75,7 +76,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/uex-data")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminUexPageController {
 
   /** URL segments accepted as the {@code kind} path variable for the loading-dock dispatcher. */
@@ -144,7 +145,7 @@ public class AdminUexPageController {
    * @return redirect back to {@code /admin/uex}
    */
   @PostMapping("/{kind}/{id}/loading-dock")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String updateLoadingDockOverride(
       @PathVariable @NotNull String kind,
       @PathVariable @NotNull UUID id,
@@ -172,7 +173,7 @@ public class AdminUexPageController {
    * @return redirect back to {@code /admin/uex}
    */
   @PostMapping("/terminals/{id}/auto-load")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String updateTerminalAutoLoadOverride(
       @PathVariable @NotNull UUID id,
       @RequestParam String action,
@@ -192,7 +193,7 @@ public class AdminUexPageController {
    * @return redirect to {@code /admin/uex} (optionally with {@code ?error=...})
    */
   @PostMapping("/terminals/{id}/toggle-visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleTerminalVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,
@@ -240,7 +241,7 @@ public class AdminUexPageController {
    */
   @ResponseBody
   @PostMapping(value = "/{kind}/{id}/loading-dock", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> updateLoadingDockOverrideAjax(
       @PathVariable @NotNull String kind,
       @PathVariable @NotNull UUID id,
@@ -262,7 +263,7 @@ public class AdminUexPageController {
    */
   @ResponseBody
   @PostMapping(value = "/terminals/{id}/auto-load", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> updateTerminalAutoLoadOverrideAjax(
       @PathVariable @NotNull UUID id, @RequestParam String action) {
     return dispatchOverrideAjax(
@@ -282,7 +283,7 @@ public class AdminUexPageController {
   @PostMapping(
       value = "/terminals/{id}/toggle-visibility",
       headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleTerminalVisibilityAjax(@PathVariable @NotNull UUID id) {
     try {
       TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);

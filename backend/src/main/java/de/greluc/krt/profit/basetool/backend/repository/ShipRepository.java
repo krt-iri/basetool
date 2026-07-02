@@ -57,12 +57,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
    */
   @Modifying(clearAutomatically = true)
-  @Query(
-      "UPDATE Ship s SET s.fitted = false WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+  @Query("UPDATE Ship s SET s.fitted = false WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   void resetAllFittedScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -223,12 +218,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * owner} via {@code @EntityGraph}.
    */
   @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
-  @Query(
-      "SELECT s FROM Ship s WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+  @Query("SELECT s FROM Ship s WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   Page<Ship> findAllScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -260,22 +250,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       value =
           "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END)"
               + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
-              + " WHERE ("
-              + "  :isAdminAllScope = true"
-              + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-              + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-              + " ) AND (cast(:query as string) IS NULL"
+              + " WHERE "
+              + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+              + " AND (cast(:query as string) IS NULL"
               + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC",
       countQuery =
           "SELECT COUNT(DISTINCT s.shipType)"
               + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
-              + " WHERE ("
-              + "  :isAdminAllScope = true"
-              + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-              + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-              + " ) AND (cast(:query as string) IS NULL"
+              + " WHERE "
+              + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+              + " AND (cast(:query as string) IS NULL"
               + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + " )")
@@ -310,11 +296,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @EntityGraph(attributePaths = {"owner", "location", "owningOrgUnit"})
   @Query(
-      "SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND "
+          + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   List<Ship> findByShipTypeInScoped(
       @org.springframework.data.repository.query.Param("shipTypes")
           List<de.greluc.krt.profit.basetool.backend.model.ShipType> shipTypes,

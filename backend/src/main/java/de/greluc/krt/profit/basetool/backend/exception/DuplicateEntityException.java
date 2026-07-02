@@ -24,12 +24,14 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * checks explicitly (e.g. duplicate Keycloak {@code sub}, duplicate name within a scope).
  *
  * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code DUPLICATE_ENTITY}. Use this rather than letting a database {@code
- * DataIntegrityViolationException} bubble up so the client receives a localized message instead of
- * a raw SQL error string.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code DUPLICATE_ENTITY}. Use this
+ * rather than letting a database {@code DataIntegrityViolationException} bubble up so the client
+ * receives a localized message instead of a raw SQL error string. Every accessor is inherited
+ * unchanged from {@link AppException} — it delegates to {@link AppExceptionKind#DUPLICATE_ENTITY},
+ * the fixed identity passed to the superclass constructor.
  */
-public class DuplicateEntityException extends RuntimeException {
+public final class DuplicateEntityException extends AppException {
 
   /**
    * Creates a {@code DuplicateEntityException} with a description of the duplicate.
@@ -37,6 +39,6 @@ public class DuplicateEntityException extends RuntimeException {
    * @param message human-readable description naming the entity and the duplicated identifier
    */
   public DuplicateEntityException(String message) {
-    super(message);
+    super(AppExceptionKind.DUPLICATE_ENTITY, message);
   }
 }

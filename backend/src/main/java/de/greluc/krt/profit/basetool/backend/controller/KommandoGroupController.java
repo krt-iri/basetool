@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.CreateKommandoGroupReques
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.backend.service.KommandoGroupService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -74,8 +75,9 @@ public class KommandoGroupController {
    */
   @PostMapping("/api/v1/squadrons/{squadronId}/kommando-groups")
   @PreAuthorize(
-      "hasRole('ADMIN') or"
-          + " @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId,"
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId,"
           + " authentication)")
   @Operation(summary = "Create a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public KommandoGroupDto create(
@@ -93,7 +95,9 @@ public class KommandoGroupController {
    */
   @PutMapping("/api/v1/kommando-groups/{groupId}")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
           + " authentication)")
   @Operation(summary = "Rename / reorder a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public KommandoGroupDto update(
@@ -109,7 +113,9 @@ public class KommandoGroupController {
    */
   @DeleteMapping("/api/v1/kommando-groups/{groupId}")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
           + " authentication)")
   @Operation(summary = "Delete a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public void delete(@PathVariable @NotNull UUID groupId) {

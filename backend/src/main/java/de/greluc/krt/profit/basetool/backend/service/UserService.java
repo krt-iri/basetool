@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -311,7 +312,7 @@ public class UserService {
     // ACTIVE. Admins are notified only for genuine Discord self-registrations (REQ-NOTIF-012); a
     // credential account is created by an admin in Keycloak, who already sees it in the pending
     // queue, so it raises no extra notification.
-    boolean isAdmin = localRoles.stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()));
+    boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration = false;
     if (created && !isAdmin && requireApproval) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
@@ -421,7 +422,7 @@ public class UserService {
     // admin pending queue.
     if (created
         && requireApproval
-        && localRoles.stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getCode()))) {
+        && localRoles.stream().noneMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
       changed = true;
     }
@@ -542,9 +543,9 @@ public class UserService {
 
     if (rank != null) {
       boolean isOfficer =
-          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase("OFFICER"));
+          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.OFFICER));
       boolean isSquadronMember =
-          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase("KRT_MEMBER"));
+          user.getRoles().stream().anyMatch(r -> r.getName().equalsIgnoreCase(Roles.KRT_MEMBER));
 
       if (isOfficer) {
         if (rank < 1 || rank > 12) {
@@ -962,7 +963,7 @@ public class UserService {
                         .filter(
                             u ->
                                 u.getRoles().stream()
-                                    .anyMatch(r -> r.getName().equalsIgnoreCase("ADMIN")))
+                                    .anyMatch(r -> r.getName().equalsIgnoreCase(Roles.ADMIN)))
                         .orElseThrow(
                             () ->
                                 new IllegalStateException("No admin user found to reassign data")));

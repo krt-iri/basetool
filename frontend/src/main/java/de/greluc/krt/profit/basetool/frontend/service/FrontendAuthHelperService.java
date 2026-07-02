@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import java.util.Set;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,20 +43,6 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class FrontendAuthHelperService {
-
-  /**
-   * Frontend mirror of the backend's "registered member or above" role set. Holding any one of
-   * these {@code ROLE_*} authorities marks the caller as an organisation member or above; holding
-   * none — anonymous OR an authenticated but role-less {@code GUEST} — marks a mission outsider.
-   * Kept in sync with the backend role matrix in {@code ROLES_AND_PERMISSIONS.md}.
-   */
-  private static final Set<String> MEMBER_ROLES =
-      Set.of(
-          "ROLE_ADMIN",
-          "ROLE_OFFICER",
-          "ROLE_MISSION_MANAGER",
-          "ROLE_LOGISTICIAN",
-          "ROLE_KRT_MEMBER");
 
   /**
    * {@code true} if the current request carries an authenticated, non-anonymous principal.
@@ -84,12 +70,15 @@ public class FrontendAuthHelperService {
     if (auth == null) {
       return false;
     }
-    return auth.getAuthorities().stream().map(Object::toString).anyMatch("ROLE_ADMIN"::equals);
+    return auth.getAuthorities().stream()
+        .map(Object::toString)
+        .anyMatch(Roles.authority(Roles.ADMIN)::equals);
   }
 
   /**
-   * {@code true} if the current authentication carries at least one {@link #MEMBER_ROLES}
-   * authority, i.e. the caller is a registered organisation member or above.
+   * {@code true} if the current authentication carries at least one {@link
+   * Roles#MEMBER_AUTHORITIES} authority, i.e. the caller is a registered organisation member or
+   * above.
    *
    * <p>Reads the authorities from the request {@link Authentication} — the SAME source {@code
    * sec:authorize} and {@code @PreAuthorize} consult — rather than from {@code
@@ -108,7 +97,9 @@ public class FrontendAuthHelperService {
     if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
       return false;
     }
-    return auth.getAuthorities().stream().map(Object::toString).anyMatch(MEMBER_ROLES::contains);
+    return auth.getAuthorities().stream()
+        .map(Object::toString)
+        .anyMatch(Roles.MEMBER_AUTHORITIES::contains);
   }
 
   private Authentication currentAuthentication() {

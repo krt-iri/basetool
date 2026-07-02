@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ApproveRegistrationReques
 import de.greluc.krt.profit.basetool.backend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -60,7 +61,7 @@ public class DiscordRegistrationAdminController {
    * @return the pending registrations
    */
   @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public List<PendingRegistrationDto> listPending() {
     return userService.findPendingRegistrations().stream().map(this::toDto).toList();
   }
@@ -74,7 +75,7 @@ public class DiscordRegistrationAdminController {
    * @return the now-active user (with its bumped version)
    */
   @PostMapping("/{id}/approve")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public PendingRegistrationDto approve(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,
@@ -92,7 +93,7 @@ public class DiscordRegistrationAdminController {
    * @return the now-rejected user (with its bumped version)
    */
   @PostMapping("/{id}/reject")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public PendingRegistrationDto reject(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,

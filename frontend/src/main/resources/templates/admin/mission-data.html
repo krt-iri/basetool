@@ -101,7 +101,7 @@
                             <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/squadrons/{id}/delete(id=${sq.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!sq.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="m-0">
+                            <form th:if="${!sq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.squadron.activate}">Aktivieren</button>
                             </form>
                         </td>
@@ -169,7 +169,7 @@
                             <button th:if="${job.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/job-types/{id}/delete(id=${job.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!job.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="m-0">
+                            <form th:if="${!job.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
                         </td>
@@ -231,7 +231,7 @@
                             <button th:if="${freq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                     th:data-action="@{/admin/mission-data/frequency-types/{id}/delete(id=${freq.id})}"
                                     th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            <form th:if="${!freq.active}" sec:authorize="hasRole('ADMIN')" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="m-0">
+                            <form th:if="${!freq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="m-0">
                                 <button type="submit" class="btn btn-ghost" th:text="#{admin.job_type.activate}">Aktivieren</button>
                             </form>
                         </td>

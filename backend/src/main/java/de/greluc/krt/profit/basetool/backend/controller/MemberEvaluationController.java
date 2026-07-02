@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.MemberEvaluationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -167,7 +168,7 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} of evaluatable members
    */
   @GetMapping("/members")
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   @org.springframework.transaction.annotation.Transactional(readOnly = true)
   @Operation(
       summary =

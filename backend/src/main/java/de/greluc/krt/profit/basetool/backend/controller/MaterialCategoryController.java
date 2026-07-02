@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialCategoryService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
@@ -95,7 +96,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MaterialCategoryDto update(@PathVariable UUID id, @RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     MaterialCategory updated = service.update(id, category);
@@ -108,7 +109,7 @@ public class MaterialCategoryController {
    * @param id category id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void delete(@PathVariable UUID id) {
     service.delete(id);
   }

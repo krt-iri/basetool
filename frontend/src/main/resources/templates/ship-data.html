@@ -45,7 +45,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="#{nav.hangar_data}">Schiffsdaten</h1>
-        <form sec:authorize="hasRole('ADMIN')" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
+        <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/ship-data/reset-fitted}" method="post" id="reset-fitted-form">
             <button type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="reset-fitted-confirm-modal" th:text="#{hangar.ship.reset_fitted}">Alle unfitted</button>
         </form>
     </div>
@@ -81,7 +81,7 @@
                         <th th:text="#{ship.shiptype.name}">Name</th>
                         <th th:text="#{ship.manufacturer}">Hersteller</th>
                         <th th:text="#{ship.shiptype.description}">Beschreibung</th>
-                        <th sec:authorize="hasRole('ADMIN')" th:text="#{general.action}">Aktion</th>
+                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,7 +89,7 @@
                         <td th:text="${st.name}">Name</td>
                         <td th:text="${st.manufacturer != null ? st.manufacturer.abbreviation : ''}">Hersteller</td>
                         <td th:text="${st.description}">Desc</td>
-                        <td sec:authorize="hasRole('ADMIN')">
+                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
                                   class="js-visibility-toggle"
                                   th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
@@ -127,7 +127,7 @@
                         <th th:text="#{ship.manufacturer.name}">Name</th>
                         <th th:text="#{ship.manufacturer.abbreviation}">Kürzel</th>
                         <th th:text="#{ship.manufacturer.description}">Beschreibung</th>
-                        <th sec:authorize="hasRole('ADMIN')" th:text="#{general.action}">Aktion</th>
+                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -135,7 +135,7 @@
                         <td th:text="${m.name}">Name</td>
                         <td th:text="${m.abbreviation}">Kürzel</td>
                         <td th:text="${m.description}">Desc</td>
-                        <td sec:authorize="hasRole('ADMIN')">
+                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                             <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
                                   class="js-visibility-toggle"
                                   th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
@@ -152,7 +152,7 @@
 </main>
 
 <!-- Modals -->
-<div sec:authorize="hasRole('ADMIN')">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <!-- Reset Fitted Confirmation Modal -->
     <div id="reset-fitted-confirm-modal" class="modal" style="display:none;">
         <div class="modal-content" style="max-width:480px; text-align:center;">

@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverFor
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -781,7 +782,7 @@ public class JobOrderPageController {
    * @return the {@code orders-create} view (in edit mode) or a redirect to the detail page
    */
   @GetMapping("/{id}/items/edit")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String viewEditItemForm(
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderDto order;
@@ -877,7 +878,7 @@ public class JobOrderPageController {
    * @return redirect to the detail page
    */
   @PostMapping("/{id}/items/update")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String updateItemOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
@@ -941,7 +942,7 @@ public class JobOrderPageController {
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateItemOrderAjax(
       @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
@@ -1245,7 +1246,7 @@ public class JobOrderPageController {
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PutMapping("/{id}/priority/ajax")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updatePriorityAjax(
       @PathVariable UUID id, @RequestParam Integer priority) {
@@ -1333,7 +1334,7 @@ public class JobOrderPageController {
    * @return the updated order on success, or the propagated backend error status.
    */
   @PostMapping("/{id}/blueprint-variant-counting")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
@@ -1367,7 +1368,7 @@ public class JobOrderPageController {
    * @return the persisted claim on success, or the propagated backend error status.
    */
   @PostMapping("/{id}/claims")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
@@ -1398,7 +1399,7 @@ public class JobOrderPageController {
    * @return 204 on success, or the propagated backend error status.
    */
   @PostMapping("/{id}/claims/{claimId}/withdraw")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> withdrawClaim(
       @PathVariable UUID id, @PathVariable UUID claimId) {
@@ -1424,7 +1425,7 @@ public class JobOrderPageController {
    * @return redirect to the order detail page
    */
   @PostMapping("/{id}/update")
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String updateOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -1478,7 +1479,7 @@ public class JobOrderPageController {
   @PostMapping(
       value = "/{id}/update",
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('LOGISTICIAN')")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @RequestBody JobOrderForm form) {
@@ -1602,7 +1603,14 @@ public class JobOrderPageController {
    * @return redirect to the order detail page
    */
   @PostMapping("/{id}/handovers")
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')")
   public String createHandover(
       @PathVariable UUID id,
       @ModelAttribute("handoverForm") JobOrderHandoverForm form,
@@ -1686,7 +1694,14 @@ public class JobOrderPageController {
    * @return redirect to the order detail page
    */
   @PostMapping("/{id}/item-handovers")
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')")
   public String createItemHandover(
       @PathVariable UUID id,
       @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
@@ -1787,7 +1802,14 @@ public class JobOrderPageController {
   @PostMapping(
       value = "/{id}/handovers",
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> createHandoverAjax(
       @PathVariable UUID id, @RequestBody JobOrderHandoverForm form) {
@@ -1841,7 +1863,14 @@ public class JobOrderPageController {
   @PostMapping(
       value = "/{id}/item-handovers",
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')")
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> createItemHandoverAjax(
       @PathVariable UUID id, @RequestBody JobOrderItemHandoverForm form) {
@@ -1881,7 +1910,8 @@ public class JobOrderPageController {
    * @return redirect to the order detail page
    */
   @PostMapping("/{id}/materials/unlink")
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public String unlinkMaterial(
       @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
     try {
@@ -1905,7 +1935,8 @@ public class JobOrderPageController {
    * @return redirect to the order detail page
    */
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public String unlinkInventoryItem(
       @PathVariable UUID id,
       @PathVariable UUID inventoryItemId,
@@ -1938,7 +1969,8 @@ public class JobOrderPageController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
-  @PreAuthorize("hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
@@ -2438,9 +2470,9 @@ public class JobOrderPageController {
         reachableAuthorities.stream()
             .anyMatch(
                 a ->
-                    a.getAuthority().equals("ROLE_LOGISTICIAN")
-                        || a.getAuthority().equals("ROLE_ADMIN")
-                        || a.getAuthority().equals("ROLE_OFFICER"));
+                    a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
+                        || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
+                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     log.debug("JobOrder: Is logistician: {}", result);
     return result;
   }

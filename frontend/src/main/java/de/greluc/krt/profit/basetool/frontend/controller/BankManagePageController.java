@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,14 +73,14 @@ public class BankManagePageController {
    * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
   @GetMapping("/bank/manage")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String manage(
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String fragment,
       Authentication authentication,
       @AuthenticationPrincipal OidcUser principal,
       Model model) {
-    boolean management = hasRole(authentication, "ROLE_BANK_MANAGEMENT");
+    boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get(
             "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});

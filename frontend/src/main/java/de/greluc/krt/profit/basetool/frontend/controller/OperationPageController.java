@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -337,9 +338,9 @@ public class OperationPageController {
         .map(GrantedAuthority::getAuthority)
         .anyMatch(
             role ->
-                "ROLE_ADMIN".equals(role)
-                    || "ROLE_OFFICER".equals(role)
-                    || "ROLE_MISSION_MANAGER".equals(role));
+                Roles.authority(Roles.ADMIN).equals(role)
+                    || Roles.authority(Roles.OFFICER).equals(role)
+                    || Roles.authority(Roles.MISSION_MANAGER).equals(role));
   }
 
   private static boolean hasOfficerOrAdminRole(Authentication authentication) {
@@ -348,7 +349,10 @@ public class OperationPageController {
     }
     return authentication.getAuthorities().stream()
         .map(GrantedAuthority::getAuthority)
-        .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_OFFICER".equals(role));
+        .anyMatch(
+            role ->
+                Roles.authority(Roles.ADMIN).equals(role)
+                    || Roles.authority(Roles.OFFICER).equals(role));
   }
 
   /**
@@ -360,7 +364,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/create")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String createOperation(
       @ModelAttribute OperationForm form, RedirectAttributes redirectAttributes) {
     try {
@@ -383,7 +387,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/{id}/update")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String updateOperation(
       @PathVariable @NotNull UUID id,
       @ModelAttribute OperationForm form,
@@ -419,7 +423,13 @@ public class OperationPageController {
    */
   @PostMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
+      "hasRole('"
+          + Roles.MISSION_MANAGER
+          + "') and (#request.paidOut() or hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "'))")
   @ResponseBody
   public ResponseEntity<OperationPayoutDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
@@ -481,7 +491,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteOperation(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -506,7 +516,7 @@ public class OperationPageController {
    * @return {@code 200} on success, or the propagated backend error
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<Object> createOperationAjax(@RequestBody OperationForm form) {
     try {
@@ -539,7 +549,7 @@ public class OperationPageController {
    * @return {@code 200} with the fresh version/name/status, or the propagated backend error
    */
   @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<Object> updateOperationAjax(
       @PathVariable @NotNull UUID id, @RequestBody OperationForm form) {
@@ -572,7 +582,7 @@ public class OperationPageController {
    * @return {@code 200} on success, or the propagated backend error
    */
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> deleteOperationAjax(@PathVariable @NotNull UUID id) {
     try {

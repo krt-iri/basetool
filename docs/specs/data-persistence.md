@@ -279,6 +279,53 @@ long batch queries raise it via the env override.
 timeout) · **Code:** `spring.jpa.properties.jakarta.persistence.query.timeout` in
 `backend/src/main/resources/application.yml`, `PaginationUtil.MAX_PAGE_SIZE` · **Security:** SEC-03
 
+### REQ-DATA-010 — Shared repository abstractions for verbatim-duplicated query shapes (S5, #911)
+
+Two query shapes were hand-copied across the repository layer rather than shared: the
+case-insensitive-unique `name` exists-pair (16 declarations across 8 lookup-table repositories) and
+the org-unit scope-predicate triple (the `:isAdminAllScope` / `:activeOrgUnitId` /
+`:memberOrgUnitIds` clause from REQ-ORG-002, copy-pasted across the 6 aggregate repositories that
+enforce it — Operation, Mission, Ship, RefineryOrder, InventoryItem, JobOrder). Both are now
+centralised:
+
+- **`repository.LookupTableRepository<T, IdT>`** (`@NoRepositoryBean`) declares
+  `existsByNameIgnoreCase(String)` / `existsByNameIgnoreCaseAndIdNot(String, IdT)`; the 8 repositories
+  whose exists-pair return type never varies (`StarSystem`, `ShipType`, `SpecialCommand`, `Squadron`,
+  `Location`, `Manufacturer`, `JobType`, `Bereich`) extend it instead of `JpaRepository` directly and
+  drop their own copies — Spring Data resolves the inherited derived query per concrete entity, so the
+  generated SQL is unaffected. `findByNameIgnoreCase` stays declared per-repository (not lifted):
+  its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
+  `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
+  return type.
+- **`repository.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
+  (`OPERATION_SCOPE_PREDICATE`, `MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`,
+  `REFINERY_ORDER_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`),
+  referenced from each repository's `@Query` value via compile-time constant-expression concatenation
+  (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
+  `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
+  constant (`o`/`m`/`s`/`r`/`i`) rather than parameterized — a compile-time constant cannot accept a
+  runtime substitution — so this is a handful of named per-aggregate constants, not one generic
+  template. The three aggregates with an escape tail beyond the plain triple (Operation's
+  ownerless-leadership + mission-participant escapes, Mission's cross-staffel public escape, JobOrder's
+  SK-public-queue escape — REQ-ORG-003) carry the tail baked into their own constant; the three
+  strict-staffel aggregates (Ship, RefineryOrder, InventoryItem) use the plain triple unchanged.
+
+Both are **read-only, wire-format-preserving refactors**: every migrated `@Query` value is
+byte-for-byte the same JPQL the compiler previously inlined, so the multi-tenant scope semantics of
+REQ-ORG-002/003 are unchanged. Neither introduces `JpaSpecificationExecutor` — every scoped query in
+this codebase is a hand-written `@Query`, not a `Specification`, and there was no behavioural reason
+to switch.
+
+**Acceptance**: `LookupTableRepository`'s exists-pair is exercised by every existing
+`*RepositoryTest`/service test that already covered the 8 migrated repositories' duplicate-name
+checks; `ScopeSpecifications`' fragments are exercised by the existing scope-regression suite
+(`RefineryOrderRepositoryScopedTest` against the real Postgres schema, plus the Mockito-level
+`OwnerScopeServiceTest` and the per-aggregate service lifecycle tests) — no new tests were needed
+because the wire behaviour is unchanged.
+
+**Code:** `backend/src/main/java/.../backend/repository/LookupTableRepository.java`,
+`backend/src/main/java/.../backend/repository/ScopeSpecifications.java`
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

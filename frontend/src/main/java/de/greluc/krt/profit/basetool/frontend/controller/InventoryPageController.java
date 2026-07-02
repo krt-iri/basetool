@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -1286,7 +1287,9 @@ public class InventoryPageController {
     }
     for (org.springframework.security.core.GrantedAuthority a : auth.getAuthorities()) {
       String r = a.getAuthority();
-      if ("ROLE_LOGISTICIAN".equals(r) || "ROLE_OFFICER".equals(r) || "ROLE_ADMIN".equals(r)) {
+      if (Roles.authority(Roles.LOGISTICIAN).equals(r)
+          || Roles.authority(Roles.OFFICER).equals(r)
+          || Roles.authority(Roles.ADMIN).equals(r)) {
         return true;
       }
     }

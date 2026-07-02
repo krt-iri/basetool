@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpda
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -121,7 +122,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if the referenced category does not exist
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
@@ -159,7 +160,7 @@ public class PromotionLevelContentService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -198,7 +199,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if no level content exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);

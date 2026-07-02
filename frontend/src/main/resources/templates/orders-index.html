@@ -104,7 +104,7 @@
                     </span>
                 </td>
                 <td class="nowrap">
-                    <span sec:authorize="hasRole('LOGISTICIAN')" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
+                    <span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
                     <span th:text="${order.priority != null ? order.priority : '-'}"></span>
                     <br>
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
@@ -265,7 +265,7 @@
         colorOrderAges(e && e.detail ? e.detail.container : document);
     });
 </script>
-<script sec:authorize="hasRole('LOGISTICIAN')" th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">
 // Bind the drag-reorder to the STABLE #orders-results container (not the <tbody>) so the
 // delegation survives a filter fragment swap that replaces the table (#573). The handlers
 // already use e.target.closest('tr.draggable-row'), so container-level delegation is equivalent.

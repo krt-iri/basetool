@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.ProfitCalculationDto;
 import de.greluc.krt.profit.basetool.backend.service.ProfitCalculationService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +52,8 @@ public class ProfitCalculationController {
    * @return per-material profit rows sorted alphabetically
    */
   @GetMapping
-  @PreAuthorize("hasAnyRole('KRT_MEMBER', 'OFFICER', 'ADMIN')")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   public List<ProfitCalculationDto> getProfitCalculation(
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
     log.debug("GET profit calculation for shipId: {} and starSystems: {}", shipId, starSystemNames);

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationUpdateReq
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -101,7 +102,7 @@ public class MemberEvaluationService {
   }
 
   /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
@@ -116,7 +117,7 @@ public class MemberEvaluationService {
    * the category's owning squadron.
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public MemberEvaluationResponse upsert(
       @NotNull String userId,
       @NotNull UUID categoryId,
@@ -161,7 +162,7 @@ public class MemberEvaluationService {
 
   /** Deletes an evaluation entry (removes the assigned level). */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =
