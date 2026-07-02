@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.List;
@@ -654,16 +655,11 @@ public class InventoryItemService {
         item.getId(),
         inventoryLabel(item),
         item.getUser().getId(),
-        "qty="
-            + item.getAmount()
-            + " q="
-            + item.getQuality()
-            + " personal="
-            + item.getPersonal()
-            + " jobOrder="
-            + jobOrderRef(item)
-            + " mission="
-            + (item.getMission() != null ? item.getMission().getName() : "-"));
+        AuditDetails.of("qty", item.getAmount())
+            .with("q", item.getQuality())
+            .with("personal", item.getPersonal())
+            .with("jobOrder", jobOrderRef(item))
+            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
 
@@ -748,16 +744,11 @@ public class InventoryItemService {
         item.getId(),
         inventoryLabel(item),
         item.getUser().getId(),
-        "qty="
-            + item.getAmount()
-            + " q="
-            + item.getQuality()
-            + " personal="
-            + item.getPersonal()
-            + " jobOrder="
-            + jobOrderRef(item)
-            + " mission="
-            + (item.getMission() != null ? item.getMission().getName() : "-"));
+        AuditDetails.of("qty", item.getAmount())
+            .with("q", item.getQuality())
+            .with("personal", item.getPersonal())
+            .with("jobOrder", jobOrderRef(item))
+            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
 
@@ -970,16 +961,11 @@ public class InventoryItemService {
           sourceId,
           sourceLabel,
           targetUser.getId(),
-          "material="
-              + materialName
-              + " amount="
-              + dto.amount()
-              + " toLoc="
-              + (targetLocation != null ? targetLocation.getName() : "—")
-              + " newRow="
-              + newItem.getId()
-              + " depleted="
-              + depleted);
+          AuditDetails.of("material", materialName)
+              .with("amount", dto.amount())
+              .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
+              .with("newRow", newItem.getId())
+              .with("depleted", depleted));
       return inventoryItemMapper.toDto(savedNew);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
       MissionParticipant participant =
@@ -1068,34 +1054,23 @@ public class InventoryItemService {
           sourceId,
           sourceLabel,
           ownerId,
-          "material="
-              + materialName
-              + " amount="
-              + dto.amount()
-              + " terminal="
-              + dto.terminal()
-              + " sellAmount="
-              + dto.sellAmount()
-              + " financeEntry="
-              + (financeEntryId != null ? financeEntryId : "-")
-              + " depleted="
-              + rowDepleted);
+          AuditDetails.of("material", materialName)
+              .with("amount", dto.amount())
+              .with("terminal", dto.terminal())
+              .with("sellAmount", dto.sellAmount())
+              .with("financeEntry", financeEntryId != null ? financeEntryId : "-")
+              .with("depleted", rowDepleted));
     } else {
       auditService.record(
           AuditEventType.INVENTORY_ITEM_CONSUMED,
           sourceId,
           sourceLabel,
           ownerId,
-          "type="
-              + type
-              + " material="
-              + materialName
-              + " amount="
-              + dto.amount()
-              + " remaining="
-              + remaining
-              + " depleted="
-              + rowDepleted);
+          AuditDetails.of("type", type)
+              .with("material", materialName)
+              .with("amount", dto.amount())
+              .with("remaining", remaining)
+              .with("depleted", rowDepleted));
     }
   }
 
@@ -1209,16 +1184,11 @@ public class InventoryItemService {
         sourceId,
         sourceLabel,
         ownerId,
-        "material="
-            + materialName
-            + " amount="
-            + dto.amount()
-            + " newRow="
-            + newItem.getId()
-            + " targetOrgUnit="
-            + (targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
-            + " depleted="
-            + depleted);
+        AuditDetails.of("material", materialName)
+            .with("amount", dto.amount())
+            .with("newRow", newItem.getId())
+            .with("targetOrgUnit", targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
+            .with("depleted", depleted));
 
     return inventoryItemMapper.toDto(savedNew);
   }
@@ -1258,10 +1228,9 @@ public class InventoryItemService {
         null,
         null,
         null,
-        "scope="
-            + (scope.adminAllScope() ? "adminAll" : "active=" + scope.activeOrgUnitId())
-            + " removed="
-            + removed);
+        AuditDetails.of(
+                "scope", scope.adminAllScope() ? "adminAll" : "active=" + scope.activeOrgUnitId())
+            .with("removed", removed));
     return removed;
   }
 
@@ -1314,7 +1283,7 @@ public class InventoryItemService {
         null,
         null,
         currentUserId,
-        "count=" + toDelete.size());
+        AuditDetails.of("count", toDelete.size()));
   }
 
   /**
@@ -1386,7 +1355,7 @@ public class InventoryItemService {
         item.getId(),
         inventoryLabel(item),
         item.getUser().getId(),
-        "delivered=" + request.delivered() + " jobOrder=" + jobOrderRef(saved));
+        AuditDetails.of("delivered", request.delivered()).with("jobOrder", jobOrderRef(saved)));
     return inventoryItemMapper.toDto(saved);
   }
 

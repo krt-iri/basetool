@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,7 +72,11 @@ public class AuditService {
    * @param subjectId the primary affected aggregate's id, or {@code null} for aggregate-less events
    * @param subjectLabel the affected aggregate's human-readable label snapshot, or {@code null}
    * @param targetUserId the affected user for user-centric events, or {@code null}
-   * @param details compact human-readable details payload (no user free text), or {@code null}
+   * @param details compact {@code key=value} details payload (no user free text), or {@code null} —
+   *     typically an {@link AuditDetails} composer, stringified via {@link CharSequence#toString()}
+   *     before persistence. Taking {@link CharSequence} (not {@code String}) makes the builder the
+   *     type-level entry point: a caller hands the composed {@code AuditDetails} directly rather
+   *     than hand-concatenating a string.
    * @return the persisted audit row
    */
   @Transactional(propagation = Propagation.MANDATORY)
@@ -80,7 +85,7 @@ public class AuditService {
       @Nullable UUID subjectId,
       @Nullable String subjectLabel,
       @Nullable UUID targetUserId,
-      @Nullable String details) {
+      @Nullable CharSequence details) {
     Optional<UUID> actorId = authHelperService.currentUserId();
     String actorHandle =
         actorId.flatMap(userRepository::findById).map(User::getEffectiveName).orElse("system");
@@ -96,7 +101,9 @@ public class AuditService {
             .subjectId(subjectId)
             .subjectLabel(truncate(subjectLabel))
             .targetUserId(targetUserId)
-            .details(details)
+            // Persist the rendered payload; a null stays null (no details), any other CharSequence
+            // (an AuditDetails composer or a raw String) is stringified byte-identically.
+            .details(details == null ? null : details.toString())
             .build();
     return auditEventRepository.save(event);
   }
@@ -141,7 +148,12 @@ public class AuditService {
   @Transactional
   public int purgeBefore(@NotNull AuditDomain domain, @NotNull Instant before) {
     int deleted = auditEventRepository.deleteByDomainAndOccurredAtBefore(domain, before);
-    record(purgeEventType(domain), null, null, null, "deleted=" + deleted + " before=" + before);
+    record(
+        purgeEventType(domain),
+        null,
+        null,
+        null,
+        AuditDetails.of("deleted", deleted).with("before", before));
     log.info("Purged {} audit events for domain {} older than {}", deleted, domain, before);
     return deleted;
   }

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -167,7 +168,11 @@ public class BankStatementReportService {
             userZone,
             redactHolders);
     bankAuditService.record(
-        BankAuditEventType.STATEMENT_EXPORTED, accountId, null, null, "period=" + from + ".." + to);
+        BankAuditEventType.STATEMENT_EXPORTED,
+        accountId,
+        null,
+        null,
+        AuditDetails.of("period", from + ".." + to));
     log.info(
         "Bank statement exported for account {} ({} rows{})",
         account.getAccountNo(),

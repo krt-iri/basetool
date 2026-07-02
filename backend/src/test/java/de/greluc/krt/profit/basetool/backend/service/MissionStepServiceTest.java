@@ -171,7 +171,7 @@ class MissionStepServiceTest {
     assertEquals(step1Id, ordered.get(1).getId());
     assertEquals(4L, result.getStepsVersion());
     // Exactly one reorder event, carrying only a count (never a title).
-    ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
             eq(AuditEventType.MISSION_STEP_REORDERED),
@@ -179,7 +179,7 @@ class MissionStepServiceTest {
             any(),
             isNull(),
             details.capture());
-    assertEquals("count=2", details.getValue());
+    assertEquals("count=2", details.getValue().toString());
   }
 
   @Test
@@ -206,7 +206,7 @@ class MissionStepServiceTest {
     missionService.addStep(missionId, "TOP-SECRET RALLY POINT", "classified", 3L);
 
     ArgumentCaptor<String> label = ArgumentCaptor.forClass(String.class);
-    ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
             eq(AuditEventType.MISSION_STEP_ADDED),
@@ -215,7 +215,7 @@ class MissionStepServiceTest {
             isNull(),
             details.capture());
     assertEquals(mission.getName(), label.getValue()); // subject label is the mission name snapshot
-    assertFalse(details.getValue().contains("TOP-SECRET"));
-    assertFalse(details.getValue().contains("classified"));
+    assertFalse(details.getValue().toString().contains("TOP-SECRET"));
+    assertFalse(details.getValue().toString().contains("classified"));
   }
 }

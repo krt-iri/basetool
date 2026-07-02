@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -312,28 +313,21 @@ public class JobOrderHandoverService {
           h.itemId(),
           h.label(),
           null,
-          "source=HANDOVER jobOrder=#"
-              + orderDisplayId
-              + " material="
-              + h.material()
-              + " amount="
-              + h.amount()
-              + " remaining="
-              + h.remaining()
-              + " depleted="
-              + h.depleted());
+          AuditDetails.of("source", "HANDOVER")
+              .with("jobOrder", "#" + orderDisplayId)
+              .with("material", h.material())
+              .with("amount", h.amount())
+              .with("remaining", h.remaining())
+              .with("depleted", h.depleted()));
     }
     auditService.record(
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
         jobOrderId,
         "#" + managedJobOrder.getDisplayId() + " '" + managedJobOrder.getHandle() + "'",
         null,
-        "handover="
-            + savedHandover.getId()
-            + " items="
-            + handedItems.size()
-            + " autoCompleted="
-            + allFulfilled);
+        AuditDetails.of("handover", savedHandover.getId())
+            .with("items", handedItems.size())
+            .with("autoCompleted", allFulfilled));
 
     return resultDto;
   }
