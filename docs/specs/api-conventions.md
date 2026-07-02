@@ -81,16 +81,21 @@ leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` const
 for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
 three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
 `NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
-Six of the eight subtypes delegate their accessors to a fixed `exception.AppExceptionKind` enum
-constant; `BankConflictException` computes them per-instance from its own `code` field (it has no
-single fixed identity — each throw site picks one of its `CODE_BANK_*` constants). The one
-behavioural fork — `ExternalServiceException` / `ReportGenerationException` suppressing
-`getMessage()` from the client and logging at ERROR instead of WARN, an info-leak-protection
-constraint (CWE-209) — is the `ErrorDisclosurePolicy` strategy enum on `AppException`. A new domain
-exception joins this hierarchy by extending `AppException` and either delegating to a new
-`AppExceptionKind` constant (the common case) or implementing the accessors directly (only if its
-identity is genuinely per-instance, as `BankConflictException`'s is) — never by hand-rolling a new
-`@ExceptionHandler` method.
+Six of the eight subtypes never override an accessor: they pass their fixed
+`exception.AppExceptionKind` constant to the `AppException(AppExceptionKind, String)` /
+`AppException(AppExceptionKind, String, Throwable)` superclass constructor and inherit every
+accessor from `AppException`, which delegates to that stored kind. `BankConflictException` is the
+one exception that overrides every accessor directly, computing them per-instance from its own
+`code` field (it has no single fixed identity — each throw site picks one of its `CODE_BANK_*`
+constants) via the legacy kind-less `AppException(String)` / `AppException(String, Throwable)`
+constructors. The one behavioural fork — `ExternalServiceException` / `ReportGenerationException`
+suppressing `getMessage()` from the client and logging at ERROR instead of WARN, an
+info-leak-protection constraint (CWE-209) — is the `ErrorDisclosurePolicy` strategy enum on
+`AppExceptionKind`, likewise inherited automatically via the stored kind. A new domain exception
+joins this hierarchy by extending `AppException` and either passing a new `AppExceptionKind`
+constant to the superclass constructor (the common case, requiring zero accessor overrides) or
+implementing the accessors directly (only if its identity is genuinely per-instance, as
+`BankConflictException`'s is) — never by hand-rolling a new `@ExceptionHandler` method.
 
 ### REQ-API-005 — Pagination & sorting
 

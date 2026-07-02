@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-import org.springframework.http.HttpStatus;
-
 /**
  * Thrown when an entity cannot be deleted because it is still referenced by other entities.
  *
  * <p>Mapped to HTTP {@code 409 Conflict} by {@link
  * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code ENTITY_IN_USE}.
+ * AppException} dispatch handler with the stable error code {@code ENTITY_IN_USE}. Every accessor
+ * is inherited unchanged from {@link AppException} — it delegates to {@link
+ * AppExceptionKind#ENTITY_IN_USE}, the fixed identity passed to the superclass constructor.
  */
 public final class EntityInUseException extends AppException {
 
@@ -36,36 +36,6 @@ public final class EntityInUseException extends AppException {
    * @param message human-readable explanation of which referencing entities still exist
    */
   public EntityInUseException(String message) {
-    super(message);
-  }
-
-  @Override
-  public HttpStatus status() {
-    return AppExceptionKind.ENTITY_IN_USE.status();
-  }
-
-  @Override
-  public String code() {
-    return AppExceptionKind.ENTITY_IN_USE.code();
-  }
-
-  @Override
-  public String titleKey() {
-    return AppExceptionKind.ENTITY_IN_USE.titleKey();
-  }
-
-  @Override
-  public String detailKey() {
-    return AppExceptionKind.ENTITY_IN_USE.detailKey();
-  }
-
-  @Override
-  public String typeSuffix() {
-    return AppExceptionKind.ENTITY_IN_USE.typeSuffix();
-  }
-
-  @Override
-  public String logLabel() {
-    return AppExceptionKind.ENTITY_IN_USE.logLabel();
+    super(AppExceptionKind.ENTITY_IN_USE, message);
   }
 }

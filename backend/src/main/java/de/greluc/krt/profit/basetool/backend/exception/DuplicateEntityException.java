@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-import org.springframework.http.HttpStatus;
-
 /**
  * Thrown when an insert or update would violate a uniqueness constraint that the service layer
  * checks explicitly (e.g. duplicate Keycloak {@code sub}, duplicate name within a scope).
@@ -29,7 +27,9 @@ import org.springframework.http.HttpStatus;
  * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
  * AppException} dispatch handler with the stable error code {@code DUPLICATE_ENTITY}. Use this
  * rather than letting a database {@code DataIntegrityViolationException} bubble up so the client
- * receives a localized message instead of a raw SQL error string.
+ * receives a localized message instead of a raw SQL error string. Every accessor is inherited
+ * unchanged from {@link AppException} — it delegates to {@link AppExceptionKind#DUPLICATE_ENTITY},
+ * the fixed identity passed to the superclass constructor.
  */
 public final class DuplicateEntityException extends AppException {
 
@@ -39,36 +39,6 @@ public final class DuplicateEntityException extends AppException {
    * @param message human-readable description naming the entity and the duplicated identifier
    */
   public DuplicateEntityException(String message) {
-    super(message);
-  }
-
-  @Override
-  public HttpStatus status() {
-    return AppExceptionKind.DUPLICATE_ENTITY.status();
-  }
-
-  @Override
-  public String code() {
-    return AppExceptionKind.DUPLICATE_ENTITY.code();
-  }
-
-  @Override
-  public String titleKey() {
-    return AppExceptionKind.DUPLICATE_ENTITY.titleKey();
-  }
-
-  @Override
-  public String detailKey() {
-    return AppExceptionKind.DUPLICATE_ENTITY.detailKey();
-  }
-
-  @Override
-  public String typeSuffix() {
-    return AppExceptionKind.DUPLICATE_ENTITY.typeSuffix();
-  }
-
-  @Override
-  public String logLabel() {
-    return AppExceptionKind.DUPLICATE_ENTITY.logLabel();
+    super(AppExceptionKind.DUPLICATE_ENTITY, message);
   }
 }

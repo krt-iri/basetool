@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-import org.springframework.http.HttpStatus;
-
 /**
  * Indicates that a requested domain entity could not be found.
  *
@@ -39,8 +37,11 @@ import org.springframework.http.HttpStatus;
  * through {@code GlobalExceptionHandler}'s generic dispatch handler — it keeps its own dedicated
  * {@code @ExceptionHandler}, shared with three non-{@code AppException} JPA/JDK "not found" flavors
  * ({@code EntityNotFoundException}, {@code NoSuchElementException}, {@code
- * NoResourceFoundException}) that cannot be sealed under this hierarchy. It still implements the
- * full accessor contract for consistency with the other sealed members.
+ * NoResourceFoundException}) that cannot be sealed under this hierarchy. Every accessor is still
+ * inherited unchanged from {@link AppException} — it delegates to {@link
+ * AppExceptionKind#NOT_FOUND}, the fixed identity passed to the superclass constructor — so that
+ * dedicated handler reads its status/code/title/detail literals from that same constant (see {@code
+ * GlobalExceptionHandler#handleNotFound}) instead of hardcoding a second copy of them.
  */
 public final class NotFoundException extends AppException {
 
@@ -51,7 +52,7 @@ public final class NotFoundException extends AppException {
    *     the RFC&nbsp;7807 {@code detail}
    */
   public NotFoundException(String message) {
-    super(message);
+    super(AppExceptionKind.NOT_FOUND, message);
   }
 
   /**
@@ -62,36 +63,6 @@ public final class NotFoundException extends AppException {
    * @param cause underlying failure
    */
   public NotFoundException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  @Override
-  public HttpStatus status() {
-    return AppExceptionKind.NOT_FOUND.status();
-  }
-
-  @Override
-  public String code() {
-    return AppExceptionKind.NOT_FOUND.code();
-  }
-
-  @Override
-  public String titleKey() {
-    return AppExceptionKind.NOT_FOUND.titleKey();
-  }
-
-  @Override
-  public String detailKey() {
-    return AppExceptionKind.NOT_FOUND.detailKey();
-  }
-
-  @Override
-  public String typeSuffix() {
-    return AppExceptionKind.NOT_FOUND.typeSuffix();
-  }
-
-  @Override
-  public String logLabel() {
-    return AppExceptionKind.NOT_FOUND.logLabel();
+    super(AppExceptionKind.NOT_FOUND, message, cause);
   }
 }

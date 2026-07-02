@@ -497,13 +497,15 @@ public class GlobalExceptionHandler {
    * {@link ReportGenerationException}. Replaces the seven near-identical handlers these types used
    * to each carry — the status/code/i18n-keys/type-suffix/log-label now live on the exception
    * itself (via {@link AppExceptionKind} for the six fixed types, computed per-instance for {@link
-   * BankConflictException}), so this method only needs to read the abstract accessors.
+   * BankConflictException}), so this method only needs to read the accessors.
    *
-   * <p>{@link AppException#disclosurePolicy()} forks the one genuinely different behaviour: {@link
-   * ErrorDisclosurePolicy#SUPPRESSED} (only {@code ExternalServiceException} / {@code
-   * ReportGenerationException}) never consults {@code ex.getMessage()} for the client-visible
-   * detail — it may carry upstream response bodies or library-internal paths (CWE-209) — and logs
-   * the full exception at ERROR with the correlation id instead of the standard WARN.
+   * <p>{@link AppException#disclosurePolicy()} forks the one genuinely different behaviour, applied
+   * after the common {@link #problem} construction: {@link ErrorDisclosurePolicy#SUPPRESSED} (only
+   * {@code ExternalServiceException} / {@code ReportGenerationException}) never consults {@code
+   * ex.getMessage()} for the client-visible detail — it may carry upstream response bodies or
+   * library-internal paths (CWE-209) — and logs the full exception at ERROR with the correlation id
+   * instead of the standard WARN, skipping {@link AppException#extraProperties()} (no suppressed
+   * subtype carries any).
    *
    * @param ex the thrown {@link AppException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -512,7 +514,12 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(AppException.class)
   public ResponseEntity<ProblemDetail> handleAppException(
       AppException ex, HttpServletRequest request) {
-    if (ex.disclosurePolicy() == ErrorDisclosurePolicy.SUPPRESSED) {
+    boolean suppressed = ex.disclosurePolicy() == ErrorDisclosurePolicy.SUPPRESSED;
+    String detail =
+        suppressed ? tr(ex.detailKey()) : resolveDetail(ex.getMessage(), ex.detailKey());
+    ProblemDetail pd =
+        problem(ex.status(), tr(ex.titleKey()), detail, request, ex.typeSuffix(), ex.code());
+    if (suppressed) {
       String cid = correlationId();
       MDC.put(MDC_CORRELATION_ID, cid);
       try {
@@ -520,29 +527,13 @@ public class GlobalExceptionHandler {
       } finally {
         MDC.remove(MDC_CORRELATION_ID);
       }
-      ProblemDetail pd =
-          problem(
-              ex.status(),
-              tr(ex.titleKey()),
-              tr(ex.detailKey()),
-              request,
-              ex.typeSuffix(),
-              ex.code());
       // Overwrite the freshly generated correlation id with the one we used for the log
       // line so the client-visible id matches the server log entry exactly.
       pd.setProperty("correlationId", cid);
-      return toEntity(pd);
+    } else {
+      ex.extraProperties().forEach(pd::setProperty);
+      logProblem(request, pd, ex.logLabel(), ex.logExtra());
     }
-    ProblemDetail pd =
-        problem(
-            ex.status(),
-            tr(ex.titleKey()),
-            resolveDetail(ex.getMessage(), ex.detailKey()),
-            request,
-            ex.typeSuffix(),
-            ex.code());
-    ex.extraProperties().forEach(pd::setProperty);
-    logProblem(request, pd, ex.logLabel(), ex.logExtra());
     return toEntity(pd);
   }
 
@@ -856,7 +847,10 @@ public class GlobalExceptionHandler {
    * Handles both the application-specific {@link NotFoundException} as well as common JPA / JDK
    * flavors of "not found" ({@link EntityNotFoundException}, {@link NoSuchElementException}) and
    * Spring's {@link NoResourceFoundException} (static resources / unknown paths) so that none of
-   * them accidentally bubble up into the generic 500 handler.
+   * them accidentally bubble up into the generic 500 handler. The status/code/title/detail literals
+   * are read from {@link AppExceptionKind#NOT_FOUND} — the same constant {@link NotFoundException}
+   * itself delegates to — rather than a second, independently-hardcoded copy, so the two can never
+   * drift apart.
    */
   @ExceptionHandler({
     NotFoundException.class,
@@ -871,12 +865,12 @@ public class GlobalExceptionHandler {
     log.debug("Not found at {}: {}", request.getRequestURI(), ex.getMessage());
     ProblemDetail pd =
         problem(
-            HttpStatus.NOT_FOUND,
-            tr("problem.not_found.title"),
-            resolveDetail(ex.getMessage(), "problem.not_found.detail"),
+            AppExceptionKind.NOT_FOUND.status(),
+            tr(AppExceptionKind.NOT_FOUND.titleKey()),
+            resolveDetail(ex.getMessage(), AppExceptionKind.NOT_FOUND.detailKey()),
             request,
-            "not-found",
-            CODE_NOT_FOUND);
+            AppExceptionKind.NOT_FOUND.typeSuffix(),
+            AppExceptionKind.NOT_FOUND.code());
     return toEntity(pd);
   }
 

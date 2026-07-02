@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-import org.springframework.http.HttpStatus;
-
 /**
  * Thrown by the service layer when a request cannot be fulfilled because of caller-supplied input
  * that is semantically invalid in a way that {@code @Valid} on the controller cannot express.
@@ -33,7 +31,8 @@ import org.springframework.http.HttpStatus;
  * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
  * AppException} dispatch handler with the stable error code {@code BAD_REQUEST}. Prefer this over
  * {@code ResponseStatusException} so the code/title/detail flow stays consistent with the other RFC
- * 7807 responses.
+ * 7807 responses. Every accessor is inherited unchanged from {@link AppException} — it delegates to
+ * {@link AppExceptionKind#BAD_REQUEST}, the fixed identity passed to the superclass constructor.
  */
 public final class BadRequestException extends AppException {
 
@@ -44,7 +43,7 @@ public final class BadRequestException extends AppException {
    * @param message human-readable description of the rejected request
    */
   public BadRequestException(String message) {
-    super(message);
+    super(AppExceptionKind.BAD_REQUEST, message);
   }
 
   /**
@@ -56,36 +55,6 @@ public final class BadRequestException extends AppException {
    * @param cause underlying failure that triggered this exception
    */
   public BadRequestException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  @Override
-  public HttpStatus status() {
-    return AppExceptionKind.BAD_REQUEST.status();
-  }
-
-  @Override
-  public String code() {
-    return AppExceptionKind.BAD_REQUEST.code();
-  }
-
-  @Override
-  public String titleKey() {
-    return AppExceptionKind.BAD_REQUEST.titleKey();
-  }
-
-  @Override
-  public String detailKey() {
-    return AppExceptionKind.BAD_REQUEST.detailKey();
-  }
-
-  @Override
-  public String typeSuffix() {
-    return AppExceptionKind.BAD_REQUEST.typeSuffix();
-  }
-
-  @Override
-  public String logLabel() {
-    return AppExceptionKind.BAD_REQUEST.logLabel();
+    super(AppExceptionKind.BAD_REQUEST, message, cause);
   }
 }
