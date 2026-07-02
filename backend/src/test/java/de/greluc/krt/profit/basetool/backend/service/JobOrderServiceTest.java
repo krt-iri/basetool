@@ -58,6 +58,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceTest {
@@ -96,6 +97,17 @@ class JobOrderServiceTest {
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   @Mock private AuditService auditService;
+
+  // The org-unit resolution, stock/claim DTO projection and priority queue were extracted to
+  // JobOrderOrgUnitResolver / JobOrderStockProjectionService / JobOrderPriorityService (L2, #921);
+  // JobOrderService now calls them. Mockito builds real instances from the same mocks, wired into
+  // jobOrderService via reflection in setUp() (Mockito does not inject one @InjectMocks into
+  // another; the priority service also gets the real projection chained in), so the
+  // create/update/delete/read paths keep exercising the real logic.
+  @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
+  @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
+  @InjectMocks private JobOrderPriorityService jobOrderPriorityService;
+
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;
@@ -109,6 +121,14 @@ class JobOrderServiceTest {
 
   @BeforeEach
   void setUp() {
+    ReflectionTestUtils.setField(
+        jobOrderService, "jobOrderOrgUnitResolver", jobOrderOrgUnitResolver);
+    ReflectionTestUtils.setField(
+        jobOrderService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderPriorityService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderService, "jobOrderPriorityService", jobOrderPriorityService);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
