@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 
 /**
  * Bank-domain state conflict carrying its own <em>stable problem code</em> (epic #556). Unlike the
@@ -34,13 +36,20 @@ import org.jetbrains.annotations.Nullable;
  * specific inline field error (e.g. the overdraft hint at the amount input, K1 mockup) instead of a
  * generic toast.
  *
- * <p>Mapped to HTTP {@code 409 Conflict} by {@link GlobalExceptionHandler}; the {@link #code} is
- * surfaced as the RFC 7807 {@code code} extension property and the optional {@link #properties} are
- * copied onto the problem response so clients can localize parameterized messages (available
- * balance, account number, holder handle) without parsing the human-readable {@code detail}.
+ * <p>Mapped to HTTP {@code 409 Conflict} by {@link GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler; the {@link #code} is surfaced as the RFC 7807 {@code code}
+ * extension property and the optional {@link #properties} are copied onto the problem response so
+ * clients can localize parameterized messages (available balance, account number, holder handle)
+ * without parsing the human-readable {@code detail}.
+ *
+ * <p>Unlike its seven {@link AppException} siblings, this exception's {@link #code()}, {@link
+ * #titleKey()}, {@link #detailKey()} and {@link #typeSuffix()} are <b>not</b> a fixed per-type
+ * {@link AppExceptionKind} constant — each instance picks its own {@link #code} from one of the
+ * {@code CODE_BANK_*} constants below, so the abstract accessors are computed from that field
+ * instead of delegated to an enum.
  */
 @Getter
-public class BankConflictException extends RuntimeException {
+public final class BankConflictException extends AppException {
 
   /** Overdraft attempt: the booking would take the account balance below zero (REQ-BANK-006). */
   public static final String CODE_BANK_OVERDRAFT = "BANK_OVERDRAFT";
@@ -160,5 +169,56 @@ public class BankConflictException extends RuntimeException {
         properties == null
             ? Collections.emptyMap()
             : Collections.unmodifiableMap(new LinkedHashMap<>(properties));
+  }
+
+  @Override
+  public HttpStatus status() {
+    return HttpStatus.CONFLICT;
+  }
+
+  @Override
+  public String code() {
+    return code;
+  }
+
+  @Override
+  public String typeSuffix() {
+    return code.toLowerCase(Locale.ROOT).replace('_', '-');
+  }
+
+  @Override
+  public String titleKey() {
+    return keyBase() + ".title";
+  }
+
+  @Override
+  public String detailKey() {
+    return keyBase() + ".detail";
+  }
+
+  @Override
+  public String logLabel() {
+    return "Bank conflict";
+  }
+
+  @Override
+  public Map<String, Object> extraProperties() {
+    return properties;
+  }
+
+  @Override
+  public Map<String, ?> logExtra() {
+    return Map.of("bankCode", code);
+  }
+
+  /**
+   * The {@code problem.<code>} bundle-key prefix {@link #titleKey()}/{@link #detailKey()} append
+   * {@code .title}/{@code .detail} to, e.g. {@code "problem.bank_overdraft"} for {@link
+   * #CODE_BANK_OVERDRAFT}.
+   *
+   * @return the bundle-key prefix derived from {@link #code}
+   */
+  private String keyBase() {
+    return "problem." + code.toLowerCase(Locale.ROOT);
   }
 }

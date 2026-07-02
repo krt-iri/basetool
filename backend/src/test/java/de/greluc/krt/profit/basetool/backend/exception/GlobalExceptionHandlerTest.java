@@ -338,7 +338,7 @@ class GlobalExceptionHandlerTest {
     // working byte-identically on the wire. The resolver only translates when the
     // message looks up as a key in the bundle.
     ResponseEntity<ProblemDetail> resp =
-        handler.handleBadRequest(
+        handler.handleAppException(
             new BadRequestException("Some literal message that is not a key"), request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
@@ -349,7 +349,7 @@ class GlobalExceptionHandlerTest {
   void handleBadRequest_resolvesI18nKeyToEnglish() {
     // setUp() forces Locale.ENGLISH so the key resolves against messages_en.properties.
     ResponseEntity<ProblemDetail> resp =
-        handler.handleBadRequest(
+        handler.handleAppException(
             new BadRequestException("error.refinery_order.location_required"), request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
@@ -360,7 +360,7 @@ class GlobalExceptionHandlerTest {
   void handleBadRequest_resolvesI18nKeyToGermanWhenLocaleIsGerman() {
     LocaleContextHolder.setLocale(Locale.GERMAN);
     ResponseEntity<ProblemDetail> resp =
-        handler.handleBadRequest(
+        handler.handleAppException(
             new BadRequestException("error.refinery_order.location_required"), request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
@@ -373,7 +373,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void handleBadRequest_blankMessageFallsBackToGenericLocalized() {
     ResponseEntity<ProblemDetail> resp =
-        handler.handleBadRequest(new BadRequestException(""), request);
+        handler.handleAppException(new BadRequestException(""), request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
     assertEquals(
@@ -405,8 +405,7 @@ class GlobalExceptionHandlerTest {
     // resolveDetail() seam is wired up - a future key would Just Work without
     // touching the handler.
     ResponseEntity<ProblemDetail> resp =
-        handler.handleDuplicateEntity(
-            new DuplicateEntityException("error.user.not_found"), request);
+        handler.handleAppException(new DuplicateEntityException("error.user.not_found"), request);
 
     assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DUPLICATE_ENTITY);
     assertEquals("User not found.", resp.getBody().getDetail());
@@ -433,23 +432,22 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleEntityInUse_messageIsPassedThroughWhenPresent() {
-    ResponseEntity<ProblemDetail> resp =
-        handler.handleEntityInUse(
-            new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException(
-                "Mission is referenced by 3 inventory items"),
-            request);
+    EntityInUseException ex =
+        new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException(
+            "Mission is referenced by 3 inventory items");
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_ENTITY_IN_USE);
+    assertCommon(resp, HttpStatus.CONFLICT, ex.code());
     assertEquals("Mission is referenced by 3 inventory items", resp.getBody().getDetail());
   }
 
   @Test
   void handleEntityInUse_fallsBackToLocalizedDetailWhenMessageBlank() {
-    ResponseEntity<ProblemDetail> resp =
-        handler.handleEntityInUse(
-            new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException(""), request);
+    EntityInUseException ex =
+        new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException("");
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_ENTITY_IN_USE);
+    assertCommon(resp, HttpStatus.CONFLICT, ex.code());
     assertEquals(
         "The entry cannot be deleted because it is still in use.", resp.getBody().getDetail());
   }
@@ -460,24 +458,22 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleBusinessConflict_messageIsPassedThroughWhenPresent() {
-    ResponseEntity<ProblemDetail> resp =
-        handler.handleBusinessConflict(
-            new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
-                "Mission already completed"),
-            request);
+    BusinessConflictException ex =
+        new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
+            "Mission already completed");
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_BUSINESS_CONFLICT);
+    assertCommon(resp, HttpStatus.CONFLICT, ex.code());
     assertEquals("Mission already completed", resp.getBody().getDetail());
   }
 
   @Test
   void handleBusinessConflict_fallsBackToLocalizedDetailWhenMessageBlank() {
-    ResponseEntity<ProblemDetail> resp =
-        handler.handleBusinessConflict(
-            new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(null),
-            request);
+    BusinessConflictException ex =
+        new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(null);
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_BUSINESS_CONFLICT);
+    assertCommon(resp, HttpStatus.CONFLICT, ex.code());
     assertNotNull(resp.getBody().getDetail());
   }
 
@@ -686,9 +682,9 @@ class GlobalExceptionHandlerTest {
         new de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException(
             "Keycloak returned 503: <html><body>realm offline</body></html>");
 
-    ResponseEntity<ProblemDetail> resp = handler.handleExternalService(ex, request);
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(resp, HttpStatus.BAD_GATEWAY, GlobalExceptionHandler.CODE_EXTERNAL_SERVICE_ERROR);
+    assertCommon(resp, HttpStatus.BAD_GATEWAY, ex.code());
     assertTrue(
         !resp.getBody().getDetail().contains("realm offline"),
         "raw upstream response must NOT leak through the client-visible detail");
@@ -708,14 +704,38 @@ class GlobalExceptionHandlerTest {
         new de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException(
             "openpdf: invalid font /usr/share/fonts/missing.ttf", new RuntimeException());
 
-    ResponseEntity<ProblemDetail> resp = handler.handleReportGeneration(ex, request);
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    assertCommon(
-        resp,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        GlobalExceptionHandler.CODE_REPORT_GENERATION_FAILED);
+    assertCommon(resp, HttpStatus.INTERNAL_SERVER_ERROR, ex.code());
     assertTrue(
         !resp.getBody().getDetail().contains("/usr/share/fonts"),
         "internal file paths must NOT leak through the client-visible detail");
+  }
+
+  // ---------------------------------------------------------------------
+  // BankConflictException — 409 with the bank-specific stable code (S4, #910)
+  // ---------------------------------------------------------------------
+
+  @Test
+  void handleBankConflict_returns409WithBankSpecificCodeAndProperties() {
+    BankConflictException ex =
+        new BankConflictException(
+            BankConflictException.CODE_BANK_OVERDRAFT, "Overdraft", Map.of("available", 100));
+
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
+
+    assertCommon(resp, HttpStatus.CONFLICT, BankConflictException.CODE_BANK_OVERDRAFT);
+    assertEquals(100, resp.getBody().getProperties().get("available"));
+  }
+
+  @Test
+  void handleBankConflict_fallsBackToLocalizedDetailWhenMessageBlank() {
+    BankConflictException ex =
+        new BankConflictException(BankConflictException.CODE_BANK_ACCOUNT_CLOSED, "");
+
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
+
+    assertCommon(resp, HttpStatus.CONFLICT, BankConflictException.CODE_BANK_ACCOUNT_CLOSED);
+    assertEquals("The account is closed and rejects bookings.", resp.getBody().getDetail());
   }
 }

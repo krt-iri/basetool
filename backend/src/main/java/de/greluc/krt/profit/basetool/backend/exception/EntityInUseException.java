@@ -19,8 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-/** Thrown when an entity cannot be deleted because it is still referenced by other entities. */
-public class EntityInUseException extends RuntimeException {
+/**
+ * Thrown when an entity cannot be deleted because it is still referenced by other entities.
+ *
+ * <p>Mapped to HTTP {@code 409 Conflict} by {@link
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code ENTITY_IN_USE}. Every accessor
+ * is inherited unchanged from {@link AppException} — it delegates to {@link
+ * AppExceptionKind#ENTITY_IN_USE}, the fixed identity passed to the superclass constructor.
+ */
+public final class EntityInUseException extends AppException {
 
   /**
    * Creates an {@code EntityInUseException} with a description of the blocking reference.
@@ -28,6 +36,6 @@ public class EntityInUseException extends RuntimeException {
    * @param message human-readable explanation of which referencing entities still exist
    */
   public EntityInUseException(String message) {
-    super(message);
+    super(AppExceptionKind.ENTITY_IN_USE, message);
   }
 }

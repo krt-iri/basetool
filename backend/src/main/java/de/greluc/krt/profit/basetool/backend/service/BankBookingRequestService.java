@@ -709,6 +709,7 @@ public class BankBookingRequestService {
         request.getId(),
         account.getId(),
         account.getAccountNo(),
+        account.getName(),
         orgUnit == null ? null : orgUnit.getId(),
         orgUnit == null ? null : orgUnit.getName(),
         orgUnit == null ? null : orgUnit.getShorthand(),
