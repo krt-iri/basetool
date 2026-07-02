@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionEligibilityResponse;
 import de.greluc.krt.profit.basetool.backend.service.PromotionEligibilityService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,11 +32,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,7 +62,7 @@ public class PromotionEligibilityController {
   /**
    * Returns the eligibility outcome for every configured rank transition for the calling user.
    *
-   * @param auth the JWT-backed authentication, never {@code null} due to {@code isAuthenticated()}
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/my")
@@ -74,8 +71,8 @@ public class PromotionEligibilityController {
     @ApiResponse(responseCode = "200", description = "Per-transition eligibility for the caller."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<PromotionEligibilityResponse> myEligibility(JwtAuthenticationToken auth) {
-    return service.evaluateAllForUser(requireSub(auth));
+  public List<PromotionEligibilityResponse> myEligibility(@CurrentUserSub String ownerSub) {
+    return service.evaluateAllForUser(ownerSub);
   }
 
   /**
@@ -84,7 +81,7 @@ public class PromotionEligibilityController {
    *
    * @param fromRank the rank the caller currently holds
    * @param toRank the rank the caller would be promoted to
-   * @param auth the JWT-backed authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the per-rule outcome plus an aggregate {@code eligible} flag
    */
   @GetMapping("/my/by-ranks")
@@ -95,8 +92,8 @@ public class PromotionEligibilityController {
   public PromotionEligibilityResponse myEligibilityForRanks(
       @Parameter(description = "Current rank of the caller.") @RequestParam int fromRank,
       @Parameter(description = "Target rank for the promotion.") @RequestParam int toRank,
-      JwtAuthenticationToken auth) {
-    return service.evaluateForRanks(requireSub(auth), fromRank, toRank);
+      @CurrentUserSub String ownerSub) {
+    return service.evaluateForRanks(ownerSub, fromRank, toRank);
   }
 
   /**
@@ -117,18 +114,5 @@ public class PromotionEligibilityController {
   })
   public List<PromotionEligibilityResponse> eligibilityForUser(@PathVariable String userId) {
     return service.evaluateAllForUserAsAdmin(userId);
-  }
-
-  @NotNull
-  private static String requireSub(JwtAuthenticationToken auth) {
-    if (auth == null || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    Jwt jwt = auth.getToken();
-    String sub = jwt.getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
   }
 }

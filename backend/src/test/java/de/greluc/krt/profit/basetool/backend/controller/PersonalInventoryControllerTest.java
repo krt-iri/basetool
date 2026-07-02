@@ -32,9 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpda
 import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,9 +42,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryControllerTest {
@@ -57,14 +52,6 @@ class PersonalInventoryControllerTest {
 
   @InjectMocks private PersonalInventoryController controller;
 
-  private JwtAuthenticationToken auth;
-
-  @BeforeEach
-  void setUp() {
-    Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").claim("sub", SUB).build();
-    auth = new JwtAuthenticationToken(jwt);
-  }
-
   @Test
   void listShouldDeriveOwnerSubFromJwtAndReturnPageResponse() {
     // Given
@@ -73,18 +60,13 @@ class PersonalInventoryControllerTest {
     when(service.listOwn(eq(SUB), any(), any())).thenReturn(page);
 
     // When
-    PageResponse<PersonalInventoryItemResponse> result = controller.list(0, 10, null, null, auth);
+    PageResponse<PersonalInventoryItemResponse> result = controller.list(0, 10, null, null, SUB);
 
     // Then
     assertNotNull(result);
     assertEquals(1, result.totalElements());
     assertEquals(1, result.content().size());
     verify(service).listOwn(eq(SUB), any(), any());
-  }
-
-  @Test
-  void listShouldRejectMissingJwtWithAccessDenied() {
-    assertThrows(AccessDeniedException.class, () -> controller.list(null, null, null, null, null));
   }
 
   @Test
@@ -96,7 +78,7 @@ class PersonalInventoryControllerTest {
     when(service.createOwn(SUB, req)).thenReturn(expected);
 
     // When
-    PersonalInventoryItemResponse result = controller.create(req, auth);
+    PersonalInventoryItemResponse result = controller.create(req, SUB);
 
     // Then
     assertSame(expected, result);
@@ -116,7 +98,7 @@ class PersonalInventoryControllerTest {
             "y", null, 1, PersonalInventoryLocationType.CITY, 1, 0L);
     when(service.updateOwn(SUB, id, req)).thenReturn(sampleResponse());
 
-    controller.update(id, req, auth);
+    controller.update(id, req, SUB);
 
     verify(service).updateOwn(SUB, id, req);
   }
@@ -125,22 +107,9 @@ class PersonalInventoryControllerTest {
   void deleteShouldPropagatePathIdAndJwtSub() {
     UUID id = UUID.randomUUID();
 
-    controller.delete(id, auth);
+    controller.delete(id, SUB);
 
     verify(service).deleteOwn(SUB, id);
-  }
-
-  @Test
-  void emptySubInJwtShouldBeRejected() {
-    Jwt brokenJwt =
-        Jwt.withTokenValue("t")
-            .header("alg", "none")
-            .claims(c -> c.putAll(Map.of("sub", "")))
-            .build();
-    JwtAuthenticationToken broken = new JwtAuthenticationToken(brokenJwt);
-
-    assertThrows(
-        AccessDeniedException.class, () -> controller.list(null, null, null, null, broken));
   }
 
   private static PersonalInventoryItemResponse sampleResponse() {

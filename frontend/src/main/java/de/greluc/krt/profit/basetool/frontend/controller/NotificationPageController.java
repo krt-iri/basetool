@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
@@ -32,7 +34,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -374,20 +375,5 @@ public class NotificationPageController {
     } catch (IOException | RuntimeException e) {
       emitter.completeWithError(e);
     }
-  }
-
-  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return ResponseEntity.status(e.getStatusCode())
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 }

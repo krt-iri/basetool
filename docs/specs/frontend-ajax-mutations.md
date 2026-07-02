@@ -66,6 +66,16 @@ Mutations use `krtFetch.write(...)`; no page may hand-roll a `fetch` write or a 
 `meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `members.html`
 `X-CSRF-TOKEN`) are forbidden.
 
+**Server-side relay helpers (S11, #917).** The page controllers' in-place AJAX write handlers relay
+a backend failure to `krtFetch` as `application/problem+json` via the shared
+`support.BackendErrorResponses.propagateBackendError(BackendServiceException)` — the single copy of
+the `status`/`code`/`detail`/`correlationId` relay the controllers previously each duplicated, so
+`krtFetch` branches on the conflict semantics identically everywhere; do not re-hand-roll the relay.
+The residual non-AJAX Post/Redirect/Get handlers (e.g. the job-order drag-drop reorder and delete)
+use `support.MutationResponseHelper.mutate(…)` for the `try → successToast / catch → errorToast →
+redirect` flash pattern. Handler-specific form re-population and `409`/concurrency-conflict branching
+stay in the handler (the helper carries only the generic toast).
+
 **Acceptance**
 
 - [ ] A new write call site uses `krtFetch.write` / `krtCsrf.headers()` — no bespoke CSRF block.

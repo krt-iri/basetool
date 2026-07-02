@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -28,7 +30,6 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -147,30 +148,5 @@ public class AdminBankPageController {
       log.error("Bank wipe reset (ajax) failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
-  }
-
-  /**
-   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
-   * preserving the stable {@code code} (e.g. {@code PESSIMISTIC_LOCK} when the all-account wipe
-   * lock races a concurrent booking) and {@code detail}, so the shared {@code krtFetch} client
-   * branches on the conflict semantics — showing the reload-confirm — exactly as it does for the
-   * other in-place admin writes.
-   *
-   * @param e the backend failure to relay
-   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
-   */
-  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return ResponseEntity.status(e.getStatusCode())
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 }

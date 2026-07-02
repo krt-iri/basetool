@@ -32,12 +32,16 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.OrgUnitBalanceTar
 import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -46,8 +50,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,7 +58,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -161,23 +162,24 @@ public class OrgUnitBankController {
    * @param id the account
    * @param from period start (inclusive, ISO-8601 instant)
    * @param to period end (inclusive, ISO-8601 instant)
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/accounts/{id}/statement")
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Download the Halter-redacted account statement PDF (org-unit viewer)")
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> downloadStatement(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull Instant from,
       @RequestParam @NotNull Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf =
-        orgUnitBankAccessService.exportViewableStatement(id, from, to, parse(userTimeZone));
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
-    return ResponseEntity.ok().headers(headers).body(pdf);
+      @UserZone ZoneId userZone) {
+    byte[] pdf = orgUnitBankAccessService.exportViewableStatement(id, from, to, userZone);
+    return PdfResponses.pdfAttachment(pdf, "kontoauszug-" + id + ".pdf");
   }
 
   /**
@@ -498,23 +500,5 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval revoked")})
   public BankBookingRequestDto revokeOwnerApproval(@PathVariable @NotNull UUID id) {
     return orgUnitBankAccessService.revokeOwnerApproval(id);
-  }
-
-  /**
-   * Parses the {@code X-User-Time-Zone} header, silently dropping invalid IANA zones (the statement
-   * service falls back to UTC).
-   *
-   * @param userTimeZone the raw header value; may be {@code null} or blank
-   * @return the parsed zone, or {@code null}
-   */
-  private static ZoneId parse(String userTimeZone) {
-    if (userTimeZone == null || userTimeZone.isBlank()) {
-      return null;
-    }
-    try {
-      return ZoneId.of(userTimeZone);
-    } catch (DateTimeException ex) {
-      return null;
-    }
   }
 }
