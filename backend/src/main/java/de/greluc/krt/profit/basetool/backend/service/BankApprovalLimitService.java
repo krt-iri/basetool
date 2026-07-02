@@ -101,7 +101,7 @@ public class BankApprovalLimitService {
    * editor with role/all-members/area-members/user ceilings): the {@code ORG_UNIT} and {@code AREA}
    * accounts only. The KRT account ({@code CARTEL}) is request-capable ({@link #configurable}) but
    * is <em>not</em> per-audience-configurable — it uses the amount-tiered approval ladder managed
-   * in the Verwaltung tab instead (REQ-BANK-046), which replaces the per-audience limits on it.
+   * in the Verwaltung tab instead (REQ-BANK-047), which replaces the per-audience limits on it.
    *
    * @param type the account type
    * @return whether the per-audience limit editor applies to this type
@@ -124,7 +124,7 @@ public class BankApprovalLimitService {
 
   /**
    * {@code true} iff the account has a "Mitglieder des Bereichs" cascade limit tier — only the
-   * {@code AREA} (Bereichskonto) accounts (REQ-BANK-047). The whole-area audience is meaningless
+   * {@code AREA} (Bereichskonto) accounts (REQ-BANK-048). The whole-area audience is meaningless
    * for a Staffel/SK account (no cascade) and the KRT account (no per-audience limits).
    *
    * @param type the account type

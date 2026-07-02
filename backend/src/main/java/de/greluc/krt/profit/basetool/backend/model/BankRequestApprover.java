@@ -40,14 +40,14 @@ public enum BankRequestApprover {
 
   /**
    * The Bereichsleiter of the {@code PROFIT} Bereich approves — the middle band of the KRT-account
-   * amount ladder (REQ-BANK-046): an amount above the bank-employee ceiling {@code T1} and at or
+   * amount ladder (REQ-BANK-047): an amount above the bank-employee ceiling {@code T1} and at or
    * below the area-lead ceiling {@code T2}.
    */
   AREA_LEAD_PROFIT,
 
   /**
    * The Organisationsleitung (any {@code OL_MEMBER}) approves — the top band of the KRT-account
-   * amount ladder (REQ-BANK-046): an amount above the area-lead ceiling {@code T2}.
+   * amount ladder (REQ-BANK-047): an amount above the area-lead ceiling {@code T2}.
    */
   ORGANISATIONSLEITUNG
 }

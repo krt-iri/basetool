@@ -58,7 +58,7 @@ public enum BankAccountViewGranteeKind {
   /**
    * Every member of the whole area cascade of an {@link BankAccountType#AREA} account's owning
    * Bereich — the Bereichsleitung <em>plus</em> every member of the Bereich's child Staffeln and
-   * Spezialkommandos ("Mitglieder des Bereichs", REQ-BANK-047). Carries no role/user and is only
+   * Spezialkommandos ("Mitglieder des Bereichs", REQ-BANK-048). Carries no role/user and is only
    * offered/valid for AREA accounts; the cascade is resolved inside {@code
    * OrgUnitBankAccessService} so the bank stays org-unit-blind.
    */

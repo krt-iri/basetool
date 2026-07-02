@@ -388,7 +388,7 @@ public class BankLedgerService {
   }
 
   /**
-   * Enforces the KRT-account direct-booking cap (REQ-BANK-046): a plain bank employee may
+   * Enforces the KRT-account direct-booking cap (REQ-BANK-047): a plain bank employee may
    * <em>directly</em> book a withdrawal / transfer leaving the KRT ({@code CARTEL}) account only up
    * to the bank-employee approval ceiling {@code T1} ({@link
    * BankAccount#getEmployeeApprovalCeiling()}, an unset ceiling treated as {@code 0}); above it the

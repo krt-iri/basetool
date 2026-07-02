@@ -131,7 +131,7 @@ public class BankAccount extends AbstractEntity<UUID> {
   private BigDecimal balanceTarget;
 
   /**
-   * The KRT-account bank-employee approval ceiling {@code T1} (REQ-BANK-046, V203) — the amount up
+   * The KRT-account bank-employee approval ceiling {@code T1} (REQ-BANK-047, V203) — the amount up
    * to which a bank employee may approve a withdrawal / transfer <em>leaving</em> the {@link
    * BankAccountType#CARTEL} account on their own (self-approve, or book directly). Above it the
    * request must be approved by the Bereichsleiter Profit; {@code null} means no ceiling is
@@ -146,7 +146,7 @@ public class BankAccount extends AbstractEntity<UUID> {
   private BigDecimal employeeApprovalCeiling;
 
   /**
-   * The KRT-account area-lead approval ceiling {@code T2} (REQ-BANK-046, V203) — the amount up to
+   * The KRT-account area-lead approval ceiling {@code T2} (REQ-BANK-047, V203) — the amount up to
    * which the Bereichsleiter Profit approves a withdrawal / transfer leaving the {@link
    * BankAccountType#CARTEL} account; above it the Organisationsleitung must approve. Must be {@code
    * >= }{@link #employeeApprovalCeiling} when both are set (V203 CHECK); {@code null} means no

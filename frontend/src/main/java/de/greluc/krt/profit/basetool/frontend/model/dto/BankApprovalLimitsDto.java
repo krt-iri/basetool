@@ -35,12 +35,12 @@ import org.jetbrains.annotations.Nullable;
  * @param configurable whether this account type carries per-audience approval limits at all
  * @param allMembersSupported whether the all-members tier applies to this account
  * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies — only for
- *     AREA (Bereichskonto) accounts (REQ-BANK-047)
+ *     AREA (Bereichskonto) accounts (REQ-BANK-048)
  * @param availableRoleCodes the role buckets that may carry a limit, in display order
  * @param roleLimits the configured role-bucket limits, keyed by role code
  * @param allMembersLimit the configured all-members limit, or {@code null}
  * @param areaMembersLimit the configured "Mitglieder des Bereichs" cascade limit, or {@code null}
- *     (REQ-BANK-047)
+ *     (REQ-BANK-048)
  * @param userLimits the configured individual-user limits, with resolved display names
  */
 public record BankApprovalLimitsDto(

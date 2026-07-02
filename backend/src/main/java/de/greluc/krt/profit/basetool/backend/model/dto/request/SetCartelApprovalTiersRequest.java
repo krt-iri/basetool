@@ -27,7 +27,7 @@ import java.math.BigDecimal;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-046),
+ * Write payload for the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047),
  * managed by bank management in the Verwaltung tab. Each ceiling is an optional whole-aUEC amount
  * of at least 0 (a {@code null} ceiling clears that band; the
  * {@code @DecimalMin}/{@code @DecimalMax}/ {@code @WholeNumber} constraints skip a {@code null}

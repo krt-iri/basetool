@@ -389,7 +389,7 @@ management export, with parameters), and — since REQ-BANK-035/-036 — **balan
 changes (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`) and **balance-visibility** grants
 (`BALANCE_VISIBILITY_GRANTED` / `BALANCE_VISIBILITY_REVOKED`, with the grantee kind/role code in
 the details payload and the target user id for individual-user grants — no free text, no PII), and —
-since REQ-BANK-046 — the **KRT-account approval-threshold** changes (`CARTEL_APPROVAL_TIERS_SET` /
+since REQ-BANK-047 — the **KRT-account approval-threshold** changes (`CARTEL_APPROVAL_TIERS_SET` /
 `CARTEL_APPROVAL_TIERS_CLEARED`, the two amounts in the details payload — no PII).
 Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
@@ -512,6 +512,8 @@ per-account N+1 (REQ-DATA-003).
   A→Z by name (case-insensitive), via the shared `BankAccountOrder` helper.
 - [x] 30-day delta equals the sum of postings in the window (test-pinned).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
+- [x] A client-side account-name live filter sits beside the Verwaltung button and hides
+  non-matching cards as the user types (REQ-BANK-046).
 
 **Enforced by:** `BankPageControllerTest` (sparkline scaling), `BankAccountOrderTest` (A→Z
 case-insensitive, null-safe, original list untouched), single-statement repository reads · **Code:**
@@ -666,6 +668,8 @@ org-unit-blind.
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
+- [x] A client-side account-name live filter sits above the Konten list and hides non-matching rows
+  as the user types (REQ-BANK-046).
 
 **Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
 
@@ -1137,9 +1141,9 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 *responsible* (never "holder"/"Halter"), to avoid colliding with the aUEC-custody `BankHolder`
 (ADR-0039); the German UI uses "Kontoverantwortliche/r".
 
-> **Amended by REQ-BANK-046:** for **request approval** the KRT account (`CARTEL`) no longer routes to
+> **Amended by REQ-BANK-047:** for **request approval** the KRT account (`CARTEL`) no longer routes to
 > the OL collegium alone — the amount-tiered ladder inserts the **Bereichsleiter Profit** as the middle
-> band's approver (`AREA_LEAD_PROFIT`) between the bank employee and the OL (ADR-0063). This is an
+> band's approver (`AREA_LEAD_PROFIT`) between the bank employee and the OL (ADR-0065). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
 > `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — now returns **all `OL_MEMBER`s ∪
 > the Profit-Bereichsleiter**, so both band approvers are notified about a KRT request (each still sees
@@ -1163,7 +1167,7 @@ users who would not otherwise see it, via additive `bank_account_view_grant` row
 - **OL/KRT-Konto (`CARTEL`)** and **`CARTEL_BANK`** carry no configurable visibility (their audiences are
   fixed by REQ-BANK-037).
 
-> **Amended by REQ-BANK-047:** a **Bereichskonto** additionally offers a **"Mitglieder des Bereichs"**
+> **Amended by REQ-BANK-048:** a **Bereichskonto** additionally offers a **"Mitglieder des Bereichs"**
 > (`AREA_MEMBERS`) audience — the whole area cascade (Bereichsleitung **plus** every child Staffel/SK
 > member), distinct from the `ALL_MEMBERS` bucket which on an AREA account means only the Bereich's
 > **direct** members (the Bereichsleitung). The new value extends the shared `BankAccountViewGranteeKind`
@@ -1328,14 +1332,14 @@ confirmable even when the employee cannot see the destination; capability gate o
 > applicable_limit`. (`CARTEL_BANK` and `SPECIAL` stay non-request-capable, so this never reaches
 > them.)
 >
-> **Amended by REQ-BANK-046/-047 (owner-approved, ADR-0063):** two refinements. (1) **"Alle Mitglieder"
+> **Amended by REQ-BANK-047/-048 (owner-approved, ADR-0065):** two refinements. (1) **"Alle Mitglieder"
 > = the owning org unit, for limits too.** The `ALL_MEMBERS` limit tier now applies **only to an actual
 > member of the account's owning org unit** (`currentUserIsMemberOfOrgUnit(owner)`) — the former
 > catch-all-for-every-eligible-requester is retired: an outsider holding only an individual view grant
 > matches no membership tier and falls through to *approval required* unless they hold their own `USER`
-> limit. The new `AREA_MEMBERS` cascade tier (REQ-BANK-047) participates in the same most-permissive
+> limit. The new `AREA_MEMBERS` cascade tier (REQ-BANK-048) participates in the same most-permissive
 > (maximum) resolution when the caller is anywhere in the Bereich cascade. (2) **The KRT account no
-> longer uses per-audience limits at all** — it uses the amount-tiered 3-stage ladder (REQ-BANK-046);
+> longer uses per-audience limits at all** — it uses the amount-tiered 3-stage ladder (REQ-BANK-047);
 > `configurable(CARTEL)` stays `true` for request-capability, but the per-audience limit editor is
 > hidden for it (`audienceLimitsSupported = ORG_UNIT/AREA`), and its display "limit" is the
 > bank-employee ceiling `T1`.
@@ -1659,12 +1663,55 @@ column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/
 `templates/bank-account-detail.html`, `templates/bank-requests.html`, `static/js/bank.js`,
 `static/css/bank.css` · **Issues:** —
 
-### REQ-BANK-046 — KRT-account amount-tiered 3-stage approval ladder
+### REQ-BANK-046 — Client-side account-name filter (dashboard + org-unit list)
+
+The bank **dashboard** (`/bank`, REQ-BANK-016) and the org-unit **account list** (`/org-unit-bank`
+"Konten" tab, REQ-BANK-021) each carry a **client-side, live account-name filter**. A search box —
+on the dashboard **next to the Verwaltung button** in the header actions, on the org-unit page
+**directly above the account list** — filters the rendered account tiles/rows **in place as the user
+types**: an account whose **name** does not contain the entered term (case-insensitive substring) is
+hidden, matching ones stay. Matching is on the account **name** only (each item carries a
+`data-filter-name`); the canonical A→Z-by-name ordering (REQ-BANK-016) is untouched — the filter only
+**hides**, it never reorders.
+
+The filter is **purely visual and read-only**: it toggles the `hidden` attribute on the
+already-rendered items with **no server round-trip, no `krtFetch`, no page reload and no CSRF**. It
+therefore satisfies the live-update standard (REQ-FE-001) **by construction** and records **no audit
+event** — it mutates nothing, so the REQ-BANK-012 audited activities are unaffected. On the dashboard
+the box is shown to **every** viewer who sees at least one card (**bank employees included**), so it
+is **not** behind the `BANK_MANAGEMENT` gate that still guards the Verwaltung / Berechtigungen /
+Report buttons. On the org-unit page the box lives **inside** the swapped `orgUnitBank` fragment, so a
+booking-request create/cancel swap re-renders it empty, resetting the filter to "show all". When the
+filter hides **every** account, a localized "no accounts match the filter" note
+(`bank.filter.empty`) is revealed — distinct from the server-rendered "no accounts at all" empty
+state, which a genuinely empty list keeps.
+
+**Acceptance**
+
+- [x] Typing a term on the dashboard hides every `.kpi-card` whose name lacks it (case-insensitive)
+  and keeps the matches; clearing the box restores all cards.
+- [x] The same filter above the org-unit "Konten" list hides/keeps `.ou-row` rows identically and
+  resets to "show all" after a request create/cancel fragment swap.
+- [x] The filter performs **no** backend call (no `krtFetch`, no reload, no CSRF) and adds **no**
+  audit event.
+- [x] Filtering every account down to none reveals the localized `bank.filter.empty` note; a
+  genuinely empty account list keeps its own empty state instead.
+- [x] The dashboard filter renders for bank employees (not gated behind `BANK_MANAGEMENT`), while the
+  Verwaltung / Berechtigungen / Report buttons stay management-only.
+
+**Enforced by:** `BankPageControllerTest` (dashboard renders the filter box + `data-filter-name` +
+filter-empty note, employee perspective included), `OrgUnitBankPageControllerMvcTest` (Konten list
+renders the filter box + `data-filter-name` + filter-empty note) · **Code:** frontend
+`templates/bank-dashboard.html`, `templates/org-unit-bank.html`, `static/js/bank.js`
+(`applyAccountNameFilter`), `static/css/bank.css`, `messages{,_de,_en}.properties` (`bank.filter.*`) ·
+**Issues:** —
+
+### REQ-BANK-047 — KRT-account amount-tiered 3-stage approval ladder
 
 The **KRT account** (`CARTEL`, **not** the bank's own `CARTEL_BANK`) uses an **amount-tiered approval
 ladder** for money *leaving* it (a withdrawal or account↔account transfer request, and the direct
 bank-staff booking) that **replaces** the per-audience approval limits of REQ-BANK-041 on this account
-(owner decision, ADR-0063). Two thresholds `T1 ≤ T2` on the account row (`bank_account.
+(owner decision, ADR-0065). Two thresholds `T1 ≤ T2` on the account row (`bank_account.
 employee_approval_ceiling` / `area_lead_approval_ceiling`, V203, whole aUEC ≥ 0, shared row `@Version`
 with rename/close/target) define three bands and their **approver class** (`BankRequestApprover`,
 snapshotted per request as `bank_booking_request.required_approver`):
@@ -1731,11 +1778,11 @@ is notified; each still sees only their own band in „Fremde Anträge".
 `resolveResponsibleHolderUserIds` CARTEL union), `service/BankLedgerService#requireCartelDirectBookingAllowed`,
 `controller/BankAccountController#setCartelApprovalTiers`, `db/migration/V203`, frontend
 `templates/bank-manage.html` + `org-unit-bank-account-detail.html` + `static/js/bank.js` ·
-**ADR:** [ADR-0063](../adr/0063-krt-account-amount-tiered-approval-ladder.md) (supersedes the
+**ADR:** [ADR-0065](../adr/0065-krt-account-amount-tiered-approval-ladder.md) (supersedes the
 single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)) ·
 **Issues:** —
 
-### REQ-BANK-047 — "Mitglieder des Bereichs" audience for Bereichskonten
+### REQ-BANK-048 — "Mitglieder des Bereichs" audience for Bereichskonten
 
 A **Bereichskonto** (`AREA`) may open its balance/read-only detail **and** its approval limit to the
 **whole area cascade** — the Bereichsleitung **plus** every member of the Bereich's child Staffeln and
@@ -1773,7 +1820,7 @@ members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTes
 `model/dto/BankApprovalLimitsDto`, `model/dto/OrgUnitBankAccountSettingsDto`,
 `controller/OrgUnitBankController`, `db/migration/V202`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank-account-detail.html` ·
-**ADR:** [ADR-0063](../adr/0063-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
+**ADR:** [ADR-0065](../adr/0065-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
 
 ## Out of scope
 

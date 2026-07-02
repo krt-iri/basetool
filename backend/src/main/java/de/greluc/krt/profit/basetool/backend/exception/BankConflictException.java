@@ -114,7 +114,7 @@ public final class BankConflictException extends AppException {
    * Direct withdrawal/transfer leaving the KRT ({@code CARTEL}) account by a plain bank employee
    * for an amount above the bank-employee approval ceiling T1 — the money must instead go through
    * the booking-request → external-approval flow (Bereichsleiter Profit / Organisationsleitung).
-   * Management and admins are unrestricted (REQ-BANK-046).
+   * Management and admins are unrestricted (REQ-BANK-047).
    */
   public static final String CODE_BANK_CARTEL_APPROVAL_REQUIRED = "BANK_CARTEL_APPROVAL_REQUIRED";
 

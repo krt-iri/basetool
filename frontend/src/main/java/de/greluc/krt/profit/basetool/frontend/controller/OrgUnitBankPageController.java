@@ -128,7 +128,7 @@ public class OrgUnitBankPageController {
     // ORG_UNIT/AREA/CARTEL account == its responsible holder) OR when the band-routed list already
     // carries a request for them — the latter covers the KRT-account middle-band approver
     // (Bereichsleiter Profit), who is not the account's responsible holder but sees its
-    // AREA_LEAD_PROFIT-band requests (REQ-BANK-046). SPECIAL is never request-capable, so an
+    // AREA_LEAD_PROFIT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
     // OL/management user who can only configure a Sonderkonto's visibility still does not see the
     // tab
     // unless a routed request exists.

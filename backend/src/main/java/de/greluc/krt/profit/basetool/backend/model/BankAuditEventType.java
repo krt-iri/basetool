@@ -179,11 +179,11 @@ public enum BankAuditEventType {
 
   /**
    * The KRT-account (CARTEL) 3-stage approval thresholds T1/T2 were set or changed by bank
-   * management in the Verwaltung tab (REQ-BANK-046). The details payload carries the two amounts —
+   * management in the Verwaltung tab (REQ-BANK-047). The details payload carries the two amounts —
    * never any free text or PII.
    */
   CARTEL_APPROVAL_TIERS_SET,
 
-  /** The KRT-account 3-stage approval thresholds were cleared (REQ-BANK-046). */
+  /** The KRT-account 3-stage approval thresholds were cleared (REQ-BANK-047). */
   CARTEL_APPROVAL_TIERS_CLEARED
 }

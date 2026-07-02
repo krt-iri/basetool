@@ -162,7 +162,7 @@ public class OrgUnitBankProxyController {
 
   /**
    * Forwards toggling the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
-   * (REQ-BANK-047).
+   * (REQ-BANK-048).
    *
    * @param id the account
    * @param enabled whether the whole area cascade may view the account
@@ -272,7 +272,7 @@ public class OrgUnitBankProxyController {
 
   /**
    * Forwards setting the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
-   * (REQ-BANK-047).
+   * (REQ-BANK-048).
    *
    * @param id the account
    * @param body the limit payload ({@code limit})
@@ -287,7 +287,7 @@ public class OrgUnitBankProxyController {
 
   /**
    * Forwards clearing the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
-   * (REQ-BANK-047).
+   * (REQ-BANK-048).
    *
    * @param id the account
    * @return the refreshed settings

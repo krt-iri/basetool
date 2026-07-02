@@ -43,16 +43,16 @@ import org.jetbrains.annotations.Nullable;
  * @param configurable whether this account type carries per-audience approval limits at all — the
  *     per-audience-editable types {@code ORG_UNIT} / {@code AREA}. The KRT account ({@code CARTEL})
  *     is <em>not</em> per-audience-configurable: it uses the amount-tiered approval ladder managed
- *     in the Verwaltung tab instead (REQ-BANK-046), so this is {@code false} for it
+ *     in the Verwaltung tab instead (REQ-BANK-047), so this is {@code false} for it
  * @param allMembersSupported whether the all-members tier applies to this account
  * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies — only for
- *     {@code AREA} (Bereichskonto) accounts (REQ-BANK-047)
+ *     {@code AREA} (Bereichskonto) accounts (REQ-BANK-048)
  * @param availableRoleCodes the role buckets that may carry a limit on this account ({@code
  *     MembershipRole} names), in display order; empty for SK / CARTEL accounts
  * @param roleLimits the currently configured role-bucket limits, keyed by role code
  * @param allMembersLimit the configured all-members limit, or {@code null} when none is set
  * @param areaMembersLimit the configured "Mitglieder des Bereichs" cascade limit, or {@code null}
- *     when none is set (REQ-BANK-047)
+ *     when none is set (REQ-BANK-048)
  * @param userLimits the configured individual-user limits, with resolved display names
  */
 public record BankApprovalLimitsDto(

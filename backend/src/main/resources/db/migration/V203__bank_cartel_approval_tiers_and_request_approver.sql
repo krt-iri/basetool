@@ -1,6 +1,6 @@
 -- =====================================================================
 -- V203 - Bank: KRT-account (CARTEL) 3-stage approval ladder and the
---        per-request required-approver snapshot (REQ-BANK-046)
+--        per-request required-approver snapshot (REQ-BANK-047)
 -- =====================================================================
 -- Why: money LEAVING the KRT account (a withdrawal / transfer on the CARTEL
 -- account) is approved by an escalating class of approver chosen by amount:
@@ -52,9 +52,9 @@ ALTER TABLE bank_account
         );
 
 COMMENT ON COLUMN bank_account.employee_approval_ceiling IS
-    'KRT-account T1 (REQ-BANK-046): amount up to which a bank employee may self-approve a withdrawal/transfer leaving the CARTEL account; NULL only for non-CARTEL. NUMERIC(19,4) per ADR-0002.';
+    'KRT-account T1 (REQ-BANK-047): amount up to which a bank employee may self-approve a withdrawal/transfer leaving the CARTEL account; NULL only for non-CARTEL. NUMERIC(19,4) per ADR-0002.';
 COMMENT ON COLUMN bank_account.area_lead_approval_ceiling IS
-    'KRT-account T2 (REQ-BANK-046): amount up to which the Bereichsleiter Profit approves; above it the Organisationsleitung approves. NULL = no upper band. NUMERIC(19,4) per ADR-0002.';
+    'KRT-account T2 (REQ-BANK-047): amount up to which the Bereichsleiter Profit approves; above it the Organisationsleitung approves. NULL = no upper band. NUMERIC(19,4) per ADR-0002.';
 
 -- ---------------------------------------------------------------------
 -- 2. Per-request required-approver snapshot

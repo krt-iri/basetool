@@ -67,7 +67,7 @@
             <span class="tab-count" th:text="${#lists.size(accounts)}">7</span>
         </a>
         <!-- KRT-Freigaben: Bankleitung-only 3-stage approval thresholds for the KRT account
-             (REQ-BANK-046). Rendered only for a management caller. -->
+             (REQ-BANK-047). Rendered only for a management caller. -->
         <a th:if="${management}" th:href="@{/bank/manage(tab='krt-freigaben')}" class="tab" role="tab"
            th:classappend="${activeTab == 'krt-freigaben'} ? ' active' : ''"
            th:aria-selected="${activeTab == 'krt-freigaben'}" data-testid="bank-tab-krt-approvals">
@@ -75,7 +75,7 @@
         </a>
     </div>
 
-    <!-- ============ Tab: KRT-Freigaben (Bankleitung-only, REQ-BANK-046) ============ -->
+    <!-- ============ Tab: KRT-Freigaben (Bankleitung-only, REQ-BANK-047) ============ -->
     <div class="bank-panel mt-2" th:if="${activeTab == 'krt-freigaben' and management}"
          data-testid="bank-krt-approvals-panel">
         <div class="bank-panel-body">

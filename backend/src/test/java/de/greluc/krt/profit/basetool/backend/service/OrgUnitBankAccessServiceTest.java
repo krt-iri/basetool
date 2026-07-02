@@ -936,7 +936,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_nonMemberViewGrantHolder_notCappedByAllMembers_needsApproval() {
-    // REQ-BANK-046 (amends REQ-BANK-041): the all-members ceiling is now MEMBERS-ONLY. An outsider
+    // REQ-BANK-047 (amends REQ-BANK-041): the all-members ceiling is now MEMBERS-ONLY. An outsider
     // holding only a USER *view* grant (canView via the grant, but NOT a member of the owning unit
     // and matching no USER/role limit) is NOT covered by the all-members limit — they fall through
     // to approval-required (applicableLimit = null, requiresOwnerApproval = true,
@@ -997,7 +997,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_allMembersLimit_appliesToActualOwningUnitMember() {
-    // REQ-BANK-046: the ALL_MEMBERS ceiling now applies ONLY to an actual member of the owning
+    // REQ-BANK-047: the ALL_MEMBERS ceiling now applies ONLY to an actual member of the owning
     // unit.
     // A member requesting above the ceiling is flagged for the responsible holder's approval.
     UUID orgUnitId = UUID.randomUUID();
@@ -1073,7 +1073,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtWithinEmployeeCeiling_needsNoApproval() {
-    // REQ-BANK-046: a KRT withdrawal at or below T1 needs no external approval; the bank employee
+    // REQ-BANK-047: a KRT withdrawal at or below T1 needs no external approval; the bank employee
     // self-approves. applicable_limit is T1 (display), required_approver null.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
@@ -1113,7 +1113,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtMiddleBand_routesToBereichsleiterProfit() {
-    // REQ-BANK-046: a KRT withdrawal above T1 and at/below T2 needs the Bereichsleiter Profit.
+    // REQ-BANK-047: a KRT withdrawal above T1 and at/below T2 needs the Bereichsleiter Profit.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     CreateBankBookingRequest request =
@@ -1152,7 +1152,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtTopBand_routesToOrganisationsleitung() {
-    // REQ-BANK-046: a KRT withdrawal above T2 needs the Organisationsleitung.
+    // REQ-BANK-047: a KRT withdrawal above T2 needs the Organisationsleitung.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     CreateBankBookingRequest request =

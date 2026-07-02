@@ -22,8 +22,9 @@
  *
  * - Lazily loads the recent notifications into the bell dropdown on open.
  * - Marks read / deletes individual notifications and the bulk actions with no page reload via
- *   window.krtFetch (CSRF + 403-retry handled centrally); destructive actions confirm through the
- *   non-native window.showKrtConfirm dialog.
+ *   window.krtFetch (CSRF + 403-retry handled centrally). Deleting a single notification is
+ *   low-stakes and fires immediately (no confirmation); only the bulk clear-read confirms through
+ *   the non-native window.showKrtConfirm dialog.
  * - Keeps the unread badge fresh from the server (the single source of truth) after every mutation
  *   and on a background poll, paused while the tab is hidden. The poll backs off to a slow keepalive
  *   while the SSE push stream is connected and speeds back up the moment it drops; the slow cadence
@@ -67,8 +68,6 @@
             deleted: data.deleted || 'Notification deleted',
             allRead: data.allRead || 'All marked read',
             cleared: data.cleared || 'Read notifications cleared',
-            confirmDeleteTitle: data.confirmDeleteTitle || 'Delete notification',
-            confirmDeleteBody: data.confirmDeleteBody || 'Delete this notification?',
             confirmClearTitle: data.confirmClearTitle || 'Clear read notifications',
             confirmClearBody: data.confirmClearBody || 'Delete all read notifications?',
             confirmOk: data.confirmOk || 'Delete',
@@ -312,24 +311,25 @@
             .finally(refreshUnreadCount);
     }
 
+    // Deleting a single notification is low-stakes and reversible-in-spirit (the message is just
+    // gone from the inbox), so it fires immediately with no confirmation hurdle — unlike the bulk
+    // clear-read below, which still confirms. The success toast is the only feedback.
     function doDelete(id, submitter) {
         if (!window.krtFetch) {
             return;
         }
-        confirmThen(i18n.confirmDeleteTitle, i18n.confirmDeleteBody, function () {
-            window.krtFetch
-                .write({
-                    method: 'DELETE',
-                    url: '/notifications/' + encodeURIComponent(id),
-                    successMessage: i18n.deleted,
-                    errorMessage: i18n.error,
-                    submitter: submitter,
-                    onSuccess: function () {
-                        eachItem(id, removeItem);
-                    },
-                })
-                .finally(refreshUnreadCount);
-        });
+        window.krtFetch
+            .write({
+                method: 'DELETE',
+                url: '/notifications/' + encodeURIComponent(id),
+                successMessage: i18n.deleted,
+                errorMessage: i18n.error,
+                submitter: submitter,
+                onSuccess: function () {
+                    eachItem(id, removeItem);
+                },
+            })
+            .finally(refreshUnreadCount);
     }
 
     function doMarkAll(submitter) {

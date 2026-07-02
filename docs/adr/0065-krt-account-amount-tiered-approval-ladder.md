@@ -1,9 +1,9 @@
-# ADR-0063 — Bank: KRT-account amount-tiered 3-stage approval ladder, "Mitglieder des Bereichs" audience & members-only ALL_MEMBERS limits
+# ADR-0065 — Bank: KRT-account amount-tiered 3-stage approval ladder, "Mitglieder des Bereichs" audience & members-only ALL_MEMBERS limits
 
 - **Status:** Accepted
 - **Date:** 2026-07-02
 - **Deciders:** @greluc
-- **Related:** spec REQ-BANK-046 / REQ-BANK-047 (amends REQ-BANK-034 / REQ-BANK-035 / REQ-BANK-041) ·
+- **Related:** spec REQ-BANK-047 / REQ-BANK-048 (amends REQ-BANK-034 / REQ-BANK-035 / REQ-BANK-041) ·
   builds on ADR-0020 (org-unit seam), ADR-0043 (responsibility & visibility), ADR-0045 (per-account
   approval limits — this ADR supersedes its single-approver/single-boolean assumption for the KRT
   account) · concurrency rule in `CLAUDE.md`
@@ -28,7 +28,7 @@ Two hard constraints are unchanged: the ArchUnit invariants `bankClassesMustNotC
 
 ## Decision
 
-1. **KRT amount-tiered ladder (REQ-BANK-046).** Store two whole-aUEC thresholds `T1 ≤ T2` on the
+1. **KRT amount-tiered ladder (REQ-BANK-047).** Store two whole-aUEC thresholds `T1 ≤ T2` on the
    `bank_account` row (`employee_approval_ceiling` / `area_lead_approval_ceiling`, V203; they share the
    row `@Version`, like `balance_target`). A KRT withdrawal/transfer request is classified at creation
    into a band → required approver, snapshotted as a new `bank_booking_request.required_approver`
@@ -51,7 +51,7 @@ Two hard constraints are unchanged: the ArchUnit invariants `bankClassesMustNotC
    `BankLedgerService.requireCartelDirectBookingAllowed`, called only by the direct-booking controller,
    never the already-approved confirmation path); management/admin are uncapped.
 
-4. **`AREA_MEMBERS` audience (REQ-BANK-047).** Add a fifth `BankAccountViewGranteeKind` value for the
+4. **`AREA_MEMBERS` audience (REQ-BANK-048).** Add a fifth `BankAccountViewGranteeKind` value for the
    whole Bereich cascade, resolved in the seam via a new
    `OwnerScopeService.currentUserIsMemberOfAreaCascade(bereichId)`. Because view grants and approval
    limits share the enum, it extends both tables (V202), offered only for AREA accounts.

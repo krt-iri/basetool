@@ -119,7 +119,7 @@
                   th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
 
         <!-- KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
-             (REQ-BANK-046): the amount bands and who approves each. Managed only by the Bankleitung in
+             (REQ-BANK-047): the amount bands and who approves each. Managed only by the Bankleitung in
              the Verwaltung tab. Shown for the KRT account regardless of settings, so a plain member and
              the OL both see it. -->
         <div class="hud-box mt-2" th:if="${acct.type() == 'CARTEL'}"
@@ -213,7 +213,7 @@
                     </span>
                 </div>
 
-                <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-047) -->
+                <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) -->
                 <div th:if="${settings.areaMembersSupported()}" class="vis-row">
                     <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
                     <span class="vis-state">

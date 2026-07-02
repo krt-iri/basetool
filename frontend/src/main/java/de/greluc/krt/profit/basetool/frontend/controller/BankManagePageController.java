@@ -95,7 +95,7 @@ public class BankManagePageController {
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
     // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
-    // (REQ-BANK-046),
+    // (REQ-BANK-047),
     // where the two 3-stage thresholds T1/T2 are edited; null until a KRT account exists.
     model.addAttribute(
         "cartelAccount",
@@ -111,7 +111,7 @@ public class BankManagePageController {
     model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
     // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
     // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
-    // (REQ-BANK-046) — the latter only for a management caller, so a plain employee forcing the
+    // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the
     // query
     // param falls back to Halter and never sees the KRT-thresholds panel.
     String activeTab;

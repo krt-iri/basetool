@@ -262,7 +262,7 @@ public class OrgUnitBankController {
 
   /**
    * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
-   * (REQ-BANK-047): every member of the whole area cascade (Bereichsleitung + child Staffel/SK
+   * (REQ-BANK-048): every member of the whole area cascade (Bereichsleitung + child Staffel/SK
    * members) may view it.
    *
    * @param id the account
@@ -372,7 +372,7 @@ public class OrgUnitBankController {
 
   /**
    * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
-   * (REQ-BANK-047).
+   * (REQ-BANK-048).
    *
    * @param id the account
    * @param request the new whole-aUEC limit (>= 0)
@@ -387,7 +387,7 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Clears the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto (REQ-BANK-047).
+   * Clears the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto (REQ-BANK-048).
    *
    * @param id the account
    * @return the refreshed settings

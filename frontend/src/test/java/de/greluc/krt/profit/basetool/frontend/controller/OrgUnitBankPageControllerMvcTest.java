@@ -184,6 +184,31 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_rendersAccountNameFilterOverKontenList() throws Exception {
+    // REQ-BANK-046: the "Konten" list carries a client-side account-name live filter — the search
+    // box + its scope/empty wiring, the per-row data-filter-name and the filter-empty note all
+    // render inside the swapped fragment above the account list.
+    stubData(UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter\"")))
+        .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-filter-scope=\"#ou-panel-konten .ou-list\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-filter-empty=\"#ou-acc-filter-empty\"")))
+        // The account row carries the name the filter matches against.
+        .andExpect(
+            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+        // The no-results note (hidden until the filter empties the list) is present.
+        .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter-empty\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_fragmentViewResolves() throws Exception {
     stubData(UUID.randomUUID());
 

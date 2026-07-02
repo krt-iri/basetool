@@ -200,7 +200,7 @@ public class BankProxyController {
 
   /**
    * Forwards setting/clearing the KRT-account (CARTEL) 3-stage approval thresholds T1/T2
-   * (REQ-BANK-046). Bank-management-only, enforced by the backend. A {@code null} ceiling in the
+   * (REQ-BANK-047). Bank-management-only, enforced by the backend. A {@code null} ceiling in the
    * body clears that band.
    *
    * @param id the KRT account

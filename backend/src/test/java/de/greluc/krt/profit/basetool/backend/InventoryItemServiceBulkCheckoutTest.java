@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -54,7 +54,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
-/** Unit tests for the bulk checkout functionality in {@link InventoryItemService}. */
+/** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceBulkCheckoutTest {
 
@@ -70,7 +70,7 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private MaterialMapper materialMapper;
 
   @Mock private AuditService auditService;
-  @InjectMocks private InventoryItemService inventoryItemService;
+  @InjectMocks private InventoryCheckoutService inventoryItemService;
 
   // -------------------------------------------------------------------------
   // Helper

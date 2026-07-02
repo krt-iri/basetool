@@ -563,7 +563,7 @@ public class OrgUnitBankAccessService {
 
   /**
    * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
-   * (REQ-BANK-047): every member of the whole area cascade — the Bereichsleitung plus every member
+   * (REQ-BANK-048): every member of the whole area cascade — the Bereichsleitung plus every member
    * of the Bereich's child Staffeln/SKs — may view it. Idempotent; only valid for {@code AREA}
    * accounts.
    *
@@ -722,7 +722,7 @@ public class OrgUnitBankAccessService {
 
   /**
    * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
-   * (REQ-BANK-047): the ceiling for any member of the whole area cascade (Bereichsleitung + child
+   * (REQ-BANK-048): the ceiling for any member of the whole area cascade (Bereichsleitung + child
    * Staffel/SK members) who matches no more specific tier.
    *
    * @param accountId the account
@@ -753,7 +753,7 @@ public class OrgUnitBankAccessService {
 
   /**
    * Removes the "Mitglieder des Bereichs" cascade approval limit from a Bereichskonto
-   * (REQ-BANK-047).
+   * (REQ-BANK-048).
    *
    * @param accountId the account
    * @return the refreshed settings
@@ -917,7 +917,7 @@ public class OrgUnitBankAccessService {
     boolean requiresOwnerApproval;
     BankRequestApprover requiredApprover;
     if (account.getType() == BankAccountType.CARTEL) {
-      // The KRT account uses the amount-tiered ladder (REQ-BANK-046): amount <= T1 the bank
+      // The KRT account uses the amount-tiered ladder (REQ-BANK-047): amount <= T1 the bank
       // employee
       // self-approves; T1 < amount <= T2 the Bereichsleiter Profit; amount > T2 the
       // Organisationsleitung. An unset T1 is treated as 0 (no employee self-approval band); an
@@ -1023,7 +1023,7 @@ public class OrgUnitBankAccessService {
     // caller
     // is the responsible holder of, plus the KRT account for the Bereichsleiter Profit (who
     // approves
-    // its middle band without being its responsible holder, REQ-BANK-046).
+    // its middle band without being its responsible holder, REQ-BANK-047).
     Set<UUID> responsibleIds = new LinkedHashSet<>();
     Set<UUID> cartelIds = new LinkedHashSet<>();
     for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
@@ -1048,7 +1048,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-046 band routing): a
+   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-047 band routing): a
    * KRT-account band-flagged request is shown only to its band approver (the Bereichsleiter Profit
    * for {@code AREA_LEAD_PROFIT}, the OL for {@code ORGANISATIONSLEITUNG}); every other request
    * stays visible to the account's responsible holder. Admins see all.
@@ -1230,7 +1230,7 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
             }
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
-            // "Mitglieder des Bereichs" (REQ-BANK-047): the whole area cascade of a Bereichskonto.
+            // "Mitglieder des Bereichs" (REQ-BANK-048): the whole area cascade of a Bereichskonto.
             // Only ever granted on AREA accounts, whose owning unit is the Bereich.
             case AREA_MEMBERS ->
                 ownerScopeService.currentUserIsMemberOfAreaCascade(owningOrgUnitId);
@@ -1286,7 +1286,7 @@ public class OrgUnitBankAccessService {
   /**
    * {@code true} iff the caller is the {@code BEREICHSLEITER} of a {@code Department.PROFIT}
    * Bereich. This is both the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037)
-   * and the middle-band approver of the KRT amount ladder (REQ-BANK-046, {@code AREA_LEAD_PROFIT}).
+   * and the middle-band approver of the KRT amount ladder (REQ-BANK-047, {@code AREA_LEAD_PROFIT}).
    *
    * @return {@code true} iff the caller leads a PROFIT Bereich
    */
@@ -1345,7 +1345,7 @@ public class OrgUnitBankAccessService {
    * <p>Per account type: a Staffelkonto → its {@code STAFFELLEITER}; an SK-Konto → its {@code
    * SK_LEAD}; a Bereichskonto → its {@code BEREICHSLEITER}; the {@code CARTEL}/KRT account → all
    * {@code OL_MEMBER}s <em>plus</em> the Bereichsleiter Profit (the middle-band approver of the KRT
-   * amount ladder, REQ-BANK-046, so both approver classes are notified); the {@code CARTEL_BANK} →
+   * amount ladder, REQ-BANK-047, so both approver classes are notified); the {@code CARTEL_BANK} →
    * the {@code BEREICHSLEITER} of every {@code Department.PROFIT} Bereich; a Sonderkonto → none.
    *
    * @param accountId the account whose responsible holder(s) to resolve
@@ -1383,7 +1383,7 @@ public class OrgUnitBankAccessService {
               orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
                   owner, MembershipRole.OL_MEMBER));
         }
-        // REQ-BANK-046: the KRT account's amount ladder additionally routes approval to the
+        // REQ-BANK-047: the KRT account's amount ladder additionally routes approval to the
         // Bereichsleiter Profit (middle band), so they are notified about its requests too — each
         // party still sees only its own band in the "Fremde Anträge" tab.
         holders.addAll(resolveCartelBankResponsibleHolders());
@@ -1492,7 +1492,7 @@ public class OrgUnitBankAccessService {
   private boolean canConfigureApprovalLimits(@NotNull BankAccount account) {
     // Per-audience limits are editable only on ORG_UNIT / AREA accounts (REQ-BANK-041). The KRT
     // account (CARTEL) is request-capable but uses the Verwaltung-managed amount ladder instead
-    // (REQ-BANK-046), so it is not per-audience-configurable here.
+    // (REQ-BANK-047), so it is not per-audience-configurable here.
     if (!BankApprovalLimitService.audienceLimitsSupported(account.getType())) {
       return false;
     }
@@ -1589,17 +1589,17 @@ public class OrgUnitBankAccessService {
 
   /**
    * Resolves the current caller's applicable approval limit from the given limit rows
-   * (REQ-BANK-041, amended by REQ-BANK-046/-047).
+   * (REQ-BANK-041, amended by REQ-BANK-047/-047).
    *
    * <ul>
    *   <li>The KRT account ({@code CARTEL}) does not use per-audience limits at all — its ladder
-   *       (REQ-BANK-046) governs approval; the value returned here is only the display/self-approve
+   *       (REQ-BANK-047) governs approval; the value returned here is only the display/self-approve
    *       ceiling, the bank-employee band {@code T1} (its {@code employeeApprovalCeiling}).
    *   <li>Otherwise an individual-user limit wins outright; else the <em>most permissive</em>
    *       (maximum) of every membership tier the caller actually matches — a role bucket held on
    *       the owning unit, the whole-area cascade ({@code AREA_MEMBERS}) when the caller is
    *       anywhere in it, and the all-members ceiling <em>only when the caller is a member of the
-   *       owning org unit</em> ("Alle Mitglieder" = the account's own org unit, REQ-BANK-046); else
+   *       owning org unit</em> ("Alle Mitglieder" = the account's own org unit, REQ-BANK-047); else
    *       {@code null} = unlimited.
    * </ul>
    *
@@ -1792,7 +1792,7 @@ public class OrgUnitBankAccessService {
 
   /**
    * {@code true} iff the account type has a "Mitglieder des Bereichs" cascade visibility bucket —
-   * only {@code AREA} (Bereichskonto) accounts (REQ-BANK-047).
+   * only {@code AREA} (Bereichskonto) accounts (REQ-BANK-048).
    *
    * @param type the account type
    * @return whether the area-members visibility bucket applies

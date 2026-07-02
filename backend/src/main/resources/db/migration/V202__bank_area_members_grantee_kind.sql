@@ -1,6 +1,6 @@
 -- =====================================================================
 -- V202 - Bank: "Mitglieder des Bereichs" audience/tier (AREA_MEMBERS)
---        for Bereichskonten (REQ-BANK-047)
+--        for Bereichskonten (REQ-BANK-048)
 -- =====================================================================
 -- Why: a Bereichskonto (AREA account) may now open its balance/limits to the
 -- WHOLE area cascade -- the Bereichsleitung PLUS every member of the Bereich's

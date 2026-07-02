@@ -373,7 +373,7 @@ public class BankAccountService {
   }
 
   /**
-   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-046) from
+   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047) from
    * the Verwaltung tab. Only the KRT account carries thresholds; both {@code null} clears the
    * ladder. The whole-aUEC / non-negativity of each value is validated on the request; here the
    * business rules are enforced: the account must be a {@code CARTEL} account and — when both are

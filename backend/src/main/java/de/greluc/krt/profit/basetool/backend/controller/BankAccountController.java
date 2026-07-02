@@ -187,7 +187,7 @@ public class BankAccountController {
   }
 
   /**
-   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-046):
+   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047):
    * bank-employee self-approval ceiling {@code T1} and Bereichsleiter-Profit ceiling {@code T2}
    * (above {@code T2} the Organisationsleitung approves). Bankleitung-only — {@code
    * hasRole('BANK_MANAGEMENT')} (admins pass via the role hierarchy). The Verwaltung tab is the

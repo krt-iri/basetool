@@ -773,7 +773,7 @@ public class OwnerScopeService {
    * — a direct member of the Bereich itself (the Bereichsleitung) <em>or</em> a member of any of
    * its child Staffeln / Spezialkommandos. Pure membership check used by the org-unit bank seam to
    * evaluate the {@code AREA_MEMBERS} view grant / approval-limit tier ("Mitglieder des Bereichs",
-   * REQ-BANK-047) on a Bereichskonto. Since the org hierarchy is exactly three levels (OL &gt;
+   * REQ-BANK-048) on a Bereichskonto. Since the org hierarchy is exactly three levels (OL &gt;
    * Bereich &gt; Staffel/SK), the Bereich's direct children are its whole subtree.
    *
    * @param bereichId the owning Bereich org unit; never {@code null}

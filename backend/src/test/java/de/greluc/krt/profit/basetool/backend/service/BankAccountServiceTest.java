@@ -486,7 +486,7 @@ class BankAccountServiceTest {
 
   @Test
   void setCartelApprovalTiers_setsCeilingsAndAuditsSet() {
-    // REQ-BANK-046: the Bankleitung sets the KRT ladder thresholds; audited as SET.
+    // REQ-BANK-047: the Bankleitung sets the KRT ladder thresholds; audited as SET.
     UUID accountId = UUID.randomUUID();
     BankAccount cartel = accountWithVersion(accountId, 2L);
     cartel.setType(BankAccountType.CARTEL);
@@ -511,7 +511,7 @@ class BankAccountServiceTest {
 
   @Test
   void setCartelApprovalTiers_bothNullClearsAndAuditsCleared() {
-    // REQ-BANK-046: clearing both thresholds is audited as CLEARED.
+    // REQ-BANK-047: clearing both thresholds is audited as CLEARED.
     UUID accountId = UUID.randomUUID();
     BankAccount cartel = accountWithVersion(accountId, 1L);
     cartel.setType(BankAccountType.CARTEL);
@@ -538,7 +538,7 @@ class BankAccountServiceTest {
 
   @Test
   void setCartelApprovalTiers_nonCartelAccount_rejectedBeforeSave() {
-    // REQ-BANK-046: only the KRT (CARTEL) account carries thresholds.
+    // REQ-BANK-047: only the KRT (CARTEL) account carries thresholds.
     UUID accountId = UUID.randomUUID();
     BankAccount special = accountWithVersion(accountId, 1L); // SPECIAL by default
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(special));
@@ -553,7 +553,7 @@ class BankAccountServiceTest {
 
   @Test
   void setCartelApprovalTiers_t2BelowT1_rejectedBeforeSave() {
-    // REQ-BANK-046: the area-lead ceiling must be at or above the bank-employee ceiling.
+    // REQ-BANK-047: the area-lead ceiling must be at or above the bank-employee ceiling.
     UUID accountId = UUID.randomUUID();
     BankAccount cartel = accountWithVersion(accountId, 1L);
     cartel.setType(BankAccountType.CARTEL);

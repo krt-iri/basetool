@@ -35,20 +35,34 @@
                 <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
             </p>
         </div>
-        <div class="bank-head-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
-            <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
-                <span th:text="#{bank.dashboard.manage}">Verwaltung</span>
-            </a>
-            <a th:href="@{/bank/grants}" class="btn btn-ghost" data-testid="bank-grants-link"
-               th:text="#{bank.dashboard.grants}">Berechtigungen</a>
-            <button type="button" class="btn btn-ghost bank-download-btn"
-                    data-download-url="/api/proxy/bank/export/three-month-report"
-                    data-filename="bank-3-monats-report.pdf"
-                    data-testid="bank-report-download">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
-                <span th:text="#{bank.dashboard.report}">3-Monats-Report</span>
-            </button>
+        <!-- Header actions. The account-name live filter (REQ-BANK-046) is visible to EVERY viewer who
+             sees at least one card (bank employees included), so it is NOT under the management gate;
+             the Verwaltung/Berechtigungen/Report buttons stay bank-management only. -->
+        <div class="bank-head-actions">
+            <div class="bank-acc-search" th:if="${!#lists.isEmpty(cards)}">
+                <label for="bank-acc-filter" class="visually-hidden"
+                       th:text="#{bank.filter.label}">Konten nach Namen filtern</label>
+                <svg class="krt-icon bank-acc-search-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                <input type="search" id="bank-acc-filter" class="bank-acc-search-input" autocomplete="off"
+                       data-bank-acc-filter data-filter-scope=".bank-acc-grid"
+                       data-filter-empty="#bank-acc-filter-empty"
+                       th:attr="placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}">
+            </div>
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+                <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
+                    <span th:text="#{bank.dashboard.manage}">Verwaltung</span>
+                </a>
+                <a th:href="@{/bank/grants}" class="btn btn-ghost" data-testid="bank-grants-link"
+                   th:text="#{bank.dashboard.grants}">Berechtigungen</a>
+                <button type="button" class="btn btn-ghost bank-download-btn"
+                        data-download-url="/api/proxy/bank/export/three-month-report"
+                        data-filename="bank-3-monats-report.pdf"
+                        data-testid="bank-report-download">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                    <span th:text="#{bank.dashboard.report}">3-Monats-Report</span>
+                </button>
+            </th:block>
         </div>
     </div>
 
@@ -83,7 +97,7 @@
            th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
            th:href="@{'/bank/accounts/' + ${card.account().id()}}"
            data-testid="bank-account-card"
-           th:attr="data-account-no=${card.account().accountNo()}">
+           th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
             <div class="kpi-card-top">
                 <div>
                     <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
@@ -106,6 +120,13 @@
                 </svg>
             </div>
         </a>
+    </div>
+
+    <!-- No-results note for the client-side account-name filter (REQ-BANK-046): revealed by bank.js
+         when the live filter hides every card. Distinct from the "no accounts at all" empty state
+         below (which is server-rendered when the caller sees no card). -->
+    <div id="bank-acc-filter-empty" class="empty-state mt-2" th:if="${!#lists.isEmpty(cards)}" hidden>
+        <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
     </div>
 
     <div class="hud-box mt-2" th:if="${#lists.isEmpty(cards)}">
