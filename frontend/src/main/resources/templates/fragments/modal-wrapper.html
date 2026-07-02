@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Canonical KRT HUD modal shell (S12, #918).
+
+  Renders the `.krt-modal-overlay` scrim + `.krt-modal` frame (orange top edge +
+  corner brackets, from styles.css) with a `.krt-modal-head` carrying the title and
+  the single standardized close trigger — `data-trigger="close-modal-display"` +
+  `data-modal-id` (common-handlers.js, the display-family convention). This is the one
+  close convention; the former `data-modal-dismiss` (mission-detail) is migrated onto it.
+
+  Parameters:
+    modalId  — the overlay element id; also the close button's data-modal-id.
+    titleKey — i18n key for the head <h3> and the dialog aria-label.
+    variant  — extra class(es) appended to `.krt-modal` (e.g. 'krt-modal--wide'); pass
+               null/'' for the compact default.
+    body     — a fragment expression (`~{::selector}`) for everything below the head
+               (the `.krt-modal-body` / `.krt-modal-foot`, or a <form> wrapping them),
+               inserted verbatim so each modal keeps its bespoke body/footer markup.
+
+  The overlay's hidden default comes from CSS (`.krt-modal-overlay { display:none }` in
+  bank.css) — every current `.krt-modal-overlay` modal loads bank.css and is opened by
+  `open-modal-display` flipping the inline `display`; the fragment therefore adds no
+  inline style, so the rendered shell is byte-identical to the hand-written markup.
+  Modals that need a server-driven open state (a th:style/th:if on the overlay) keep
+  their bespoke overlay inline for now — this fragment targets the JS-toggled ones.
+-->
+<div th:fragment="modal(modalId, titleKey, variant, body)"
+     class="krt-modal-overlay" th:id="${modalId}">
+  <div class="krt-modal" th:classappend="${variant}"
+       role="dialog" aria-modal="true" th:aria-label="#{__${titleKey}__}">
+    <div class="krt-modal-head">
+      <h3 th:text="#{__${titleKey}__}">Titel</h3>
+      <button type="button" class="krt-modal-close"
+              data-trigger="close-modal-display" th:attr="data-modal-id=${modalId}"
+              th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+    </div>
+    <th:block th:replace="${body}"></th:block>
+  </div>
+</div>
+</body>
+</html>

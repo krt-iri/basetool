@@ -57,14 +57,7 @@
     </div>
 
     <!-- Type-to-confirm danger modal (reserved for wipe-reset-grade actions). -->
-    <div class="krt-modal-overlay" id="bank-wipe-modal">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true"
-             th:aria-label="#{admin.bank.wipe.modal.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{admin.bank.wipe.modal.title}">Wipe-Reset best&auml;tigen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-wipe-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
-            </div>
+    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-wipe-modal', titleKey='admin.bank.wipe.modal.title', variant='krt-modal--danger', body=~{::.no-track})}">
             <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track" data-bank-wipe
                   th:data-wipe-success="#{admin.bank.wipe.success}"
                   th:data-wipe-noop="#{admin.bank.wipe.noop}"
@@ -87,7 +80,6 @@
                             th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
                 </div>
             </form>
-        </div>
     </div>
 </main>
 

@@ -141,6 +141,26 @@ app-wide; new AJAX call sites inherit it for free.
 
 **Enforced by:** code/design review + ESLint (mechanical grep-able rule).
 
+### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918)
+
+The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
+brackets) > `.krt-modal-head` (title + close-X) — is extracted as the reusable Thymeleaf fragment
+`fragments/modal-wrapper.html :: modal(modalId, titleKey, variant, body)`. New `.krt-modal-overlay`
+modals and migrations use it rather than hand-copying the shell; the bespoke body/footer is passed
+through the `body` fragment expression (`~{::selector}`) so rendering stays identical, and
+`variant` appends a `.krt-modal--*` class (e.g. `krt-modal--wide`, `krt-modal--danger`). Modals open
+with `data-trigger="open-modal-display"` and **close with the single standardized trigger
+`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js) — the former
+`data-modal-dismiss` convention is being migrated onto it. The overlay's hidden default comes from
+CSS (`.krt-modal-overlay { display:none }` in bank.css), so the fragment injects no inline style.
+
+**Acceptance**
+
+- [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
+  its body projected exactly once and closes via `close-modal-display` (no `data-modal-dismiss`).
+
+**Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
+
 ### REQ-UI-009 — Responsive across four device classes
 
 Every layout change and new component works on **four** classes:
