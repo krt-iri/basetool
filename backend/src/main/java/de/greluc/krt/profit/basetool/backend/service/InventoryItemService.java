@@ -22,17 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
@@ -43,26 +38,20 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
-import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -70,36 +59,34 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages inventory items — the squadron's physical stock of refined and raw materials.
+ * Inventory-item facade — the single service seam the {@code InventoryItemController} and the
+ * material-collection / craftability callers depend on for the squadron's physical stock of refined
+ * and raw materials.
  *
  * <p>Each item links to a material (UEX commodity), optionally to a user (the owner, or null for
- * shared/squadron stock), and optionally to a job order or mission. The service covers the read API
- * (aggregated per material, per user, per mission, per job-order, plus the {@code /grouped}
- * variants used by the inventory page), the create/update/delete cycle, the book-out flow (consume
- * / transfer / sell), the bulk-checkout endpoint, and the material-collection roll-up used by the
- * job-order detail page.
+ * shared/squadron stock), and optionally to a job order or mission. This class implements the
+ * create/update/note cycle directly and delegates the two large cohesive clusters carved out in the
+ * L2 split (#921) so the public API stays byte-for-byte stable:
  *
- * <p>Concurrency-relevant: the {@link #bookOutInventoryItem} flow touches multiple {@code
- * JobOrderMaterial} rows of the same aggregate. It follows the bulk-update-after-loop pattern
- * (CLAUDE.md): the loop only mutates managed entities (Hibernate dirty-checking), material ids that
- * need a {@code @Modifying(clearAutomatically=true)} bulk update are collected in a {@code
- * Set<UUID>} and the bulk update runs ONCE after the loop. Doing the bulk update inside the loop
- * would detach the entire persistence context and cause spurious 409s on the sibling rows.
+ * <ul>
+ *   <li>every read / aggregation projection (per-material aggregate, {@code /grouped} roll-ups,
+ *       per-stack drilldowns, flat and per-material listings, craftability stock slices, job-order
+ *       material collection) → {@link InventoryAggregationService};
+ *   <li>every checkout write (book-out consume/transfer/sell, personal↔shared rebooking, bulk
+ *       checkout, delivered toggle, admin global wipe) → {@link InventoryCheckoutService}.
+ * </ul>
+ *
+ * <p>The delegating write methods keep their own {@code @Transactional} so the read-write
+ * transaction opens here and the sub-service's {@code @Transactional} joins it (REQUIRED
+ * propagation) — a delegating write is never trapped in the class-level {@code readOnly} default.
+ * This facade stays in the {@code staffelScopedServicesMustWireOwnerScopeOrAuthHelper} whitelist
+ * and keeps its {@code OwnerScopeService} dependency (used by {@link #createInventoryItem}) so the
+ * multi-tenant org-unit stamp cannot be dropped.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class InventoryItemService {
-
-  /**
-   * Tolerance used when comparing inventory amounts that are stored as {@code double}. Mirrors
-   * {@code JobOrderHandoverService.QUANTITY_EPSILON} — both services compare the same quantity
-   * column on {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem} so they need the
-   * same rounding-safe threshold. Anything below 1e-4 is floating-point noise (quantities are
-   * user-edited at three decimals max), not a real residual.
-   */
-  private static final double QUANTITY_EPSILON = 1e-4;
 
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
@@ -107,13 +94,12 @@ public class InventoryItemService {
   private final LocationRepository locationRepository;
   private final JobOrderRepository jobOrderRepository;
   private final MissionRepository missionRepository;
-  private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
   private final InventoryItemMapper inventoryItemMapper;
-  private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
   private final AuditService auditService;
+  private final InventoryAggregationService inventoryAggregationService;
+  private final InventoryCheckoutService inventoryCheckoutService;
 
   /**
    * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair
@@ -128,7 +114,7 @@ public class InventoryItemService {
    *     null}
    */
   public List<OwnedStockSlice> getOwnedStockSlices(@org.jetbrains.annotations.NotNull UUID userId) {
-    return inventoryItemRepository.sumOwnedStockByMaterialAndQuality(userId);
+    return inventoryAggregationService.getOwnedStockSlices(userId);
   }
 
   /**
@@ -138,18 +124,7 @@ public class InventoryItemService {
    * @return paged aggregated DTOs (material + total amount + average quality)
    */
   public Page<AggregatedInventoryDto> getAggregatedInventory(Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return inventoryItemRepository
-        .getAggregatedInventory(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
-        .map(
-            obj ->
-                new AggregatedInventoryDto(
-                    materialMapper.toDto((Material) obj[0]),
-                    obj[1] != null
-                        ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0
-                        : 0.0,
-                    obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0));
+    return inventoryAggregationService.getAggregatedInventory(pageable);
   }
 
   /**
@@ -162,19 +137,7 @@ public class InventoryItemService {
    * @throws NotFoundException when the material id is unknown
    */
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
-    Material material =
-        materialRepository
-            .findById(materialId)
-            .orElseThrow(() -> new NotFoundException("Material not found"));
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return inventoryItemRepository
-        .findByMaterialAndPersonalFalseScoped(
-            material,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return inventoryAggregationService.getInventoryByMaterial(materialId, pageable);
   }
 
   /**
@@ -186,9 +149,7 @@ public class InventoryItemService {
    * @return paged inventory items owned by the user
    */
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    return inventoryItemRepository.findByUser(user, pageable).map(inventoryItemMapper::toDto);
+    return inventoryAggregationService.getUserInventory(userId, pageable);
   }
 
   /**
@@ -200,7 +161,7 @@ public class InventoryItemService {
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId) {
-    return getMyAggregatedInventory(userId, null, null, null, null);
+    return inventoryAggregationService.getMyAggregatedInventory(userId);
   }
 
   /**
@@ -213,7 +174,7 @@ public class InventoryItemService {
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
-    return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
+    return inventoryAggregationService.getMyAggregatedInventory(userId, jobOrderIds, missionIds);
   }
 
   /**
@@ -236,8 +197,8 @@ public class InventoryItemService {
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
-    return getMyAggregatedInventory(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, false);
+    return inventoryAggregationService.getMyAggregatedInventory(
+        userId, materialIds, minQuality, jobOrderIds, missionIds);
   }
 
   /**
@@ -264,24 +225,8 @@ public class InventoryItemService {
           List<UUID> jobOrderIds,
           List<UUID> missionIds,
           boolean personalOnly) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    List<InventoryStackAggregate> stacks =
-        inventoryItemRepository.findUserStacks(
-            user.getId(),
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
-            personalOnly);
-
-    return buildGroupedFromStacks(stacks);
+    return inventoryAggregationService.getMyAggregatedInventory(
+        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly);
   }
 
   /**
@@ -294,7 +239,7 @@ public class InventoryItemService {
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
-    return getAllAggregatedInventory(materialIds, minQuality, null, null);
+    return inventoryAggregationService.getAllAggregatedInventory(materialIds, minQuality);
   }
 
   /**
@@ -313,128 +258,8 @@ public class InventoryItemService {
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    List<InventoryStackAggregate> stacks =
-        inventoryItemRepository.findGlobalStacks(
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds());
-
-    return buildGroupedFromStacks(stacks);
-  }
-
-  /**
-   * Assembles the Material → Stack shape the {@code /grouped} views render from the SQL-computed
-   * per-stack aggregates. Outer grouping is by material; the individual entries are no longer
-   * materialised here — append-only rows grow unboundedly per stack, so a stack's entries are
-   * loaded lazily and paginated on expand (ADR-0003, REQ-INV-002, see {@link #getMyStackEntries} /
-   * {@link #getAllStackEntries}). Each {@link InventoryStackAggregate} row is one display stack.
-   *
-   * @param aggregates the SQL-grouped per-stack rows for the current scope/filter
-   * @return the materials, each carrying its sorted stacks and material-wide totals
-   */
-  private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      buildGroupedFromStacks(List<InventoryStackAggregate> aggregates) {
-    return aggregates.stream()
-        .collect(
-            java.util.stream.Collectors.groupingBy(
-                aggregate -> aggregate.material().getId(),
-                java.util.LinkedHashMap::new,
-                java.util.stream.Collectors.toList()))
-        .values()
-        .stream()
-        .map(this::buildMaterialGroup)
-        .sorted(java.util.Comparator.comparing(g -> g.material().name()))
-        .toList();
-  }
-
-  /**
-   * Builds one material roll-up from its per-stack aggregates: the stacks (sorted quality desc,
-   * location asc, amount desc) plus the material-wide totals (summed amount, amount-weighted mean
-   * quality, max quality) accumulated from the raw {@code SUM(amount)} / {@code SUM(amount *
-   * quality)} the database returned, so the material average stays independent of per-stack
-   * rounding — identical to the previous over-the-entries computation.
-   *
-   * @param matStacks every per-stack aggregate of one material in the current scope; never empty
-   * @return the populated material group with its nested stacks
-   */
-  private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildMaterialGroup(
-      List<InventoryStackAggregate> matStacks) {
-    List<InventoryStackDto> stacks = new java.util.ArrayList<>(matStacks.size());
-    de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto material = null;
-    double totalAmount = 0.0;
-    double weightedQualitySum = 0.0;
-    int maxQuality = 0;
-    for (InventoryStackAggregate aggregate : matStacks) {
-      InventoryItemDto refs = mapAggregateRefs(aggregate);
-      if (material == null) {
-        material = refs.material();
-      }
-      double amt = aggregate.totalAmount() != null ? aggregate.totalAmount() : 0.0;
-      double wqs = aggregate.weightedQualitySum() != null ? aggregate.weightedQualitySum() : 0.0;
-      int mq = aggregate.maxQuality() != null ? aggregate.maxQuality() : 0;
-      double stackAvg = amt > 0 ? Math.round((wqs / amt) * 100.0) / 100.0 : 0.0;
-      stacks.add(
-          new InventoryStackDto(
-              refs.user(),
-              refs.location(),
-              refs.quality(),
-              refs.jobOrderId(),
-              refs.jobOrderDisplayId(),
-              refs.missionId(),
-              refs.missionName(),
-              refs.personal(),
-              refs.owningSquadron(),
-              amt,
-              stackAvg,
-              mq,
-              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0));
-      totalAmount += amt;
-      weightedQualitySum += wqs;
-      if (mq > maxQuality) {
-        maxQuality = mq;
-      }
-    }
-    stacks.sort(STACK_ORDER);
-    double avgQuality =
-        totalAmount > 0 ? Math.round((weightedQualitySum / totalAmount) * 100.0) / 100.0 : 0.0;
-    return new de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto(
-        material, totalAmount, avgQuality, maxQuality, stacks);
-  }
-
-  /**
-   * Projects one stack aggregate's shared identity entities through the inventory-item mapper to
-   * obtain the redaction-safe reference DTOs (user, material, location, owning squadron) and the
-   * flattened job-order / mission ids the stack DTO carries. A transient probe {@link
-   * InventoryItem} is fed to the mapper so PII redaction and the {@code owningOrgUnit ->
-   * owningSquadron} projection behave exactly as they do for a real entry — the probe is never
-   * persisted and only its identity fields are read.
-   *
-   * @param aggregate the per-stack aggregate whose shared identity to project
-   * @return an inventory-item DTO carrying only the mapped reference fields (amount/version/id
-   *     null)
-   */
-  private InventoryItemDto mapAggregateRefs(InventoryStackAggregate aggregate) {
-    InventoryItem probe = new InventoryItem();
-    probe.setUser(aggregate.user());
-    probe.setMaterial(aggregate.material());
-    probe.setLocation(aggregate.location());
-    probe.setQuality(aggregate.quality());
-    probe.setJobOrder(aggregate.jobOrder());
-    probe.setMission(aggregate.mission());
-    probe.setPersonal(aggregate.personal());
-    probe.setOwningOrgUnit(aggregate.owningOrgUnit());
-    return inventoryItemMapper.toDto(probe);
+    return inventoryAggregationService.getAllAggregatedInventory(
+        materialIds, minQuality, jobOrderIds, missionIds);
   }
 
   /**
@@ -466,20 +291,16 @@ public class InventoryItemService {
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    return inventoryItemRepository
-        .findUserStackEntries(
-            user.getId(),
-            materialId,
-            locationId,
-            quality,
-            jobOrderId,
-            missionId,
-            personal != null ? personal : Boolean.FALSE,
-            owningOrgUnitId,
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return inventoryAggregationService.getMyStackEntries(
+        userId,
+        materialId,
+        locationId,
+        quality,
+        jobOrderId,
+        missionId,
+        personal,
+        owningOrgUnitId,
+        pageable);
   }
 
   /**
@@ -508,21 +329,8 @@ public class InventoryItemService {
       UUID missionId,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return inventoryItemRepository
-        .findGlobalStackEntries(
-            materialId,
-            userId,
-            locationId,
-            quality,
-            jobOrderId,
-            missionId,
-            owningOrgUnitId,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return inventoryAggregationService.getAllStackEntries(
+        materialId, userId, locationId, quality, jobOrderId, missionId, owningOrgUnitId, pageable);
   }
 
   /**
@@ -535,7 +343,7 @@ public class InventoryItemService {
    */
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds, Integer minQuality, Pageable pageable) {
-    return getAllInventory(materialIds, minQuality, null, null, pageable);
+    return inventoryAggregationService.getAllInventory(materialIds, minQuality, pageable);
   }
 
   /**
@@ -555,24 +363,8 @@ public class InventoryItemService {
       List<UUID> jobOrderIds,
       List<UUID> missionIds,
       Pageable pageable) {
-    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
-    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
-    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    return inventoryItemRepository
-        .findGlobalByFilters(
-            hasMaterials,
-            hasMaterials ? materialIds : null,
-            minQuality,
-            hasJobOrders,
-            hasJobOrders ? jobOrderIds : null,
-            hasMissions,
-            hasMissions ? missionIds : null,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return inventoryAggregationService.getAllInventory(
+        materialIds, minQuality, jobOrderIds, missionIds, pageable);
   }
 
   /**
@@ -837,22 +629,18 @@ public class InventoryItemService {
   }
 
   /**
-   * Consumes or transfers an inventory item.
+   * Consumes or transfers an inventory item — delegates to {@link
+   * InventoryCheckoutService#bookOutInventoryItem}.
    *
-   * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
-   * then insert a new row for the moved quantity at the target location/owner — inventory is
-   * append-only, so the moved stock is never folded into an existing target stack), SELL (decrement
-   * here, create a finance entry for the participant). When the post-decrement quantity is below
-   * {@link #QUANTITY_EPSILON} the row is removed entirely. Fulfills attached job-order materials
-   * when the amount delivered reaches the required quantity.
+   * <p>The {@code type} discriminator selects CONSUME (just decrement), TRANSFER (append-only move
+   * to the target location/owner) or SELL (decrement plus a mission finance entry). When the
+   * post-decrement quantity is floating-point-zero the row is removed entirely.
    *
-   * <p>Follows the bulk-update-after-loop concurrency pattern: collects every {@code
-   * JobOrderMaterial} id that may be ready for a clearing bulk update in a {@code Set<UUID>},
-   * applies all mutations through dirty-checking inside the loop, then runs the bulk update exactly
-   * once after the loop. Re-fetches the aggregate root for the completion check so {@link
-   * JobOrderService#completeJobOrderWithinTransaction} sees the freshly-incremented
-   * {@code @Version}.
-   *
+   * @param id the source inventory row id
+   * @param dto the book-out payload (type, amount, version, transfer/sell fields)
+   * @param currentUserId the authenticated caller's user id
+   * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
+   * @return the reduced source (or new target) row DTO, or {@code null} when the row is depleted
    * @throws NotFoundException when the item is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
    *     amount exceeds the available quantity
@@ -860,280 +648,13 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
-    InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
-
-    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
-
-    if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
-      throw new AccessDeniedException("You are not allowed to book out this inventory item");
-    }
-
-    if (dto.amount() > item.getAmount()) {
-      throw new BadRequestException("Cannot book out more than the available amount");
-    }
-
-    CheckoutType checkoutType = dto.type();
-    if (checkoutType == null) {
-      checkoutType =
-          (dto.targetUserId() != null || dto.targetLocationId() != null)
-              ? CheckoutType.TRANSFER
-              : CheckoutType.DISCARD;
-    }
-
-    if (checkoutType == CheckoutType.SELL) {
-      if (dto.terminal() == null || dto.terminal().isBlank()) {
-        throw new BadRequestException("Terminal is required for selling");
-      }
-      if (dto.sellAmount() == null || dto.sellAmount().compareTo(java.math.BigDecimal.ZERO) < 0) {
-        throw new BadRequestException("Sell amount is required and must be positive");
-      }
-    }
-
-    double remainingAmount = roundAmount(item.getAmount() - dto.amount());
-
-    // Snapshot the source row's scalar identity BEFORE any decrement/delete so the audit row stays
-    // accurate even when the source is depleted to zero and removed (bulk-clear landmine rules).
-    final UUID sourceId = item.getId();
-    final String sourceLabel = inventoryLabel(item);
-    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
-    final UUID sourceOwnerId = item.getUser().getId();
-    final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
-    UUID financeEntryId = null;
-
-    if (checkoutType == CheckoutType.TRANSFER
-        && (dto.targetUserId() != null || dto.targetLocationId() != null)) {
-      return bookOutTransfer(
-          item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
-    } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
-      financeEntryId = createSaleFinanceEntry(item, dto, currentUserId);
-    }
-
-    if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
-      inventoryItemRepository.delete(item);
-      recordBookOutTail(
-          checkoutType,
-          sourceId,
-          sourceLabel,
-          materialName,
-          sourceOwnerId,
-          dto,
-          0.0,
-          financeEntryId);
-      return null;
-    } else {
-      item.setAmount(remainingAmount);
-      // saveAndFlush so a partial book-out's response carries the fresh @Version (see
-      // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
-      InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-      recordBookOutTail(
-          checkoutType,
-          sourceId,
-          sourceLabel,
-          materialName,
-          sourceOwnerId,
-          dto,
-          remainingAmount,
-          financeEntryId);
-      return inventoryItemMapper.toDto(saved);
-    }
-  }
-
-  /**
-   * Applies the {@code TRANSFER} book-out branch: an append-only move of {@code dto.amount()} to
-   * the resolved target user / location / owning-org-unit pool (a new row is inserted, never folded
-   * into an existing target stack), decrementing the source row (deleting it when it depletes below
-   * {@link #QUANTITY_EPSILON}), and records the transfer audit event.
-   *
-   * @param item the managed source row
-   * @param dto the book-out request (target user/location/org-unit + amount)
-   * @param remainingAmount the source's post-decrement amount (already rounded)
-   * @param sourceId the source row id snapshot
-   * @param sourceLabel the source row's {@code material @ location} label snapshot
-   * @param materialName the material name snapshot
-   * @param depleted whether the source row depletes to zero (audit detail)
-   * @return the DTO of the newly created target row
-   * @throws NotFoundException when the target user or location is unknown
-   * @throws BadRequestException when the transfer changes neither user nor location
-   */
-  private InventoryItemDto bookOutTransfer(
-      InventoryItem item,
-      InventoryItemBookOutDto dto,
-      double remainingAmount,
-      UUID sourceId,
-      String sourceLabel,
-      String materialName,
-      boolean depleted) {
-    User targetUser = item.getUser();
-    if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
-      targetUser =
-          userRepository
-              .findById(dto.targetUserId())
-              .orElseThrow(() -> new NotFoundException("Target user not found"));
-    }
-
-    Location targetLocation = item.getLocation();
-    if (dto.targetLocationId() != null
-        && !dto.targetLocationId().equals(item.getLocation().getId())) {
-      targetLocation =
-          locationRepository
-              .findById(dto.targetLocationId())
-              .orElseThrow(() -> new NotFoundException("Target location not found"));
-    }
-
-    if (targetUser.getId().equals(item.getUser().getId())
-        && targetLocation.getId().equals(item.getLocation().getId())) {
-      throw new BadRequestException("Transfer must change either the user or the location");
-    }
-
-    // Resolve the target stack's owning org-unit pool up front — the eighth identity dimension —
-    // so the freshly created target row is stamped with that pool.
-    final OrgUnit targetOwningOrgUnit =
-        ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-            targetUser, dto.targetOwningOrgUnitId());
-
-    // Append-only: a transfer always inserts its own row at the target and is never folded into
-    // an existing identical stack there. The view collapses rows that share a stack identity for
-    // display (group-on-read), so no duplicate is visible and no read-add-write race exists.
-    InventoryItem newItem = new InventoryItem();
-    newItem.setUser(targetUser);
-    newItem.setOwningOrgUnit(targetOwningOrgUnit);
-    newItem.setMaterial(item.getMaterial());
-    newItem.setLocation(targetLocation);
-    newItem.setQuality(item.getQuality());
-    newItem.setAmount(roundAmount(dto.amount()));
-    newItem.setPersonal(item.getPersonal());
-    newItem.setJobOrder(item.getJobOrder());
-    newItem.setMission(item.getMission());
-    InventoryItem savedNew = inventoryItemRepository.save(newItem);
-    if (remainingAmount <= QUANTITY_EPSILON) {
-      inventoryItemRepository.delete(item);
-    } else {
-      item.setAmount(remainingAmount);
-      // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
-      // the returned DTO is the new target row, but flushing keeps the source row's @Version
-      // current within the transaction so any future in-place consumer of a transfer cannot 409.
-      inventoryItemRepository.saveAndFlush(item);
-    }
-    auditService.record(
-        AuditEventType.INVENTORY_ITEM_TRANSFERRED,
-        sourceId,
-        sourceLabel,
-        targetUser.getId(),
-        AuditDetails.of("material", materialName)
-            .with("amount", dto.amount())
-            .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
-            .with("newRow", newItem.getId())
-            .with("depleted", depleted));
-    return inventoryItemMapper.toDto(savedNew);
-  }
-
-  /**
-   * Creates the {@link MissionFinanceEntry} for a {@code SELL} book-out of a mission-linked row:
-   * the caller must be a participant of the item's mission, and the sale is recorded as squadron
-   * {@code INCOME} of {@code dto.sellAmount()}. The DISCARD/SELL consume tail then decrements the
-   * source row as usual.
-   *
-   * @param item the managed source row (mission-linked)
-   * @param dto the book-out request (read for sell amount, terminal, amount)
-   * @param currentUserId the selling participant's user id
-   * @return the created finance-entry id (read off the managed entity, so a unit-test mock's null
-   *     {@code save()} return does not matter)
-   * @throws BadRequestException when the caller is not a participant of the item's mission
-   */
-  private UUID createSaleFinanceEntry(
-      InventoryItem item, InventoryItemBookOutDto dto, UUID currentUserId) {
-    MissionParticipant participant =
-        missionParticipantRepository
-            .findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "You must be a participant of the mission to sell its items"));
-
-    MissionFinanceEntry entry = new MissionFinanceEntry();
-    entry.setMission(item.getMission());
-    entry.setParticipant(participant);
-    entry.setType(FinanceType.INCOME);
-    entry.setAmount(dto.sellAmount());
-    entry.setNote(
-        "Sale of " + dto.amount() + "x " + item.getMaterial().getName() + " at " + dto.terminal());
-    missionFinanceEntryRepository.save(entry);
-    // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
-    // the save() return value, which a unit-test mock leaves null.
-    return entry.getId();
-  }
-
-  /**
-   * Records the audit event for the consume/sell tail of {@link #bookOutInventoryItem} (the
-   * transfer branch records its own event). SELL events carry the
-   * terminal/sell-amount/finance-entry; DISCARD events carry the consumed/remaining amounts.
-   *
-   * @param type the resolved checkout type (never {@code TRANSFER} here)
-   * @param sourceId the source row id (snapshotted before a possible delete)
-   * @param sourceLabel the source row's {@code material @ location} label snapshot
-   * @param materialName the material name snapshot
-   * @param ownerId the source row owner's id
-   * @param dto the book-out request (read for terminal/sell amount)
-   * @param remaining the post-decrement amount (0 when the row was depleted)
-   * @param financeEntryId the created finance entry id for a SELL with a mission, or {@code null}
-   */
-  private void recordBookOutTail(
-      CheckoutType type,
-      UUID sourceId,
-      String sourceLabel,
-      String materialName,
-      UUID ownerId,
-      InventoryItemBookOutDto dto,
-      double remaining,
-      UUID financeEntryId) {
-    boolean rowDepleted = remaining <= QUANTITY_EPSILON;
-    if (type == CheckoutType.SELL) {
-      auditService.record(
-          AuditEventType.INVENTORY_ITEM_SOLD,
-          sourceId,
-          sourceLabel,
-          ownerId,
-          AuditDetails.of("material", materialName)
-              .with("amount", dto.amount())
-              .with("terminal", dto.terminal())
-              .with("sellAmount", dto.sellAmount())
-              .with("financeEntry", financeEntryId != null ? financeEntryId : "-")
-              .with("depleted", rowDepleted));
-    } else {
-      auditService.record(
-          AuditEventType.INVENTORY_ITEM_CONSUMED,
-          sourceId,
-          sourceLabel,
-          ownerId,
-          AuditDetails.of("type", type)
-              .with("material", materialName)
-              .with("amount", dto.amount())
-              .with("remaining", remaining)
-              .with("depleted", rowDepleted));
-    }
+    return inventoryCheckoutService.bookOutInventoryItem(id, dto, currentUserId, isAdmin);
   }
 
   /**
    * Rebooks (Umbuchung) part or all of an inventory row between the owner's personal pool and the
-   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007).
-   *
-   * <p>The direction is derived from the source row's current {@code personal} flag, never from the
-   * caller: a {@code personal = true} source is <em>de-personalized</em> (the moved quantity
-   * becomes shared squadron stock stamped on {@code dto.targetOwningOrgUnitId()}'s pool); a {@code
-   * personal = false} source is <em>personalized</em> (the moved quantity becomes the owner's
-   * private stock, carrying the source row's existing org-unit stamp over). Either way this is an
-   * append-only split mirroring the book-out {@code TRANSFER} branch: the moved {@code amount} is
-   * decremented off the source (the source row is deleted when it depletes below {@link
-   * #QUANTITY_EPSILON}) and inserted as its own new row with the opposite {@code personal} flag —
-   * never folded into an existing stack (REQ-INV-001).
-   *
-   * <p>The personalize direction refuses a source row bound to a job order or mission: a {@code
-   * personal = true} row may never carry either association (the invariant {@link
-   * #createInventoryItem} and {@link #updateInventoryItem} also enforce), and silently dropping the
-   * link would lose the assignment.
+   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007) — delegates to
+   * {@link InventoryCheckoutService#rebookPersonal}.
    *
    * @param id the source inventory row id
    * @param dto the rebooking payload (amount, version, target org-unit pool)
@@ -1147,224 +668,49 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto rebookPersonal(
       UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
-    InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
-
-    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
-
-    if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
-      throw new AccessDeniedException("You are not allowed to rebook this inventory item");
-    }
-
-    if (dto.amount() == null || dto.amount() <= 0) {
-      throw new BadRequestException("Rebooked amount must be positive");
-    }
-    if (dto.amount() > item.getAmount()) {
-      throw new BadRequestException("Cannot rebook more than the available amount");
-    }
-
-    final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
-    final boolean targetPersonal = !sourcePersonal;
-
-    // Personalize (shared -> personal): a personal row may never carry a job order or mission, so
-    // refuse an assigned source rather than silently dropping the link.
-    if (targetPersonal && (item.getJobOrder() != null || item.getMission() != null)) {
-      throw new BadRequestException(
-          "Stock assigned to a job order or mission cannot be marked personal");
-    }
-
-    // De-personalize stamps the new shared row on the picked org-unit pool (validated against the
-    // owner's memberships); personalize carries the source row's existing stamp over to the private
-    // row (personal visibility is owner-scoped regardless of the stamp).
-    final OrgUnit targetOwningOrgUnit =
-        targetPersonal
-            ? item.getOwningOrgUnit()
-            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
-                item.getUser(), dto.targetOwningOrgUnitId());
-
-    final double remainingAmount = roundAmount(item.getAmount() - dto.amount());
-    final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
-
-    // Snapshot the source row's scalar identity before any decrement/delete so the audit row stays
-    // accurate even when the source is depleted to zero and removed.
-    final UUID sourceId = item.getId();
-    final String sourceLabel = inventoryLabel(item);
-    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
-    final UUID ownerId = item.getUser().getId();
-
-    // Append-only: insert a new row for the moved quantity with the flipped personal flag; the
-    // grouped view collapses rows that share a stack identity for display (group-on-read), so no
-    // duplicate is visible and no read-add-write race exists. A personal target never carries a job
-    // order / mission association.
-    InventoryItem newItem = new InventoryItem();
-    newItem.setUser(item.getUser());
-    newItem.setOwningOrgUnit(targetOwningOrgUnit);
-    newItem.setMaterial(item.getMaterial());
-    newItem.setLocation(item.getLocation());
-    newItem.setQuality(item.getQuality());
-    newItem.setAmount(roundAmount(dto.amount()));
-    newItem.setPersonal(targetPersonal);
-    newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
-    newItem.setMission(targetPersonal ? null : item.getMission());
-    InventoryItem savedNew = inventoryItemRepository.save(newItem);
-
-    if (depleted) {
-      inventoryItemRepository.delete(item);
-    } else {
-      item.setAmount(remainingAmount);
-      // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
-      // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
-      inventoryItemRepository.saveAndFlush(item);
-    }
-
-    auditService.record(
-        targetPersonal
-            ? AuditEventType.INVENTORY_ITEM_PERSONALIZED
-            : AuditEventType.INVENTORY_ITEM_DEPERSONALIZED,
-        sourceId,
-        sourceLabel,
-        ownerId,
-        AuditDetails.of("material", materialName)
-            .with("amount", dto.amount())
-            .with("newRow", newItem.getId())
-            .with("targetOrgUnit", targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
-            .with("depleted", depleted));
-
-    return inventoryItemMapper.toDto(savedNew);
+    return inventoryCheckoutService.rebookPersonal(id, dto, currentUserId, isAdmin);
   }
 
   /**
    * Removes every non-personal inventory item from the database — the admin "globales Lager leeren"
-   * action. Personal entries ({@code personal = true}) are kept on purpose: they belong to
-   * individual users and live outside the squadron's shared stock.
-   *
-   * <p>Implemented as a single bulk {@code DELETE} via {@link
-   * InventoryItemRepository#deleteAllNonPersonal()}. The previously load-bearing FK {@code
-   * job_order_handover_item.inventory_item_id} was dropped in migration {@code V64} (handover rows
-   * snapshot the material data directly), so no pre-cleanup of dependent rows is needed and no
-   * {@code @Modifying(clearAutomatically = true)} loop is required — the operation is a one-shot
-   * bulk statement that does not collide with any sibling-aggregate {@code @Version}.
+   * action. Personal entries are kept on purpose. Delegates to {@link
+   * InventoryCheckoutService#deleteAllGlobalInventory}.
    *
    * @return number of inventory rows deleted (0 if the global inventory was already empty)
    */
   @Transactional
   public int deleteAllGlobalInventory() {
-    ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    log.info(
-        "Bulk delete of global inventory requested (adminAll={}, active={}, members={})",
-        scope.adminAllScope(),
-        scope.activeOrgUnitId(),
-        scope.memberOrgUnitIds().size());
-    int removed =
-        inventoryItemRepository.deleteAllNonPersonal(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
-    log.info(
-        "Bulk delete of global inventory completed: {} item(s) removed (adminAll={}, active={})",
-        removed,
-        scope.adminAllScope(),
-        scope.activeOrgUnitId());
-    auditService.record(
-        AuditEventType.INVENTORY_WIPED,
-        null,
-        null,
-        null,
-        AuditDetails.of(
-                "scope", scope.adminAllScope() ? "adminAll" : "active=" + scope.activeOrgUnitId())
-            .with("removed", removed));
-    return removed;
+    return inventoryCheckoutService.deleteAllGlobalInventory();
   }
 
   /**
    * Bulk-checkout: removes all inventory items with the given IDs that belong to the authenticated
-   * user. Associations to JobOrders and Missions are cleared on the managed entities inside the
-   * loop (no @Modifying bulk-update inside the loop). The actual deleteAllById call happens after
-   * the loop, in one batch.
+   * user. Delegates to {@link InventoryCheckoutService#bulkCheckout}.
    *
    * @param request the bulk checkout request containing item IDs
    * @param currentUserId the UUID of the authenticated user (JWT sub)
    */
   @Transactional
   public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
-    log.info(
-        "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
-
-    List<UUID> toDelete = new ArrayList<>();
-
-    for (UUID itemId : request.itemIds()) {
-      InventoryItem item =
-          inventoryItemRepository
-              .findByIdForUpdate(itemId)
-              .orElseThrow(() -> new NotFoundException("Inventory item not found: " + itemId));
-
-      if (!item.getUser().getId().equals(currentUserId)) {
-        log.warn(
-            "User {} attempted to bulk-checkout item {} owned by {}",
-            currentUserId,
-            itemId,
-            item.getUser().getId());
-        throw new AccessDeniedException(
-            "You are not allowed to check out inventory item: " + itemId);
-      }
-
-      // Clear associations on the managed entity – no @Modifying query inside the loop
-      item.setJobOrder(null);
-      item.setMission(null);
-
-      toDelete.add(itemId);
-    }
-
-    // Flush association changes, then delete all in one batch
-    inventoryItemRepository.flush();
-    inventoryItemRepository.deleteAllById(toDelete);
-    log.info(
-        "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
-    auditService.record(
-        AuditEventType.INVENTORY_BULK_CHECKED_OUT,
-        null,
-        null,
-        currentUserId,
-        AuditDetails.of("count", toDelete.size()));
+    inventoryCheckoutService.bulkCheckout(request, currentUserId);
   }
 
   /**
    * Returns all inventory items linked to the given job order, sorted server-side by owner name,
-   * location, material name, quality (desc), quantity (desc).
+   * location, material name, quality (desc), quantity (desc). Delegates to {@link
+   * InventoryAggregationService#getMaterialCollection}.
    *
    * @param jobOrderId the UUID of the job order
    * @return sorted list of {@link MaterialCollectionEntryDto}
    * @throws NotFoundException when the job order is unknown
    */
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
-    jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("Job order not found"));
-    return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
-        .map(
-            item -> {
-              String ownerName =
-                  item.getUser().getDisplayName() != null
-                      ? item.getUser().getDisplayName()
-                      : item.getUser().getUsername();
-              return new MaterialCollectionEntryDto(
-                  item.getId(),
-                  item.getVersion() != null ? item.getVersion() : 0L,
-                  ownerName,
-                  item.getUser().getId(),
-                  item.getLocation().getName(),
-                  item.getLocation().getId(),
-                  item.getMaterial().getName(),
-                  item.getQuality() != null ? item.getQuality().doubleValue() : null,
-                  item.getAmount(),
-                  Boolean.TRUE.equals(item.getDelivered()));
-            })
-        .toList();
+    return inventoryAggregationService.getMaterialCollection(jobOrderId);
   }
 
   /**
-   * Updates the delivered status of an inventory item. Applies optimistic locking via the version
-   * field.
+   * Updates the delivered status of an inventory item. Delegates to {@link
+   * InventoryCheckoutService#updateDelivered}.
    *
    * @param id the UUID of the inventory item
    * @param request the update request containing delivered flag and version
@@ -1376,29 +722,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
-    InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
-
-    if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
-      throw new AccessDeniedException("You are not allowed to update this inventory item");
-    }
-
-    OptimisticLock.check(item.getVersion(), request.version(), InventoryItem.class, id);
-
-    item.setDelivered(request.delivered());
-    // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
-    // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
-    // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
-    InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
-        AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
-        item.getId(),
-        inventoryLabel(item),
-        item.getUser().getId(),
-        AuditDetails.of("delivered", request.delivered()).with("jobOrder", jobOrderRef(saved)));
-    return inventoryItemMapper.toDto(saved);
+    return inventoryCheckoutService.updateDelivered(id, request, currentUserId, isLogistician);
   }
 
   /**
@@ -1432,19 +756,4 @@ public class InventoryItemService {
         .setScale(3, java.math.RoundingMode.HALF_UP)
         .doubleValue();
   }
-
-  /**
-   * Display order of the stacks within a material: highest quality first, then location name
-   * ascending, then largest total amount first — mirrors the previous per-row ordering.
-   */
-  private static final java.util.Comparator<InventoryStackDto> STACK_ORDER =
-      java.util.Comparator.<InventoryStackDto, Integer>comparing(
-              s -> s.quality() != null ? s.quality() : 0)
-          .reversed()
-          .thenComparing(
-              s -> s.location() != null && s.location().name() != null ? s.location().name() : "")
-          .thenComparing(
-              java.util.Comparator.<InventoryStackDto, Double>comparing(
-                      s -> s.totalAmount() != null ? s.totalAmount() : 0.0)
-                  .reversed());
 }

@@ -93,7 +93,7 @@ class InventoryItemServiceBookOutTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
-  @InjectMocks private InventoryItemService service;
+  @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
