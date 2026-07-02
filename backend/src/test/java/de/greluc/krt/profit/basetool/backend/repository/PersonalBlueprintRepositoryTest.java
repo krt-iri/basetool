@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.List;
@@ -49,7 +50,10 @@ class PersonalBlueprintRepositoryTest {
   private static final String OWNER_B = "22222222-2222-2222-2222-222222222222";
   private static final String OWNER_C = "33333333-3333-3333-3333-333333333333";
 
+  private static final String DEFAULT_KEY = "test-default-blueprint";
+
   @Autowired private PersonalBlueprintRepository repository;
+  @Autowired private DefaultBlueprintRepository defaultBlueprintRepository;
 
   @BeforeEach
   void clean() {
@@ -103,11 +107,60 @@ class PersonalBlueprintRepositoryTest {
     assertEquals(Set.of(OWNER_A, OWNER_B), owners);
   }
 
+  @Test
+  void deleteRemovableByOwnerSub_removesOwnersRemovableRowsButKeepsDefaultsAndOtherOwners() {
+    defaultBlueprintRepository.save(defaultBp(DEFAULT_KEY, "Test Default"));
+    repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
+    repository.save(bp(OWNER_A, "test-removable-2", "Removable Two"));
+    repository.save(bp(OWNER_A, DEFAULT_KEY, "Test Default")); // granted default — must survive
+    repository.save(bp(OWNER_B, "test-removable-1", "Removable One")); // other owner — untouched
+
+    int removed = repository.deleteRemovableByOwnerSub(OWNER_A);
+
+    assertEquals(2, removed);
+    List<PersonalBlueprint> ownerA = repository.findAllByOwnerSubIn(Set.of(OWNER_A));
+    assertEquals(1, ownerA.size());
+    assertEquals(DEFAULT_KEY, ownerA.get(0).getProductKey());
+    assertEquals(1, repository.findAllByOwnerSubIn(Set.of(OWNER_B)).size());
+  }
+
+  @Test
+  void deleteRemovableByOwnerSub_removesAllWhenOwnerHoldsNoDefaults() {
+    repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
+    repository.save(bp(OWNER_A, "test-removable-2", "Removable Two"));
+
+    int removed = repository.deleteRemovableByOwnerSub(OWNER_A);
+
+    assertEquals(2, removed);
+    assertTrue(repository.findAllByOwnerSubIn(Set.of(OWNER_A)).isEmpty());
+  }
+
+  @Test
+  void deleteAllRemovable_removesEveryOwnersRemovableRowsButKeepsDefaults() {
+    defaultBlueprintRepository.save(defaultBp(DEFAULT_KEY, "Test Default"));
+    repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
+    repository.save(bp(OWNER_A, DEFAULT_KEY, "Test Default"));
+    repository.save(bp(OWNER_B, "test-removable-2", "Removable Two"));
+    repository.save(bp(OWNER_B, DEFAULT_KEY, "Test Default"));
+
+    int removed = repository.deleteAllRemovable();
+
+    assertEquals(2, removed);
+    List<PersonalBlueprint> remaining =
+        repository.findAllByOwnerSubIn(Set.of(OWNER_A, OWNER_B, OWNER_C));
+    assertEquals(2, remaining.size());
+    assertTrue(remaining.stream().allMatch(r -> DEFAULT_KEY.equals(r.getProductKey())));
+  }
+
   private static PersonalBlueprint bp(String ownerSub, String productKey, String productName) {
     return PersonalBlueprint.builder()
         .ownerSub(ownerSub)
         .productKey(productKey)
         .productName(productName)
         .build();
+  }
+
+  private static DefaultBlueprint defaultBp(String productKey, String productName) {
+    return DefaultBlueprint.builder().productKey(productKey).productName(productName).build();
   }
 }
