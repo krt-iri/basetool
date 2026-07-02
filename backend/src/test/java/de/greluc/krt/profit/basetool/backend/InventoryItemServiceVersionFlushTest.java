@@ -42,14 +42,18 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
@@ -78,7 +82,30 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private MaterialMapper materialMapper;
 
   @Mock private AuditService auditService;
+  @Mock private OwnerScopeService ownerScopeService;
   @InjectMocks private InventoryItemService inventoryItemService;
+
+  private InventoryCheckoutService realCheckoutService;
+
+  @BeforeEach
+  void wireCheckoutDelegate() {
+    // The facade delegates the book-out flow to InventoryCheckoutService; Mockito does not inject
+    // one @InjectMocks target into another, so build the real sub-service from the same mocks and
+    // set it on the facade. updateInventoryItem / updateNote stay on the facade and use the mocks
+    // directly.
+    realCheckoutService =
+        new InventoryCheckoutService(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            missionFinanceEntryRepository,
+            missionParticipantRepository,
+            inventoryItemMapper,
+            ownerScopeService,
+            auditService);
+    ReflectionTestUtils.setField(
+        inventoryItemService, "inventoryCheckoutService", realCheckoutService);
+  }
 
   private User userWithId(UUID id) {
     User u = new User();
