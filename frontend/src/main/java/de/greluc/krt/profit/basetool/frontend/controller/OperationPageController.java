@@ -423,7 +423,13 @@ public class OperationPageController {
    */
   @PostMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('MISSION_MANAGER') and (#request.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
+      "hasRole('"
+          + Roles.MISSION_MANAGER
+          + "') and (#request.paidOut() or hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "'))")
   @ResponseBody
   public ResponseEntity<OperationPayoutDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {

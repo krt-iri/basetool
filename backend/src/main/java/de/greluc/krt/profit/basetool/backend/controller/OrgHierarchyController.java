@@ -197,8 +197,10 @@ public class OrgHierarchyController {
    */
   @PostMapping("/bereiche/{id}/members")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canAppointBereichRole(#id,"
-          + " #request.role(), authentication)")
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canAppointBereichRole(#id, #request.role(),"
+          + " authentication)")
   @Operation(
       summary = "Add a Bereichsleitung member",
       description =
@@ -219,7 +221,9 @@ public class OrgHierarchyController {
    */
   @DeleteMapping("/bereiche/{id}/members/{userId}")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canRemoveBereichRole(#id, #userId,"
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canRemoveBereichRole(#id, #userId,"
           + " authentication)")
   @Operation(
       summary = "Remove a Bereichsleitung member",

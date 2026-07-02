@@ -125,8 +125,13 @@ public class JobOrderController {
       summary = "Create a job order handover",
       description = "Logs a handover of materials for this job order.")
   @PreAuthorize(
-      "(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN'))"
-          + " and @ownerScopeService.canEditJobOrder(#id)")
+      "(hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')) and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
@@ -147,8 +152,13 @@ public class JobOrderController {
       summary = "Create an item handover",
       description = "Logs a handover of produced items for this item order.")
   @PreAuthorize(
-      "(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN'))"
-          + " and @ownerScopeService.canEditJobOrder(#id)")
+      "(hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')) and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
@@ -180,8 +190,13 @@ public class JobOrderController {
         description = "Job order or item handover not found")
   })
   @PreAuthorize(
-      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
-          + " and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+      "hasAnyRole('"
+          + Roles.LOGISTICIAN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.ADMIN
+          + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> downloadItemHandoverReport(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID handoverId,
@@ -230,8 +245,13 @@ public class JobOrderController {
         description = "Job order or handover not found")
   })
   @PreAuthorize(
-      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
-          + " and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+      "hasAnyRole('"
+          + Roles.LOGISTICIAN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.ADMIN
+          + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> downloadHandoverReport(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID handoverId,
@@ -277,8 +297,13 @@ public class JobOrderController {
         description = "Forbidden")
   })
   @PreAuthorize(
-      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
-          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+      "hasAnyRole('"
+          + Roles.LOGISTICIAN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.ADMIN
+          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> previewHandoverReport(
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
@@ -819,8 +844,13 @@ public class JobOrderController {
         description = "Job order or material not found")
   })
   @PreAuthorize(
-      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
-          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+      "hasAnyRole('"
+          + Roles.LOGISTICIAN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.ADMIN
+          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
@@ -851,8 +881,13 @@ public class JobOrderController {
         description = "Job order or inventory item not found")
   })
   @PreAuthorize(
-      "hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')"
-          + " and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+      "hasAnyRole('"
+          + Roles.LOGISTICIAN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.ADMIN
+          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
   public void unlinkInventoryItem(
       @PathVariable UUID jobOrderId, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);

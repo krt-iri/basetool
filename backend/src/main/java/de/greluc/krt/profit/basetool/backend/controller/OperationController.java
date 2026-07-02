@@ -328,8 +328,13 @@ public class OperationController {
   // expression encodes both halves in one gate.
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
-      "hasRole('MISSION_MANAGER') and @ownerScopeService.canEditOperation(#id) "
-          + "and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER'))")
+      "hasRole('"
+          + Roles.MISSION_MANAGER
+          + "') and @ownerScopeService.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "'))")
   @Operation(
       summary = "Toggle the per-participant paid-out flag for an operation",
       description =

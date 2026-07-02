@@ -133,7 +133,7 @@ public class PromotionTopicService {
    * @throws BadRequestException when the caller has no active squadron context
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     // REQ-ORG-017 "pin, else choose": an officer who belongs to two Staffeln must pin the target
@@ -184,7 +184,7 @@ public class PromotionTopicService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -208,7 +208,7 @@ public class PromotionTopicService {
    * @throws AccessDeniedException if the caller's squadron does not match
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);

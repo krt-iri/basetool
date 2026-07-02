@@ -350,7 +350,9 @@ public class RefineryOrderController {
    */
   @PostMapping("/users/{userId}")
   @PreAuthorize(
-      "hasRole('LOGISTICIAN') and @ownerScopeService.canManageUserRefineryOrders(#userId)")
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') and @ownerScopeService.canManageUserRefineryOrders(#userId)")
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     RefineryOrder saved =

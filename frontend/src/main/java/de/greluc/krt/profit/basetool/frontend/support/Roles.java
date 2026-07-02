@@ -89,4 +89,11 @@ public final class Roles {
           authority(MISSION_MANAGER),
           authority(LOGISTICIAN),
           authority(KRT_MEMBER));
+
+  /**
+   * Pre-built {@code @PreAuthorize} SpEL expression for the "admin or officer" gate repeated
+   * verbatim across the promotion proxy/page controllers. A compile-time constant per JLS
+   * 4.12.4/15.28, so {@code @PreAuthorize(Roles.ADMIN_OR_OFFICER)} is a legal annotation value.
+   */
+  public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
 }

@@ -122,7 +122,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if the referenced category does not exist
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
@@ -160,7 +160,7 @@ public class PromotionLevelContentService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -199,7 +199,7 @@ public class PromotionLevelContentService {
    * @throws EntityNotFoundException if no level content exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);

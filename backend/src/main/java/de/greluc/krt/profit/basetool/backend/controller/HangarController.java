@@ -353,7 +353,7 @@ public class HangarController {
 
   /** Bulk reset of the {@code fitted} flag on every ship in the squadron. ADMIN/OFFICER-only. */
   @PostMapping("/ships/reset-fitted")
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void resetAllFittedStatus() {
     hangarService.resetAllFittedStatus();
   }

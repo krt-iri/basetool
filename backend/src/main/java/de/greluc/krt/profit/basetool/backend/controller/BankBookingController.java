@@ -86,8 +86,9 @@ public class BankBookingController {
   @Operation(summary = "Book a deposit")
   @PostMapping("/deposits")
   @PreAuthorize(
-      "hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#request.accountId,"
-          + " authentication)")
+      "hasRole('"
+          + Roles.BANK_EMPLOYEE
+          + "') and @bankSecurityService.canDeposit(#request.accountId, authentication)")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto bookDeposit(@RequestBody @Valid BankDepositRequest request) {
@@ -104,8 +105,9 @@ public class BankBookingController {
   @Operation(summary = "Book a withdrawal")
   @PostMapping("/withdrawals")
   @PreAuthorize(
-      "hasRole('BANK_EMPLOYEE') and @bankSecurityService.canWithdraw(#request.accountId,"
-          + " authentication)")
+      "hasRole('"
+          + Roles.BANK_EMPLOYEE
+          + "') and @bankSecurityService.canWithdraw(#request.accountId, authentication)")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto bookWithdrawal(@RequestBody @Valid BankWithdrawalRequest request) {
@@ -124,8 +126,9 @@ public class BankBookingController {
   @Operation(summary = "Book an account-to-account transfer")
   @PostMapping("/transfers")
   @PreAuthorize(
-      "hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId,"
-          + " authentication)")
+      "hasRole('"
+          + Roles.BANK_EMPLOYEE
+          + "') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication)")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto bookTransfer(

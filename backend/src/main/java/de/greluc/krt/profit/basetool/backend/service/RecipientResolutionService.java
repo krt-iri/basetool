@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -46,7 +47,7 @@ import org.springframework.stereotype.Service;
 public class RecipientResolutionService {
 
   /** Stable code of the global Officer role in {@code role.code}. */
-  static final String ROLE_OFFICER = "OFFICER";
+  static final String ROLE_OFFICER = Roles.OFFICER;
 
   private final UserRepository userRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;

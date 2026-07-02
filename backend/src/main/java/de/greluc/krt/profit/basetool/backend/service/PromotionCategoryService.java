@@ -143,7 +143,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if the referenced topic does not exist
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic topic =
@@ -180,7 +180,7 @@ public class PromotionCategoryService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse update(
       @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -216,7 +216,7 @@ public class PromotionCategoryService {
    * @throws EntityNotFoundException if no category exists for that id
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);

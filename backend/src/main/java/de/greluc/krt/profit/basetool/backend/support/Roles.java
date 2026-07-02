@@ -78,4 +78,13 @@ public final class Roles {
   public static String authority(String code) {
     return ROLE_PREFIX + code;
   }
+
+  /**
+   * Pre-built {@code @PreAuthorize} SpEL expression for the "admin or officer" gate repeated
+   * verbatim across the promotion/rank/evaluation surface (member evaluations, promotion
+   * categories/topics/level content/eligibility, rank requirements, hangar admin). A compile-time
+   * constant per JLS 4.12.4/15.28, so {@code @PreAuthorize(Roles.ADMIN_OR_OFFICER)} is a legal
+   * annotation value — collapses ~24 identical splices into one referenced literal.
+   */
+  public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
 }

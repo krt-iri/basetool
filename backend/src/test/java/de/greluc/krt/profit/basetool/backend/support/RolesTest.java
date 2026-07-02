@@ -46,4 +46,9 @@ class RolesTest {
     assertEquals("ROLE_ADMIN", Roles.authority(Roles.ADMIN));
     assertEquals("ROLE_BANK_MANAGEMENT", Roles.authority(Roles.BANK_MANAGEMENT));
   }
+
+  @Test
+  void adminOrOfficerIsTheExpectedSpelExpression() {
+    assertEquals("hasAnyRole('ADMIN','OFFICER')", Roles.ADMIN_OR_OFFICER);
+  }
 }

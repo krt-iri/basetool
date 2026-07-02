@@ -102,7 +102,7 @@ public class MemberEvaluationService {
   }
 
   /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
@@ -117,7 +117,7 @@ public class MemberEvaluationService {
    * the category's owning squadron.
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public MemberEvaluationResponse upsert(
       @NotNull String userId,
       @NotNull UUID categoryId,
@@ -162,7 +162,7 @@ public class MemberEvaluationService {
 
   /** Deletes an evaluation entry (removes the assigned level). */
   @Transactional
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =

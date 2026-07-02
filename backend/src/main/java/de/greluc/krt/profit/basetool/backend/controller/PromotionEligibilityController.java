@@ -107,7 +107,7 @@ public class PromotionEligibilityController {
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/user/{userId}")
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   @Operation(summary = "Evaluate eligibility for another member (ADMIN/OFFICER only).")
   @ApiResponses({
     @ApiResponse(

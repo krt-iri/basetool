@@ -87,6 +87,24 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   new Thymeleaf expression-utility object or model binding was needed — see
   [ADR-0059](../adr/0059-thymeleaf-sec-authorize-role-constants-via-spel-type-operator.md) for the
   full rationale and the rejected bound-expression-object alternative.
+- **Missed mixed-clause `@PreAuthorize` expressions closed (code-review follow-up).** The initial
+  266-site sweep's mechanical splice reliably handled a `@PreAuthorize` body that was *only* a role
+  check, but was inconsistent on a mixed expression combining a role with a bean-method call —
+  exactly the `hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)`
+  shape this same section cites as in scope. A review pass found the raw-literal form still present
+  in `BankBookingController` (deposit/withdraw/transfer), `JobOrderController` (7 handover/report/
+  unlink endpoints), the org-role delegation cluster (`KommandoGroupController`,
+  `OrgHierarchyController`, `SquadronRoleController`, `SpecialCommandMembershipController`),
+  `RefineryOrderController`, `OperationController` and its frontend mirror
+  `OperationPageController`, and the frontend `OrgUnitBankPageController`'s
+  `MEMBER_OR_ABOVE` constant — all now migrated. The same pass also closed four service-layer raw
+  role-code comparisons that sit outside `@PreAuthorize` entirely and were never covered by the
+  original sweep or the programmatic-comparison follow-up above: `UserService` (including the
+  Keycloak first-admin bootstrap auto-activation check), `BankGrantService`,
+  `BankHolderReconciliationService` and `RecipientResolutionService`. Finally, the ~35 sites sharing
+  the identical `hasAnyRole('ADMIN','OFFICER')` splice across the promotion/rank/evaluation surface
+  now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
+  `frontend.support.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 

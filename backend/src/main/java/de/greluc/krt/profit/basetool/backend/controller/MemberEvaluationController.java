@@ -168,7 +168,7 @@ public class MemberEvaluationController {
    * @return a {@link PageResponse} of evaluatable members
    */
   @GetMapping("/members")
-  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   @org.springframework.transaction.annotation.Transactional(readOnly = true)
   @Operation(
       summary =

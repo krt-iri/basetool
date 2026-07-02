@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.AssignSquadronRankRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -74,7 +75,9 @@ public class SquadronRoleController {
    */
   @PutMapping("/{userId}")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canAssignSquadronRank(#squadronId,"
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canAssignSquadronRank(#squadronId,"
           + " #request.role(), authentication)")
   @Operation(summary = "Assign a squadron leadership rank to a Staffel member")
   public OrgUnitMembershipDto assignRank(
@@ -97,8 +100,10 @@ public class SquadronRoleController {
    */
   @DeleteMapping("/{userId}")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canRemoveSquadronRank(#squadronId,"
-          + " #userId, authentication)")
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canRemoveSquadronRank(#squadronId, #userId,"
+          + " authentication)")
   @Operation(summary = "Clear a Staffel member's squadron leadership rank")
   public OrgUnitMembershipDto removeRank(
       @PathVariable @NotNull UUID squadronId,

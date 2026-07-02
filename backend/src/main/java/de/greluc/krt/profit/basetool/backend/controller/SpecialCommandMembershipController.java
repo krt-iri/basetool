@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchReque
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -194,7 +195,9 @@ public class SpecialCommandMembershipController {
    */
   @PatchMapping("/{userId}/lead")
   @PreAuthorize(
-      "hasRole('ADMIN') or @orgRoleManagementSecurityService.canAppointSkLead(#id, authentication)")
+      "hasRole('"
+          + Roles.ADMIN
+          + "') or @orgRoleManagementSecurityService.canAppointSkLead(#id, authentication)")
   @Operation(
       summary = "Toggle the SK-Lead flag on a membership",
       description =
