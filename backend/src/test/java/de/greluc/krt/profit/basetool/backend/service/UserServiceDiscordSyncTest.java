@@ -137,14 +137,13 @@ class UserServiceDiscordSyncTest {
   }
 
   @Test
-  void newCredentialUser_landsPending_noLink_noNotification() {
-    // Fail-safe default (REQ-SEC-017): a brand-new non-admin credential login now also lands
-    // PENDING
-    // (no longer ACTIVE), independent of any Discord claim — this is what closes the
-    // mapper-misconfig
-    // gap. It carries no Discord link, and raises no admin notification (only genuine Discord
-    // self-registrations notify; an admin-created credential account is already known via the
-    // queue).
+  void newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim() {
+    // REQ-NOTIF-012 regression guard: the admin notification is keyed off the PENDING transition,
+    // NOT off the discord_user_id claim. A brand-new non-admin registration whose token carries NO
+    // discord_user_id claim (jwt(false, ...)) — e.g. because the optional Keycloak claim mapper is
+    // absent/misconfigured — still lands PENDING (fail-safe, REQ-SEC-017) AND still notifies every
+    // admin. This is the exact fragility that previously silenced all approval notifications when
+    // the mapper was not wired: PENDING was decoupled from the claim but the notification was not.
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
     when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest"))
@@ -155,7 +154,7 @@ class UserServiceDiscordSyncTest {
 
     assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
     assertNull(result.getDiscordUserId());
-    verify(eventPublisher, never()).publishEvent(any());
+    verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
   }
 
   @Test

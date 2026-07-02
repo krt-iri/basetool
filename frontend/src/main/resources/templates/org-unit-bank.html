@@ -91,6 +91,20 @@
             <!-- KONTEN: dense list, one row per visible account. Newest-first stays server-ordered. -->
             <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
                  aria-labelledby="ou-tab-konten" th:if="${showKonten}">
+                <!-- Client-side account-name live filter (REQ-BANK-046): hides non-matching rows as the
+                     user types; read-only + purely visual, no server round-trip. Lives inside the
+                     swapped fragment, so it resets to "show all" after a request create/cancel swap. -->
+                <div class="mb-2">
+                    <div class="bank-acc-search">
+                        <label for="ou-acc-filter" class="visually-hidden"
+                               th:text="#{bank.filter.label}">Konten nach Namen filtern</label>
+                        <svg class="krt-icon bank-acc-search-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                        <input type="search" id="ou-acc-filter" class="bank-acc-search-input" autocomplete="off"
+                               data-bank-acc-filter data-filter-scope="#ou-panel-konten .ou-list"
+                               data-filter-empty="#ou-acc-filter-empty"
+                               th:attr="placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}">
+                    </div>
+                </div>
                 <div class="ou-list">
                     <div class="ou-rowhead" aria-hidden="true">
                         <span th:text="#{bank.request.col.account}">Konto</span>
@@ -100,7 +114,8 @@
                         <span class="e" th:text="#{bank.request.col.actions}">Aktion</span>
                     </div>
                     <div th:each="b : ${balances}" class="ou-row" th:with="spark=${sparks.get(b.accountId())}"
-                         data-testid="org-unit-bank-card" th:attr="data-account-no=${b.accountNo()}">
+                         data-testid="org-unit-bank-card"
+                         th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
                         <!-- Konto: name (linked to the drill-in) + account no and its org-unit shorthand
                              (or name). A special account (Sonderkonto, REQ-BANK-028) belongs to no org
                              unit, so it is labelled by its account-type label instead. -->
@@ -163,6 +178,11 @@
                                th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
                         </div>
                     </div>
+                </div>
+                <!-- No-results note for the client-side account-name filter (REQ-BANK-046): bank.js
+                     reveals it when the live filter hides every account row. -->
+                <div id="ou-acc-filter-empty" class="empty-state mt-2" hidden>
+                    <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
                 </div>
             </div>
 

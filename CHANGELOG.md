@@ -8,12 +8,12 @@
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
 - **Monitoring: Prometheus-Metrik-Endpunkt in allen drei Modulen.** Backend, Frontend und Ingest exponieren jetzt Micrometer-Metriken (JVM, HTTP, Caches, Verbindungspools) unter `/actuator/prometheus` — abgesichert über einen fail-closed Basic-Auth-Zugang (`MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD`; ohne Konfiguration wird jeder Zugriff abgelehnt). Grundstein für den Monitoring-Stack aus Epic #936 (REQ-OBS-005, ADR-0064).
 - **Monitoring: Verteiltes Tracing (OpenTelemetry) in allen drei Modulen vorbereitet.** Frontend-, Backend- und Ingest-Aufrufe können durchgängig als Traces verfolgt werden (W3C `traceparent`, Trace-IDs in den JSON-Logs). Query-Strings und rohe IDs werden aus Metrik-Tags und Span-Attributen entfernt. Standardmäßig vollständig inaktiv; erst `MONITORING_TRACING_ENABLED=true` plus OTLP-Endpunkt aktivieren den Export zum Monitoring-Stack (REQ-OBS-009, Epic #936 Phase 1b).
+- **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
 
 ### Fixed
 
 - **Frontend: Caffeine-Cache erfasst jetzt Trefferstatistiken.** Der `staticData`-Cache liefert damit Hit-Ratio-Werte an den Metrik-Endpunkt; zuvor wären die Cache-Panels des künftigen Monitorings dauerhaft leer geblieben (Epic #936).
 - **Ingest: Prod-Logs werden jetzt PII-maskiert.** Der Ingest-Dienst nutzt wie Backend und Frontend den maskierenden JSON-Encoder (JWTs, E-Mail-Adressen, Token-Schlüsselwörter); zuvor war er der letzte unmaskierte Log-Ausgang (REQ-OBS-004).
-
 ### Changed
 
 - **Benachrichtigungen: Löschen ohne Rückfrage.** Eine einzelne Benachrichtigung im Glocken-Menü oder auf der Benachrichtigungsseite wird jetzt sofort gelöscht — die zusätzliche Bestätigungsabfrage entfällt, da Benachrichtigungen unkritisch sind. Das Sammel-Löschen „Gelesene löschen" fragt weiterhin nach (REQ-NOTIF-005).
@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- **Benachrichtigungen: Admins werden jetzt zuverlässig über neue Konto-Freigabeanträge informiert.** Neue, noch nicht freigeschaltete Registrierungen (insbesondere über Discord) lösen jetzt immer genau eine Admin-Benachrichtigung aus — auch wenn der optionale Discord-Claim in Keycloak fehlt oder das Konto zuerst über die periodische Keycloak-Synchronisation statt über den Login angelegt wird. Bisher blieb die Meldung in diesen Fällen komplett aus (REQ-NOTIF-012).
 - **Deployment: Der Deploy-Zyklus erkennt jetzt einen abgedrifteten oder ungesunden Stack.** `deploy.sh` nimmt die „no change"-Abkürzung nur noch, wenn die laufenden Container tatsächlich den zuletzt ausgerollten Image-Digests entsprechen und gesund sind; andernfalls wird derselbe Stand automatisch neu angewendet — etwa nach einem manuellen `docker compose up` mit veraltetem lokalem `:stable`-Tag (Vorfall vom 02.07.2026). Für geplante Wartung vorher den `iri-deploy.timer` stoppen (REQ-OPS-013).
 
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
