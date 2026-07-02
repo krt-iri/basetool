@@ -29,8 +29,14 @@ import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -130,22 +135,22 @@ public class BankAdminController {
    *
    * @param from period start (inclusive, ISO instant)
    * @param to period end (inclusive, ISO instant); must not be before {@code from}
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Export the bank audit log as a PDF for a period (admin)")
   @GetMapping("/audit/export")
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> exportAuditLog(
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf =
-        bankAuditReportService.generateAuditLogPdf(
-            from, to, BankAccountController.parse(userTimeZone));
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", "audit-bank.pdf");
-    return ResponseEntity.ok().headers(headers).body(pdf);
+      @UserZone ZoneId userZone) {
+    byte[] pdf = bankAuditReportService.generateAuditLogPdf(from, to, userZone);
+    return PdfResponses.pdfAttachment(pdf, "audit-bank.pdf");
   }
 
   /**

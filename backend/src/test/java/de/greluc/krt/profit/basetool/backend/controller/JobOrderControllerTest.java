@@ -622,7 +622,8 @@ class JobOrderControllerTest {
         .thenReturn(pdf);
 
     ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, "Europe/Berlin");
+        controller.downloadHandoverReport(
+            jobOrderId, handoverId, java.time.ZoneId.of("Europe/Berlin"));
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isSameAs(pdf);
@@ -635,43 +636,9 @@ class JobOrderControllerTest {
         .isEqualTo("uebergabeprotokoll-" + jobOrderId + ".pdf");
   }
 
-  @Test
-  void downloadHandoverReport_blankTimeZone_treatedAsNull() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID handoverId = UUID.randomUUID();
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
-        .thenReturn(pdf);
-
-    ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, "   ");
-
-    // A blank header value must reach the service as null (the service falls back to UTC).
-    // Pinning this prevents a future refactor that calls ZoneId.of(" ".strip()) and throws
-    // a DateTimeException before the service is even reached.
-    assertThat(response.getStatusCode().value()).isEqualTo(200);
-    verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);
-  }
-
-  @Test
-  void downloadHandoverReport_invalidTimeZone_silentlyDroppedAndServiceCalledWithNull() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID handoverId = UUID.randomUUID();
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    when(jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, null))
-        .thenReturn(pdf);
-
-    ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, "Not/AValidZone");
-
-    // Invalid IANA zone MUST be silently dropped — the user gets a UTC-rendered PDF rather than
-    // a 400, because the time-zone header is "best effort" UX, not a correctness contract. This
-    // is the spot where a refactor that propagates the DateTimeException would silently change
-    // a previously-working PDF download into a 400 error for everyone running an outdated
-    // browser locale.
-    assertThat(response.getStatusCode().value()).isEqualTo(200);
-    verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);
-  }
+  // The X-User-Time-Zone parse-and-fall-back-to-UTC contract (blank/invalid zone -> null) now lives
+  // in UserZoneArgumentResolver and is pinned by UserZoneArgumentResolverTest; the controller only
+  // forwards the already-resolved ZoneId, exercised by the null pass-through case below.
 
   @Test
   void downloadHandoverReport_nullTimeZoneHeader_passedAsNull() {

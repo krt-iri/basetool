@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCrea
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -34,14 +35,10 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -87,8 +84,7 @@ public class PersonalInventoryController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String q,
-      JwtAuthenticationToken authentication) {
-    String ownerSub = requireSub(authentication);
+      @CurrentUserSub String ownerSub) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -113,8 +109,8 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "200", description = "Item found."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public PersonalInventoryItemResponse get(@PathVariable UUID id, JwtAuthenticationToken auth) {
-    return service.getOwn(requireSub(auth), id);
+  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
+    return service.getOwn(ownerSub, id);
   }
 
   /**
@@ -132,8 +128,9 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
   })
   public PersonalInventoryItemResponse create(
-      @Valid @RequestBody PersonalInventoryItemCreateRequest request, JwtAuthenticationToken auth) {
-    return service.createOwn(requireSub(auth), request);
+      @Valid @RequestBody PersonalInventoryItemCreateRequest request,
+      @CurrentUserSub String ownerSub) {
+    return service.createOwn(ownerSub, request);
   }
 
   /**
@@ -156,8 +153,8 @@ public class PersonalInventoryController {
   public PersonalInventoryItemResponse update(
       @PathVariable UUID id,
       @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
-      JwtAuthenticationToken auth) {
-    return service.updateOwn(requireSub(auth), id, request);
+      @CurrentUserSub String ownerSub) {
+    return service.updateOwn(ownerSub, id, request);
   }
 
   /**
@@ -172,20 +169,7 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "204", description = "Item deleted."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
-    service.deleteOwn(requireSub(auth), id);
-  }
-
-  @NotNull
-  private static String requireSub(JwtAuthenticationToken auth) {
-    if (auth == null || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    Jwt jwt = auth.getToken();
-    String sub = jwt.getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
+  public void delete(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
+    service.deleteOwn(ownerSub, id);
   }
 }
