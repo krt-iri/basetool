@@ -727,6 +727,9 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] Reject flips to `REJECTED` with a reason and books nothing; needs account visibility.
 - [x] Staff confirmation queue + confirm modal (holder selector) + reject modal, AJAX no-reload
   (frontend `BankRequestQueuePageControllerMvcTest`).
+- [x] The queue's account column leads with the account's display name (`accountName`) for
+  readability, with the account number shown small underneath; the org-unit shorthand is dropped
+  from this column (frontend `BankRequestQueuePageControllerMvcTest`).
 
 **Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html` · **Issues:** #666, #671, #672
 
