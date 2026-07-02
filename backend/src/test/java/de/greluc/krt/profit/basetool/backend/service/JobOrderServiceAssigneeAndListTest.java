@@ -67,6 +67,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Coverage for {@link JobOrderService} methods that the main {@code JobOrderServiceTest} doesn't
@@ -92,6 +93,11 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private MaterialClaimService materialClaimService;
 
   @Mock private AuditService auditService;
+
+  // The stock/claim DTO projection was extracted to JobOrderStockProjectionService (L2, #921);
+  // a real instance (built from the same mocks) is wired into the CUT via reflection in setUp().
+  @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
+
   @InjectMocks private JobOrderService service;
 
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
@@ -99,6 +105,8 @@ class JobOrderServiceAssigneeAndListTest {
 
   @BeforeEach
   void stubMapperEchoingEmptyMaterials() {
+    ReflectionTestUtils.setField(
+        service, "jobOrderStockProjectionService", jobOrderStockProjectionService);
     // The service routes nearly every return through mapToDtoWithStock(),
     // which calls jobOrderMapper.toDto(...) and then iterates the result's
     // materials. Return an empty materials list so we don't have to stub
