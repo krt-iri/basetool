@@ -178,10 +178,11 @@ org-unit membership + cascade) is short-circuited to a single `ROLE_PENDING_APPR
 Keycloak `ADMIN`-realm-role holders are auto-`ACTIVE` (bootstrap safety — the first admin can never be
 locked out). Both creation paths apply the rule — the interactive login (`syncUser(Jwt)`) and the
 scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — so the scheduler can never
-pre-create an `ACTIVE` row that a later login would inherit. Admins are **notified** only for genuine
-Discord self-registrations (REQ-NOTIF-012); a credential account is created by an admin in Keycloak
-who already sees it in the pending queue, so it raises no extra notification. After approval,
-roles/units are assigned manually (Track 1) — no automated mapping.
+pre-create an `ACTIVE` row that a later login would inherit. Admins are **notified** for every such
+new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itself and — like the gate
+— independent of the `discord_user_id` claim, from whichever path first materialises the row
+(interactive or scheduled) and exactly once. After approval, roles/units are assigned manually
+(Track 1) — no automated mapping.
 
 > **Trade-off (owner-approved 2026-06-20).** Making the default fail-safe means a brand-new
 > **credential** account (created directly in Keycloak) now also requires a one-time Basetool
@@ -221,18 +222,30 @@ roles/units are assigned manually (Track 1) — no automated mapping.
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
-When a new Discord user enters `PENDING`, every admin receives one in-app notification (no Discord id
-or PII in the payload), via the existing data-driven notification rule engine (a `ROLE` selector with
-`roleCode = 'ADMIN'`, mirroring V160/V161).
+When any brand-new non-admin account enters `PENDING` (awaiting approval), every admin receives
+**exactly one** in-app notification (no Discord id or PII in the payload), via the existing
+data-driven notification rule engine (a `ROLE` selector with `roleCode = 'ADMIN'`, mirroring
+V160/V161). The trigger is the **PENDING transition itself** — deliberately **independent of the
+optional `discord_user_id` claim/mapper**, exactly as the PENDING decision is (REQ-SEC-017). A missing
+or misconfigured claim mapper must never silence an approval notification any more than it may let a
+login skip the gate; and because there is no reliable Discord signal at first login without that
+claim, the notification fires for **every** new PENDING registration regardless of source (Discord
+**or** credential). Both creation paths announce it — the interactive login (`syncUser(Jwt)`) and the
+scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — each gated on `created`, so whichever
+path first materialises the row emits the event and the other stays silent: exactly one notification,
+no persisted "announced" flag, no double-fire on a scheduler-first row or a login-then-sync race.
 
 **Acceptance**
 
 - [x] A new PENDING registration publishes a `DISCORD_REGISTRATION_PENDING` after-commit event whose
-  default rule (V174) resolves to every admin via a `ROLE` selector.
+  default rule (V174) resolves to every admin via a `ROLE` selector — fired on the PENDING transition,
+  **not** gated on the `discord_user_id` claim, and from **both** the interactive and the scheduled
+  sync paths (each gated on `created`).
 - [x] No Discord id / token / e-mail rides the event (it carries only the user id + username).
-- [ ] Exactly one notification per admin, end to end. _(notification engine; T1.4 e2e.)_
+- [x] Exactly one notification per admin, end to end (the `created` gate makes the two sync paths
+  mutually exclusive for a given row).
 
-**Enforced by:** `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed; the rule-engine fan-out is covered by the epic-#622 tests · **Code:** `UserService.syncUser`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
+**Enforced by:** `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (V174 rule → ADMIN recipient → exactly one unread row, end to end) · `UserServiceDiscordSyncTest#newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim` (fires with the claim absent) · `UserServiceSyncTest` (scheduled path fires for a new non-admin, stays silent for an admin and for an already-persisted row) · `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed · **Code:** `UserService.syncUser(Jwt)` / `UserService.syncUser(KeycloakUserDto)`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
 
 ### REQ-NOTIF-014 — User notified by e-mail on approval / rejection (reason included)
 
@@ -240,7 +253,7 @@ When an admin **approves** or **rejects** a pending registration, the decided us
 e-mail** — closing the loop the waiting page (REQ-SEC-017) opens. The approval mail tells them they
 can now sign in; the rejection mail states they were declined **and includes the admin's free-text
 reason** (a localized placeholder when none was given). Built on the reusable transactional e-mail
-channel (REQ-NOTIF-013, [ADR-0063](../adr/0063-transactional-email-delivery-channel.md)): `approveUser` /
+channel (REQ-NOTIF-013, [ADR-0064](../adr/0064-transactional-email-delivery-channel.md)): `approveUser` /
 `rejectUser` publish a data-only `UserApprovalDecidedEvent` inside the deciding transaction; an
 after-commit `@Async(MAIL_EXECUTOR)` listener composes a localized plain-text mail and sends it
 best-effort. A rolled-back or 409-conflicting decision sends nothing; a mail failure never affects
@@ -267,7 +280,7 @@ reason are **never logged** (REQ-OBS).
 (approval/rejection composition, reason placeholder, skip-on-no-email) · `UserApprovalMailEventListenerTest`
 (delegate + swallow) · `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
 `UserService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
-`service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0063 · **Issues:** #720
+`service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
 

@@ -1,4 +1,4 @@
-# ADR-0063 — Transactional e-mail as an opt-in, best-effort delivery channel
+# ADR-0064 — Transactional e-mail as an opt-in, best-effort delivery channel
 
 - **Status:** Accepted
 - **Date:** 2026-07-02

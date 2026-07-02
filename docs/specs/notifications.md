@@ -280,7 +280,7 @@ admin-editable at runtime.
 The backend has a channel-agnostic e-mail seam so system events can notify a user **by e-mail** in
 addition to (or instead of) the in-app inbox. `MailService.send(MailMessage)` takes a domain-free
 `MailMessage(to, subject, body)` — no notion of approval or notification — so any producer can reuse
-it; the first consumer is the account decision mail (REQ-NOTIF-014, [ADR-0063](../adr/0063-transactional-email-delivery-channel.md)),
+it; the first consumer is the account decision mail (REQ-NOTIF-014, [ADR-0064](../adr/0064-transactional-email-delivery-channel.md)),
 and the in-app rule engine may adopt it later as a second delivery channel.
 
 Sending is **three-gated** and **best-effort**: the `SmtpMailService` implementation sends only when
@@ -308,7 +308,7 @@ logged** (REQ-OBS).
 
 **Enforced by:** `SmtpMailServiceTest` · **Code:** `service/MailService`, `service/MailMessage`,
 `service/SmtpMailService`, `config/MailProperties`, `config/AsyncConfig#MAIL_EXECUTOR`,
-`application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0063 · **Issues:** #720
+`application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ## Out of scope (v1)
 

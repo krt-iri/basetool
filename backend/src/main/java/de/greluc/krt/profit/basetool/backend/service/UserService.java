@@ -311,14 +311,18 @@ public class UserService {
     // approval. Keycloak ADMIN-realm-role holders are auto-ACTIVE (bootstrap safety — the first
     // admin
     // can never be locked out), and the carve-out below also promotes an existing PENDING admin to
-    // ACTIVE. Admins are notified only for genuine Discord self-registrations (REQ-NOTIF-012); a
-    // credential account is created by an admin in Keycloak, who already sees it in the pending
-    // queue, so it raises no extra notification.
+    // ACTIVE. The admin notification (REQ-NOTIF-012) fires for EVERY such new PENDING registration,
+    // keyed off the PENDING transition itself and NOT off the discord_user_id claim: a missing
+    // claim
+    // mapper must never silence an approval notification any more than it may skip the gate. A
+    // credential registration therefore notifies too — at first login there is no reliable Discord
+    // signal without the claim, and the event carries no Discord id/PII anyway (only id +
+    // username).
     boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration = false;
     if (created && !isAdmin && requireApproval) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
-      newPendingRegistration = viaDiscord;
+      newPendingRegistration = true;
       changed = true;
     } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
       user.setApprovalStatus(ApprovalStatus.ACTIVE);
@@ -337,8 +341,8 @@ public class UserService {
         defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
       }
       if (newPendingRegistration) {
-        // After-commit listener notifies every admin of the pending registration (REQ-NOTIF-012);
-        // the event carries no Discord id.
+        // After-commit listener notifies every admin of the new pending registration
+        // (REQ-NOTIF-012); the event carries no Discord id/PII (only user id + username).
         eventPublisher.publishEvent(
             new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
       }
@@ -417,15 +421,13 @@ public class UserService {
     // first discovered by the scheduled reconciliation lands PENDING, so the scheduler can never
     // pre-create an ACTIVE row that a later interactive login would inherit (created == false) and
     // thereby skip the approval gate. Admins stay ACTIVE (entity default, bootstrap safety). Only
-    // brand-new rows are touched — an existing user's approval state is never changed here. No
-    // notification is raised: this is batch reconciliation, a genuine Discord self-registration is
-    // announced by the interactive login path (REQ-NOTIF-012), and the new rows still surface in
-    // the
-    // admin pending queue.
+    // brand-new rows are touched — an existing user's approval state is never changed here.
+    boolean newPendingRegistration = false;
     if (created
         && requireApproval
         && localRoles.stream().noneMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
+      newPendingRegistration = true;
       changed = true;
     }
 
@@ -434,6 +436,15 @@ public class UserService {
       if (created) {
         // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
         defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+      }
+      if (newPendingRegistration) {
+        // A registration first materialised by the scheduled reconciler (rather than by the
+        // interactive login) must still notify the admins (REQ-NOTIF-012). Gating on `created`
+        // keeps it exactly-once across both paths: whichever path inserts the row has created ==
+        // true and publishes; every later call in either path sees created == false and stays
+        // silent, so no persisted "announced" flag is needed. The event carries no Discord id/PII.
+        eventPublisher.publishEvent(
+            new DiscordRegistrationPendingEvent(user.getId(), user.getUsername()));
       }
     }
   }
