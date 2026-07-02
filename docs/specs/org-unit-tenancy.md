@@ -35,6 +35,11 @@ non-admins see the union of their memberships unless they pin one.
 
 ### REQ-ORG-003 — Aggregate scope kinds
 
+> The JPQL implementing every scope-predicate triple/escape below is centralised in
+> `repository.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
+> hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
+> implementation detail; the scope semantics documented here are unchanged.
+
 - **Strict-staffel** (no cross-staffel escape): `Ship`, `InventoryItem` (direct Lager-View),
   `RefineryOrder`. List/CRUD filter by `owning_org_unit_id`; detail gates on
   `canSee*`/`canEdit*`. `InventoryItem` rows are append-only and collapsed into display

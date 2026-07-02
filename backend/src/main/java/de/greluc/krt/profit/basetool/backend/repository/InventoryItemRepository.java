@@ -98,11 +98,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
   Page<InventoryItem> findByMaterialAndPersonalFalseScoped(
       @Param("material") Material material,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -128,11 +125,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.personal = false AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
+      "SELECT i FROM InventoryItem i WHERE i.personal = false AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
           + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
           + " NOT NULL AND i.mission.id IN :missionIds))")
@@ -189,11 +184,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
           + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
           + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
-          + " WHERE i.personal = false AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
+          + " WHERE i.personal = false AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
           + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
           + " NOT NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
@@ -259,11 +252,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " i.quality IS NULL) OR i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder"
           + " IS NULL) OR i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS"
           + " NULL) OR i.mission.id = :missionId) AND ((:owningOrgUnitId IS NULL AND"
-          + " i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) ORDER BY i.createdAt ASC")
+          + " i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + " ORDER BY i.createdAt ASC")
   Page<InventoryItem> findGlobalStackEntries(
       @Param("materialId") UUID materialId,
       @Param("userId") UUID userId,
@@ -318,11 +309,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       "SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS"
           + " double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount"
-          + " FROM InventoryItem i WHERE i.personal = false AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) GROUP BY i.material")
+          + " FROM InventoryItem i WHERE i.personal = false AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
+          + " GROUP BY i.material")
   Page<Object[]> getAggregatedInventory(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -457,11 +446,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Modifying
   @Query(
-      "DELETE FROM InventoryItem i WHERE i.personal = false AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "DELETE FROM InventoryItem i WHERE i.personal = false AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
   int deleteAllNonPersonal(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,

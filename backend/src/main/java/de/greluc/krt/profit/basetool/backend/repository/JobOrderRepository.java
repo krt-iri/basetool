@@ -141,12 +141,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR TYPE(o.responsibleOrgUnit) = SpecialCommand"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)"
-          + " ) AND o.status IN :statuses AND (:squadronId IS NULL OR o.responsibleOrgUnit.id ="
+      "SELECT o FROM JobOrder o WHERE "
+          + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
+          + " AND o.status IN :statuses AND (:squadronId IS NULL OR o.responsibleOrgUnit.id ="
           + " :squadronId OR o.requestingOrgUnit.id = :squadronId)")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
