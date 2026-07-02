@@ -141,6 +141,16 @@ class PersonalBlueprintControllerTest {
   }
 
   @Test
+  void deleteAll_relaysToServiceWithSubAndReturnsCount() {
+    when(service.deleteAllOwn(SUB)).thenReturn(3);
+
+    var result = controller.deleteAll(SUB);
+
+    assertEquals(3, result.deleted());
+    verify(service).deleteAllOwn(SUB);
+  }
+
+  @Test
   void recipe_derivesSubAndRelaysToService() {
     UUID id = UUID.randomUUID();
     PersonalBlueprintRecipeResponse recipe =

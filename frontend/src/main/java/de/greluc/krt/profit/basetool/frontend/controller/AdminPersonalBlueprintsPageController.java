@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
@@ -38,7 +39,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +50,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -288,6 +292,82 @@ public class AdminPersonalBlueprintsPageController {
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred during import apply.");
     }
+  }
+
+  /**
+   * Admin global purge: clears the removable owned blueprints of ALL users (REQ-INV-024). Guarded
+   * in the UI by a type-to-confirm danger modal. No-JS fallback: flashes a countless success toast
+   * and redirects to the bare admin Blueprints page (the AJAX twin below shows the removed count).
+   * Auto-granted defaults (REQ-INV-016) are preserved by the backend.
+   *
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the admin Blueprints page
+   */
+  @PostMapping("/delete-all-users")
+  public String deleteAllUsers(RedirectAttributes redirectAttributes) {
+    try {
+      backendApiClient.delete(
+          "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      redirectAttributes.addFlashAttribute(
+          "successToast", "admin.personalInventory.blueprints.purge.toast.done");
+    } catch (Exception e) {
+      log.error("Admin failed to clear all users' blueprints", e);
+      redirectAttributes.addFlashAttribute(
+          "errorToast", "admin.personalInventory.blueprints.purge.error");
+    }
+    return "redirect:/admin/personal-blueprints";
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #deleteAllUsers}: clears every user's removable owned
+   * blueprints (REQ-INV-024) and returns the removed count as JSON so {@code
+   * admin/personal-blueprints.html} toasts "{n} Blueprints entfernt" and re-renders the current
+   * member's owned-list fragment in place (REQ-FE-002) instead of a full-page reload. A backend
+   * failure is relayed as {@code problem+json}.
+   *
+   * @return {@code 200} with the removed count on success, or the relayed backend {@code
+   *     problem+json}
+   */
+  @PostMapping(value = "/delete-all-users", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteAllUsersAjax() {
+    try {
+      PersonalBlueprintBulkDeleteResultDto result =
+          backendApiClient.delete(
+              "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      return ResponseEntity.ok(
+          result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
+    } catch (BackendServiceException e) {
+      log.error("Admin failed to clear all users' blueprints (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Admin failed to clear all users' blueprints (ajax)", e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
+   * preserving the backend status, {@code code}, {@code detail} and correlation id so the client's
+   * {@code krtFetch} shows the right error toast. Mirrors the helper in {@link
+   * PersonalInventoryBlueprintsPageController}.
+   *
+   * @param e the backend failure to relay
+   * @return a {@code problem+json} response carrying the backend status and code
+   */
+  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", e.getStatusCode());
+    body.put("code", e.getProblemCode());
+    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
+      body.put("detail", e.getProblemDetail());
+    }
+    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
+      body.put("correlationId", e.getCorrelationId());
+    }
+    return ResponseEntity.status(e.getStatusCode())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(body);
   }
 
   /**

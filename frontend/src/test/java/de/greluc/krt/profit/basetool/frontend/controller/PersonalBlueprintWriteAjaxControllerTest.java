@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -127,5 +128,24 @@ class PersonalBlueprintWriteAjaxControllerTest {
         .andExpect(status().isNoContent());
 
     verify(backendApiClient).delete(eq("/api/v1/personal-blueprints/" + id), eq(Void.class));
+  }
+
+  @Test
+  @WithMockUser
+  void deleteAllAjax_forwardsToBackendAndReturnsRemovedCount() throws Exception {
+    when(backendApiClient.delete(
+            eq("/api/v1/personal-blueprints"), eq(PersonalBlueprintBulkDeleteResultDto.class)))
+        .thenReturn(new PersonalBlueprintBulkDeleteResultDto(5));
+
+    mockMvc
+        .perform(
+            post("/personal-inventory/blueprints/delete-all")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deleted").value(5));
+
+    verify(backendApiClient)
+        .delete(eq("/api/v1/personal-blueprints"), eq(PersonalBlueprintBulkDeleteResultDto.class));
   }
 }
