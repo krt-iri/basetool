@@ -93,9 +93,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderService {
 
-  /** System-setting key holding the UUID of the intake SK that guest order creations route to. */
-  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
-
   /**
    * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (650+ =
    * refining-grade); a {@code NONE} bucket imposes no floor. Mirrors the MATERIAL requirement's
@@ -108,7 +105,7 @@ public class JobOrderService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final OrgUnitRepository orgUnitRepository;
-  private final SystemSettingService systemSettingService;
+  private final JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final ApplicationEventPublisher eventPublisher;
@@ -137,8 +134,10 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
-    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
+    OrgUnit responsible =
+        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting =
+        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -202,8 +201,10 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
-    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
+    OrgUnit responsible =
+        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting =
+        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -723,7 +724,8 @@ public class JobOrderService {
     // therefore ignored here. The requesting (customer) org unit is freely editable by any
     // Logistician+; a null id on update means "leave it unchanged" (minimal-payload contract).
     if (updateDto.requestingOrgUnitId() != null) {
-      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+      jobOrder.setRequestingOrgUnit(
+          jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
@@ -829,7 +831,8 @@ public class JobOrderService {
     // The requesting (customer) org unit is freely editable; a null id leaves it unchanged. The
     // responsible org unit stays put (reassignment endpoint owns it).
     if (updateDto.requestingOrgUnitId() != null) {
-      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+      jobOrder.setRequestingOrgUnit(
+          jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
@@ -1467,95 +1470,6 @@ public class JobOrderService {
   }
 
   /**
-   * Resolves the responsible (processing) org unit for a freshly-created job order.
-   *
-   * <ul>
-   *   <li>Anonymous / guest callers (the public request form is {@code permitAll}) may pick any
-   *       <em>profit-eligible</em> squadron or Spezialkommando from the create form's responsible
-   *       picker, and that pick is honoured. When the picker output is absent, unresolvable, or
-   *       points at a non-profit unit, the order routes to the configured intake Spezialkommando
-   *       ({@link #INTAKE_SK_SETTING_KEY}) as a forgiving fallback — so a guest can still never
-   *       direct work to a unit that has not opted in to processing orders.
-   *   <li>Authenticated callers must supply a {@code responsibleOrgUnitId} that resolves to a
-   *       profit-eligible squadron or Spezialkommando — only Profit-side units process orders.
-   * </ul>
-   *
-   * @param responsibleOrgUnitId picker output from the create DTO; required for authenticated
-   *     callers, honoured-when-profit-eligible (else intake-SK fallback) for guests.
-   * @return the resolved, profit-eligible responsible org unit; never {@code null}.
-   * @throws BadRequestException when an authenticated caller's id is missing/unresolvable or not
-   *     profit-eligible, or no intake SK is configured for a guest creation that falls back.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveResponsibleOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID responsibleOrgUnitId) {
-    if (!authHelperService.isAuthenticated()) {
-      // Guest (public request form): honour a profit-eligible pick from the responsible picker,
-      // otherwise route to the configured intake Spezialkommando. A non-profit or unresolvable id
-      // is
-      // not a 400 here — the public form stays forgiving and silently falls back rather than
-      // surfacing a validation gate to an anonymous probe. The profit-eligibility guard is
-      // preserved, so a guest still cannot direct work to a unit that has not opted in.
-      if (responsibleOrgUnitId != null) {
-        OrgUnit picked = orgUnitRepository.findById(responsibleOrgUnitId).orElse(null);
-        if (picked != null && picked.isProfitEligible()) {
-          return picked;
-        }
-      }
-      return resolveIntakeSpecialCommand();
-    }
-    if (responsibleOrgUnitId == null) {
-      throw new BadRequestException("responsibleOrgUnitId is required.");
-    }
-    OrgUnit orgUnit =
-        orgUnitRepository
-            .findById(responsibleOrgUnitId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "responsibleOrgUnitId does not resolve to a known org unit: "
-                            + responsibleOrgUnitId));
-    if (!orgUnit.isProfitEligible()) {
-      throw new BadRequestException(
-          "The selected responsible org unit is not profit-eligible and cannot process orders: "
-              + responsibleOrgUnitId);
-    }
-    return orgUnit;
-  }
-
-  /**
-   * Resolves the configured intake Spezialkommando that anonymous/guest order creations are routed
-   * to (system setting {@link #INTAKE_SK_SETTING_KEY}). The setting is seeded empty by V128; until
-   * an admin selects an SK, guest creation is refused with a 400.
-   *
-   * @return the configured intake org unit; never {@code null}.
-   * @throws BadRequestException when the setting is unset/blank/malformed or no longer resolves.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveIntakeSpecialCommand() {
-    String raw =
-        systemSettingService
-            .getSettingValue(INTAKE_SK_SETTING_KEY)
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "No intake Spezialkommando is configured; an admin must set it in system"
-                            + " settings before guests can create orders."));
-    UUID intakeId;
-    try {
-      intakeId = UUID.fromString(raw);
-    } catch (IllegalArgumentException ex) {
-      throw new BadRequestException("Configured intake Spezialkommando id is malformed.");
-    }
-    return orgUnitRepository
-        .findById(intakeId)
-        .orElseThrow(
-            () -> new BadRequestException("Configured intake Spezialkommando no longer exists."));
-  }
-
-  /**
    * Reassigns the responsible (processing) org unit of an existing order. Permission model:
    *
    * <ul>
@@ -1641,32 +1555,6 @@ public class JobOrderService {
             .with("toOrgUnit", orgUnitRef(target))
             .with("claimsWithdrawn", claimsWithdrawn));
     return mapToDtoWithStock(jobOrder);
-  }
-
-  /**
-   * Resolves the requesting (customer / Auftraggeber) org unit from the picker output. Any org unit
-   * is accepted — Staffel, Spezialkommando, Bereich or Organisationsleitung (epic #692): there is
-   * no profit-eligibility or kind restriction on who may be named the customer (unlike the
-   * responsible unit, which must be a profit-eligible Staffel/SK). Mandatory: the create/update
-   * DTOs always carry it.
-   *
-   * @param requestingOrgUnitId picker output from the DTO.
-   * @return the resolved requesting org unit; never {@code null}.
-   * @throws BadRequestException when the id is missing or does not resolve to a known org unit.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveRequestingOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID requestingOrgUnitId) {
-    if (requestingOrgUnitId == null) {
-      throw new BadRequestException("requestingOrgUnitId is required.");
-    }
-    return orgUnitRepository
-        .findById(requestingOrgUnitId)
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "requestingOrgUnitId does not resolve to a known org unit: "
-                        + requestingOrgUnitId));
   }
 
   /**

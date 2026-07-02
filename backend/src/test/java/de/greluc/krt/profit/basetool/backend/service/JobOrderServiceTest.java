@@ -58,6 +58,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceTest {
@@ -96,6 +97,13 @@ class JobOrderServiceTest {
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   @Mock private AuditService auditService;
+
+  // resolveResponsible/RequestingOrgUnit were extracted to JobOrderOrgUnitResolver (L2, #921);
+  // JobOrderService now calls it. Mockito builds a real instance from the same mocks, wired into
+  // jobOrderService via reflection in setUp() (Mockito does not inject one @InjectMocks into
+  // another), so the create/update paths keep exercising the real resolution logic.
+  @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
+
   @InjectMocks private JobOrderService jobOrderService;
 
   private Material material;
@@ -109,6 +117,8 @@ class JobOrderServiceTest {
 
   @BeforeEach
   void setUp() {
+    ReflectionTestUtils.setField(
+        jobOrderService, "jobOrderOrgUnitResolver", jobOrderOrgUnitResolver);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
