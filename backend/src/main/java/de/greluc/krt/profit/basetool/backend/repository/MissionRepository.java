@@ -76,13 +76,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
           + " m.status, m.plannedStartTime) FROM Mission m WHERE ("
           + "  m.status IN ('PLANNED', 'ACTIVE')"
           + "  OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)"
-          + " ) AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + "  OR m.isInternal = false"
-          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
-          + " ) ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
+          + " ) AND "
+          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
+          + " ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -199,13 +195,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    */
   @EntityGraph(attributePaths = {"participants", "assignedUnits"})
   @Query(
-      "SELECT m FROM Mission m WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + "  OR m.isInternal = false"
-          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
-          + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
+      "SELECT m FROM Mission m WHERE "
+          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
+          + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
           + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"
@@ -243,13 +235,9 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    */
   @EntityGraph(attributePaths = {"operation", "owningOrgUnit"})
   @Query(
-      "SELECT m FROM Mission m WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + "  OR m.isInternal = false"
-          + "  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
-          + " ) AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
+      "SELECT m FROM Mission m WHERE "
+          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
+          + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
           + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"

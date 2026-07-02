@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.model.Department;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -34,16 +33,10 @@ import org.springframework.stereotype.Repository;
  * flows (epic #692) read like the existing org-unit lifecycle code.
  */
 @Repository
-public interface BereichRepository extends JpaRepository<Bereich, UUID> {
+public interface BereichRepository extends LookupTableRepository<Bereich, UUID> {
 
   /** Derived Spring-Data query — returns the Bereich whose {@code shorthand} matches, if any. */
   Optional<Bereich> findByShorthand(String shorthand);
-
-  /** Returns {@code true} iff at least one Bereich matches {@code NameIgnoreCase}. */
-  boolean existsByNameIgnoreCase(String name);
-
-  /** Returns {@code true} iff a Bereich other than {@code id} matches {@code NameIgnoreCase}. */
-  boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
 
   /** Returns every active Bereich (soft-delete-aware list view). */
   List<Bereich> findAllByActiveTrue();

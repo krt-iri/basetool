@@ -25,12 +25,11 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Job Type. */
 @Repository
-public interface JobTypeRepository extends JpaRepository<JobType, UUID> {
+public interface JobTypeRepository extends LookupTableRepository<JobType, UUID> {
   /** Derived Spring-Data query - returns entities matching {@code Archetype}. */
   List<JobType> findByArchetype(JobTypeArchetype archetype);
 
@@ -56,18 +55,6 @@ public interface JobTypeRepository extends JpaRepository<JobType, UUID> {
 
   /** Derived Spring-Data query - returns entities matching {@code ParentId}. */
   List<JobType> findByParentId(UUID parentId);
-
-  /**
-   * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
-   * NameIgnoreCase}.
-   */
-  boolean existsByNameIgnoreCase(String name);
-
-  /**
-   * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
-   * NameIgnoreCaseAndIdNot}.
-   */
-  boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
 
   /**
    * Returns the job type(s) currently designated as the "Einsatzleiter" (mission lead). A partial

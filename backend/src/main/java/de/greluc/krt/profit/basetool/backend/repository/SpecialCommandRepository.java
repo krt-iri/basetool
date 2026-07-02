@@ -25,7 +25,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -40,7 +39,7 @@ import org.springframework.stereotype.Repository;
  * repository. No explicit predicate or {@code @Query} override is needed.
  */
 @Repository
-public interface SpecialCommandRepository extends JpaRepository<SpecialCommand, UUID> {
+public interface SpecialCommandRepository extends LookupTableRepository<SpecialCommand, UUID> {
 
   /**
    * Returns the SK whose {@code shorthand} matches the given string exactly. Used by the admin UI
@@ -51,28 +50,6 @@ public interface SpecialCommandRepository extends JpaRepository<SpecialCommand, 
    * @return the matching SK if present, empty otherwise.
    */
   Optional<SpecialCommand> findByShorthand(String shorthand);
-
-  /**
-   * Case-insensitive existence check on the name column. Used by {@code
-   * SpecialCommandService.create} (R2.b) to surface a 409 Conflict before the SQL UNIQUE constraint
-   * trips, so the error reaches the admin UI as a structured validation error rather than a generic
-   * optimistic-lock failure.
-   *
-   * @param name the proposed name; never {@code null}.
-   * @return {@code true} iff at least one SK already carries this name (case-insensitive).
-   */
-  boolean existsByNameIgnoreCase(String name);
-
-  /**
-   * Case-insensitive existence check on the name column, excluding the row with the given id. Used
-   * by the rename path: the admin may keep the existing name unchanged (a no-op uniqueness
-   * collision should not block the save), but cannot rename one SK onto another existing SK's name.
-   *
-   * @param name the proposed name; never {@code null}.
-   * @param id the id of the SK currently being renamed; never {@code null}.
-   * @return {@code true} iff at least one OTHER SK already carries this name (case-insensitive).
-   */
-  boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
 
   /**
    * Returns every active SK in an arbitrary order, intended for dropdown population (small result
