@@ -19,59 +19,41 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.assertSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
+
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
-import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.MissionStep;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionCrewRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -109,14 +91,6 @@ public class MissionService {
 
   private final MissionRepository missionRepository;
   private final UserRepository userRepository;
-  private final ShipRepository shipRepository;
-  private final ShipTypeRepository shipTypeRepository;
-  private final JobTypeRepository jobTypeRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
-  private final MissionUnitRepository missionUnitRepository;
-  private final MissionCrewRepository missionCrewRepository;
-  private final MissionStepRepository missionStepRepository;
-  private final MissionObjectiveRepository missionObjectiveRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
@@ -124,11 +98,10 @@ public class MissionService {
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
-  private final OrgUnitMembershipService orgUnitMembershipService;
-  private final de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository
-      orgUnitRepository;
-  private final GuestParticipantTokenService guestParticipantTokenService;
   private final AuditService auditService;
+  private final MissionTimelineService missionTimelineService;
+  private final MissionParticipantService missionParticipantService;
+  private final MissionStructureService missionStructureService;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -675,115 +648,6 @@ public class MissionService {
   }
 
   /**
-   * Checks the expected value of a mission's fine-grained {@link MissionSection} version counter
-   * against its current value, raising a 409 on mismatch so two managers racing on the
-   * <em>same</em> section surface a conflict instead of one silently overwriting the other, while a
-   * concurrent edit to an <em>unrelated</em> section never collides (REQ-ORG-018). An absent
-   * (never-bumped) counter reads as {@code 0L}, matching the value a fresh section renders and
-   * echoes back.
-   *
-   * <p>These are the manual business-{@code Long} section counters described in CLAUDE.md: they are
-   * deliberately <strong>not</strong> the row's JPA {@code @Version} and are <strong>not</strong>
-   * routed through the {@code support.OptimisticLock} helper family — the null-{@code ->}-{@code
-   * 0L} semantics are their own.
-   *
-   * @param mission the managed mission whose counter to check.
-   * @param section the section the caller echoed a version back for.
-   * @param expectedVersion the version the caller echoed back from the rendered page.
-   * @param missionId the mission id, for the conflict exception identifier.
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the expected
-   *     version is stale.
-   */
-  private void assertSectionVersion(
-      @NotNull Mission mission,
-      @NotNull MissionSection section,
-      @NotNull Long expectedVersion,
-      @NotNull UUID missionId) {
-    if (!expectedVersion.equals(section.current(mission))) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
-    }
-  }
-
-  /**
-   * Increments a mission's fine-grained {@link MissionSection} version counter after a successful
-   * edit of that section, so the next echo from a now-stale form for the <em>same</em> section is
-   * rejected while unrelated sections keep their counters. An absent (never-bumped) counter is
-   * treated as {@code 0L} and becomes {@code 1L}.
-   *
-   * @param mission the managed mission whose counter to bump.
-   * @param section the section whose counter to increment.
-   */
-  private void bumpSectionVersion(@NotNull Mission mission, @NotNull MissionSection section) {
-    section.set(mission, section.current(mission) + 1L);
-  }
-
-  /**
-   * The mission's independently-versioned edit sections. Each constant binds the getter/setter of
-   * one manual {@code *Version} counter on {@link Mission}, letting {@link #assertSectionVersion}
-   * and {@link #bumpSectionVersion} operate on any section without a per-section helper. These back
-   * the fine-grained per-section optimistic locks (REQ-ORG-018): an edit to one section must not
-   * 409 a concurrent edit to another, so each section carries its own counter rather than sharing
-   * the row's Hibernate {@code @Version}.
-   */
-  private enum MissionSection {
-    /** The mission core (name, description, status, owner-visible identity). */
-    CORE(Mission::getCoreVersion, Mission::setCoreVersion),
-    /** The mission schedule (planned/actual start and end times). */
-    SCHEDULE(Mission::getScheduleVersion, Mission::setScheduleVersion),
-    /** The mission flags (e.g. the internal/public visibility toggle). */
-    FLAGS(Mission::getFlagsVersion, Mission::setFlagsVersion),
-    /** The mission party-lead assignment. */
-    PARTY_LEAD(Mission::getPartyLeadVersion, Mission::setPartyLeadVersion),
-    /** The Ablauf steps timeline. */
-    STEPS(Mission::getStepsVersion, Mission::setStepsVersion),
-    /** The mission objectives (Ziele). */
-    OBJECTIVES(Mission::getObjectivesVersion, Mission::setObjectivesVersion),
-    /** The owning-org-unit assignment. */
-    OWNING_ORG_UNIT(Mission::getOwningOrgUnitVersion, Mission::setOwningOrgUnitVersion);
-
-    /** Reads the raw (nullable) counter value from a mission. */
-    private final transient Function<Mission, Long> getter;
-
-    /** Writes the counter value back onto a mission. */
-    private final transient BiConsumer<Mission, Long> setter;
-
-    /**
-     * Binds a section constant to its {@code *Version} counter accessors on {@link Mission}.
-     *
-     * @param getter reads the raw (nullable) counter value.
-     * @param setter writes the counter value back.
-     */
-    MissionSection(Function<Mission, Long> getter, BiConsumer<Mission, Long> setter) {
-      this.getter = getter;
-      this.setter = setter;
-    }
-
-    /**
-     * Returns this section's current counter value for the given mission, coalescing an absent
-     * (never-bumped) {@code null} counter to {@code 0L} — the exact value a fresh section renders
-     * and echoes back, so the very first edit validates against {@code 0L}.
-     *
-     * @param mission the mission to read the counter from.
-     * @return the current section version, or {@code 0L} when the counter is null.
-     */
-    private long current(@NotNull Mission mission) {
-      Long value = getter.apply(mission);
-      return value == null ? 0L : value;
-    }
-
-    /**
-     * Writes a new value into this section's counter on the given mission.
-     *
-     * @param mission the mission to write the counter on.
-     * @param value the new counter value.
-     */
-    private void set(@NotNull Mission mission, long value) {
-      setter.accept(mission, value);
-    }
-  }
-
-  /**
    * Deletes a mission. The cascade unlinks inventory items and refinery orders (rather than
    * deleting them) so individual member contributions survive the mission delete. Mission
    * participants, finance entries, units, crews and frequencies ARE deleted because they only exist
@@ -847,7 +711,7 @@ public class MissionService {
    */
   @Transactional
   public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
-    return addParticipant(missionId, userId, null, null, null, null, null);
+    return missionParticipantService.addParticipant(missionId, userId);
   }
 
   /**
@@ -862,7 +726,8 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment) {
-    return addParticipant(missionId, userId, guestName, desiredJobTypeId, comment, null, null);
+    return missionParticipantService.addParticipant(
+        missionId, userId, guestName, desiredJobTypeId, comment);
   }
 
   /**
@@ -878,9 +743,9 @@ public class MissionService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@link #resolveGuestSubmittedOrgUnits(java.util.List)} (anonymous
-   *       callers cannot label a guest at all; authenticated callers may label only org units they
-   *       can edit).
+   *       authorization filter in {@code MissionParticipantService.resolveGuestSubmittedOrgUnits}
+   *       (anonymous callers cannot label a guest at all; authenticated callers may label only org
+   *       units they can edit).
    * </ul>
    *
    * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
@@ -900,144 +765,8 @@ public class MissionService {
       String comment,
       java.util.List<UUID> orgUnitIds,
       PayoutPreference payoutPreference) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    // Audit finding M-4: hard cap of {@value #MAX_PARTICIPANTS_PER_MISSION} per mission. Closes
-    // the DoS vector where an anonymous caller scripts thousands of guest sign-ups until the
-    // mission_participant table holds millions of rows for a single mission and {@code
-    // mission.getParticipants()} (eager-fetched via the findById EntityGraph) starts scanning
-    // hundreds of MB per request. 500 covers every realistic IRIDIUM-scale operation by a large
-    // margin; override via a Squadron-level property is a follow-up if ever needed.
-    if (mission.getParticipants() != null
-        && mission.getParticipants().size() >= MAX_PARTICIPANTS_PER_MISSION) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
-          "Mission participant cap reached ("
-              + MAX_PARTICIPANTS_PER_MISSION
-              + "). Remove inactive participants before adding more.");
-    }
-
-    UUID effectiveUserId = userId;
-    String effectiveGuestName = guestName;
-
-    if (effectiveUserId == null && effectiveGuestName != null && !effectiveGuestName.isBlank()) {
-      Optional<User> matchedUser =
-          userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(
-              effectiveGuestName.trim(), effectiveGuestName.trim());
-      if (matchedUser.isPresent()) {
-        effectiveUserId = matchedUser.orElseThrow().getId();
-        effectiveGuestName = null;
-      }
-    }
-
-    if (effectiveUserId == null && (effectiveGuestName == null || effectiveGuestName.isBlank())) {
-      throw new IllegalArgumentException("Either User ID or Guest Name must be provided.");
-    }
-
-    final UUID finalUserId = effectiveUserId;
-    final String finalGuestName = effectiveGuestName;
-
-    // Check for duplicates
-    if (finalUserId != null) {
-      boolean exists =
-          mission.getParticipants().stream()
-              .anyMatch(p -> p.getUser() != null && p.getUser().getId().equals(finalUserId));
-      if (exists) {
-        throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-            "error.mission.participant.duplicate.user");
-      }
-    } else if (finalGuestName != null && !finalGuestName.isBlank()) {
-      boolean exists =
-          mission.getParticipants().stream()
-              .anyMatch(p -> finalGuestName.equalsIgnoreCase(p.getGuestName()));
-      if (exists) {
-        throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-            "error.mission.participant.duplicate.guest");
-      }
-    }
-
-    MissionParticipant participant = new MissionParticipant();
-    participant.setMission(mission);
-
-    if (effectiveUserId != null) {
-      User user =
-          userRepository
-              .findById(effectiveUserId)
-              .orElseThrow(() -> new NotFoundException("User not found"));
-      participant.setUser(user);
-      // Registered users carry every org unit they belong to at participate-time (their Staffel
-      // and/or any Spezialkommandos). Auto-derived from org_unit_membership — empty when the user
-      // belongs to none (admins / brand-new accounts) so the roster shows no affiliation instead of
-      // the old, wrong IRIDIUM fallback. The caller-submitted orgUnitIds are intentionally ignored
-      // for registered participants; the picker is guest-only.
-      participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
-      // REQ-MISSION-002: pre-fill the per-participant payout preference from the signing-up user's
-      // personal default. A user who never chose one keeps the entity default (PAYOUT). This is a
-      // one-time seed at sign-up — the per-mission value stays editable afterwards via
-      // updateParticipantAttributes and is NOT rewritten when the user later changes their profile
-      // default. Guests (the else branch) have no profile and keep PAYOUT.
-      if (user.getDefaultPayoutPreference() != null) {
-        participant.setPayoutPreference(user.getDefaultPayoutPreference());
-      }
-    } else {
-      participant.setGuestName(effectiveGuestName);
-      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
-      // Security audit M1 / REQ-SEC-018: bind this anonymous guest sign-up to its creator with a
-      // per-row capability token. Only the hash is persisted; the plaintext rides back on the
-      // transient field so the create response can hand it to the caller exactly once. A later
-      // guest
-      // mutate/delete must present the token (or hold a mission-management role) — enforced by
-      // MissionSecurityService.canAccessParticipant.
-      String mintedGuestEditToken = guestParticipantTokenService.generateToken();
-      participant.setGuestEditTokenHash(
-          guestParticipantTokenService.hashToken(mintedGuestEditToken));
-      participant.setGuestEditToken(mintedGuestEditToken);
-    }
-
-    if (desiredJobTypeId != null) {
-      JobType job = jobTypeRepository.findById(desiredJobTypeId).orElse(null);
-      participant.setDesiredMissionJobType(job);
-    }
-
-    // An explicit sign-up choice (the modal's Auszahlungsart select) wins over the profile-default
-    // seeding above; null keeps the default chain untouched.
-    if (payoutPreference != null) {
-      participant.setPayoutPreference(payoutPreference);
-    }
-
-    participant.setComment(comment);
-
-    mission.getParticipants().add(participant);
-    missionParticipantRepository.save(participant);
-    auditService.record(
-        AuditEventType.MISSION_PARTICIPANT_ADDED,
-        mission.getId(),
-        mission.getName(),
-        finalUserId,
-        AuditDetails.of("participant", participant.getId())
-            .with("type", finalUserId != null ? "user" : "guest"));
-    // NOTE: no explicit missionRepository.save(mission) here.
-    // The collection is @OptimisticLock(excluded = true) so Hibernate's dirty-check
-    // on commit persists the new participant (via cascade) without bumping the parent
-    // Mission.version. This is key for the multi-user concurrency design (Option A):
-    // adding a participant must NOT invalidate other users' open forms on the same mission.
-    //
-    // No `flush()` here on purpose. The in-memory `anyMatch` check above is the
-    // primary duplicate detector (returns a localized DuplicateEntityException → 409).
-    // The Stufe-2 DB-level backstop is the partial unique index `uq_mission_participant_user`
-    // (Flyway V96): a TOCTOU-raced double-signup (double-click, two tabs) slips past the
-    // in-memory check, both inserts head for the same (mission, user) key, and PostgreSQL
-    // rejects the second one at commit time as a unique-constraint violation. Spring
-    // wraps that as DataIntegrityViolationException and the GlobalExceptionHandler maps
-    // it to 409 — the same HTTP status the in-memory branch produces, so the frontend
-    // toast logic (`MissionPageController#addParticipant`, status-code-based) shows the
-    // user the same error. A service-side translation to DuplicateEntityException was
-    // attempted but required `saveAndFlush`, which forces a session-wide flush and
-    // breaks @Transactional tests that intentionally hold half-built sibling entities
-    // in the persistence context until rollback.
-    return mission;
+    return missionParticipantService.addParticipant(
+        missionId, userId, guestName, desiredJobTypeId, comment, orgUnitIds, payoutPreference);
   }
 
   /**
@@ -1049,10 +778,7 @@ public class MissionService {
    *     does not exist on this mission
    */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    return missionParticipantRepository
-        .findById(participantId)
-        .filter(p -> p.getMission().getId().equals(missionId))
-        .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
+    return missionParticipantService.getParticipant(missionId, participantId);
   }
 
   /**
@@ -1063,18 +789,7 @@ public class MissionService {
    * @return list of unassigned participants
    */
   public List<MissionParticipant> getUnassignedParticipants(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    Set<UUID> assignedParticipantIds =
-        mission.getAssignedUnits().stream()
-            .flatMap(unit -> unit.getCrew().stream())
-            .map(crew -> crew.getParticipant().getId())
-            .collect(java.util.stream.Collectors.toSet());
-    return mission.getParticipants().stream()
-        .filter(p -> !assignedParticipantIds.contains(p.getId()))
-        .toList();
+    return missionParticipantService.getUnassignedParticipants(missionId);
   }
 
   /**
@@ -1084,35 +799,7 @@ public class MissionService {
    */
   @Transactional
   public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    boolean removed = mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
-
-    if (!removed) {
-      throw new NotFoundException("Participant not found in this mission");
-    }
-
-    // Also remove from any crews in this mission
-    for (MissionUnit ship : mission.getAssignedUnits()) {
-      ship.getCrew()
-          .removeIf(
-              crew ->
-                  crew.getParticipant() != null
-                      && crew.getParticipant().getId().equals(participantId));
-    }
-
-    // NOTE: no explicit missionRepository.save(mission). orphanRemoval + @OptimisticLock(excluded)
-    // on participants/assignedUnits ensures dirty-flush on commit without bumping Mission.version.
-    auditService.record(
-        AuditEventType.MISSION_PARTICIPANT_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionParticipantService.removeParticipant(missionId, participantId);
   }
 
   /**
@@ -1138,116 +825,18 @@ public class MissionService {
       PayoutPreference payoutPreference,
       String guestName,
       Long version) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
-
-    if (version != null && !version.equals(participant.getVersion())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          MissionParticipant.class, participant.getId());
-    }
-
-    if (payoutPreference != null) {
-      participant.setPayoutPreference(payoutPreference);
-      missionParticipantRepository.save(participant);
-      missionParticipantRepository.flush();
-    }
-
-    if (desiredMissionJobTypeId != null) {
-      JobType jt =
-          jobTypeRepository
-              .findById(desiredMissionJobTypeId)
-              .orElseThrow(() -> new NotFoundException("Desired JobType not found"));
-      if (jt.getArchetype() != JobTypeArchetype.MISSION) {
-        throw new IllegalArgumentException(
-            "Desired JobType " + jt.getName() + " is not of archetype MISSION");
-      }
-      participant.setDesiredMissionJobType(jt);
-    } else {
-      participant.setDesiredMissionJobType(null);
-    }
-
-    if (participant.getUser() != null) {
-      // Registered users carry every org unit they belong to at participate-time. Re-derives from
-      // org_unit_membership on every update so a freshly-assigned Staffel / SK propagates into the
-      // participant row. The submitted orgUnitIds are ignored for registered participants — the
-      // picker is guest-only, and the affiliation is the user's actual membership set.
-      participant.setOrgUnits(resolveMembershipOrgUnits(participant.getUser().getId()));
-    } else {
-      // Audit finding M-3 (2026-05-20): logging the raw {@code guestName} leaks PII —
-      // free-text names often contain real-life names of third parties that PiiMasker does not
-      // catch (regex covers emails / JWTs / token keywords only). Log just the participant id;
-      // the linked-vs-guest distinction is implicit because the linked-user branch above logged
-      // nothing either.
-      log.info("Updating guest participant: {}", participant.getId());
-      if (guestName != null) {
-        participant.setGuestName(guestName);
-      }
-      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
-    }
-
-    if (plannedMissionJobTypeId != null) {
-      JobType jt =
-          jobTypeRepository
-              .findById(plannedMissionJobTypeId)
-              .orElseThrow(() -> new NotFoundException("Planned JobType not found"));
-      if (jt.getArchetype() != JobTypeArchetype.MISSION) {
-        throw new IllegalArgumentException(
-            "Planned JobType " + jt.getName() + " is not of archetype MISSION");
-      }
-      // A mission may have only one "Einsatzleiter" (the participant whose planned job type is the
-      // designated mission-lead type, JobType.isMissionLead). Reject assigning it to a second
-      // participant (REQ-MISSION-013) — the editor must first clear the existing one.
-      if (jt.isMissionLead()) {
-        boolean alreadyTaken =
-            mission.getParticipants().stream()
-                .anyMatch(
-                    other ->
-                        !other.getId().equals(participant.getId())
-                            && other.getPlannedMissionJobType() != null
-                            && other.getPlannedMissionJobType().isMissionLead());
-        if (alreadyTaken) {
-          throw new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
-              "A mission can have only one Einsatzleiter (mission lead).");
-        }
-      }
-      participant.setPlannedMissionJobType(jt);
-    } else {
-      participant.setPlannedMissionJobType(null);
-    }
-
-    participant.setComment(comment);
-
-    if (startTime != null) {
-      if (mission.getActualStartTime() == null) {
-        throw new IllegalArgumentException(
-            "Cannot set participant start time before mission actual start time is set");
-      }
-    }
-
-    if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
-      throw new IllegalArgumentException("Start time cannot be after end time");
-    }
-
-    participant.setStartTime(startTime);
-    participant.setEndTime(endTime);
-
-    // Persist the participant explicitly; avoid save(mission) to keep Mission.version stable.
-    missionParticipantRepository.save(participant);
-    auditService.record(
-        AuditEventType.MISSION_PARTICIPANT_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionParticipantService.updateParticipantAttributes(
+        missionId,
+        participantId,
+        desiredMissionJobTypeId,
+        plannedMissionJobTypeId,
+        comment,
+        startTime,
+        endTime,
+        orgUnitIds,
+        payoutPreference,
+        guestName,
+        version);
   }
 
   /**
@@ -1257,23 +846,7 @@ public class MissionService {
    */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    MissionParticipant participant = getParticipant(missionId, participantId);
-    if (mission.getActualStartTime() == null) {
-      throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
-    }
-    participant.setStartTime(Instant.now());
-    missionParticipantRepository.save(participant);
-    auditService.record(
-        AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionParticipantService.checkIn(missionId, participantId);
   }
 
   /**
@@ -1282,29 +855,7 @@ public class MissionService {
    */
   @Transactional
   public Mission checkOut(UUID missionId, UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    MissionParticipant participant = getParticipant(missionId, participantId);
-    if (mission.getActualEndTime() != null && Instant.now().isAfter(mission.getActualEndTime())) {
-      if (participant.getStartTime() != null
-          && mission.getActualEndTime().isBefore(participant.getStartTime())) {
-        participant.setEndTime(participant.getStartTime());
-      } else {
-        participant.setEndTime(mission.getActualEndTime());
-      }
-    } else {
-      participant.setEndTime(Instant.now());
-    }
-    missionParticipantRepository.save(participant);
-    auditService.record(
-        AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("participant", participantId));
-    return mission;
+    return missionParticipantService.checkOut(missionId, participantId);
   }
 
   /**
@@ -1315,25 +866,7 @@ public class MissionService {
   @Transactional
   public Mission updatePayoutPreference(
       UUID missionId, UUID participantId, PayoutPreference preference) {
-    Mission mission = getMissionById(missionId);
-    MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
-
-    if (preference != null) {
-      participant.setPayoutPreference(preference);
-      missionParticipantRepository.save(participant);
-      missionParticipantRepository.flush();
-      auditService.record(
-          AuditEventType.MISSION_PARTICIPANT_UPDATED,
-          mission.getId(),
-          mission.getName(),
-          participant.getUser() != null ? participant.getUser().getId() : null,
-          AuditDetails.of("participant", participantId).with("field", "payoutPreference"));
-    }
-    return mission;
+    return missionParticipantService.updatePayoutPreference(missionId, participantId, preference);
   }
 
   /**
@@ -1355,120 +888,8 @@ public class MissionService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit = new MissionUnit();
-    missionUnit.setMission(mission);
-
-    if (shipTypeId != null) {
-      ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
-      missionUnit.setShipType(shipType);
-    } else {
-      missionUnit.setShipType(null);
-    }
-
-    if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
-      if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
-        throw new IllegalArgumentException("Ship does not match the specified ShipType");
-      }
-      if (!isOwnerRegisteredParticipant(mission, ship)) {
-        throw new IllegalArgumentException(
-            "Ship owner is not a registered participant of the mission");
-      }
-      missionUnit.setShip(ship);
-      if (shipTypeId == null) {
-        missionUnit.setShipType(ship.getShipType());
-      }
-    }
-
-    missionUnit.setName(resolveUnitName(name, missionUnit));
-    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
-    missionUnit.setHighValueUnit(highValueUnit);
-
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    }
-
-    mission.getAssignedUnits().add(missionUnit);
-    missionUnitRepository.save(missionUnit);
-    auditService.record(
-        AuditEventType.MISSION_UNIT_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnit.getId()));
-    return mission;
-  }
-
-  /**
-   * Resolves the stored (NOT NULL) unit name from the optional display name: a non-blank caller
-   * value wins; otherwise the name is derived from the already-resolved ship (its hangar name)
-   * respectively ship type. Mirrors the unit-modal mock where the Anzeigename is optional because
-   * ship / ship type carry the unit's identity.
-   *
-   * @param name the caller-submitted display name (nullable/blank)
-   * @param unit the unit with {@code ship} / {@code shipType} already resolved
-   * @return the effective non-blank name to store
-   * @throws IllegalArgumentException when neither a name nor a ship / ship type is present
-   */
-  private static String resolveUnitName(String name, MissionUnit unit) {
-    if (name != null && !name.isBlank()) {
-      return name.trim();
-    }
-    if (unit.getShip() != null && unit.getShip().getName() != null) {
-      return unit.getShip().getName();
-    }
-    if (unit.getShipType() != null) {
-      return unit.getShipType().getName();
-    }
-    throw new IllegalArgumentException(
-        "Unit needs a display name or a ship / ship type to derive one from");
-  }
-
-  /**
-   * Resolves the optional explicit responsible person of a unit.
-   *
-   * @param responsibleUserId the user id, or {@code null} for "no explicit responsible" (the UI
-   *     then falls back to the assigned ship's owner)
-   * @return the resolved user or {@code null}
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the id is
-   *     unknown
-   */
-  private User resolveResponsibleUser(UUID responsibleUserId) {
-    if (responsibleUserId == null) {
-      return null;
-    }
-    return userRepository
-        .findById(responsibleUserId)
-        .orElseThrow(() -> new NotFoundException("Responsible user not found"));
-  }
-
-  /**
-   * Normalises a unit note: trims surrounding whitespace and collapses blank input to {@code null}
-   * so the column stays empty instead of storing whitespace-only strings.
-   *
-   * @param note the caller-submitted note (nullable)
-   * @return the trimmed note or {@code null}
-   */
-  private static String normalizeUnitNote(String note) {
-    return note == null || note.isBlank() ? null : note.trim();
+    return missionStructureService.addUnitToMission(
+        missionId, name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note);
   }
 
   /**
@@ -1486,103 +907,16 @@ public class MissionService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(unitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    missionUnit.setHighValueUnit(highValueUnit);
-    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
-
-    if (shipTypeId != null) {
-      ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
-      missionUnit.setShipType(shipType);
-    } else {
-      missionUnit.setShipType(null);
-    }
-
-    if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
-      if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
-        throw new IllegalArgumentException("Ship does not match the specified ShipType");
-      }
-      // A ship already pinned to any unit of this mission is grandfathered: unrelated edits (name,
-      // frequency, HVU) on a unit whose ship owner has since left the roster must not 400, and the
-      // edit picker keeps offering every already-assigned ship so it round-trips. Only a ship new
-      // to the mission must belong to a current participant.
-      boolean alreadyAssignedInMission =
-          mission.getAssignedUnits().stream()
-              .map(MissionUnit::getShip)
-              .filter(assigned -> assigned != null)
-              .anyMatch(assigned -> assigned.getId().equals(shipId));
-      if (!alreadyAssignedInMission && !isOwnerRegisteredParticipant(mission, ship)) {
-        throw new IllegalArgumentException(
-            "Ship owner is not a registered participant of the mission");
-      }
-      missionUnit.setShip(ship);
-      if (shipTypeId == null) {
-        missionUnit.setShipType(ship.getShipType());
-      }
-    } else {
-      missionUnit.setShip(null);
-    }
-
-    // After ship / ship type resolution so a blank display name can derive from them (same rule
-    // as addUnitToMission).
-    missionUnit.setName(resolveUnitName(name, missionUnit));
-
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    } else {
-      missionUnit.setFrequency(null);
-    }
-
-    missionUnitRepository.save(missionUnit);
-    auditService.record(
-        AuditEventType.MISSION_UNIT_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
-  }
-
-  /**
-   * Tests whether the given ship's owner is signed up as a participant of the mission. Only
-   * participants backed by a real {@link User} account count — guest participants have no account
-   * and therefore never own hangar ships. Used by {@link #addUnitToMission} and {@link
-   * #updateMissionUnit} to keep a unit's assigned ship constrained to ships brought by people
-   * actually registered for the mission.
-   *
-   * @param mission the mission whose participant roster is searched, never {@code null}
-   * @param ship the ship whose owner is checked for participation, never {@code null}
-   * @return {@code true} if the ship's owner is a registered (account-backed) participant
-   */
-  private boolean isOwnerRegisteredParticipant(@NotNull Mission mission, @NotNull Ship ship) {
-    UUID ownerId = ship.getOwner().getId();
-    return mission.getParticipants().stream()
-        .map(MissionParticipant::getUser)
-        .filter(user -> user != null)
-        .anyMatch(user -> user.getId().equals(ownerId));
+    return missionStructureService.updateMissionUnit(
+        missionId,
+        unitId,
+        name,
+        shipTypeId,
+        shipId,
+        highValueUnit,
+        frequency,
+        responsibleUserId,
+        note);
   }
 
   /**
@@ -1600,33 +934,7 @@ public class MissionService {
    */
   @Transactional(readOnly = true)
   public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
-
-    Set<UUID> participantUserIds =
-        mission.getParticipants().stream()
-            .map(MissionParticipant::getUser)
-            .filter(user -> user != null)
-            .map(User::getId)
-            .collect(java.util.stream.Collectors.toSet());
-    if (!participantUserIds.isEmpty()) {
-      shipRepository
-          .findByOwnerIdIn(participantUserIds)
-          .forEach(ship -> byId.put(ship.getId(), ship));
-    }
-
-    for (MissionUnit unit : mission.getAssignedUnits()) {
-      Ship ship = unit.getShip();
-      if (ship != null) {
-        byId.putIfAbsent(ship.getId(), ship);
-      }
-    }
-
-    return new java.util.ArrayList<>(byId.values());
+    return missionStructureService.getSelectableUnitShips(missionId);
   }
 
   /**
@@ -1635,24 +943,7 @@ public class MissionService {
    */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    boolean removed = mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId));
-
-    if (!removed) {
-      throw new NotFoundException("MissionUnit not found in this mission");
-    }
-
-    auditService.record(
-        AuditEventType.MISSION_UNIT_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
+    return missionStructureService.removeMissionUnit(missionId, unitId);
   }
 
   // --- Ablauf steps (procedure timeline) ---
@@ -1676,29 +967,7 @@ public class MissionService {
   @Transactional
   public Mission addStep(
       @NotNull UUID missionId, String title, String meta, @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    MissionStep step = new MissionStep();
-    step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
-    step.setDone(false);
-    step.setOrderIndex(nextStepOrderIndex(mission));
-    mission.addStep(step);
-    missionStepRepository.save(step);
-
-    bumpSectionVersion(mission, MissionSection.STEPS);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_STEP_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", step.getId()));
-    return mission;
+    return missionTimelineService.addStep(missionId, title, meta, expectedStepsVersion);
   }
 
   /**
@@ -1715,25 +984,7 @@ public class MissionService {
       String title,
       String meta,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    MissionStep step = findStep(mission, stepId);
-    step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
-
-    bumpSectionVersion(mission, MissionSection.STEPS);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_STEP_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", stepId));
-    return mission;
+    return missionTimelineService.updateStep(missionId, stepId, title, meta, expectedStepsVersion);
   }
 
   /**
@@ -1746,27 +997,7 @@ public class MissionService {
   @Transactional
   public Mission deleteStep(
       @NotNull UUID missionId, @NotNull UUID stepId, @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    boolean removed = mission.removeStep(stepId);
-    if (!removed) {
-      throw new NotFoundException("MissionStep not found in this mission");
-    }
-    repackStepOrder(mission);
-
-    bumpSectionVersion(mission, MissionSection.STEPS);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_STEP_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", stepId));
-    return mission;
+    return missionTimelineService.deleteStep(missionId, stepId, expectedStepsVersion);
   }
 
   /**
@@ -1785,34 +1016,7 @@ public class MissionService {
       @NotNull UUID missionId,
       @NotNull List<UUID> orderedStepIds,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    Set<UUID> existingIds =
-        mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
-    if (orderedStepIds.size() != existingIds.size()
-        || !existingIds.equals(new HashSet<>(orderedStepIds))) {
-      throw new IllegalArgumentException("Reorder id set must match the mission's steps exactly");
-    }
-
-    Map<UUID, MissionStep> byId =
-        mission.getSteps().stream().collect(Collectors.toMap(MissionStep::getId, s -> s));
-    for (int i = 0; i < orderedStepIds.size(); i++) {
-      byId.get(orderedStepIds.get(i)).setOrderIndex(i);
-    }
-
-    bumpSectionVersion(mission, MissionSection.STEPS);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_STEP_REORDERED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("count", existingIds.size()));
-    return mission;
+    return missionTimelineService.reorderSteps(missionId, orderedStepIds, expectedStepsVersion);
   }
 
   /**
@@ -1829,63 +1033,7 @@ public class MissionService {
       @NotNull UUID stepId,
       boolean done,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
-
-    MissionStep step = findStep(mission, stepId);
-    step.setDone(done);
-
-    bumpSectionVersion(mission, MissionSection.STEPS);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_STEP_DONE_CHANGED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("step", stepId).with("done", done));
-    return mission;
-  }
-
-  /**
-   * Finds a managed step by id within the mission, or throws.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
-   */
-  private static MissionStep findStep(@NotNull Mission mission, @NotNull UUID stepId) {
-    return mission.getSteps().stream()
-        .filter(s -> s.getId() != null && s.getId().equals(stepId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("MissionStep not found in this mission"));
-  }
-
-  /**
-   * Normalises a step's optional time/place hint: trims surrounding whitespace and collapses blank
-   * input to {@code null}.
-   */
-  private static String normalizeStepMeta(String meta) {
-    return meta == null || meta.isBlank() ? null : meta.trim();
-  }
-
-  /** Returns the {@code orderIndex} to assign a newly appended step (max existing + 1, or 0). */
-  private static int nextStepOrderIndex(@NotNull Mission mission) {
-    int max = -1;
-    for (MissionStep s : mission.getSteps()) {
-      max = Math.max(max, s.getOrderIndex());
-    }
-    return max + 1;
-  }
-
-  /** Re-assigns the remaining steps' {@code orderIndex} to a contiguous 0..n-1 by current order. */
-  private static void repackStepOrder(@NotNull Mission mission) {
-    List<MissionStep> ordered = new ArrayList<>(mission.getSteps());
-    ordered.sort(Comparator.comparingInt(MissionStep::getOrderIndex));
-    for (int i = 0; i < ordered.size(); i++) {
-      ordered.get(i).setOrderIndex(i);
-    }
+    return missionTimelineService.toggleStepDone(missionId, stepId, done, expectedStepsVersion);
   }
 
   // --- Mission goals (Ziele) ---
@@ -1912,28 +1060,7 @@ public class MissionService {
       String title,
       @NotNull MissionObjectiveKind kind,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
-
-    MissionObjective objective = new MissionObjective();
-    objective.setTitle(title == null ? null : title.trim());
-    objective.setKind(kind);
-    objective.setOrderIndex(nextObjectiveOrderIndex(mission));
-    mission.addObjective(objective);
-    missionObjectiveRepository.save(objective);
-
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_OBJECTIVE_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objective.getId()).with("kind", kind));
-    return mission;
+    return missionTimelineService.addObjective(missionId, title, kind, expectedObjectivesVersion);
   }
 
   /**
@@ -1950,25 +1077,8 @@ public class MissionService {
       String title,
       @NotNull MissionObjectiveKind kind,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
-
-    MissionObjective objective = findObjective(mission, objectiveId);
-    objective.setTitle(title == null ? null : title.trim());
-    objective.setKind(kind);
-
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_OBJECTIVE_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objectiveId).with("kind", kind));
-    return mission;
+    return missionTimelineService.updateObjective(
+        missionId, objectiveId, title, kind, expectedObjectivesVersion);
   }
 
   /**
@@ -1981,27 +1091,8 @@ public class MissionService {
   @Transactional
   public Mission deleteObjective(
       @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
-
-    boolean removed = mission.removeObjective(objectiveId);
-    if (!removed) {
-      throw new NotFoundException("MissionObjective not found in this mission");
-    }
-    repackObjectiveOrder(mission);
-
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_OBJECTIVE_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("objective", objectiveId));
-    return mission;
+    return missionTimelineService.deleteObjective(
+        missionId, objectiveId, expectedObjectivesVersion);
   }
 
   /**
@@ -2020,66 +1111,8 @@ public class MissionService {
       @NotNull UUID missionId,
       @NotNull List<UUID> orderedObjectiveIds,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
-
-    Set<UUID> existingIds =
-        mission.getObjectives().stream().map(MissionObjective::getId).collect(Collectors.toSet());
-    if (orderedObjectiveIds.size() != existingIds.size()
-        || !existingIds.equals(new HashSet<>(orderedObjectiveIds))) {
-      throw new IllegalArgumentException("Reorder id set must match the mission's goals exactly");
-    }
-
-    Map<UUID, MissionObjective> byId =
-        mission.getObjectives().stream().collect(Collectors.toMap(MissionObjective::getId, o -> o));
-    for (int i = 0; i < orderedObjectiveIds.size(); i++) {
-      byId.get(orderedObjectiveIds.get(i)).setOrderIndex(i);
-    }
-
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
-    missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_OBJECTIVE_REORDERED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("count", existingIds.size()));
-    return mission;
-  }
-
-  /**
-   * Finds a managed goal by id within the mission, or throws.
-   *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
-   *     a child of the mission
-   */
-  private static MissionObjective findObjective(
-      @NotNull Mission mission, @NotNull UUID objectiveId) {
-    return mission.getObjectives().stream()
-        .filter(o -> o.getId() != null && o.getId().equals(objectiveId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("MissionObjective not found in this mission"));
-  }
-
-  /** Returns the {@code orderIndex} to assign a newly appended goal (max existing + 1, or 0). */
-  private static int nextObjectiveOrderIndex(@NotNull Mission mission) {
-    int max = -1;
-    for (MissionObjective o : mission.getObjectives()) {
-      max = Math.max(max, o.getOrderIndex());
-    }
-    return max + 1;
-  }
-
-  /** Re-assigns the remaining goals' {@code orderIndex} to a contiguous 0..n-1 by current order. */
-  private static void repackObjectiveOrder(@NotNull Mission mission) {
-    List<MissionObjective> ordered = new ArrayList<>(mission.getObjectives());
-    ordered.sort(Comparator.comparingInt(MissionObjective::getOrderIndex));
-    for (int i = 0; i < ordered.size(); i++) {
-      ordered.get(i).setOrderIndex(i);
-    }
+    return missionTimelineService.reorderObjectives(
+        missionId, orderedObjectiveIds, expectedObjectivesVersion);
   }
 
   /**
@@ -2092,51 +1125,8 @@ public class MissionService {
       @NotNull UUID missionUnitId,
       @NotNull UUID participantId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionShip =
-        mission.getAssignedUnits().stream()
-            .filter(ms -> ms != null && ms.getId() != null && ms.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found in this mission"));
-
-    MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
-
-    boolean isAlreadyAssigned =
-        mission.getAssignedUnits().stream()
-            .flatMap(u -> u.getCrew().stream())
-            .anyMatch(c -> c.getParticipant().getId().equals(participantId));
-
-    if (isAlreadyAssigned) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-          "error.mission.crew.duplicate");
-    }
-
-    MissionCrew crew = new MissionCrew();
-    crew.setMissionUnit(missionShip);
-    crew.setParticipant(participant);
-
-    // Fetch and validate JobTypes
-    Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
-
-    crew.setJobTypes(jobTypes);
-
-    missionShip.getCrew().add(crew);
-    missionCrewRepository.save(crew);
-    auditService.record(
-        AuditEventType.MISSION_CREW_ADDED,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crew.getId()));
-    return mission;
+    return missionStructureService.addCrewToShip(
+        missionId, missionUnitId, participantId, jobTypeIds);
   }
 
   /** Updates a crew's name, role, and assigned ship. */
@@ -2146,34 +1136,7 @@ public class MissionService {
       @NotNull UUID missionUnitId,
       @NotNull UUID crewId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    MissionCrew crew =
-        missionUnit.getCrew().stream()
-            .filter(c -> c.getId().equals(crewId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Crew member not found in this unit"));
-
-    Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
-    crew.setJobTypes(jobTypes);
-
-    missionCrewRepository.save(crew);
-    auditService.record(
-        AuditEventType.MISSION_CREW_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
+    return missionStructureService.updateCrewInShip(missionId, missionUnitId, crewId, jobTypeIds);
   }
 
   /**
@@ -2183,49 +1146,7 @@ public class MissionService {
   @Transactional
   public Mission removeCrewFromShip(
       @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    boolean removed = missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId));
-
-    if (!removed) {
-      throw new NotFoundException("Crew member not found in this unit");
-    }
-
-    auditService.record(
-        AuditEventType.MISSION_CREW_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
-  }
-
-  private Set<JobType> validateAndFetchJobTypes(Set<UUID> jobTypeIds) {
-    Set<JobType> jobTypes = new HashSet<>();
-    if (jobTypeIds != null && !jobTypeIds.isEmpty()) {
-      for (UUID jtId : jobTypeIds) {
-        JobType jt =
-            jobTypeRepository
-                .findById(jtId)
-                .orElseThrow(() -> new NotFoundException("JobType not found: " + jtId));
-
-        if (jt.getArchetype() != JobTypeArchetype.CREW) {
-          throw new IllegalArgumentException(
-              "JobType " + jt.getName() + " is not of archetype CREW");
-        }
-        jobTypes.add(jt);
-      }
-    }
-    return jobTypes;
+    return missionStructureService.removeCrewFromShip(missionId, missionUnitId, crewId);
   }
 
   /**
@@ -2624,40 +1545,8 @@ public class MissionService {
       UUID userId,
       String guestName,
       @NotNull Long expectedPartyLeadVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
-
-    if (userId != null) {
-      User user =
-          userRepository
-              .findById(userId)
-              .orElseThrow(() -> new NotFoundException("User not found"));
-      mission.setPartyLeadUser(user);
-      mission.setPartyLeadGuestName(null);
-    } else if (guestName != null && !guestName.isBlank()) {
-      mission.setPartyLeadUser(null);
-      mission.setPartyLeadGuestName(guestName.trim());
-    } else {
-      mission.setPartyLeadUser(null);
-      mission.setPartyLeadGuestName(null);
-    }
-
-    bumpSectionVersion(mission, MissionSection.PARTY_LEAD);
-    Mission saved = missionRepository.save(mission);
-    auditService.record(
-        AuditEventType.MISSION_PARTY_LEAD_CHANGED,
-        mission.getId(),
-        mission.getName(),
-        userId,
-        AuditDetails.of(
-            "kind",
-            userId != null
-                ? "user"
-                : (guestName != null && !guestName.isBlank() ? "guest" : "cleared")));
-    return saved;
+    return missionParticipantService.setPartyLead(
+        missionId, userId, guestName, expectedPartyLeadVersion);
   }
 
   /**
@@ -2666,16 +1555,7 @@ public class MissionService {
    */
   @Transactional
   public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    mission.getManagers().add(user);
-    auditService.record(
-        AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
-    return mission;
+    return missionParticipantService.addManager(missionId, userId);
   }
 
   /**
@@ -2684,82 +1564,6 @@ public class MissionService {
    */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    mission.getManagers().removeIf(u -> u.getId().equals(userId));
-    auditService.record(
-        AuditEventType.MISSION_MANAGER_REMOVED, mission.getId(), mission.getName(), userId, null);
-    return mission;
-  }
-
-  /**
-   * Resolves every org unit a registered user belongs to (Staffel and/or Spezialkommandos) into the
-   * managed {@link OrgUnit} entities to stamp on the participant. Reads the membership rows via
-   * {@link OrgUnitMembershipService#findAllMembershipsForUser(UUID)} (already Staffel-first, then
-   * SK alphabetical) and materialises each org-unit id through the polymorphic {@code
-   * OrgUnitRepository}. A user with no memberships yields an empty list — there is deliberately no
-   * IRIDIUM fallback, so an admin who belongs to nothing shows no affiliation on the roster.
-   *
-   * @param userId the registered user whose memberships to resolve; never {@code null}.
-   * @return the managed org-unit entities, membership order preserved; never {@code null}, possibly
-   *     empty.
-   */
-  private java.util.List<OrgUnit> resolveMembershipOrgUnits(@NotNull UUID userId) {
-    java.util.List<UUID> orgUnitIds =
-        orgUnitMembershipService.findAllMembershipsForUser(userId).stream()
-            .map(m -> m.getId().getOrgUnitId())
-            .toList();
-    if (orgUnitIds.isEmpty()) {
-      return java.util.List.of();
-    }
-    // One batched lookup instead of findById per membership; re-key to preserve membership order
-    // and drop any id that no longer resolves (mirrors the previous nonNull filter).
-    java.util.Map<UUID, OrgUnit> byId =
-        orgUnitRepository.findAllById(orgUnitIds).stream()
-            .collect(java.util.stream.Collectors.toMap(OrgUnit::getId, o -> o));
-    return orgUnitIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
-  }
-
-  /**
-   * Resolves a caller-submitted {@code orgUnitIds} list for a GUEST participant entry to the org
-   * units to persist. A guest's org-unit affiliation is mission-scoped roster metadata only: it is
-   * a label on a single mission's participant row, drives nothing but the roster badges (see {@code
-   * MissionMapper.orgUnitsToReferenceDtos}), grants no permissions and touches no user data. Anyone
-   * who may add the guest at all — the endpoint's {@code canSeeMission} gate already governs that,
-   * including anonymous sign-ups on public (non-internal) missions — may therefore label it with
-   * any Staffel or SK:
-   *
-   * <ul>
-   *   <li>{@code null} / empty input → empty list (no affiliation).
-   *   <li>otherwise → every id that resolves to a real {@link OrgUnit} is kept, in submission
-   *       order; a {@code null} or unknown id is silently skipped (a roster mislabel is not a
-   *       forgery worth a 403, and a non-resolving id simply yields no badge).
-   * </ul>
-   *
-   * <p>This deliberately drops the former audit-H-3 authorization filter (admin / own-membership
-   * required) for guests: that gate denied an SK lead — and every anonymous sign-up — from tagging
-   * a guest with the relevant org unit, even though the tag carries no authority. Registered-user
-   * participants are unaffected: their affiliations are auto-derived from their actual memberships
-   * in the caller paths, never from this submitted list.
-   *
-   * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
-   * @return the managed org-unit entities to persist on the guest participant; never {@code null},
-   *     possibly empty.
-   */
-  private java.util.List<OrgUnit> resolveGuestSubmittedOrgUnits(
-      java.util.List<UUID> submittedOrgUnitIds) {
-    if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
-      return java.util.List.of();
-    }
-    java.util.List<OrgUnit> resolved = new java.util.ArrayList<>();
-    for (UUID orgUnitId : submittedOrgUnitIds) {
-      if (orgUnitId == null) {
-        continue;
-      }
-      orgUnitRepository.findById(orgUnitId).ifPresent(resolved::add);
-    }
-    return resolved;
+    return missionParticipantService.removeManager(missionId, userId);
   }
 }

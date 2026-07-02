@@ -1438,6 +1438,8 @@ class ArchitectureTest {
       "de.greluc.krt.profit.basetool.backend.repository.MissionRepository";
   private static final String MISSION_SERVICE_FQN =
       "de.greluc.krt.profit.basetool.backend.service.MissionService";
+  private static final String MISSION_PARTICIPANT_SERVICE_FQN =
+      "de.greluc.krt.profit.basetool.backend.service.MissionParticipantService";
 
   /**
    * The multi-user signup concurrency contract (see the inline comment block in {@link
@@ -1526,38 +1528,45 @@ class ArchitectureTest {
 
   /**
    * Pins the second half of the signup concurrency contract: the {@code addParticipant} overloads
-   * in {@link de.greluc.krt.profit.basetool.backend.service.MissionService} must never call {@code
-   * missionRepository.save(...)} (or {@code saveAndFlush}). The save is the only realistic way to
-   * dirty the parent {@code mission} row from inside this method — and a dirty parent row would
-   * issue an {@code UPDATE mission} statement that, under contention, races between threads and
-   * surfaces as {@code ObjectOptimisticLockingFailureException}. Persisting the new participant via
-   * {@code missionParticipantRepository.save(participant)} is the supported path; Hibernate's
-   * cascade + dirty-check on the inverse-side collection handles the rest without touching the
-   * parent row.
+   * must never call {@code missionRepository.save(...)} (or {@code saveAndFlush}). The save is the
+   * only realistic way to dirty the parent {@code mission} row from inside this method — and a
+   * dirty parent row would issue an {@code UPDATE mission} statement that, under contention, races
+   * between threads and surfaces as {@code ObjectOptimisticLockingFailureException}. Persisting the
+   * new participant via {@code missionParticipantRepository.save(participant)} is the supported
+   * path; Hibernate's cascade + dirty-check on the inverse-side collection handles the rest without
+   * touching the parent row.
    *
    * <p>The rule is structural: it walks the bytecode of every method named {@code addParticipant}
-   * declared on {@code MissionService} and rejects any direct call into {@code
-   * MissionRepository#save*}. False positives (e.g. a future legitimate reason to re-save the
-   * mission inside the signup flow) should be carved out by renaming the method or by extracting
-   * the save into a dedicated helper that is itself documented.
+   * declared on {@link de.greluc.krt.profit.basetool.backend.service.MissionParticipantService}
+   * (where the real signup logic lives since the L1 step-2 split, #920) <em>and</em> on the {@link
+   * de.greluc.krt.profit.basetool.backend.service.MissionService} facade (whose overloads are thin
+   * delegations that must likewise stay save-free), rejecting any direct call into {@code
+   * MissionRepository#save*}. Covering both classes keeps the guard pointed at the actual signup
+   * body — a rule scoped to the facade alone would pass vacuously after the method body moved.
+   * False positives (e.g. a future legitimate reason to re-save the mission inside the signup flow)
+   * should be carved out by renaming the method or by extracting the save into a dedicated helper
+   * that is itself documented.
    */
   @Test
   void missionServiceAddParticipantMustNotSaveMission() {
     methods()
         .that()
         .areDeclaredInClassesThat()
+        .haveFullyQualifiedName(MISSION_PARTICIPANT_SERVICE_FQN)
+        .or()
+        .areDeclaredInClassesThat()
         .haveFullyQualifiedName(MISSION_SERVICE_FQN)
         .and()
         .haveName("addParticipant")
         .should(notCallMissionRepositorySave())
         .because(
-            "MissionService.addParticipant must not bump Mission.version under concurrent signups"
-                + " — calling missionRepository.save(mission) inside the flow would dirty the"
-                + " parent row and re-open 409s on parallel \"Anmelden\" clicks. Persist the new"
-                + " participant via missionParticipantRepository.save(participant) and let"
-                + " Hibernate's cascade handle the rest. See"
-                + " MissionParticipantConcurrencyTest and the comment block on"
-                + " MissionService.addParticipant.")
+            "MissionParticipantService.addParticipant (and the MissionService facade delegation)"
+                + " must not bump Mission.version under concurrent signups — calling"
+                + " missionRepository.save(mission) inside the flow would dirty the parent row and"
+                + " re-open 409s on parallel \"Anmelden\" clicks. Persist the new participant via"
+                + " missionParticipantRepository.save(participant) and let Hibernate's cascade"
+                + " handle the rest. See MissionParticipantConcurrencyTest and the comment block on"
+                + " MissionParticipantService.addParticipant.")
         .check(CLASSES);
   }
 

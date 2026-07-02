@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +67,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Coverage for {@link MissionService} lifecycle / ownership methods that the existing focused test
@@ -98,7 +100,17 @@ class MissionServiceLifecycleTest {
   @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
+
+  @InjectMocks private MissionParticipantService missionParticipantService;
   @InjectMocks private MissionService service;
+
+  @BeforeEach
+  void wireExtractedParticipantService() {
+    // MissionService delegates the participant methods to the extracted MissionParticipantService
+    // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
+    // reflection, since Mockito does not inject one @InjectMocks target into another.
+    ReflectionTestUtils.setField(service, "missionParticipantService", missionParticipantService);
+  }
 
   private static final UUID MISSION_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();

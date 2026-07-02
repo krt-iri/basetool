@@ -53,7 +53,7 @@ class MissionEinsatzleiterConstraintTest {
   @Mock private JobTypeRepository jobTypeRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionParticipantService missionParticipantService;
 
   private UUID missionId;
   private Mission mission;
@@ -92,7 +92,7 @@ class MissionEinsatzleiterConstraintTest {
     assertThrows(
         BusinessConflictException.class,
         () ->
-            missionService.updateParticipantAttributes(
+            missionParticipantService.updateParticipantAttributes(
                 missionId,
                 p2.getId(),
                 null,
@@ -114,7 +114,7 @@ class MissionEinsatzleiterConstraintTest {
 
     assertDoesNotThrow(
         () ->
-            missionService.updateParticipantAttributes(
+            missionParticipantService.updateParticipantAttributes(
                 missionId,
                 p2.getId(),
                 null,

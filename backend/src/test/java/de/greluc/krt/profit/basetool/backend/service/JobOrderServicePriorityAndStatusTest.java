@@ -63,6 +63,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Concurrency-sensitive coverage for {@link JobOrderService} priority/status transitions and the
@@ -85,12 +86,26 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private MaterialClaimService materialClaimService;
 
   @Mock private AuditService auditService;
+
+  // The stock/claim DTO projection and the priority queue were extracted to
+  // JobOrderStockProjectionService / JobOrderPriorityService (L2, #921); real instances (built from
+  // the same mocks) are wired into the CUT via reflection in setUp() — the priority service also
+  // gets the real projection chained in — so the delegated updateJobOrderPriority and the
+  // normalizePriorities calls on the status/complete paths keep exercising the real logic.
+  @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
+  @InjectMocks private JobOrderPriorityService jobOrderPriorityService;
+
   @InjectMocks private JobOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
 
   @BeforeEach
   void stubMapper() {
+    ReflectionTestUtils.setField(
+        service, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderPriorityService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(service, "jobOrderPriorityService", jobOrderPriorityService);
     // Every return path goes through mapToDtoWithStock(). Return an empty-materials
     // DTO so the stock-aggregation repository call is unnecessary.
     lenient()
