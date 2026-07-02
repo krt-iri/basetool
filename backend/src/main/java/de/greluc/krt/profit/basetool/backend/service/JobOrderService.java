@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -35,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
@@ -46,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
@@ -91,7 +88,7 @@ public class JobOrderService {
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final UserRepository userRepository;
+  private final JobOrderAssigneeService jobOrderAssigneeService;
   private final OrgUnitRepository orgUnitRepository;
   private final JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   private final AuthHelperService authHelperService;
@@ -900,29 +897,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto addAssignee(UUID jobOrderId, UUID userId) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    boolean alreadyAssigned =
-        jobOrder.getAssignees().stream()
-            .anyMatch(a -> a.getUser() != null && a.getUser().getId().equals(userId));
-    if (alreadyAssigned) {
-      return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-    }
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-    jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    auditService.record(
-        AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
-        saved.getId(),
-        orderLabel(saved),
-        userId,
-        AuditDetails.of("assignee", userId));
-    return jobOrderStockProjectionService.mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.addAssignee(jobOrderId, userId);
   }
 
   /**
@@ -1004,24 +979,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto removeAssignee(UUID jobOrderId, UUID userId) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    boolean removed =
-        jobOrder
-            .getAssignees()
-            .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    if (removed) {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId));
-    }
-    return jobOrderStockProjectionService.mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.removeAssignee(jobOrderId, userId);
   }
 
   /**
@@ -1041,7 +999,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
-    return setAssigneeNote(jobOrderId, userId, note, version);
+    return jobOrderAssigneeService.updateAssigneeNote(jobOrderId, userId, note, version);
   }
 
   /**
@@ -1058,57 +1016,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto deleteAssigneeNote(UUID jobOrderId, UUID userId, Long version) {
-    return setAssigneeNote(jobOrderId, userId, null, version);
-  }
-
-  /**
-   * Shared implementation for the note set/clear endpoints: locates the assignee edge, enforces the
-   * supplied version against the edge's own {@code @Version}, mutates the note via dirty-checking
-   * and flushes so the returned DTO carries the freshly incremented edge version.
-   *
-   * @param jobOrderId job order primary key
-   * @param userId the assignee whose note is changed
-   * @param note the new note value, or {@code null} to clear it
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
-   * @return the persisted order with the refreshed assignee list
-   */
-  private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    JobOrderAssignee assignee =
-        jobOrder.getAssignees().stream()
-            .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Assignee not found on job order " + jobOrderId + ": " + userId));
-
-    OptimisticLock.checkOptionalClient(
-        assignee.getVersion(), version, JobOrderAssignee.class, assignee.getId());
-
-    String trimmed = (note == null || note.isBlank()) ? null : note.strip();
-    assignee.setNote(trimmed);
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    // PII: the note body is user free text — record only its presence/length, never the content.
-    if (trimmed != null) {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()));
-    } else {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId));
-    }
-    return jobOrderStockProjectionService.mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.deleteAssigneeNote(jobOrderId, userId, version);
   }
 
   /**

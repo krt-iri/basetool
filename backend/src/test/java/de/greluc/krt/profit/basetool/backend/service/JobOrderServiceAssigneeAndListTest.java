@@ -94,9 +94,13 @@ class JobOrderServiceAssigneeAndListTest {
 
   @Mock private AuditService auditService;
 
-  // The stock/claim DTO projection was extracted to JobOrderStockProjectionService (L2, #921);
-  // a real instance (built from the same mocks) is wired into the CUT via reflection in setUp().
+  // The stock/claim DTO projection and the assignee lifecycle were extracted to
+  // JobOrderStockProjectionService / JobOrderAssigneeService (L2, #921); real instances (built from
+  // the same mocks) are wired into the CUT via reflection in setUp() — the assignee service also
+  // gets the real projection chained in — so the delegated add/remove/note paths and the list paths
+  // keep exercising the real logic.
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
+  @InjectMocks private JobOrderAssigneeService jobOrderAssigneeService;
 
   @InjectMocks private JobOrderService service;
 
@@ -107,6 +111,9 @@ class JobOrderServiceAssigneeAndListTest {
   void stubMapperEchoingEmptyMaterials() {
     ReflectionTestUtils.setField(
         service, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderAssigneeService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(service, "jobOrderAssigneeService", jobOrderAssigneeService);
     // The service routes nearly every return through mapToDtoWithStock(),
     // which calls jobOrderMapper.toDto(...) and then iterates the result's
     // materials. Return an empty materials list so we don't have to stub
