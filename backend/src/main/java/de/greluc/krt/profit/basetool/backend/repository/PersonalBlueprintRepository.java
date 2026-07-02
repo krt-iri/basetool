@@ -126,8 +126,9 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    *     null}
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct("
-          + "b.ownerSub, b.productName) FROM PersonalBlueprint b WHERE b.ownerSub IN :ownerSubs")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct(b.ownerSub, b.productName) FROM PersonalBlueprint b WHERE b.ownerSub IN :ownerSubs
+      """)
   List<BlueprintOwnerProduct> findOwnerProductByOwnerSubIn(
       @Param("ownerSubs") Collection<String> ownerSubs);
 

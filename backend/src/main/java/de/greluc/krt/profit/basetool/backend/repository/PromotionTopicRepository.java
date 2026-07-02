@@ -51,8 +51,10 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
    * default matches {@link #findAllByOrderBySortOrderAsc()}.
    */
   @Query(
-      "SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id ="
-          + " :owningSquadronId ORDER BY t.sortOrder ASC")
+      """
+      SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id =
+      :owningSquadronId ORDER BY t.sortOrder ASC
+      """)
   List<PromotionTopic> findAllScoped(@Param("owningSquadronId") UUID owningSquadronId);
 
   /**
@@ -60,8 +62,10 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
    * #findAllScoped(UUID)}; sort is delegated to {@link Pageable} so the caller can override.
    */
   @Query(
-      "SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id ="
-          + " :owningSquadronId")
+      """
+      SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id =
+      :owningSquadronId
+      """)
   Page<PromotionTopic> findAllScoped(
       @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 }

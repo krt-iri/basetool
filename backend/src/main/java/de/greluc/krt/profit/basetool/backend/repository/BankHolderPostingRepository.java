@@ -55,13 +55,14 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    * @return per-holder global totals with the live display label
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance("
-          + "h.id,"
-          + " CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''"
-          + " THEN u.displayName ELSE COALESCE(u.username, h.handle) END,"
-          + " h.active, SUM(p.amount))"
-          + " FROM BankHolderPosting p JOIN p.holder h LEFT JOIN h.user u"
-          + " GROUP BY h.id, h.active, h.handle, u.displayName, u.username")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance(h.id,
+      CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''
+      THEN u.displayName ELSE COALESCE(u.username, h.handle) END,
+      h.active, SUM(p.amount))
+      FROM BankHolderPosting p JOIN p.holder h LEFT JOIN h.user u
+      GROUP BY h.id, h.active, h.handle, u.displayName, u.username
+      """)
   List<BankHolderBalance> holderTotals();
 
   /**
@@ -95,14 +96,15 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    * @return every holder leg of the given transactions with the live display label
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg("
-          + "t.id, h.id,"
-          + " CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''"
-          + " THEN u.displayName ELSE COALESCE(u.username, h.handle) END,"
-          + " p.amount)"
-          + " FROM BankHolderPosting p JOIN p.transaction t JOIN p.holder h"
-          + " LEFT JOIN h.user u"
-          + " WHERE t.id IN :transactionIds")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg(t.id, h.id,
+      CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''
+      THEN u.displayName ELSE COALESCE(u.username, h.handle) END,
+      p.amount)
+      FROM BankHolderPosting p JOIN p.transaction t JOIN p.holder h
+      LEFT JOIN h.user u
+      WHERE t.id IN :transactionIds
+      """)
   List<BankHolderLeg> findHolderLegsByTransactionIds(
       @Param("transactionIds") Collection<UUID> transactionIds);
 
@@ -118,10 +120,11 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    * @return one page of the holder's booking rows
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow("
-          + "p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee)"
-          + " FROM BankHolderPosting p JOIN p.transaction t"
-          + " LEFT JOIN t.reversedTransaction rt WHERE p.holder.id = :holderId")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow(p.id, t.id, t.type, p.amount, t.note, p.createdAt, rt.id, t.transferFee)
+      FROM BankHolderPosting p JOIN p.transaction t
+      LEFT JOIN t.reversedTransaction rt WHERE p.holder.id = :holderId
+      """)
   Page<BankHolderBookingRow> findHolderBookings(
       @Param("holderId") UUID holderId, Pageable pageable);
 
@@ -137,11 +140,13 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    * @return the violating transaction ids (empty when sound)
    */
   @Query(
-      "SELECT t.id FROM BankHolderPosting p JOIN p.transaction t"
-          + " WHERE t.type IN ("
-          + "   de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER,"
-          + "   de.greluc.krt.profit.basetool.backend.model.BankTransactionType.HOLDER_TRANSFER)"
-          + " GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0")
+      """
+      SELECT t.id FROM BankHolderPosting p JOIN p.transaction t
+      WHERE t.type IN (
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER,
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.HOLDER_TRANSFER)
+      GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0
+      """)
   List<UUID> findHolderMovementTransactionsWithNonZeroSum();
 
   /**
@@ -154,11 +159,13 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    */
   @Query(
       value =
-          "SELECT rt.id FROM bank_transaction rt"
-              + " WHERE rt.type = 'REVERSAL' AND EXISTS ("
-              + "   SELECT 1 FROM bank_holder_posting p"
-              + "   WHERE p.transaction_id IN (rt.id, rt.reversed_transaction_id)"
-              + "   GROUP BY p.holder_id HAVING SUM(p.amount) <> 0)",
+          """
+          SELECT rt.id FROM bank_transaction rt
+          WHERE rt.type = 'REVERSAL' AND EXISTS (
+          SELECT 1 FROM bank_holder_posting p
+          WHERE p.transaction_id IN (rt.id, rt.reversed_transaction_id)
+          GROUP BY p.holder_id HAVING SUM(p.amount) <> 0)
+          """,
       nativeQuery = true)
   List<UUID> findReversalTransactionsNotMirroredOnHolderLedger();
 }

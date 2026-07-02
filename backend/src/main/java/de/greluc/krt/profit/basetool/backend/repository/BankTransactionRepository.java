@@ -54,9 +54,11 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
    * @return the violating transfer transaction ids (empty when sound)
    */
   @Query(
-      "SELECT t.id FROM BankPosting p JOIN p.transaction t WHERE t.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER"
-          + " GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0")
+      """
+      SELECT t.id FROM BankPosting p JOIN p.transaction t WHERE t.type =
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER
+      GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0
+      """)
   List<UUID> findTransferTransactionsWithNonZeroSum();
 
   /**
@@ -70,11 +72,13 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
    */
   @Query(
       value =
-          "SELECT rt.id FROM bank_transaction rt"
-              + " WHERE rt.type = 'REVERSAL' AND EXISTS ("
-              + "   SELECT 1 FROM bank_posting p"
-              + "   WHERE p.transaction_id IN (rt.id, rt.reversed_transaction_id)"
-              + "   GROUP BY p.account_id HAVING SUM(p.amount) <> 0)",
+          """
+          SELECT rt.id FROM bank_transaction rt
+          WHERE rt.type = 'REVERSAL' AND EXISTS (
+          SELECT 1 FROM bank_posting p
+          WHERE p.transaction_id IN (rt.id, rt.reversed_transaction_id)
+          GROUP BY p.account_id HAVING SUM(p.amount) <> 0)
+          """,
       nativeQuery = true)
   List<UUID> findReversalTransactionsNotMirrored();
 
@@ -88,8 +92,10 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
    * @return the violating transaction ids (empty when every audited type has its row)
    */
   @Query(
-      "SELECT t.id FROM BankTransaction t WHERE t.type <>"
-          + " de.greluc.krt.profit.basetool.backend.model.BankTransactionType.WIPE_RESET"
-          + " AND NOT EXISTS (SELECT 1 FROM BankAuditEvent e WHERE e.transactionId = t.id)")
+      """
+      SELECT t.id FROM BankTransaction t WHERE t.type <>
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.WIPE_RESET
+      AND NOT EXISTS (SELECT 1 FROM BankAuditEvent e WHERE e.transactionId = t.id)
+      """)
   List<UUID> findTransactionsWithoutAuditEvent();
 }

@@ -90,8 +90,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC"
-          + " NULLS LAST, o.displayId DESC")
+      """
+      SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC
+      NULLS LAST, o.displayId DESC
+      """)
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
@@ -167,11 +169,13 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    *     or empty when the id is unknown
    */
   @Query(
-      "SELECT o FROM JobOrder o"
-          + " LEFT JOIN FETCH o.items i"
-          + " LEFT JOIN FETCH i.blueprint"
-          + " LEFT JOIN FETCH i.gameItem"
-          + " WHERE o.id = :id")
+      """
+      SELECT o FROM JobOrder o
+      LEFT JOIN FETCH o.items i
+      LEFT JOIN FETCH i.blueprint
+      LEFT JOIN FETCH i.gameItem
+      WHERE o.id = :id
+      """)
   Optional<JobOrder> findByIdWithItemBlueprints(@Param("id") UUID id);
 
   /**

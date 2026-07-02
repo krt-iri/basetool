@@ -130,8 +130,10 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
    */
   @EntityGraph(attributePaths = {"orgUnit"})
   @Query(
-      "SELECT a FROM BankAccount a WHERE a.id IN"
-          + " (SELECT g.id.accountId FROM BankAccountGrant g WHERE g.id.userId = :userId)")
+      """
+      SELECT a FROM BankAccount a WHERE a.id IN
+      (SELECT g.id.accountId FROM BankAccountGrant g WHERE g.id.userId = :userId)
+      """)
   Page<BankAccount> findGrantedTo(@Param("userId") UUID userId, Pageable pageable);
 
   /**
@@ -144,9 +146,11 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
    */
   @EntityGraph(attributePaths = {"orgUnit"})
   @Query(
-      "SELECT a FROM BankAccount a WHERE a.id IN"
-          + " (SELECT g.id.accountId FROM BankAccountGrant g WHERE g.id.userId = :userId)"
-          + " ORDER BY a.accountNo")
+      """
+      SELECT a FROM BankAccount a WHERE a.id IN
+      (SELECT g.id.accountId FROM BankAccountGrant g WHERE g.id.userId = :userId)
+      ORDER BY a.accountNo
+      """)
   List<BankAccount> findAllGrantedTo(@Param("userId") UUID userId);
 
   /**

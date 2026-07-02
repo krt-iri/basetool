@@ -68,8 +68,10 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
    * @return a page of categories visible to the caller
    */
   @Query(
-      "SELECT c FROM PromotionCategory c WHERE :owningSquadronId IS NULL OR"
-          + " c.topic.owningSquadron.id = :owningSquadronId")
+      """
+      SELECT c FROM PromotionCategory c WHERE :owningSquadronId IS NULL OR
+      c.topic.owningSquadron.id = :owningSquadronId
+      """)
   Page<PromotionCategory> findAllScoped(
       @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 
@@ -84,8 +86,10 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
    * @return a page of categories under the topic, scoped to the caller
    */
   @Query(
-      "SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL"
-          + " OR c.topic.owningSquadron.id = :owningSquadronId)")
+      """
+      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL
+      OR c.topic.owningSquadron.id = :owningSquadronId)
+      """)
   Page<PromotionCategory> findAllByTopicIdScoped(
       @Param("topicId") UUID topicId,
       @Param("owningSquadronId") UUID owningSquadronId,
@@ -100,8 +104,10 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
    * @return the topic's categories in display order, scoped to the caller
    */
   @Query(
-      "SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL"
-          + " OR c.topic.owningSquadron.id = :owningSquadronId) ORDER BY c.sortOrder ASC")
+      """
+      SELECT c FROM PromotionCategory c WHERE c.topic.id = :topicId AND (:owningSquadronId IS NULL
+      OR c.topic.owningSquadron.id = :owningSquadronId) ORDER BY c.sortOrder ASC
+      """)
   List<PromotionCategory> findAllByTopicIdScopedOrdered(
       @Param("topicId") UUID topicId, @Param("owningSquadronId") UUID owningSquadronId);
 }

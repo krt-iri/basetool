@@ -159,8 +159,10 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @EntityGraph(attributePaths = {"goods", "goods.outputMaterial"})
   @Query(
-      "SELECT DISTINCT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND r.status IN"
-          + " :statuses")
+      """
+      SELECT DISTINCT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND r.status IN
+      :statuses
+      """)
   List<RefineryOrder> findOwnedWithGoodsByStatusIn(
       @Param("ownerId") UUID ownerId,
       @Param("statuses")

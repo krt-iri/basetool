@@ -58,8 +58,10 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return a page of rank requirements visible to the caller
    */
   @Query(
-      "SELECT r FROM RankRequirement r WHERE :owningSquadronId IS NULL OR r.owningSquadron.id ="
-          + " :owningSquadronId")
+      """
+      SELECT r FROM RankRequirement r WHERE :owningSquadronId IS NULL OR r.owningSquadron.id =
+      :owningSquadronId
+      """)
   Page<RankRequirement> findAllScoped(
       @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 
@@ -73,9 +75,11 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return matching requirements visible to the caller, ordered by id
    */
   @Query(
-      "SELECT r FROM RankRequirement r WHERE r.fromRank = :fromRank AND r.toRank = :toRank AND"
-          + " (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) ORDER BY r.id"
-          + " ASC")
+      """
+      SELECT r FROM RankRequirement r WHERE r.fromRank = :fromRank AND r.toRank = :toRank AND
+      (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) ORDER BY r.id
+      ASC
+      """)
   List<RankRequirement> findScopedByFromRankAndToRank(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,
@@ -101,8 +105,10 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return one row per configured transition, each carrying {@code [fromRank, toRank]}
    */
   @Query(
-      "SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r ORDER BY r.fromRank DESC,"
-          + " r.toRank DESC")
+      """
+      SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r ORDER BY r.fromRank DESC,
+      r.toRank DESC
+      """)
   List<Object[]> findDistinctRankTransitions();
 
   /**
@@ -115,8 +121,10 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return one row per configured transition in the scope, carrying {@code [fromRank, toRank]}
    */
   @Query(
-      "SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r WHERE :owningSquadronId IS NULL"
-          + " OR r.owningSquadron.id = :owningSquadronId ORDER BY r.fromRank DESC, r.toRank DESC")
+      """
+      SELECT DISTINCT r.fromRank, r.toRank FROM RankRequirement r WHERE :owningSquadronId IS NULL
+      OR r.owningSquadron.id = :owningSquadronId ORDER BY r.fromRank DESC, r.toRank DESC
+      """)
   List<Object[]> findDistinctRankTransitionsScoped(
       @Param("owningSquadronId") UUID owningSquadronId);
 
@@ -133,12 +141,14 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return matching requirements with topic+category eagerly fetched
    */
   @Query(
-      "SELECT r FROM RankRequirement r "
-          + "LEFT JOIN FETCH r.topic "
-          + "LEFT JOIN FETCH r.category c "
-          + "LEFT JOIN FETCH c.topic "
-          + "WHERE r.fromRank = :fromRank AND r.toRank = :toRank "
-          + "ORDER BY r.id ASC")
+      """
+      SELECT r FROM RankRequirement r
+      LEFT JOIN FETCH r.topic
+      LEFT JOIN FETCH r.category c
+      LEFT JOIN FETCH c.topic
+      WHERE r.fromRank = :fromRank AND r.toRank = :toRank
+      ORDER BY r.id ASC
+      """)
   List<RankRequirement> findAllForRankTransitionWithRelations(int fromRank, int toRank);
 
   /**
@@ -153,13 +163,15 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
    * @return matching requirements with topic+category eagerly fetched, scoped to the caller
    */
   @Query(
-      "SELECT r FROM RankRequirement r "
-          + "LEFT JOIN FETCH r.topic "
-          + "LEFT JOIN FETCH r.category c "
-          + "LEFT JOIN FETCH c.topic "
-          + "WHERE r.fromRank = :fromRank AND r.toRank = :toRank "
-          + "AND (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId) "
-          + "ORDER BY r.id ASC")
+      """
+      SELECT r FROM RankRequirement r
+      LEFT JOIN FETCH r.topic
+      LEFT JOIN FETCH r.category c
+      LEFT JOIN FETCH c.topic
+      WHERE r.fromRank = :fromRank AND r.toRank = :toRank
+      AND (:owningSquadronId IS NULL OR r.owningSquadron.id = :owningSquadronId)
+      ORDER BY r.id ASC
+      """)
   List<RankRequirement> findAllForRankTransitionWithRelationsScoped(
       @Param("fromRank") int fromRank,
       @Param("toRank") int toRank,

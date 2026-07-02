@@ -57,11 +57,13 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    * @return one page of audit events
    */
   @Query(
-      "SELECT e FROM AuditEvent e WHERE e.domain = :domain"
-          + " AND (CAST(:from AS timestamp) IS NULL OR e.occurredAt >= :from)"
-          + " AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt <= :to)"
-          + " AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)"
-          + " AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)")
+      """
+      SELECT e FROM AuditEvent e WHERE e.domain = :domain
+      AND (CAST(:from AS timestamp) IS NULL OR e.occurredAt >= :from)
+      AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt <= :to)
+      AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)
+      AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)
+      """)
   Page<AuditEvent> findFiltered(
       @Param("domain") AuditDomain domain,
       @Param("from") Instant from,
@@ -81,9 +83,11 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    * @return the period's events in ascending time order
    */
   @Query(
-      "SELECT e FROM AuditEvent e WHERE e.domain = :domain"
-          + " AND e.occurredAt >= :from AND e.occurredAt <= :to"
-          + " ORDER BY e.occurredAt ASC")
+      """
+      SELECT e FROM AuditEvent e WHERE e.domain = :domain
+      AND e.occurredAt >= :from AND e.occurredAt <= :to
+      ORDER BY e.occurredAt ASC
+      """)
   List<AuditEvent> findForExport(
       @Param("domain") AuditDomain domain, @Param("from") Instant from, @Param("to") Instant to);
 
@@ -98,8 +102,10 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    * @return the number of events in the period
    */
   @Query(
-      "SELECT COUNT(e) FROM AuditEvent e WHERE e.domain = :domain"
-          + " AND e.occurredAt >= :from AND e.occurredAt <= :to")
+      """
+      SELECT COUNT(e) FROM AuditEvent e WHERE e.domain = :domain
+      AND e.occurredAt >= :from AND e.occurredAt <= :to
+      """)
   long countForExport(
       @Param("domain") AuditDomain domain, @Param("from") Instant from, @Param("to") Instant to);
 
