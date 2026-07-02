@@ -50,8 +50,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for the goal (Ziel) mutators on {@link MissionService}: add / update / delete /
- * reorder. Pins the {@code objectivesVersion} optimistic-lock guard (409 on stale), the contiguous
+ * Unit tests for the goal (Ziel) mutators on {@link MissionTimelineService}: add / update / delete
+ * / reorder. Pins the {@code objectivesVersion} optimistic-lock guard (409 on stale), the contiguous
  * {@code orderIndex} re-pack on delete, the single reorder audit event, and the no-free-text rule
  * (a goal title never enters the audit details payload, though the non-personal kind enum may).
  */
@@ -61,7 +61,7 @@ class MissionObjectiveServiceTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionObjectiveRepository missionObjectiveRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionTimelineService timelineService;
 
   private UUID missionId;
   private Mission mission;
@@ -107,7 +107,7 @@ class MissionObjectiveServiceTest {
   void addObjective_appendsAtEnd_bumpsVersion_andRecordsAudit() {
     // When
     Mission result =
-        missionService.addObjective(
+        timelineService.addObjective(
             missionId, "  Schutz der Crew  ", MissionObjectiveKind.SECONDARY, 3L);
 
     // Then
@@ -131,13 +131,13 @@ class MissionObjectiveServiceTest {
   void addObjective_throws409_whenObjectivesVersionStale() {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> missionService.addObjective(missionId, "Ziel", MissionObjectiveKind.PRIMARY, 2L));
+        () -> timelineService.addObjective(missionId, "Ziel", MissionObjectiveKind.PRIMARY, 2L));
   }
 
   @Test
   void updateObjective_editsTitleAndKind_bumpsVersion() {
     Mission result =
-        missionService.updateObjective(
+        timelineService.updateObjective(
             missionId, goal1Id, "Erz vollständig sichern", MissionObjectiveKind.SECONDARY, 3L);
 
     MissionObjective edited = orderedObjectives().get(0);
@@ -154,14 +154,14 @@ class MissionObjectiveServiceTest {
     assertThrows(
         NotFoundException.class,
         () ->
-            missionService.updateObjective(
+            timelineService.updateObjective(
                 missionId, UUID.randomUUID(), "X", MissionObjectiveKind.PRIMARY, 3L));
   }
 
   @Test
   void deleteObjective_removesAndRepacksOrderIndex_andRecordsAudit() {
     // When the first goal is removed, the remaining goal must re-pack to orderIndex 0.
-    Mission result = missionService.deleteObjective(missionId, goal1Id, 3L);
+    Mission result = timelineService.deleteObjective(missionId, goal1Id, 3L);
 
     assertEquals(1, result.getObjectives().size());
     MissionObjective remaining = orderedObjectives().get(0);
@@ -175,7 +175,7 @@ class MissionObjectiveServiceTest {
 
   @Test
   void reorderObjectives_reassignsOrderIndex_andRecordsSingleEvent() {
-    Mission result = missionService.reorderObjectives(missionId, List.of(goal2Id, goal1Id), 3L);
+    Mission result = timelineService.reorderObjectives(missionId, List.of(goal2Id, goal1Id), 3L);
 
     List<MissionObjective> ordered = orderedObjectives();
     assertEquals(goal2Id, ordered.get(0).getId());
@@ -197,14 +197,14 @@ class MissionObjectiveServiceTest {
   void reorderObjectives_throwsIllegalArgument_whenIdSetDoesNotMatch() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> missionService.reorderObjectives(missionId, List.of(goal1Id), 3L));
+        () -> timelineService.reorderObjectives(missionId, List.of(goal1Id), 3L));
   }
 
   @Test
   void objectiveMutations_neverLeakTheGoalTitleIntoTheAuditDetails() {
     // The title is user free text — REQ-AUDIT-001 forbids it (and any PII) in the details payload.
     // The kind enum is a non-personal classification and IS allowed.
-    missionService.addObjective(
+    timelineService.addObjective(
         missionId, "TOP-SECRET RALLY POINT", MissionObjectiveKind.PRIMARY, 3L);
 
     ArgumentCaptor<String> label = ArgumentCaptor.forClass(String.class);

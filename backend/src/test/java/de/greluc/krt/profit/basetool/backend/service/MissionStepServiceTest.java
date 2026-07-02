@@ -50,10 +50,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for the Ablauf (procedure step) mutators on {@link MissionService}: add / update /
- * delete / reorder / toggle-done. Pins the {@code stepsVersion} optimistic-lock guard (409 on
- * stale), the contiguous {@code orderIndex} re-pack on delete, the single reorder audit event, and
- * the no-free-text rule (a step title / meta never enters the audit details payload).
+ * Unit tests for the Ablauf (procedure step) mutators on {@link MissionTimelineService}: add /
+ * update / delete / reorder / toggle-done. Pins the {@code stepsVersion} optimistic-lock guard (409
+ * on stale), the contiguous {@code orderIndex} re-pack on delete, the single reorder audit event,
+ * and the no-free-text rule (a step title / meta never enters the audit details payload).
  */
 @ExtendWith(MockitoExtension.class)
 class MissionStepServiceTest {
@@ -61,7 +61,7 @@ class MissionStepServiceTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionStepRepository missionStepRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionTimelineService timelineService;
 
   private UUID missionId;
   private Mission mission;
@@ -101,7 +101,7 @@ class MissionStepServiceTest {
   @Test
   void addStep_appendsAtEnd_bumpsVersion_andRecordsAudit() {
     // When
-    Mission result = missionService.addStep(missionId, "  Eskorte  ", "  TS 20:00 ", 3L);
+    Mission result = timelineService.addStep(missionId, "  Eskorte  ", "  TS 20:00 ", 3L);
 
     // Then
     assertEquals(3, result.getSteps().size());
@@ -125,13 +125,13 @@ class MissionStepServiceTest {
   void addStep_throws409_whenStepsVersionStale() {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> missionService.addStep(missionId, "Eskorte", null, 2L));
+        () -> timelineService.addStep(missionId, "Eskorte", null, 2L));
   }
 
   @Test
   void updateStep_editsTitleAndMeta_bumpsVersion() {
     Mission result =
-        missionService.updateStep(missionId, step1Id, "Lagebesprechung", "TS 19:30", 3L);
+        timelineService.updateStep(missionId, step1Id, "Lagebesprechung", "TS 19:30", 3L);
 
     MissionStep edited = orderedSteps().get(0);
     assertEquals("Lagebesprechung", edited.getTitle());
@@ -145,13 +145,13 @@ class MissionStepServiceTest {
   void updateStep_throwsNotFound_whenStepNotChildOfMission() {
     assertThrows(
         NotFoundException.class,
-        () -> missionService.updateStep(missionId, UUID.randomUUID(), "X", null, 3L));
+        () -> timelineService.updateStep(missionId, UUID.randomUUID(), "X", null, 3L));
   }
 
   @Test
   void deleteStep_removesAndRepacksOrderIndex_andRecordsAudit() {
     // When the first step is removed, the remaining step must re-pack to orderIndex 0.
-    Mission result = missionService.deleteStep(missionId, step1Id, 3L);
+    Mission result = timelineService.deleteStep(missionId, step1Id, 3L);
 
     assertEquals(1, result.getSteps().size());
     MissionStep remaining = orderedSteps().get(0);
@@ -164,7 +164,7 @@ class MissionStepServiceTest {
 
   @Test
   void reorderSteps_reassignsOrderIndex_andRecordsSingleEvent() {
-    Mission result = missionService.reorderSteps(missionId, List.of(step2Id, step1Id), 3L);
+    Mission result = timelineService.reorderSteps(missionId, List.of(step2Id, step1Id), 3L);
 
     List<MissionStep> ordered = orderedSteps();
     assertEquals(step2Id, ordered.get(0).getId());
@@ -186,12 +186,12 @@ class MissionStepServiceTest {
   void reorderSteps_throwsIllegalArgument_whenIdSetDoesNotMatch() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> missionService.reorderSteps(missionId, List.of(step1Id), 3L));
+        () -> timelineService.reorderSteps(missionId, List.of(step1Id), 3L));
   }
 
   @Test
   void toggleStepDone_setsFlag_bumpsVersion_andRecordsAudit() {
-    Mission result = missionService.toggleStepDone(missionId, step1Id, true, 3L);
+    Mission result = timelineService.toggleStepDone(missionId, step1Id, true, 3L);
 
     assertTrue(orderedSteps().get(0).isDone());
     assertEquals(4L, result.getStepsVersion());
@@ -203,7 +203,7 @@ class MissionStepServiceTest {
   @Test
   void stepMutations_neverLeakTheStepTitleIntoTheAuditDetails() {
     // The title is user free text — REQ-AUDIT-001 forbids it (and any PII) in the details payload.
-    missionService.addStep(missionId, "TOP-SECRET RALLY POINT", "classified", 3L);
+    timelineService.addStep(missionId, "TOP-SECRET RALLY POINT", "classified", 3L);
 
     ArgumentCaptor<String> label = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);

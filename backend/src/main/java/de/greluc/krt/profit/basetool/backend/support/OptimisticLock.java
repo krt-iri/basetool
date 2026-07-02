@@ -39,11 +39,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * <p>The {@code identifier} is used only to build the 409 exception (its message names the entity +
  * id) and may be {@code null}, a plain id, or a composite-key object — it is never dereferenced.
  *
- * <p><b>Not for the manual {@code Mission} counters.</b> {@code MissionService}'s {@code
- * coreVersion} / {@code scheduleVersion} / {@code flagsVersion} / {@code partyLeadVersion} / {@code
- * stepsVersion} are plain business {@code Long}s (NOT JPA {@code @Version}) that back the
- * per-section fine-grained lock (REQ-ORG-018); they keep their bespoke {@code assert*Version}
- * checks and must not be routed through this helper.
+ * <p><b>Not for the manual {@code Mission} counters.</b> {@code Mission}'s {@code coreVersion} /
+ * {@code scheduleVersion} / {@code flagsVersion} / {@code partyLeadVersion} / {@code stepsVersion}
+ * / {@code objectivesVersion} / {@code owningOrgUnitVersion} are plain business {@code Long}s (NOT
+ * JPA {@code @Version}) that back the per-section fine-grained lock (REQ-ORG-018); they go through
+ * {@link MissionSectionVersions} (whose {@code null -> 0L} semantics differ) and must not be routed
+ * through this helper.
  */
 public final class OptimisticLock {
 
