@@ -19,21 +19,25 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * Thrown when generating a downloadable report (PDF, CSV, …) fails because of an unexpected problem
  * in the report pipeline — typically an {@code IOException} from the PDF library, a missing
  * required field on the input model, or an unsupported font/encoding.
  *
  * <p>Mapped to HTTP {@code 500 Internal Server Error} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code REPORT_GENERATION_FAILED}. Compared to the generic 500 fallback this gives
- * monitoring/alerting a dedicated handle on a specific failure mode (a report problem is rarely a
- * code bug, but it is also not a user-input problem in the sense of {@code BadRequestException}).
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code REPORT_GENERATION_FAILED}.
+ * Compared to the generic 500 fallback this gives monitoring/alerting a dedicated handle on a
+ * specific failure mode (a report problem is rarely a code bug, but it is also not a user-input
+ * problem in the sense of {@code BadRequestException}).
  *
- * <p>The original cause is preserved so the server log shows the full stack trace; the client
- * receives a localized generic detail instead of the raw upstream message.
+ * <p>{@link #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED}: the original cause is
+ * preserved so the server log shows the full stack trace; the client receives a localized generic
+ * detail instead of the raw upstream message.
  */
-public class ReportGenerationException extends RuntimeException {
+public final class ReportGenerationException extends AppException {
 
   /**
    * Creates a {@code ReportGenerationException} with a description of the report-pipeline failure.
@@ -54,5 +58,40 @@ public class ReportGenerationException extends RuntimeException {
    */
   public ReportGenerationException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.logLabel();
+  }
+
+  @Override
+  public ErrorDisclosurePolicy disclosurePolicy() {
+    return AppExceptionKind.REPORT_GENERATION_FAILED.disclosurePolicy();
   }
 }

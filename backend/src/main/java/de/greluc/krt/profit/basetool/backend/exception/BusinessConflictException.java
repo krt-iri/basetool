@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * Thrown when a request collides with the current state of the system in a way that is neither a
  * pure duplicate (see {@link DuplicateEntityException}) nor a referential-integrity block (see
@@ -29,10 +31,10 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * several aggregates and cannot be expressed by a simple uniqueness constraint.
  *
  * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code BUSINESS_CONFLICT}.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code BUSINESS_CONFLICT}.
  */
-public class BusinessConflictException extends RuntimeException {
+public final class BusinessConflictException extends AppException {
 
   /**
    * Creates a {@code BusinessConflictException} with a human-readable description of the conflict.
@@ -53,5 +55,35 @@ public class BusinessConflictException extends RuntimeException {
    */
   public BusinessConflictException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.BUSINESS_CONFLICT.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.BUSINESS_CONFLICT.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.BUSINESS_CONFLICT.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.BUSINESS_CONFLICT.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.BUSINESS_CONFLICT.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.BUSINESS_CONFLICT.logLabel();
   }
 }

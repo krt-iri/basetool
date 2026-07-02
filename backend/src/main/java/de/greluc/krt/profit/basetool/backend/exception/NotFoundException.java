@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * Indicates that a requested domain entity could not be found.
  *
@@ -32,8 +34,15 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * produced HTTP 500 responses together with a full ERROR stacktrace in the logs (e.g. for
  * externally crawled / deleted mission IDs). 404 is the semantically correct status and keeps the
  * logs clean.
+ *
+ * <p>Unlike its six {@link AppException} siblings, {@code NotFoundException} is <b>not</b> routed
+ * through {@code GlobalExceptionHandler}'s generic dispatch handler — it keeps its own dedicated
+ * {@code @ExceptionHandler}, shared with three non-{@code AppException} JPA/JDK "not found" flavors
+ * ({@code EntityNotFoundException}, {@code NoSuchElementException}, {@code
+ * NoResourceFoundException}) that cannot be sealed under this hierarchy. It still implements the
+ * full accessor contract for consistency with the other sealed members.
  */
-public class NotFoundException extends RuntimeException {
+public final class NotFoundException extends AppException {
 
   /**
    * Creates a {@code NotFoundException} with a description of the missing entity.
@@ -54,5 +63,35 @@ public class NotFoundException extends RuntimeException {
    */
   public NotFoundException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.NOT_FOUND.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.NOT_FOUND.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.NOT_FOUND.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.NOT_FOUND.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.NOT_FOUND.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.NOT_FOUND.logLabel();
   }
 }

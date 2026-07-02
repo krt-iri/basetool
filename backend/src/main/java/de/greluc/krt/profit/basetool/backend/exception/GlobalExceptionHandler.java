@@ -91,16 +91,12 @@ public class GlobalExceptionHandler {
   public static final String CODE_VALIDATION_FAILED = "VALIDATION_FAILED";
   public static final String CODE_CONSTRAINT_VIOLATION = "CONSTRAINT_VIOLATION";
   public static final String CODE_DUPLICATE_ENTITY = "DUPLICATE_ENTITY";
-  public static final String CODE_ENTITY_IN_USE = "ENTITY_IN_USE";
-  public static final String CODE_BUSINESS_CONFLICT = "BUSINESS_CONFLICT";
   public static final String CODE_ILLEGAL_ARGUMENT = "ILLEGAL_ARGUMENT";
   public static final String CODE_BAD_REQUEST = "BAD_REQUEST";
   public static final String CODE_TYPE_MISMATCH = "TYPE_MISMATCH";
   public static final String CODE_DATA_INTEGRITY = "DATA_INTEGRITY_VIOLATION";
   public static final String CODE_NOT_FOUND = "NOT_FOUND";
   public static final String CODE_METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
-  public static final String CODE_EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR";
-  public static final String CODE_REPORT_GENERATION_FAILED = "REPORT_GENERATION_FAILED";
   public static final String CODE_INTERNAL_ERROR = "INTERNAL_ERROR";
 
   private static final String MDC_CORRELATION_ID = "correlationId";
@@ -491,133 +487,62 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
-  // --- 409 Domain conflicts -------------------------------------------------------------
+  // --- AppException dispatch (S4, #910) --------------------------------------------------
 
   /**
-   * Maps {@link DuplicateEntityException} (raised by service-layer uniqueness checks) to 409 with
-   * code {@code DUPLICATE_ENTITY}. The exception message is either a verbatim string OR an i18n key
-   * — both go through {@link #resolveDetail} so newer throw sites benefit from {@code
-   * Accept-Language}-aware translation without breaking the legacy literal-string callers.
+   * Single dispatch handler for every sealed {@link AppException} subtype except {@link
+   * NotFoundException} (whose handler stays separate — see {@link #handleNotFound}): {@link
+   * BadRequestException}, {@link BankConflictException}, {@link BusinessConflictException}, {@link
+   * DuplicateEntityException}, {@link EntityInUseException}, {@link ExternalServiceException} and
+   * {@link ReportGenerationException}. Replaces the seven near-identical handlers these types used
+   * to each carry — the status/code/i18n-keys/type-suffix/log-label now live on the exception
+   * itself (via {@link AppExceptionKind} for the six fixed types, computed per-instance for {@link
+   * BankConflictException}), so this method only needs to read the abstract accessors.
    *
-   * @param ex thrown {@link DuplicateEntityException}
+   * <p>{@link AppException#disclosurePolicy()} forks the one genuinely different behaviour: {@link
+   * ErrorDisclosurePolicy#SUPPRESSED} (only {@code ExternalServiceException} / {@code
+   * ReportGenerationException}) never consults {@code ex.getMessage()} for the client-visible
+   * detail — it may carry upstream response bodies or library-internal paths (CWE-209) — and logs
+   * the full exception at ERROR with the correlation id instead of the standard WARN.
+   *
+   * @param ex the thrown {@link AppException}
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
-  @ExceptionHandler(DuplicateEntityException.class)
-  public ResponseEntity<ProblemDetail> handleDuplicateEntity(
-      DuplicateEntityException ex, HttpServletRequest request) {
+  @ExceptionHandler(AppException.class)
+  public ResponseEntity<ProblemDetail> handleAppException(
+      AppException ex, HttpServletRequest request) {
+    if (ex.disclosurePolicy() == ErrorDisclosurePolicy.SUPPRESSED) {
+      String cid = correlationId();
+      MDC.put(MDC_CORRELATION_ID, cid);
+      try {
+        log.error("{} at {} [correlationId={}]", ex.logLabel(), request.getRequestURI(), cid, ex);
+      } finally {
+        MDC.remove(MDC_CORRELATION_ID);
+      }
+      ProblemDetail pd =
+          problem(
+              ex.status(),
+              tr(ex.titleKey()),
+              tr(ex.detailKey()),
+              request,
+              ex.typeSuffix(),
+              ex.code());
+      // Overwrite the freshly generated correlation id with the one we used for the log
+      // line so the client-visible id matches the server log entry exactly.
+      pd.setProperty("correlationId", cid);
+      return toEntity(pd);
+    }
     ProblemDetail pd =
         problem(
-            HttpStatus.CONFLICT,
-            tr("problem.duplicate_entity.title"),
-            resolveDetail(ex.getMessage(), "problem.duplicate_entity.detail"),
+            ex.status(),
+            tr(ex.titleKey()),
+            resolveDetail(ex.getMessage(), ex.detailKey()),
             request,
-            "duplicate-entity",
-            CODE_DUPLICATE_ENTITY);
-    logProblem(request, pd, "Duplicate entity", null);
-    return toEntity(pd);
-  }
-
-  /**
-   * Maps {@link EntityInUseException} (delete blocked by an existing referencing entity) to 409
-   * with code {@code ENTITY_IN_USE}. The exception message is resolved via {@link #resolveDetail}
-   * (i18n key OR verbatim string).
-   *
-   * @param ex thrown {@link EntityInUseException}
-   * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response
-   */
-  @ExceptionHandler(EntityInUseException.class)
-  public ResponseEntity<ProblemDetail> handleEntityInUse(
-      EntityInUseException ex, HttpServletRequest request) {
-    ProblemDetail pd =
-        problem(
-            HttpStatus.CONFLICT,
-            tr("problem.entity_in_use.title"),
-            resolveDetail(ex.getMessage(), "problem.entity_in_use.detail"),
-            request,
-            "entity-in-use",
-            CODE_ENTITY_IN_USE);
-    logProblem(request, pd, "Entity in use", null);
-    return toEntity(pd);
-  }
-
-  /**
-   * Maps {@link BusinessConflictException} (cross-aggregate invariant or state-machine refusal) to
-   * 409 with code {@code BUSINESS_CONFLICT}. Reserved for collisions that are neither a pure
-   * duplicate nor an in-use blocker.
-   *
-   * @param ex thrown {@link BusinessConflictException}
-   * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response
-   */
-  @ExceptionHandler(BusinessConflictException.class)
-  public ResponseEntity<ProblemDetail> handleBusinessConflict(
-      BusinessConflictException ex, HttpServletRequest request) {
-    ProblemDetail pd =
-        problem(
-            HttpStatus.CONFLICT,
-            tr("problem.business_conflict.title"),
-            resolveDetail(ex.getMessage(), "problem.business_conflict.detail"),
-            request,
-            "business-conflict",
-            CODE_BUSINESS_CONFLICT);
-    logProblem(request, pd, "Business conflict", null);
-    return toEntity(pd);
-  }
-
-  /**
-   * Maps {@link BankConflictException} to 409 with the <em>bank-specific</em> stable code the
-   * exception carries (e.g. {@code BANK_OVERDRAFT}, {@code BANK_ACCOUNT_NOT_EMPTY} — epic #556,
-   * REQ-BANK-002/-006/-009). Title and detail resolve from the per-code bundle keys ({@code
-   * problem.bank_overdraft.title} etc.); the exception's structured, PII-free properties (account
-   * number, available balance, holder handle) are copied onto the problem response so the frontend
-   * can render a localized inline field error without parsing the human-readable detail.
-   *
-   * @param ex thrown {@link BankConflictException}
-   * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 response with status 409 and the bank-specific stable code
-   */
-  @ExceptionHandler(BankConflictException.class)
-  public ResponseEntity<ProblemDetail> handleBankConflict(
-      BankConflictException ex, HttpServletRequest request) {
-    String keyBase = "problem." + ex.getCode().toLowerCase(Locale.ROOT);
-    ProblemDetail pd =
-        problem(
-            HttpStatus.CONFLICT,
-            tr(keyBase + ".title"),
-            resolveDetail(ex.getMessage(), keyBase + ".detail"),
-            request,
-            ex.getCode().toLowerCase(Locale.ROOT).replace('_', '-'),
-            ex.getCode());
-    ex.getProperties().forEach(pd::setProperty);
-    logProblem(request, pd, "Bank conflict", Map.of("bankCode", ex.getCode()));
-    return toEntity(pd);
-  }
-
-  // --- 400 Bad request (service-layer validation/business rule violations) --------------
-
-  /**
-   * Maps {@link BadRequestException} (service-layer rule that {@code @Valid} cannot express) to 400
-   * with code {@code BAD_REQUEST}. Use this rather than {@code ResponseStatusException} so the
-   * code/title/detail/i18n flow stays consistent.
-   *
-   * @param ex thrown {@link BadRequestException}
-   * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response
-   */
-  @ExceptionHandler(BadRequestException.class)
-  public ResponseEntity<ProblemDetail> handleBadRequest(
-      BadRequestException ex, HttpServletRequest request) {
-    ProblemDetail pd =
-        problem(
-            HttpStatus.BAD_REQUEST,
-            tr("problem.bad_request.title"),
-            resolveDetail(ex.getMessage(), "problem.bad_request.detail"),
-            request,
-            "bad-request",
-            CODE_BAD_REQUEST);
-    logProblem(request, pd, "Bad request", null);
+            ex.typeSuffix(),
+            ex.code());
+    ex.extraProperties().forEach(pd::setProperty);
+    logProblem(request, pd, ex.logLabel(), ex.logExtra());
     return toEntity(pd);
   }
 
@@ -952,71 +877,6 @@ public class GlobalExceptionHandler {
             request,
             "not-found",
             CODE_NOT_FOUND);
-    return toEntity(pd);
-  }
-
-  // --- 502 Upstream service errors (Keycloak, UEX, …) -----------------------------------
-
-  /**
-   * Mapped distinctly from the generic 500 fallback so an upstream outage is monitorable as its own
-   * class of problem ({@code code=EXTERNAL_SERVICE_ERROR}). The user-facing {@code detail} is a
-   * localized generic message — the underlying exception message (which may contain raw response
-   * bodies from the upstream system) is logged at ERROR with the full stacktrace so triage has
-   * access to it without leaking it through the API.
-   */
-  @ExceptionHandler(ExternalServiceException.class)
-  public ResponseEntity<ProblemDetail> handleExternalService(
-      ExternalServiceException ex, HttpServletRequest request) {
-    String cid = correlationId();
-    MDC.put(MDC_CORRELATION_ID, cid);
-    try {
-      log.error(
-          "Upstream service error at {} [correlationId={}]", request.getRequestURI(), cid, ex);
-    } finally {
-      MDC.remove(MDC_CORRELATION_ID);
-    }
-    ProblemDetail pd =
-        problem(
-            HttpStatus.BAD_GATEWAY,
-            tr("problem.external_service.title"),
-            tr("problem.external_service.detail"),
-            request,
-            "external-service-error",
-            CODE_EXTERNAL_SERVICE_ERROR);
-    // Overwrite the freshly generated correlation id with the one we used for the log
-    // line so the client-visible id matches the server log entry exactly.
-    pd.setProperty("correlationId", cid);
-    return toEntity(pd);
-  }
-
-  // --- 500 Report generation failures ---------------------------------------------------
-
-  /**
-   * Carved out from the generic 500 fallback so the report pipeline (PDF, CSV, …) has its own
-   * monitorable error category ({@code code=REPORT_GENERATION_FAILED}). The detail shown to the
-   * client is intentionally generic to avoid leaking library-internal messages (font/encoding
-   * errors, file-path fragments, …) into the response body.
-   */
-  @ExceptionHandler(ReportGenerationException.class)
-  public ResponseEntity<ProblemDetail> handleReportGeneration(
-      ReportGenerationException ex, HttpServletRequest request) {
-    String cid = correlationId();
-    MDC.put(MDC_CORRELATION_ID, cid);
-    try {
-      log.error(
-          "Report generation failed at {} [correlationId={}]", request.getRequestURI(), cid, ex);
-    } finally {
-      MDC.remove(MDC_CORRELATION_ID);
-    }
-    ProblemDetail pd =
-        problem(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            tr("problem.report_generation_failed.title"),
-            tr("problem.report_generation_failed.detail"),
-            request,
-            "report-generation-failed",
-            CODE_REPORT_GENERATION_FAILED);
-    pd.setProperty("correlationId", cid);
     return toEntity(pd);
   }
 

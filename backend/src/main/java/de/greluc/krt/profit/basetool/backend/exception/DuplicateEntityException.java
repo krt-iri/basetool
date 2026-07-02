@@ -19,17 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * Thrown when an insert or update would violate a uniqueness constraint that the service layer
  * checks explicitly (e.g. duplicate Keycloak {@code sub}, duplicate name within a scope).
  *
  * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code DUPLICATE_ENTITY}. Use this rather than letting a database {@code
- * DataIntegrityViolationException} bubble up so the client receives a localized message instead of
- * a raw SQL error string.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code DUPLICATE_ENTITY}. Use this
+ * rather than letting a database {@code DataIntegrityViolationException} bubble up so the client
+ * receives a localized message instead of a raw SQL error string.
  */
-public class DuplicateEntityException extends RuntimeException {
+public final class DuplicateEntityException extends AppException {
 
   /**
    * Creates a {@code DuplicateEntityException} with a description of the duplicate.
@@ -38,5 +40,35 @@ public class DuplicateEntityException extends RuntimeException {
    */
   public DuplicateEntityException(String message) {
     super(message);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.DUPLICATE_ENTITY.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.DUPLICATE_ENTITY.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.DUPLICATE_ENTITY.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.DUPLICATE_ENTITY.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.DUPLICATE_ENTITY.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.DUPLICATE_ENTITY.logLabel();
   }
 }

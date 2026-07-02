@@ -19,8 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
-/** Thrown when an entity cannot be deleted because it is still referenced by other entities. */
-public class EntityInUseException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+/**
+ * Thrown when an entity cannot be deleted because it is still referenced by other entities.
+ *
+ * <p>Mapped to HTTP {@code 409 Conflict} by {@link
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code ENTITY_IN_USE}.
+ */
+public final class EntityInUseException extends AppException {
 
   /**
    * Creates an {@code EntityInUseException} with a description of the blocking reference.
@@ -29,5 +37,35 @@ public class EntityInUseException extends RuntimeException {
    */
   public EntityInUseException(String message) {
     super(message);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.ENTITY_IN_USE.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.ENTITY_IN_USE.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.ENTITY_IN_USE.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.ENTITY_IN_USE.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.ENTITY_IN_USE.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.ENTITY_IN_USE.logLabel();
   }
 }

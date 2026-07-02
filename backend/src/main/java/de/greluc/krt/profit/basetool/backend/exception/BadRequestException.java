@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * Thrown by the service layer when a request cannot be fulfilled because of caller-supplied input
  * that is semantically invalid in a way that {@code @Valid} on the controller cannot express.
@@ -28,11 +30,12 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * but are in the wrong state, or requests that conflict with an aggregate's current state.
  *
  * <p>Mapped to HTTP {@code 400 Bad Request} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code BAD_REQUEST}. Prefer this over {@code ResponseStatusException} so the
- * code/title/detail flow stays consistent with the other RFC 7807 responses.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code BAD_REQUEST}. Prefer this over
+ * {@code ResponseStatusException} so the code/title/detail flow stays consistent with the other RFC
+ * 7807 responses.
  */
-public class BadRequestException extends RuntimeException {
+public final class BadRequestException extends AppException {
 
   /**
    * Creates a {@code BadRequestException} with a developer-facing detail message that is also
@@ -54,5 +57,35 @@ public class BadRequestException extends RuntimeException {
    */
   public BadRequestException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  @Override
+  public HttpStatus status() {
+    return AppExceptionKind.BAD_REQUEST.status();
+  }
+
+  @Override
+  public String code() {
+    return AppExceptionKind.BAD_REQUEST.code();
+  }
+
+  @Override
+  public String titleKey() {
+    return AppExceptionKind.BAD_REQUEST.titleKey();
+  }
+
+  @Override
+  public String detailKey() {
+    return AppExceptionKind.BAD_REQUEST.detailKey();
+  }
+
+  @Override
+  public String typeSuffix() {
+    return AppExceptionKind.BAD_REQUEST.typeSuffix();
+  }
+
+  @Override
+  public String logLabel() {
+    return AppExceptionKind.BAD_REQUEST.logLabel();
   }
 }

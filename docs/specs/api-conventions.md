@@ -71,6 +71,27 @@ Service-layer repository lookups raise their 404 through the fetch-or-throw help
 treats the message as a translation key (sentinel-guarded), so an auto-derived message would change
 the wire `detail` and break the future i18n-key migration seam.
 
+**Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
+`NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,
+`EntityInUseException`, `ExternalServiceException`, `ReportGenerationException` and
+`BankConflictException` all extend the sealed `exception.AppException`, exposing `status()`,
+`code()`, `titleKey()`, `detailKey()`, `typeSuffix()` and `logLabel()` on the type itself instead of
+leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` constants and per-type
+`@ExceptionHandler` methods. A single `handleAppException` dispatch handler reads those accessors
+for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
+three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
+`NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
+Six of the eight subtypes delegate their accessors to a fixed `exception.AppExceptionKind` enum
+constant; `BankConflictException` computes them per-instance from its own `code` field (it has no
+single fixed identity — each throw site picks one of its `CODE_BANK_*` constants). The one
+behavioural fork — `ExternalServiceException` / `ReportGenerationException` suppressing
+`getMessage()` from the client and logging at ERROR instead of WARN, an info-leak-protection
+constraint (CWE-209) — is the `ErrorDisclosurePolicy` strategy enum on `AppException`. A new domain
+exception joins this hierarchy by extending `AppException` and either delegating to a new
+`AppExceptionKind` constant (the common case) or implementing the accessors directly (only if its
+identity is genuinely per-instance, as `BankConflictException`'s is) — never by hand-rolling a new
+`@ExceptionHandler` method.
+
 ### REQ-API-005 — Pagination & sorting
 
 All list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total
