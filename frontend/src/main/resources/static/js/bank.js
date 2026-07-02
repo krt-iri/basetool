@@ -1416,9 +1416,7 @@
     // survives the org-unit `orgUnitBank` fragment swap (after a swap the input is re-rendered empty,
     // which naturally resets the filter to "show all").
     document.addEventListener('input', function (event) {
-        const input = event.target.closest
-            ? event.target.closest('[data-bank-acc-filter]')
-            : null;
+        const input = event.target.closest ? event.target.closest('[data-bank-acc-filter]') : null;
         if (input) {
             applyAccountNameFilter(input);
         }
