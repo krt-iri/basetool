@@ -510,6 +510,8 @@ per-account N+1 (REQ-DATA-003).
   A→Z by name (case-insensitive), via the shared `BankAccountOrder` helper.
 - [x] 30-day delta equals the sum of postings in the window (test-pinned).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
+- [x] A client-side account-name live filter sits beside the Verwaltung button and hides
+  non-matching cards as the user types (REQ-BANK-046).
 
 **Enforced by:** `BankPageControllerTest` (sparkline scaling), `BankAccountOrderTest` (A→Z
 case-insensitive, null-safe, original list untouched), single-statement repository reads · **Code:**
@@ -664,6 +666,8 @@ org-unit-blind.
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
+- [x] A client-side account-name live filter sits above the Konten list and hides non-matching rows
+  as the user types (REQ-BANK-046).
 
 **Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
 
@@ -1630,6 +1634,49 @@ column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/
 `exception/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
 `templates/bank-account-detail.html`, `templates/bank-requests.html`, `static/js/bank.js`,
 `static/css/bank.css` · **Issues:** —
+
+### REQ-BANK-046 — Client-side account-name filter (dashboard + org-unit list)
+
+The bank **dashboard** (`/bank`, REQ-BANK-016) and the org-unit **account list** (`/org-unit-bank`
+"Konten" tab, REQ-BANK-021) each carry a **client-side, live account-name filter**. A search box —
+on the dashboard **next to the Verwaltung button** in the header actions, on the org-unit page
+**directly above the account list** — filters the rendered account tiles/rows **in place as the user
+types**: an account whose **name** does not contain the entered term (case-insensitive substring) is
+hidden, matching ones stay. Matching is on the account **name** only (each item carries a
+`data-filter-name`); the canonical A→Z-by-name ordering (REQ-BANK-016) is untouched — the filter only
+**hides**, it never reorders.
+
+The filter is **purely visual and read-only**: it toggles the `hidden` attribute on the
+already-rendered items with **no server round-trip, no `krtFetch`, no page reload and no CSRF**. It
+therefore satisfies the live-update standard (REQ-FE-001) **by construction** and records **no audit
+event** — it mutates nothing, so the REQ-BANK-012 audited activities are unaffected. On the dashboard
+the box is shown to **every** viewer who sees at least one card (**bank employees included**), so it
+is **not** behind the `BANK_MANAGEMENT` gate that still guards the Verwaltung / Berechtigungen /
+Report buttons. On the org-unit page the box lives **inside** the swapped `orgUnitBank` fragment, so a
+booking-request create/cancel swap re-renders it empty, resetting the filter to "show all". When the
+filter hides **every** account, a localized "no accounts match the filter" note
+(`bank.filter.empty`) is revealed — distinct from the server-rendered "no accounts at all" empty
+state, which a genuinely empty list keeps.
+
+**Acceptance**
+
+- [x] Typing a term on the dashboard hides every `.kpi-card` whose name lacks it (case-insensitive)
+  and keeps the matches; clearing the box restores all cards.
+- [x] The same filter above the org-unit "Konten" list hides/keeps `.ou-row` rows identically and
+  resets to "show all" after a request create/cancel fragment swap.
+- [x] The filter performs **no** backend call (no `krtFetch`, no reload, no CSRF) and adds **no**
+  audit event.
+- [x] Filtering every account down to none reveals the localized `bank.filter.empty` note; a
+  genuinely empty account list keeps its own empty state instead.
+- [x] The dashboard filter renders for bank employees (not gated behind `BANK_MANAGEMENT`), while the
+  Verwaltung / Berechtigungen / Report buttons stay management-only.
+
+**Enforced by:** `BankPageControllerTest` (dashboard renders the filter box + `data-filter-name` +
+filter-empty note, employee perspective included), `OrgUnitBankPageControllerMvcTest` (Konten list
+renders the filter box + `data-filter-name` + filter-empty note) · **Code:** frontend
+`templates/bank-dashboard.html`, `templates/org-unit-bank.html`, `static/js/bank.js`
+(`applyAccountNameFilter`), `static/css/bank.css`, `messages{,_de,_en}.properties` (`bank.filter.*`) ·
+**Issues:** —
 
 ## Out of scope
 

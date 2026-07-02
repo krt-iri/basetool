@@ -6,6 +6,7 @@
 
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
+- **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
 
 ### Changed
 
