@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.ReverseBankTransa
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -70,7 +71,7 @@ public class BankBookingController {
    */
   @Operation(summary = "Read the current in-game transfer-fee rate")
   @GetMapping("/transfer-fee-rate")
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   @Transactional(readOnly = true)
   public BankTransferFeeRateDto getTransferFeeRate() {
     return new BankTransferFeeRateDto(bankTransferFeeService.resolveTransferFeeRate());
@@ -143,7 +144,7 @@ public class BankBookingController {
    */
   @Operation(summary = "Reverse a transaction (management)")
   @PostMapping("/transactions/{id}/reversal")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto reverseTransaction(

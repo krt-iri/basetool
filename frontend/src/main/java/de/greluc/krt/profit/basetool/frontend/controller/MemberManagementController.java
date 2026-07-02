@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -72,7 +73,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/members")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class MemberManagementController {
 
   private final BackendApiClient backendApiClient;
@@ -518,7 +519,7 @@ public class MemberManagementController {
    * @return redirect to {@code /members}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);
@@ -543,7 +544,7 @@ public class MemberManagementController {
    */
   @DeleteMapping("/{id}")
   @ResponseBody
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Map<String, Object>> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);

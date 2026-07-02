@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -58,7 +59,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/locations")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminLocationsPageController {
 
   private final BackendApiClient backendApiClient;
@@ -108,7 +109,7 @@ public class AdminLocationsPageController {
    * @return redirect to {@code /admin/locations}
    */
   @PostMapping("/{id}/toggle-visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleLocationVisibility(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean hidden,
@@ -156,7 +157,7 @@ public class AdminLocationsPageController {
    * @return redirect to {@code /admin/locations}
    */
   @PostMapping("/{id}/toggle-home-location")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleHomeLocation(
       @PathVariable @NotNull UUID id,
       @RequestParam boolean homeLocation,
@@ -203,7 +204,7 @@ public class AdminLocationsPageController {
    */
   @ResponseBody
   @PostMapping(value = "/{id}/toggle-visibility", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleLocationVisibilityAjax(@PathVariable @NotNull UUID id) {
     try {
       LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
@@ -237,7 +238,7 @@ public class AdminLocationsPageController {
    */
   @ResponseBody
   @PostMapping(value = "/{id}/toggle-home-location", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleHomeLocationAjax(@PathVariable @NotNull UUID id) {
     try {
       LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -360,7 +361,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/create")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String createOperation(
       @ModelAttribute OperationForm form, RedirectAttributes redirectAttributes) {
     try {
@@ -383,7 +384,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/{id}/update")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String updateOperation(
       @PathVariable @NotNull UUID id,
       @ModelAttribute OperationForm form,
@@ -481,7 +482,7 @@ public class OperationPageController {
    * @return redirect to {@code /operations}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteOperation(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -506,7 +507,7 @@ public class OperationPageController {
    * @return {@code 200} on success, or the propagated backend error
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<Object> createOperationAjax(@RequestBody OperationForm form) {
     try {
@@ -539,7 +540,7 @@ public class OperationPageController {
    * @return {@code 200} with the fresh version/name/status, or the propagated backend error
    */
   @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<Object> updateOperationAjax(
       @PathVariable @NotNull UUID id, @RequestBody OperationForm form) {
@@ -572,7 +573,7 @@ public class OperationPageController {
    * @return {@code 200} on success, or the propagated backend error
    */
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> deleteOperationAjax(@PathVariable @NotNull UUID id) {
     try {

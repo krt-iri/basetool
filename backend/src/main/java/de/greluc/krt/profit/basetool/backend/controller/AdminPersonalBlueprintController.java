@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -68,7 +69,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/admin/personal-blueprints")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Tag(
     name = "Admin – Personal Blueprints",
     description = "Administrator endpoints for managing any user's acquired blueprints (#327).")

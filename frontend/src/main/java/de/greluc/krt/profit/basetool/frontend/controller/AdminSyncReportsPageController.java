@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSyncReportsPageController {
 
   private static final int PAGE_SIZE = 100;

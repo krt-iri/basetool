@@ -45,11 +45,43 @@ constant per role. `LOGISTICIAN` / `MISSION_MANAGER` are hierarchy-derived only 
 `Role` — and stay documented as such on `Roles`. Both constant holders live in the dependency-leaf
 `support` package (ADR-0047): plain `String` constants with no dependency on the security API.
 
-The `@PreAuthorize` literal-role expressions across controllers/services (~158 occurrences) and the
-frontend's own role-literal comparisons are **not yet migrated** — that requires each occurrence to
-become a compile-time-constant SpEL expression (`hasRole('` + constant + `')`) built via annotation
-constant-concatenation, a much larger and more security-sensitive sweep than the backend's runtime
-`SecurityConfig`/`DataInitializer` slice. Left as deliberate, tracked follow-up.
+Every literal-role `@PreAuthorize` expression is migrated too — **266 sites across 96 backend +
+frontend controller/service files** (153 backend, 113 frontend; a ground-truth grep sweep, not the
+issue's original ~158/~322 estimates). Each `hasRole('X')` / `hasAnyRole('X','Y',…)` /
+`hasAuthority('X')` / `hasAnyAuthority('X','Y',…)` single-quoted literal is spliced into a
+compile-time-constant string-concatenation expression, e.g. `hasRole('ADMIN')` becomes `hasRole('" +
+Roles.ADMIN + "')`. This is safe by construction: `"literal" + Roles.X + "literal"` is itself a Java
+compile-time constant (JLS 4.12.4 / 15.28 — a `public static final String` field initialized from a
+literal, referenced from another compilation unit, is a constant expression), so javac folds it to
+the byte-identical original string before the annotation is even written to the class file — the
+wire behavior, and everything ArchUnit's `staffelScopedWriteEndpointsMustGateOnOwnerScopeService` /
+`writeEndpointsMustDeclareAnAuthorisationAnnotation` inspect via the resolved annotation value, is
+unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthenticated()`,
+`permitAll()`) are untouched — only the literal-role/permission subset was in scope, matching the
+`@PreAuthorize` value's constant-concatenation seam so a role literal can sit alongside an untouched
+bean-method call in the same string (e.g. `hasRole('" + Roles.LOGISTICIAN + "') and
+@ownerScopeService.canEditJobOrder(#id)`).
+
+On the frontend, `frontend.support.Roles` mirrors the backend's bare role codes (the frontend cannot
+depend on the backend's Java classes — separate Gradle module, bearer-token relay only — so the
+values are intentionally duplicated and must stay byte-identical). `FrontendAuthHelperService` and
+every frontend `@PreAuthorize` with a literal role are migrated the same way.
+
+**Deliberately out of scope**, tracked as follow-up:
+
+- **Programmatic authority-string comparisons** outside `@PreAuthorize` — e.g. backend
+  `AuthHelperService.hasReachableRole("ROLE_ADMIN")` call sites (`BankSecurityService`,
+  `MissionSecurityService`, `OwnerScopeService`, `OrgUnitBankAccessService`, a few controllers) and
+  frontend raw `"ROLE_ADMIN".equals(...)`/`getAuthority().equals("ROLE_X")` checks (`BackendRoleSyncFilter`,
+  `InventoryPageController`, `JobOrderPageController`, `OperationPageController`,
+  `RefineryOrderPageController`). Same stringly-typed pattern, different code shape (a method
+  parameter / raw comparison, not a `@PreAuthorize` SpEL literal) — left for a dedicated follow-up
+  rather than risking a rushed, differently-shaped mechanical sweep on top of an already large change.
+- **Thymeleaf `sec:authorize="hasRole('X')"` template attributes** (136 occurrences across 27
+  templates) — these are HTML strings evaluated by the Spring Security Thymeleaf dialect at render
+  time; javac never sees them, so no `Roles` constant reference is possible without introducing a new
+  Thymeleaf expression-utility object bound into every request's model — a materially larger,
+  differently-risked change than a string substitution, and out of scope here.
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 

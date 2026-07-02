@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateReque
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,7 +67,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @RequestMapping("/admin/org-structure")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminOrgStructurePageController {
 
   /** Backend org-unit kind discriminator: the top-of-hierarchy Organisationsleitung. */

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
@@ -132,7 +133,7 @@ public class PromotionTopicService {
    * @throws BadRequestException when the caller has no active squadron context
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
   public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     // REQ-ORG-017 "pin, else choose": an officer who belongs to two Staffeln must pin the target
@@ -183,7 +184,7 @@ public class PromotionTopicService {
    *     matches the persisted entity
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -207,7 +208,7 @@ public class PromotionTopicService {
    * @throws AccessDeniedException if the caller's squadron does not match
    */
   @Transactional
-  @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "','" + Roles.OFFICER + "')")
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);

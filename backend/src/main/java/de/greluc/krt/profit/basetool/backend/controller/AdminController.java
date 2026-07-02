@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RoleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.RoleService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -54,7 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Transactional
 public class AdminController {
 

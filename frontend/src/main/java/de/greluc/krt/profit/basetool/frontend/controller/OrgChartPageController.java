@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -104,7 +105,7 @@ public class OrgChartPageController {
    */
   @PostMapping("/positions/ajax")
   @ResponseBody
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> createPosition(@RequestBody Map<String, Object> body) {
     try {
       return ResponseEntity.ok(
@@ -125,7 +126,7 @@ public class OrgChartPageController {
    */
   @PutMapping("/positions/{id}/ajax")
   @ResponseBody
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> updatePosition(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
@@ -149,7 +150,7 @@ public class OrgChartPageController {
    */
   @DeleteMapping("/positions/{id}/leader/ajax")
   @ResponseBody
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> vacateLeader(
       @PathVariable @NotNull UUID id, @RequestParam("version") long version) {
     try {
@@ -171,7 +172,7 @@ public class OrgChartPageController {
    */
   @DeleteMapping("/positions/{id}/ajax")
   @ResponseBody
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deletePosition(@PathVariable @NotNull UUID id) {
     try {
       backendApiClient.delete("/api/v1/org-chart/positions/" + id, Void.class);

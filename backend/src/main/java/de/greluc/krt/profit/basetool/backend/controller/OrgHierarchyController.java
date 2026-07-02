@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateReques
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgHierarchyService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -78,7 +79,7 @@ public class OrgHierarchyController {
    * @return the Bereich DTOs.
    */
   @GetMapping("/bereiche")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(summary = "List Bereiche", description = "Admin-only list of the area (Bereich) tier.")
   public List<BereichDto> listBereiche(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
@@ -92,7 +93,7 @@ public class OrgHierarchyController {
    * @return the persisted Bereich DTO.
    */
   @PostMapping("/bereiche")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Create a Bereich",
       description = "Creates an area (Bereich); name/shorthand unique across all org units.")
@@ -113,7 +114,7 @@ public class OrgHierarchyController {
    * @return the OL DTO(s).
    */
   @GetMapping("/organisationsleitung")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "List the Organisationsleitung",
       description = "Admin-only list of the single top-of-hierarchy org unit.")
@@ -131,7 +132,7 @@ public class OrgHierarchyController {
    * @return the persisted OL DTO.
    */
   @PostMapping("/organisationsleitung")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Create the Organisationsleitung",
       description = "Creates the single top-of-hierarchy org unit; a second one is rejected (409).")
@@ -150,7 +151,7 @@ public class OrgHierarchyController {
    * @return the org-unit node DTOs.
    */
   @GetMapping("/org-units")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "List all org units",
       description =
@@ -169,7 +170,7 @@ public class OrgHierarchyController {
    * @return the child's id, kind, new parent id and bumped version.
    */
   @PatchMapping("/org-units/{id}/parent")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Set an org unit's parent",
       description =
@@ -239,7 +240,7 @@ public class OrgHierarchyController {
    * @return the member's resulting OL-flag + version.
    */
   @PostMapping("/organisationsleitung/{id}/members")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Add an Organisationsleitung member",
       description = "Adds a user to the Organisationsleitung (is_ol_member). ADMIN-only.")
@@ -255,7 +256,7 @@ public class OrgHierarchyController {
    * @param userId the user to remove.
    */
   @DeleteMapping("/organisationsleitung/{id}/members/{userId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Operation(
       summary = "Remove an Organisationsleitung member",
       description = "Removes the user's Organisationsleitung membership. ADMIN-only.")

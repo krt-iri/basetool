@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.LocationService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -150,7 +151,7 @@ public class LocationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public LocationDto createLocation(@RequestBody @Valid @NotNull LocationDto location) {
     // stripServerManaged drops client-supplied id / version so JPA performs an INSERT
     // and the client cannot mass-assign onto an existing row through this endpoint.
@@ -166,7 +167,7 @@ public class LocationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public LocationDto updateLocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull LocationDto location) {
     return locationMapper.toDto(locationService.updateLocation(id, location));
@@ -180,7 +181,7 @@ public class LocationController {
    * @param id location id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteLocation(@PathVariable @NotNull UUID id) {
     locationService.deleteLocation(id);
   }

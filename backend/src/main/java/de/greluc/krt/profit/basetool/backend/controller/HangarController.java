@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.service.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Permissions;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -123,7 +125,7 @@ public class HangarController {
    * @return paged ship DTOs
    */
   @GetMapping("/ships")
-  @PreAuthorize("hasAuthority('HANGAR_READ')")
+  @PreAuthorize("hasAuthority('" + Permissions.HANGAR_READ + "')")
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getAllShips(
       @RequestParam(required = false) Integer page,
@@ -244,7 +246,7 @@ public class HangarController {
     @ApiResponse(responseCode = "403", description = "Not authorized")
   })
   @DeleteMapping("/ships")
-  @PreAuthorize("hasAuthority('HANGAR_WRITE')")
+  @PreAuthorize("hasAuthority('" + Permissions.HANGAR_WRITE + "')")
   public ResponseEntity<Void> deleteAllMyShips(@AuthenticationPrincipal Jwt jwt) {
     hangarService.deleteAllShipsForUser(userService.getUserIdFromJwt(jwt));
     return ResponseEntity.noContent().build();
@@ -259,7 +261,7 @@ public class HangarController {
    * @return paged ship DTOs
    */
   @GetMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getUserShips(
       @PathVariable @NotNull UUID userId,
@@ -282,7 +284,7 @@ public class HangarController {
 
   /** Admin-only: adds a ship to a target user's hangar. */
   @PostMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
@@ -291,7 +293,7 @@ public class HangarController {
 
   /** Admin-only: updates a target user's ship. */
   @PutMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @Transactional
   public ShipDto updateUserShip(
       @PathVariable @NotNull UUID userId,
@@ -302,7 +304,7 @@ public class HangarController {
 
   /** Admin-only: deletes a target user's ship. */
   @DeleteMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
     hangarService.deleteShip(userId, shipId);
@@ -351,7 +353,7 @@ public class HangarController {
 
   /** Bulk reset of the {@code fitted} flag on every ship in the squadron. ADMIN/OFFICER-only. */
   @PostMapping("/ships/reset-fitted")
-  @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")
+  @PreAuthorize("hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "')")
   public void resetAllFittedStatus() {
     hangarService.resetAllFittedStatus();
   }

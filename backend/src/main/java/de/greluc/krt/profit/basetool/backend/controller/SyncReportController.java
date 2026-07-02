@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -55,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/sync-reports")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class SyncReportController {
 
   private static final int DEFAULT_PAGE_SIZE = 50;

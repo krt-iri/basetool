@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankStatementReportService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -94,7 +95,7 @@ public class BankAccountController {
    */
   @Operation(summary = "List the bank accounts visible to the caller (paged)")
   @GetMapping
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   @Transactional(readOnly = true)
   public PageResponse<BankAccountDto> getAccounts(
       @RequestParam(required = false) Integer page,
@@ -119,7 +120,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Create a bank account (management: any type; employee: SPECIAL only)")
   @PostMapping
-  @PreAuthorize("hasRole('BANK_EMPLOYEE')")
+  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankAccountDto createAccount(@RequestBody @Valid CreateBankAccountRequest request) {
@@ -159,7 +160,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Rename a bank account (management)")
   @PatchMapping("/{id}")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   @Transactional
   public BankAccountDto renameAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid RenameBankAccountRequest request) {
@@ -192,7 +193,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Close a bank account (management; zero balance required)")
   @PostMapping("/{id}/close")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   @Transactional
   public BankAccountDto closeAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid BankAccountLifecycleRequest request) {
@@ -208,7 +209,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Reopen a closed bank account (management)")
   @PostMapping("/{id}/reopen")
-  @PreAuthorize("hasRole('BANK_MANAGEMENT')")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   @Transactional
   public BankAccountDto reopenAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid BankAccountLifecycleRequest request) {

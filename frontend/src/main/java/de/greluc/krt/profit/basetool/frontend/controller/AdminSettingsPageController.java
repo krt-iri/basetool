@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
@@ -70,7 +71,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/settings")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSettingsPageController {
 
   /** Decimal scale used when converting between DB fraction and form percentage. */

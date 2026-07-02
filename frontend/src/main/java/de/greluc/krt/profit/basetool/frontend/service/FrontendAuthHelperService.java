@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Set;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -52,11 +53,11 @@ public class FrontendAuthHelperService {
    */
   private static final Set<String> MEMBER_ROLES =
       Set.of(
-          "ROLE_ADMIN",
-          "ROLE_OFFICER",
-          "ROLE_MISSION_MANAGER",
-          "ROLE_LOGISTICIAN",
-          "ROLE_KRT_MEMBER");
+          Roles.authority(Roles.ADMIN),
+          Roles.authority(Roles.OFFICER),
+          Roles.authority(Roles.MISSION_MANAGER),
+          Roles.authority(Roles.LOGISTICIAN),
+          Roles.authority(Roles.KRT_MEMBER));
 
   /**
    * {@code true} if the current request carries an authenticated, non-anonymous principal.
@@ -84,7 +85,9 @@ public class FrontendAuthHelperService {
     if (auth == null) {
       return false;
     }
-    return auth.getAuthorities().stream().map(Object::toString).anyMatch("ROLE_ADMIN"::equals);
+    return auth.getAuthorities().stream()
+        .map(Object::toString)
+        .anyMatch(Roles.authority(Roles.ADMIN)::equals);
   }
 
   /**

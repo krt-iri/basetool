@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -102,7 +103,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public FrequencyTypeDto createFrequencyType(
       @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     var toCreate = frequencyTypeMapper.toEntity(frequencyType);
@@ -122,7 +123,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public FrequencyTypeDto updateFrequencyType(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     return frequencyTypeMapper.toDto(
@@ -135,7 +136,7 @@ public class FrequencyTypeController {
    * @param id frequency type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.deleteFrequencyType(id);
   }
@@ -146,7 +147,7 @@ public class FrequencyTypeController {
    * @param id frequency type id
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void activateFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.activateFrequencyType(id);
   }
@@ -158,7 +159,7 @@ public class FrequencyTypeController {
    * @param ids ids in the desired new order
    */
   @PostMapping("/reorder")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void reorderFrequencyTypes(@RequestBody @NotNull List<UUID> ids) {
     frequencyTypeService.reorderFrequencyTypes(ids);
   }

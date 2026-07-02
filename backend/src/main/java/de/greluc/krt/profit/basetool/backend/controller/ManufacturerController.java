@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.ManufacturerService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.List;
 import java.util.Set;
@@ -100,7 +101,7 @@ public class ManufacturerController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/visibility")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ManufacturerDto updateManufacturerVisibility(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
     return manufacturerMapper.toDto(manufacturerService.updateManufacturerVisibility(id, hidden));

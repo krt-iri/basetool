@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -311,7 +312,10 @@ public class RefineryOrderController {
    * @return paged refinery-order list DTOs
    */
   @GetMapping("/users/{userId}")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewUserRefineryOrders(#userId)")
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') and @ownerScopeService.canViewUserRefineryOrders(#userId)")
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getUserRefineryOrders(
       @PathVariable @NotNull UUID userId,
@@ -362,7 +366,8 @@ public class RefineryOrderController {
    * @return the persisted DTO
    */
   @PutMapping("/users/{userId}/{orderId}")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditRefineryOrder(#orderId)")
   public RefineryOrderDto updateUserRefineryOrder(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
@@ -375,7 +380,8 @@ public class RefineryOrderController {
 
   /** Logistician-only: cancels a target user's refinery order. */
   @DeleteMapping("/users/{userId}/{orderId}")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditRefineryOrder(#orderId)")
   public void deleteUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
     refineryOrderService.deleteRefineryOrder(userId, orderId, true);

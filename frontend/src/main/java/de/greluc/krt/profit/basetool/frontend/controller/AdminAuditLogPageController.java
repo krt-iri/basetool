@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Controller
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminAuditLogPageController {
 
   /** Audit-log page size; the table is dense and read-only, so a large page is fine. */

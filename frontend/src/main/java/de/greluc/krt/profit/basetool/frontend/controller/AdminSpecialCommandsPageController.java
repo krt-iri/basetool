@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MembershipFlagsForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -82,7 +83,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/special-commands")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSpecialCommandsPageController {
 
   private final BackendApiClient backendApiClient;

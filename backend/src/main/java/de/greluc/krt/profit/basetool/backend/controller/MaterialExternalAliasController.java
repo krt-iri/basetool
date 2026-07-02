@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasCrea
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -58,7 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/material-external-aliases")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class MaterialExternalAliasController {
 
   private final MaterialExternalAliasService service;

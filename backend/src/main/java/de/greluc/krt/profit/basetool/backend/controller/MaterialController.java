@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -250,7 +251,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialCreateDto material) {
     return materialMapper.toDto(materialService.createMaterial(material));
   }
@@ -264,7 +265,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MaterialDto updateMaterial(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
     return materialMapper.toDto(
@@ -277,7 +278,7 @@ public class MaterialController {
    * @param id material id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteMaterial(@PathVariable @NotNull UUID id) {
     materialService.deleteMaterial(id);
   }

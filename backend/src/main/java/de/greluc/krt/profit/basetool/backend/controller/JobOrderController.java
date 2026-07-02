@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverService
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -629,7 +630,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -648,7 +649,7 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order priority",
       description = "Updates priority and shifts others.")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderPriority(@PathVariable UUID id, @RequestParam Integer priority) {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
@@ -662,7 +663,7 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -700,7 +701,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
@@ -741,7 +742,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
@@ -763,7 +764,7 @@ public class JobOrderController {
       description =
           "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
               + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
@@ -787,7 +788,7 @@ public class JobOrderController {
   @Operation(
       summary = "Delete a job order",
       description = "Deletes a job order and shifts priorities.")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public void deleteJobOrder(@PathVariable UUID id) {
     jobOrderService.deleteJobOrder(id);
   }

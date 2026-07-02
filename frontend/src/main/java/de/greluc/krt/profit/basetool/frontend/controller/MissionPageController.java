@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
@@ -1758,7 +1759,7 @@ public class MissionPageController {
    * @return redirect to {@code /missions}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMission(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -2005,7 +2006,7 @@ public class MissionPageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/frequencies")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull UUID frequencyTypeId,
@@ -2031,7 +2032,7 @@ public class MissionPageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/frequencies/{frequencyId}/delete")
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String deleteFrequency(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
@@ -2057,7 +2058,7 @@ public class MissionPageController {
       value = "/{id}/frequencies/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public org.springframework.http.ResponseEntity<Object> addOrUpdateFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -2086,7 +2087,7 @@ public class MissionPageController {
       value = "/{id}/frequencies/{frequencyId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public org.springframework.http.ResponseEntity<Object> deleteFrequencyAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
     try {
@@ -2120,7 +2121,7 @@ public class MissionPageController {
       value = "/{id}/frequencies/custom/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public org.springframework.http.ResponseEntity<Object> addCustomFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -2155,7 +2156,7 @@ public class MissionPageController {
       value = "/{id}/frequencies/custom/{frequencyId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("hasRole('MISSION_MANAGER')")
+  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public org.springframework.http.ResponseEntity<Object> updateCustomFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,

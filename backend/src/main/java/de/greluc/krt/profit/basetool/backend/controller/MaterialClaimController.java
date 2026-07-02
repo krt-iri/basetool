@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -111,7 +112,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders()")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canViewJobOrders()")
   public ClaimDto upsertClaim(
       @PathVariable UUID jobOrderId, @RequestBody @Valid CreateClaimDto dto) {
     return materialClaimService.upsertClaim(jobOrderId, dto);
@@ -134,7 +135,7 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order or claim not found")
   })
-  @PreAuthorize("hasRole('LOGISTICIAN') and @ownerScopeService.canViewJobOrders()")
+  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canViewJobOrders()")
   public void withdrawClaim(@PathVariable UUID jobOrderId, @PathVariable UUID claimId) {
     materialClaimService.withdrawClaim(jobOrderId, claimId);
   }

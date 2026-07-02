@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,7 +55,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/announcement")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminAnnouncementPageController {
 
   private final BackendApiClient backendApiClient;
