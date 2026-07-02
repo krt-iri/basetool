@@ -91,6 +91,10 @@ class MissionServiceSectionPatchTest {
   // core/schedule/flags section patches.
   @InjectMocks private MissionParticipantService missionParticipantService;
 
+  // removeMissionUnit was extracted to MissionStructureService (L1 step 2, #920); same wiring
+  // rationale as the participant service above.
+  @InjectMocks private MissionStructureService missionStructureService;
+
   @InjectMocks private MissionService missionService;
 
   private UUID missionId;
@@ -100,6 +104,8 @@ class MissionServiceSectionPatchTest {
   void setUp() {
     ReflectionTestUtils.setField(
         missionService, "missionParticipantService", missionParticipantService);
+    ReflectionTestUtils.setField(
+        missionService, "missionStructureService", missionStructureService);
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);

@@ -25,42 +25,31 @@ import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersio
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionCrewRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -102,11 +91,6 @@ public class MissionService {
 
   private final MissionRepository missionRepository;
   private final UserRepository userRepository;
-  private final ShipRepository shipRepository;
-  private final ShipTypeRepository shipTypeRepository;
-  private final JobTypeRepository jobTypeRepository;
-  private final MissionUnitRepository missionUnitRepository;
-  private final MissionCrewRepository missionCrewRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
@@ -117,6 +101,7 @@ public class MissionService {
   private final AuditService auditService;
   private final MissionTimelineService missionTimelineService;
   private final MissionParticipantService missionParticipantService;
+  private final MissionStructureService missionStructureService;
 
   /**
    * <strong>Do not call from new code.</strong> Kept only because the wider service test suite
@@ -903,120 +888,8 @@ public class MissionService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit = new MissionUnit();
-    missionUnit.setMission(mission);
-
-    if (shipTypeId != null) {
-      ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
-      missionUnit.setShipType(shipType);
-    } else {
-      missionUnit.setShipType(null);
-    }
-
-    if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
-      if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
-        throw new IllegalArgumentException("Ship does not match the specified ShipType");
-      }
-      if (!isOwnerRegisteredParticipant(mission, ship)) {
-        throw new IllegalArgumentException(
-            "Ship owner is not a registered participant of the mission");
-      }
-      missionUnit.setShip(ship);
-      if (shipTypeId == null) {
-        missionUnit.setShipType(ship.getShipType());
-      }
-    }
-
-    missionUnit.setName(resolveUnitName(name, missionUnit));
-    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
-    missionUnit.setHighValueUnit(highValueUnit);
-
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    }
-
-    mission.getAssignedUnits().add(missionUnit);
-    missionUnitRepository.save(missionUnit);
-    auditService.record(
-        AuditEventType.MISSION_UNIT_ADDED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnit.getId()));
-    return mission;
-  }
-
-  /**
-   * Resolves the stored (NOT NULL) unit name from the optional display name: a non-blank caller
-   * value wins; otherwise the name is derived from the already-resolved ship (its hangar name)
-   * respectively ship type. Mirrors the unit-modal mock where the Anzeigename is optional because
-   * ship / ship type carry the unit's identity.
-   *
-   * @param name the caller-submitted display name (nullable/blank)
-   * @param unit the unit with {@code ship} / {@code shipType} already resolved
-   * @return the effective non-blank name to store
-   * @throws IllegalArgumentException when neither a name nor a ship / ship type is present
-   */
-  private static String resolveUnitName(String name, MissionUnit unit) {
-    if (name != null && !name.isBlank()) {
-      return name.trim();
-    }
-    if (unit.getShip() != null && unit.getShip().getName() != null) {
-      return unit.getShip().getName();
-    }
-    if (unit.getShipType() != null) {
-      return unit.getShipType().getName();
-    }
-    throw new IllegalArgumentException(
-        "Unit needs a display name or a ship / ship type to derive one from");
-  }
-
-  /**
-   * Resolves the optional explicit responsible person of a unit.
-   *
-   * @param responsibleUserId the user id, or {@code null} for "no explicit responsible" (the UI
-   *     then falls back to the assigned ship's owner)
-   * @return the resolved user or {@code null}
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the id is
-   *     unknown
-   */
-  private User resolveResponsibleUser(UUID responsibleUserId) {
-    if (responsibleUserId == null) {
-      return null;
-    }
-    return userRepository
-        .findById(responsibleUserId)
-        .orElseThrow(() -> new NotFoundException("Responsible user not found"));
-  }
-
-  /**
-   * Normalises a unit note: trims surrounding whitespace and collapses blank input to {@code null}
-   * so the column stays empty instead of storing whitespace-only strings.
-   *
-   * @param note the caller-submitted note (nullable)
-   * @return the trimmed note or {@code null}
-   */
-  private static String normalizeUnitNote(String note) {
-    return note == null || note.isBlank() ? null : note.trim();
+    return missionStructureService.addUnitToMission(
+        missionId, name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note);
   }
 
   /**
@@ -1034,103 +907,16 @@ public class MissionService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(unitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    missionUnit.setHighValueUnit(highValueUnit);
-    missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
-
-    if (shipTypeId != null) {
-      ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
-      missionUnit.setShipType(shipType);
-    } else {
-      missionUnit.setShipType(null);
-    }
-
-    if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
-      if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
-        throw new IllegalArgumentException("Ship does not match the specified ShipType");
-      }
-      // A ship already pinned to any unit of this mission is grandfathered: unrelated edits (name,
-      // frequency, HVU) on a unit whose ship owner has since left the roster must not 400, and the
-      // edit picker keeps offering every already-assigned ship so it round-trips. Only a ship new
-      // to the mission must belong to a current participant.
-      boolean alreadyAssignedInMission =
-          mission.getAssignedUnits().stream()
-              .map(MissionUnit::getShip)
-              .filter(assigned -> assigned != null)
-              .anyMatch(assigned -> assigned.getId().equals(shipId));
-      if (!alreadyAssignedInMission && !isOwnerRegisteredParticipant(mission, ship)) {
-        throw new IllegalArgumentException(
-            "Ship owner is not a registered participant of the mission");
-      }
-      missionUnit.setShip(ship);
-      if (shipTypeId == null) {
-        missionUnit.setShipType(ship.getShipType());
-      }
-    } else {
-      missionUnit.setShip(null);
-    }
-
-    // After ship / ship type resolution so a blank display name can derive from them (same rule
-    // as addUnitToMission).
-    missionUnit.setName(resolveUnitName(name, missionUnit));
-
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    } else {
-      missionUnit.setFrequency(null);
-    }
-
-    missionUnitRepository.save(missionUnit);
-    auditService.record(
-        AuditEventType.MISSION_UNIT_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
-  }
-
-  /**
-   * Tests whether the given ship's owner is signed up as a participant of the mission. Only
-   * participants backed by a real {@link User} account count — guest participants have no account
-   * and therefore never own hangar ships. Used by {@link #addUnitToMission} and {@link
-   * #updateMissionUnit} to keep a unit's assigned ship constrained to ships brought by people
-   * actually registered for the mission.
-   *
-   * @param mission the mission whose participant roster is searched, never {@code null}
-   * @param ship the ship whose owner is checked for participation, never {@code null}
-   * @return {@code true} if the ship's owner is a registered (account-backed) participant
-   */
-  private boolean isOwnerRegisteredParticipant(@NotNull Mission mission, @NotNull Ship ship) {
-    UUID ownerId = ship.getOwner().getId();
-    return mission.getParticipants().stream()
-        .map(MissionParticipant::getUser)
-        .filter(user -> user != null)
-        .anyMatch(user -> user.getId().equals(ownerId));
+    return missionStructureService.updateMissionUnit(
+        missionId,
+        unitId,
+        name,
+        shipTypeId,
+        shipId,
+        highValueUnit,
+        frequency,
+        responsibleUserId,
+        note);
   }
 
   /**
@@ -1148,33 +934,7 @@ public class MissionService {
    */
   @Transactional(readOnly = true)
   public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
-
-    Set<UUID> participantUserIds =
-        mission.getParticipants().stream()
-            .map(MissionParticipant::getUser)
-            .filter(user -> user != null)
-            .map(User::getId)
-            .collect(java.util.stream.Collectors.toSet());
-    if (!participantUserIds.isEmpty()) {
-      shipRepository
-          .findByOwnerIdIn(participantUserIds)
-          .forEach(ship -> byId.put(ship.getId(), ship));
-    }
-
-    for (MissionUnit unit : mission.getAssignedUnits()) {
-      Ship ship = unit.getShip();
-      if (ship != null) {
-        byId.putIfAbsent(ship.getId(), ship);
-      }
-    }
-
-    return new java.util.ArrayList<>(byId.values());
+    return missionStructureService.getSelectableUnitShips(missionId);
   }
 
   /**
@@ -1183,24 +943,7 @@ public class MissionService {
    */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    boolean removed = mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId));
-
-    if (!removed) {
-      throw new NotFoundException("MissionUnit not found in this mission");
-    }
-
-    auditService.record(
-        AuditEventType.MISSION_UNIT_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", unitId));
-    return mission;
+    return missionStructureService.removeMissionUnit(missionId, unitId);
   }
 
   // --- Ablauf steps (procedure timeline) ---
@@ -1382,51 +1125,8 @@ public class MissionService {
       @NotNull UUID missionUnitId,
       @NotNull UUID participantId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionShip =
-        mission.getAssignedUnits().stream()
-            .filter(ms -> ms != null && ms.getId() != null && ms.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found in this mission"));
-
-    MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
-
-    boolean isAlreadyAssigned =
-        mission.getAssignedUnits().stream()
-            .flatMap(u -> u.getCrew().stream())
-            .anyMatch(c -> c.getParticipant().getId().equals(participantId));
-
-    if (isAlreadyAssigned) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-          "error.mission.crew.duplicate");
-    }
-
-    MissionCrew crew = new MissionCrew();
-    crew.setMissionUnit(missionShip);
-    crew.setParticipant(participant);
-
-    // Fetch and validate JobTypes
-    Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
-
-    crew.setJobTypes(jobTypes);
-
-    missionShip.getCrew().add(crew);
-    missionCrewRepository.save(crew);
-    auditService.record(
-        AuditEventType.MISSION_CREW_ADDED,
-        mission.getId(),
-        mission.getName(),
-        participant.getUser() != null ? participant.getUser().getId() : null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crew.getId()));
-    return mission;
+    return missionStructureService.addCrewToShip(
+        missionId, missionUnitId, participantId, jobTypeIds);
   }
 
   /** Updates a crew's name, role, and assigned ship. */
@@ -1436,34 +1136,7 @@ public class MissionService {
       @NotNull UUID missionUnitId,
       @NotNull UUID crewId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    MissionCrew crew =
-        missionUnit.getCrew().stream()
-            .filter(c -> c.getId().equals(crewId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Crew member not found in this unit"));
-
-    Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
-    crew.setJobTypes(jobTypes);
-
-    missionCrewRepository.save(crew);
-    auditService.record(
-        AuditEventType.MISSION_CREW_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
+    return missionStructureService.updateCrewInShip(missionId, missionUnitId, crewId, jobTypeIds);
   }
 
   /**
@@ -1473,49 +1146,7 @@ public class MissionService {
   @Transactional
   public Mission removeCrewFromShip(
       @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-
-    MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
-
-    boolean removed = missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId));
-
-    if (!removed) {
-      throw new NotFoundException("Crew member not found in this unit");
-    }
-
-    auditService.record(
-        AuditEventType.MISSION_CREW_REMOVED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("unit", missionUnitId).with("crew", crewId));
-    return mission;
-  }
-
-  private Set<JobType> validateAndFetchJobTypes(Set<UUID> jobTypeIds) {
-    Set<JobType> jobTypes = new HashSet<>();
-    if (jobTypeIds != null && !jobTypeIds.isEmpty()) {
-      for (UUID jtId : jobTypeIds) {
-        JobType jt =
-            jobTypeRepository
-                .findById(jtId)
-                .orElseThrow(() -> new NotFoundException("JobType not found: " + jtId));
-
-        if (jt.getArchetype() != JobTypeArchetype.CREW) {
-          throw new IllegalArgumentException(
-              "JobType " + jt.getName() + " is not of archetype CREW");
-        }
-        jobTypes.add(jt);
-      }
-    }
-    return jobTypes;
+    return missionStructureService.removeCrewFromShip(missionId, missionUnitId, crewId);
   }
 
   /**

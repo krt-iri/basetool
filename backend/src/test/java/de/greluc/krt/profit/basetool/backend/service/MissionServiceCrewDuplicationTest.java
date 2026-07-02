@@ -42,7 +42,7 @@ class MissionServiceCrewDuplicationTest {
   @Mock private SquadronRepository squadronRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionStructureService missionStructureService;
 
   @Test
   void addCrewToShip_shouldThrowIfParticipantAlreadyAssignedToSameUnit() {
@@ -73,7 +73,8 @@ class MissionServiceCrewDuplicationTest {
     assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
         () ->
-            missionService.addCrewToShip(missionId, unitId, participantId, Collections.emptySet()));
+            missionStructureService.addCrewToShip(
+                missionId, unitId, participantId, Collections.emptySet()));
   }
 
   @Test
@@ -110,7 +111,7 @@ class MissionServiceCrewDuplicationTest {
     assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
         () ->
-            missionService.addCrewToShip(
+            missionStructureService.addCrewToShip(
                 missionId, unitId2, participantId, Collections.emptySet()));
   }
 }
