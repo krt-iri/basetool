@@ -56,12 +56,14 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    * @return one page of audit events
    */
   @Query(
-      "SELECT e FROM BankAuditEvent e WHERE"
-          + " (CAST(:from AS timestamp) IS NULL OR e.occurredAt >= :from)"
-          + " AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt <= :to)"
-          + " AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)"
-          + " AND (CAST(:accountId AS uuid) IS NULL OR e.accountId = :accountId)"
-          + " AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)")
+      """
+      SELECT e FROM BankAuditEvent e WHERE
+      (CAST(:from AS timestamp) IS NULL OR e.occurredAt >= :from)
+      AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt <= :to)
+      AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)
+      AND (CAST(:accountId AS uuid) IS NULL OR e.accountId = :accountId)
+      AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)
+      """)
   Page<BankAuditEvent> findFiltered(
       @Param("from") Instant from,
       @Param("to") Instant to,
@@ -89,8 +91,10 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    * @return the period's events in ascending time order
    */
   @Query(
-      "SELECT e FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to"
-          + " ORDER BY e.occurredAt ASC")
+      """
+      SELECT e FROM BankAuditEvent e WHERE e.occurredAt >= :from AND e.occurredAt <= :to
+      ORDER BY e.occurredAt ASC
+      """)
   List<BankAuditEvent> findForExport(@Param("from") Instant from, @Param("to") Instant to);
 
   /**

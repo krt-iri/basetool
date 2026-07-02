@@ -140,8 +140,10 @@ public interface OrgUnitMembershipRepository
    * @return the lead user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role ="
-          + " de.greluc.krt.profit.basetool.backend.model.MembershipRole.SK_LEAD")
+      """
+      SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role =
+      de.greluc.krt.profit.basetool.backend.model.MembershipRole.SK_LEAD
+      """)
   Set<UUID> findLeadUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
@@ -152,8 +154,10 @@ public interface OrgUnitMembershipRepository
    * @return the logistician user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND"
-          + " m.isLogistician = true")
+      """
+      SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND
+      m.isLogistician = true
+      """)
   Set<UUID> findLogisticianUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
@@ -164,8 +168,10 @@ public interface OrgUnitMembershipRepository
    * @return the mission-manager user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND"
-          + " m.isMissionManager = true")
+      """
+      SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND
+      m.isMissionManager = true
+      """)
   Set<UUID> findMissionManagerUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
@@ -181,8 +187,10 @@ public interface OrgUnitMembershipRepository
    * @return the matching user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role ="
-          + " :role")
+      """
+      SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role =
+      :role
+      """)
   Set<UUID> findUserIdsByOrgUnitAndRole(
       @Param("orgUnitId") UUID orgUnitId, @Param("role") MembershipRole role);
 }

@@ -88,8 +88,10 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
    */
   @Modifying(clearAutomatically = true)
   @Query(
-      "update Notification n set n.read = true, n.readAt = :readAt"
-          + " where n.recipientSub = :recipientSub and n.read = false")
+      """
+      update Notification n set n.read = true, n.readAt = :readAt
+      where n.recipientSub = :recipientSub and n.read = false
+      """)
   int markAllReadForRecipient(
       @Param("recipientSub") UUID recipientSub, @Param("readAt") Instant readAt);
 

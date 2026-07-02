@@ -70,8 +70,10 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * @return the member's evaluations visible in the scope, possibly empty
    */
   @Query(
-      "SELECT e FROM MemberEvaluation e WHERE e.userId = :userId AND (:owningSquadronId IS NULL OR"
-          + " e.category.topic.owningSquadron.id = :owningSquadronId)")
+      """
+      SELECT e FROM MemberEvaluation e WHERE e.userId = :userId AND (:owningSquadronId IS NULL OR
+      e.category.topic.owningSquadron.id = :owningSquadronId)
+      """)
   List<MemberEvaluation> findAllByUserIdScoped(
       @Param("userId") String userId, @Param("owningSquadronId") UUID owningSquadronId);
 
@@ -84,8 +86,10 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * @return a page of the member's evaluations visible in the scope
    */
   @Query(
-      "SELECT e FROM MemberEvaluation e WHERE e.userId = :userId AND (:owningSquadronId IS NULL OR"
-          + " e.category.topic.owningSquadron.id = :owningSquadronId)")
+      """
+      SELECT e FROM MemberEvaluation e WHERE e.userId = :userId AND (:owningSquadronId IS NULL OR
+      e.category.topic.owningSquadron.id = :owningSquadronId)
+      """)
   Page<MemberEvaluation> findAllByUserIdScoped(
       @Param("userId") String userId,
       @Param("owningSquadronId") UUID owningSquadronId,
@@ -101,8 +105,10 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * @return a page of evaluations visible to the caller
    */
   @Query(
-      "SELECT e FROM MemberEvaluation e WHERE :owningSquadronId IS NULL OR"
-          + " e.category.topic.owningSquadron.id = :owningSquadronId")
+      """
+      SELECT e FROM MemberEvaluation e WHERE :owningSquadronId IS NULL OR
+      e.category.topic.owningSquadron.id = :owningSquadronId
+      """)
   Page<MemberEvaluation> findAllScoped(
       @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
 
@@ -134,10 +140,12 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * @return evaluations with category+topic already populated, possibly empty
    */
   @Query(
-      "SELECT e FROM MemberEvaluation e "
-          + "JOIN FETCH e.category c "
-          + "JOIN FETCH c.topic "
-          + "WHERE e.userId = :userId")
+      """
+      SELECT e FROM MemberEvaluation e
+      JOIN FETCH e.category c
+      JOIN FETCH c.topic
+      WHERE e.userId = :userId
+      """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopic(String userId);
 
   /**
@@ -151,11 +159,13 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * @return the member's evaluations (category+topic fetched) within the scope, possibly empty
    */
   @Query(
-      "SELECT e FROM MemberEvaluation e "
-          + "JOIN FETCH e.category c "
-          + "JOIN FETCH c.topic t "
-          + "WHERE e.userId = :userId "
-          + "AND (:owningSquadronId IS NULL OR t.owningSquadron.id = :owningSquadronId)")
+      """
+      SELECT e FROM MemberEvaluation e
+      JOIN FETCH e.category c
+      JOIN FETCH c.topic t
+      WHERE e.userId = :userId
+      AND (:owningSquadronId IS NULL OR t.owningSquadron.id = :owningSquadronId)
+      """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopicScoped(
       @Param("userId") String userId, @Param("owningSquadronId") UUID owningSquadronId);
 }

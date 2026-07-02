@@ -73,15 +73,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * still sees the unassigned bucket alongside the squadron members.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,"
-          + " u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>"
-          + " '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE"
-          + " :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE"
-          + " ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
-          + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " IN :scopeSquadronIds) ORDER BY u.displayName")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,
+      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
+      :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
+      ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
+      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+      IN :scopeSquadronIds) ORDER BY u.displayName
+      """)
   List<UserReferenceDto> findAllReferenceScoped(
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
           java.util.Collection<UUID> scopeSquadronIds);
@@ -92,10 +94,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * #findAllReferenceScoped(java.util.Collection)} instead.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,"
-          + " u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>"
-          + " '') THEN u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY"
-          + " u.displayName")
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,
+      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u ORDER BY
+      u.displayName
+      """)
   List<UserReferenceDto> findAllReference();
 
   /**
@@ -132,9 +136,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * @return the matching user ids; never {@code null}, possibly empty
    */
   @Query(
-      "SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode AND EXISTS"
-          + " (SELECT 1 FROM OrgUnitMembership m WHERE m.id.userId = u.id AND m.id.orgUnitId ="
-          + " :orgUnitId)")
+      """
+      SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode AND EXISTS
+      (SELECT 1 FROM OrgUnitMembership m WHERE m.id.userId = u.id AND m.id.orgUnitId =
+      :orgUnitId)
+      """)
   Set<UUID> findUserIdsByRoleCodeAndOrgUnitMembership(
       @org.springframework.data.repository.query.Param("roleCode") String roleCode,
       @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
@@ -147,12 +153,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM"
-          + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
-          + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " IN :scopeSquadronIds)")
+      """
+      SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
+      OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
+      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+      IN :scopeSquadronIds)
+      """)
   Page<User> findAllScoped(
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
           java.util.Collection<UUID> scopeSquadronIds,
@@ -165,12 +173,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM"
-          + " OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1"
-          + " FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " IN :scopeSquadronIds)")
+      """
+      SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
+      OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
+      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+      IN :scopeSquadronIds)
+      """)
   List<User> findAllScopedList(
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
           java.util.Collection<UUID> scopeSquadronIds,
@@ -199,10 +209,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id ="
-          + " u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON"
-          + " AND (:scopeSquadronIds IS NULL OR ms.id.orgUnitId IN :scopeSquadronIds)) AND NOT"
-          + " EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))")
+      """
+      SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id =
+      u.id AND ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON
+      AND (:scopeSquadronIds IS NULL OR ms.id.orgUnitId IN :scopeSquadronIds)) AND NOT
+      EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))
+      """)
   Page<User> findEvaluatableMembers(
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
           java.util.Collection<UUID> scopeSquadronIds,
@@ -215,13 +227,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
-          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS"
-          + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
-          + " ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
-          + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " IN :scopeSquadronIds))")
+      """
+      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+      NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
+      ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
+      (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+      IN :scopeSquadronIds))
+      """)
   Page<User> searchScoped(
       @org.springframework.data.repository.query.Param("query") String query,
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
@@ -234,13 +248,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
-      "SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR"
-          + " LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS"
-          + " NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND"
-          + " ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS"
-          + " (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind ="
-          + " de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId"
-          + " IN :scopeSquadronIds))")
+      """
+      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
+      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+      NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
+      ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
+      (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+      de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+      IN :scopeSquadronIds))
+      """)
   List<User> searchScopedList(
       @org.springframework.data.repository.query.Param("query") String query,
       @org.springframework.data.repository.query.Param("scopeSquadronIds")
@@ -295,8 +311,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * @return {@code true} iff at least one user matches on username or display name
    */
   @Query(
-      "SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.username) IN :lowerNames OR"
-          + " LOWER(u.displayName) IN :lowerNames")
+      """
+      SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.username) IN :lowerNames OR
+      LOWER(u.displayName) IN :lowerNames
+      """)
   boolean existsByLowerUsernameOrDisplayNameIn(
       @org.springframework.data.repository.query.Param("lowerNames")
           java.util.Collection<String> lowerNames);

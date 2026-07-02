@@ -83,10 +83,12 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
    */
   @Modifying
   @Query(
-      "UPDATE Manufacturer m SET m.scwikiDeletedAt = :now "
-          + "WHERE m.scwikiSyncedAt IS NOT NULL "
-          + "AND m.scwikiUuid NOT IN :seenScwikiUuids "
-          + "AND m.scwikiDeletedAt IS NULL")
+      """
+      UPDATE Manufacturer m SET m.scwikiDeletedAt = :now
+      WHERE m.scwikiSyncedAt IS NOT NULL
+      AND m.scwikiUuid NOT IN :seenScwikiUuids
+      AND m.scwikiDeletedAt IS NULL
+      """)
   int markScwikiDeletedExcept(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 }

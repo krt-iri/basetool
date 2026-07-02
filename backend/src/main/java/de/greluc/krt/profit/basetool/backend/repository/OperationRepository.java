@@ -100,8 +100,10 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @return slim reference DTOs, sorted by name ascending
    */
   @org.springframework.data.jpa.repository.Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,"
-          + " o.name) FROM Operation o WHERE "
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,
+      o.name) FROM Operation o WHERE
+      """
           + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
           + " ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
@@ -194,8 +196,10 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @return {@code true} iff {@code userId} participated in any of the operation's missions.
    */
   @Query(
-      "SELECT COUNT(p) > 0 FROM MissionParticipant p WHERE p.mission.operation.id = :operationId"
-          + " AND p.user.id = :userId")
+      """
+      SELECT COUNT(p) > 0 FROM MissionParticipant p WHERE p.mission.operation.id = :operationId
+      AND p.user.id = :userId
+      """)
   boolean existsParticipantUserInOperation(
       @Param("operationId") UUID operationId, @Param("userId") UUID userId);
 }
