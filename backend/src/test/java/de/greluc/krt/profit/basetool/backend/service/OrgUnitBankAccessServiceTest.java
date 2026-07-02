@@ -1111,6 +1111,7 @@ class OrgUnitBankAccessServiceTest {
         UUID.randomUUID(),
         accountId,
         "KB-0001",
+        "Own Account",
         orgUnitId,
         "Own",
         "OWN",
