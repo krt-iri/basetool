@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.Permissions;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -154,14 +156,14 @@ public class SecurityConfig {
   @Bean
   public static RoleHierarchy roleHierarchy() {
     return RoleHierarchyImpl.fromHierarchy(
-        """
-        ROLE_ADMIN > ROLE_LOGISTICIAN
-        ROLE_OFFICER > ROLE_LOGISTICIAN
-        ROLE_ADMIN > ROLE_MISSION_MANAGER
-        ROLE_OFFICER > ROLE_MISSION_MANAGER
-        ROLE_ADMIN > ROLE_BANK_MANAGEMENT
-        ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
-        """);
+        String.join(
+            "\n",
+            Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.LOGISTICIAN),
+            Roles.authority(Roles.OFFICER) + " > " + Roles.authority(Roles.LOGISTICIAN),
+            Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.MISSION_MANAGER),
+            Roles.authority(Roles.OFFICER) + " > " + Roles.authority(Roles.MISSION_MANAGER),
+            Roles.authority(Roles.ADMIN) + " > " + Roles.authority(Roles.BANK_MANAGEMENT),
+            Roles.authority(Roles.BANK_MANAGEMENT) + " > " + Roles.authority(Roles.BANK_EMPLOYEE)));
   }
 
   /**
@@ -428,7 +430,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/missions/*/participants/*/slim")
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
+                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     // Bank widening (REQ-BANK-009 grants, REQ-BANK-044 deposit/withdrawal
                     // counterparty): bank staff resolve grantees and the Einzahler/Empfänger via
                     // the
@@ -439,13 +441,17 @@ public class SecurityConfig {
                     // depend on hierarchy evaluation at the filter layer.
                     .requestMatchers("/api/v1/users/lookup")
                     .hasAnyRole(
-                        "ADMIN", "OFFICER", "KRT_MEMBER", "BANK_MANAGEMENT", "BANK_EMPLOYEE")
+                        Roles.ADMIN,
+                        Roles.OFFICER,
+                        Roles.KRT_MEMBER,
+                        Roles.BANK_MANAGEMENT,
+                        Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
+                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER")
+                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     // Post Phase-4-Lockdown (MULTI_SQUADRON_PLAN.md section 2): flag-vergabe
                     // (Logistician/Mission-Manager) und attribute-patches sind admin-only. Die
                     // method-level @PreAuthorize auf UserController#patchLogistician /
@@ -455,11 +461,11 @@ public class SecurityConfig {
                     // SecurityConfig nicht mehr suggeriert OFFICER duerfe diese Endpunkte
                     // erreichen.
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/logistician")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/mission-manager")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     // GET .../memberships ist die Picker-Read-Variante (SPEZIALKOMMANDO_PLAN.md
                     // §7.4) — gibt nur OrgUnit-Names + Shorthands zurueck, keine PII. Wird vom
                     // Frontend SquadronContextAdvice (Sidebar-Switcher + Bereichskontext-Chip)
@@ -477,9 +483,9 @@ public class SecurityConfig {
                     // BANK_MANAGEMENT
                     // via the role hierarchy.
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
-                    .hasAnyRole("ADMIN", "OFFICER", "KRT_MEMBER", "BANK_EMPLOYEE")
+                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/**")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/hangar/ships")
@@ -493,28 +499,31 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/fleetview")
                     .authenticated()
                     .requestMatchers("/api/v1/hangar/**")
-                    .hasAnyAuthority("HANGAR_READ", "HANGAR_WRITE", "ROLE_ADMIN")
+                    .hasAnyAuthority(
+                        Permissions.HANGAR_READ,
+                        Permissions.HANGAR_WRITE,
+                        Roles.authority(Roles.ADMIN))
                     .requestMatchers(
                         "/api/v1/inventory/my-inventory", "/api/v1/inventory/my-inventory/**")
                     .authenticated()
                     .requestMatchers("/api/v1/inventory", "/api/v1/inventory/**")
-                    .hasAnyRole("ADMIN", "OFFICER", "LOGISTICIAN", "KRT_MEMBER")
+                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
                     .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
                     .authenticated()
                     .requestMatchers("/api/v1/uex/locations/**")
                     .authenticated()
                     .requestMatchers("/api/v1/admin/**")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     // Bank admin carve-out (REQ-BANK-010/-012): wipe reset and the audit log are
                     // URL-gated to ADMIN on top of the method-level @PreAuthorize — bank
                     // management explicitly does NOT pass. The rest of /api/v1/bank/** rides the
                     // authenticated() catch-all plus the BankSecurityService method gates.
                     .requestMatchers("/api/v1/bank/admin/**")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     // Activity audit logs (REQ-AUDIT-001, ADR-0037): the per-area viewer and PDF
                     // export are URL-gated to ADMIN on top of the method-level @PreAuthorize.
                     .requestMatchers("/api/v1/audit/**")
-                    .hasRole("ADMIN")
+                    .hasRole(Roles.ADMIN)
                     .anyRequest()
                     .authenticated())
         // RFC-7807 hardening (REQ-API-004 / REQ-SEC): route filter-level 401/403 through the same

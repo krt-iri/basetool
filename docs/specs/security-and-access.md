@@ -30,6 +30,27 @@ which delegates to the MVC `handlerExceptionResolver` so `GlobalExceptionHandler
 default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
 [`api-conventions.md`](api-conventions.md) REQ-API-004).
 
+### REQ-SEC-002a — Central role/permission constants (backend)
+
+Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and
+the fine-grained permission strings a role's `permissions` collection carries are centralised in
+`support.Roles` / `support.Permissions` (S3, #909) rather than repeated as raw string literals.
+`SecurityConfig` (the `roleHierarchy()` chain and every `hasRole`/`hasAnyRole`/`hasAuthority`/
+`hasAnyAuthority` call in the `authorizeHttpRequests` matrix — these are plain Java method calls,
+not SpEL, so passing a `String` constant is a zero-risk substitution) and `DataInitializer` (the
+seeded role/permission values) are migrated. `Roles.authority(String)` derives the `ROLE_`-prefixed
+Spring-authority form for the few call sites that need it (the hierarchy chain,
+`hasAnyAuthority(...)` mixing a role into a permission list) instead of a duplicated `ROLE_*`
+constant per role. `LOGISTICIAN` / `MISSION_MANAGER` are hierarchy-derived only — never seeded in
+`Role` — and stay documented as such on `Roles`. Both constant holders live in the dependency-leaf
+`support` package (ADR-0047): plain `String` constants with no dependency on the security API.
+
+The `@PreAuthorize` literal-role expressions across controllers/services (~158 occurrences) and the
+frontend's own role-literal comparisons are **not yet migrated** — that requires each occurrence to
+become a compile-time-constant SpEL expression (`hasRole('` + constant + `')`) built via annotation
+constant-concatenation, a much larger and more security-sensitive sweep than the backend's runtime
+`SecurityConfig`/`DataInitializer` slice. Left as deliberate, tracked follow-up.
+
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
 The following must always hold and are enforced as ArchUnit rules in
