@@ -139,6 +139,29 @@ HOST_IP=CHANGE_ME
 Compose uses `${VAR:?...}` references throughout — if any required variable
 is missing, the stack refuses to start.
 
+#### Transactional e-mail (account approval/rejection notices)
+
+The account approval/rejection e-mail (REQ-NOTIF-013/-014,
+[ADR-0064](docs/adr/0064-transactional-email-delivery-channel.md)) **ships enabled**, but sends
+nothing until you point the backend at an SMTP host — with no host it is a safe no-op, so the app is
+fully functional without SMTP. The curated Docker Compose env already forwards the variables below;
+set them in `.env` to start sending. Example for **Gmail** (needs 2-Step Verification + a 16-character
+[App Password](https://support.google.com/accounts/answer/185833) — a normal account password will
+not work):
+
+```env
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=you@gmail.com
+SPRING_MAIL_PASSWORD=<16-char Google App Password>   # NOT your normal password
+APP_MAIL_FROM_ADDRESS=you@gmail.com                  # Gmail rewrites From to the auth'd user
+APP_MAIL_FROM_NAME=Profit Basetool
+```
+
+STARTTLS + SMTP auth are already set in `application.yml`. Restart the backend after editing `.env`
+(`docker compose up -d backend`). With `SPRING_MAIL_HOST` unset (or `APP_MAIL_ENABLED=false`) no mail
+is sent and the approval flow is otherwise unchanged.
+
 #### Ingest gateway (epic #639 — desktop one-click send)
 
 The `ingest` service is the only **new** internet-reachable component: it lets the
