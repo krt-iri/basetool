@@ -51633,6 +51633,9 @@
           "accountNo" : {
             "type" : "string"
           },
+          "accountName" : {
+            "type" : "string"
+          },
           "orgUnitId" : {
             "type" : "string",
             "format" : "uuid"

@@ -182,6 +182,7 @@ class OrgUnitBankControllerTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         "KB-0001",
+        "Staffel IRIDIUM",
         UUID.randomUUID(),
         "IRIDIUM",
         "IRI",
