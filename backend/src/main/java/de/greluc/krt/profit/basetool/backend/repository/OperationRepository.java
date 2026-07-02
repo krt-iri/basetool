@@ -69,14 +69,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @org.springframework.data.jpa.repository.Query(
-      "SELECT o FROM Operation o WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + "  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
-          + "  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p"
-          + "   WHERE p.mission.operation = o AND p.user.id = :viewerUserId))"
-          + " )")
+      "SELECT o FROM Operation o WHERE " + ScopeSpecifications.OPERATION_SCOPE_PREDICATE)
   org.springframework.data.domain.Page<Operation> findAllScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -108,12 +101,9 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @org.springframework.data.jpa.repository.Query(
       "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,"
-          + " o.name) FROM Operation o WHERE (  :isAdminAllScope = true  OR (:activeOrgUnitId IS"
-          + " NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)  OR (:activeOrgUnitId IS NULL AND"
-          + " o.owningOrgUnit.id IN :memberOrgUnitIds)  OR (o.owningOrgUnit IS NULL AND"
-          + " :viewerIsMemberOrAbove = true)  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id"
-          + " FROM MissionParticipant p   WHERE p.mission.operation = o AND p.user.id ="
-          + " :viewerUserId)) ) ORDER BY o.name ASC")
+          + " o.name) FROM Operation o WHERE "
+          + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
+          + " ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
       @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -171,14 +161,9 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
-      "SELECT o FROM Operation o WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + "  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)"
-          + "  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p"
-          + "   WHERE p.mission.operation = o AND p.user.id = :viewerUserId))"
-          + " ) AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
+      "SELECT o FROM Operation o WHERE "
+          + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
+          + " AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') OR CAST(o.description AS string) ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%')) AND (CAST(o.status AS string) IN (:status)) AND (CAST(:start AS"
           + " timestamp) IS NULL OR (SELECT MIN(m.plannedStartTime) FROM Mission m WHERE"

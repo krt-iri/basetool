@@ -69,11 +69,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE r.mission.id = :missionId AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "SELECT r FROM RefineryOrder r WHERE r.mission.id = :missionId AND "
+          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   List<RefineryOrder> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -139,11 +136,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND "
+          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findByOwnerIdScoped(
       @Param("ownerId") UUID ownerId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -197,12 +191,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * cross-squadron escape clause like Mission's {@code is_internal = false}.
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
-  @Query(
-      "SELECT r FROM RefineryOrder r WHERE ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+  @Query("SELECT r FROM RefineryOrder r WHERE " + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -217,11 +206,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND ("
-          + "  :isAdminAllScope = true"
-          + "  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)"
-          + "  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)"
-          + " )")
+      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND "
+          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findByStatusInScoped(
       @Param("statuses")
           List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
