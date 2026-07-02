@@ -73,9 +73,28 @@
     remain visible.
   -->
   <suppress>
-    <notes>False positive: CPE confusion. The opentelemetry-semconv Java jars are constants-only; the umbrella cpe:2.3:a:opentelemetry:opentelemetry attributes OpenTelemetry-Go SDK CVEs (CVE-2026-29181, CVE-2026-24051, CVE-2026-39883) to them by pure version-number overlap.</notes>
+    <notes>False positive: CPE confusion. The opentelemetry-semconv Java jars are constants-only; the umbrella cpe:/a:opentelemetry:opentelemetry attributes OpenTelemetry-Go SDK CVEs (CVE-2026-29181, CVE-2026-24051, CVE-2026-39883) to them by pure version-number overlap.</notes>
     <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
-    <cpe>cpe:2.3:a:opentelemetry:opentelemetry</cpe>
+    <cpe>cpe:/a:opentelemetry:opentelemetry</cpe>
+  </suppress>
+
+  <!--
+    Belt-and-braces companion to the CPE suppression above: the same five
+    OpenTelemetry-GO SDK CVEs pinned by id, in case a future
+    dependency-check version changes how partial-CPE matching works. All
+    five are Go-SDK-only (baggage-header DoS and macOS/BSD PATH-hijack in
+    host-resource detection - see the notes above); none has any Java
+    counterpart. CVE-2026-39882 and CVE-2026-41178 sit below the 7.0 gate
+    but would still spam the weekly SARIF upload.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion (companion to the CPE-level entry). CVE-2026-29181, CVE-2026-24051, CVE-2026-39883, CVE-2026-39882 and CVE-2026-41178 are OpenTelemetry-Go SDK vulnerabilities attributed to the constants-only Java semconv jars.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
+    <cve>CVE-2026-29181</cve>
+    <cve>CVE-2026-24051</cve>
+    <cve>CVE-2026-39883</cve>
+    <cve>CVE-2026-39882</cve>
+    <cve>CVE-2026-41178</cve>
   </suppress>
 
   <!--
