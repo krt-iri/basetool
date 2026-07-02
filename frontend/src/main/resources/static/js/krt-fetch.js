@@ -235,6 +235,39 @@
         return m ? readGuestToken(m[1]) : null;
     }
 
+    /**
+     * Assembles the request headers shared by every krtFetch write — the JSON {@link write} and the
+     * multipart {@link submitForm} alike: {@code Accept}, {@code X-Requested-With}, the CSRF header
+     * read fresh from the meta tags, and (for a per-row participant write) the REQ-SEC-018 guest edit
+     * token replayed from local storage. A {@code Content-Type: application/json} is added only when
+     * {@code json} is true; it is deliberately omitted for a {@code FormData} body so the browser sets
+     * the {@code multipart/form-data} boundary itself. Centralising this here keeps the CSRF + guest
+     * token assembly in one place so the two write paths cannot drift.
+     *
+     * @param url  the target URL, used to look up a matching per-row guest edit token
+     * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
+     * @return a plain headers object ready to hand to {@code fetch}
+     */
+    function writeHeaders(url, json) {
+        const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        if (json) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const token = csrfToken();
+        const header = csrfHeaderName();
+        if (token && header) {
+            headers[header] = token;
+        }
+        // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this participant)
+        // so an anonymous guest can edit/withdraw their own sign-up. The frontend relays the header to
+        // the backend, which verifies it against the stored hash.
+        const guestToken = guestTokenForUrl(url);
+        if (guestToken) {
+            headers[GUEST_TOKEN_HEADER] = guestToken;
+        }
+        return headers;
+    }
+
     // Captures any guest edit token returned by a write response (the create response of a guest
     // sign-up) into the store. The body is either a single participant object or the slim
     // participant list; only the freshly created guest row carries a non-null guestEditToken.
@@ -404,6 +437,10 @@
      *                         response BEFORE the default handleProblem; return a truthy value to
      *                         signal "handled" (e.g. rendering 422 field-validation errors) and skip
      *                         the default toast/conflict handling
+     *  - onNetworkError       optional callback(networkError) run when the request fails at the
+     *                         transport layer (no response ever arrived, so onError never fires);
+     *                         return truthy to signal it surfaced its own error UI and suppress the
+     *                         default network-error toast
      *  - submitter            optional submit button disabled for the in-flight request and
      *                         re-enabled when it settles (double-submit guard)
      *
@@ -434,12 +471,27 @@
                     }
                 }
             } catch (networkError) {
-                errorToast(
-                    text(opts.errorMessage, 'Speichern fehlgeschlagen.') +
-                        ' (' +
-                        (networkError && networkError.message ? networkError.message : 'network') +
-                        ')',
-                );
+                // Transport-layer failure (offline, DNS/TLS, aborted): the fetch promise rejected
+                // before any response arrived. Keep the raw browser diagnostic in the console for
+                // debugging, but never leak the untranslated message into the user-facing toast
+                // (i18n). The optional onNetworkError hook lets a caller restore optimistic UI (e.g.
+                // re-enable a store button) that the response-side onError never sees on this path;
+                // returning truthy signals it already surfaced its own error UI and suppresses the
+                // default network-error toast.
+                if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                    console.warn('krtFetch network error', networkError);
+                }
+                let handled = false;
+                if (typeof opts.onNetworkError === 'function') {
+                    try {
+                        handled = opts.onNetworkError(networkError);
+                    } catch (_callbackError) {
+                        /* a network-error callback must never break the UX */
+                    }
+                }
+                if (!handled) {
+                    errorToast(text(opts.errorMessage, 'Speichern fehlgeschlagen.'));
+                }
                 return { ok: false, status: 0, body: null };
             }
 
@@ -509,14 +561,7 @@
         const method = opts.method || 'PATCH';
 
         function buildInit() {
-            const headers = csrfHeaders();
-            // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this
-            // participant) so an anonymous guest can edit/withdraw their own sign-up. The frontend
-            // relays the header to the backend, which verifies it against the stored hash.
-            const guestToken = guestTokenForUrl(opts.url);
-            if (guestToken) {
-                headers[GUEST_TOKEN_HEADER] = guestToken;
-            }
+            const headers = writeHeaders(opts.url, true);
             const init = { method: method, headers: headers };
             if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
                 init.body = JSON.stringify(opts.payload);
@@ -537,9 +582,10 @@
      *
      * <p><b>Content-Type is deliberately NOT set.</b> When the body is a {@code FormData} the browser
      * must set {@code multipart/form-data} together with the boundary parameter itself; a manual
-     * Content-Type would omit the boundary and corrupt the parse. So this builds the CSRF headers
-     * directly (Accept + X-Requested-With + the CSRF header) instead of {@code csrfHeaders()}, which
-     * forces {@code application/json}. The CSRF token rides in the header, never in the form body.
+     * Content-Type would omit the boundary and corrupt the parse. So it asks {@link writeHeaders} for
+     * the shared CSRF + guest-token header set with {@code json=false}, which omits the
+     * {@code Content-Type} that {@link write} forces to {@code application/json}. The CSRF token rides
+     * in the header, never in the form body.
      *
      * <p><b>No-JS fallback.</b> submitForm never runs unless {@code window.krtFetch} loaded, so a
      * script-disabled browser keeps the form's native {@code th:action}/{@code method=post} submit —
@@ -564,16 +610,7 @@
         ).toUpperCase();
 
         function buildInit() {
-            const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-            const token = csrfToken();
-            const header = csrfHeaderName();
-            if (token && header) {
-                headers[header] = token;
-            }
-            const guestToken = guestTokenForUrl(url);
-            if (guestToken) {
-                headers[GUEST_TOKEN_HEADER] = guestToken;
-            }
+            const headers = writeHeaders(url, false);
             const body =
                 opts.formData !== undefined ? opts.formData : form ? new FormData(form) : undefined;
             return { method: method, headers: headers, body: body };

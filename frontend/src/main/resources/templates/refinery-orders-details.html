@@ -492,29 +492,30 @@
     // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
     // X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
     // behaviour: navigate away to the JSON targetUrl on success (toast:false — an edit/store/cancel
-    // leaves the page) with resetUnsavedChanges, and the onFailure UI-restore + inline error toast.
-    // The classic form-POST handlers stay the no-JS fallback (krtFetch absent). onFailure must fire
-    // on BOTH the !ok response (via onError) AND a network failure (status 0, which never reaches
-    // onError) so the store button's disabled/label is always restored.
+    // leaves the page) with resetUnsavedChanges, and the onFailure store-button restore + inline
+    // error toast. The classic form-POST handlers stay the no-JS fallback (krtFetch absent). The
+    // store-button restore must fire on BOTH failure paths: an !ok response (onError) AND a
+    // transport-layer network failure (onNetworkError, which the response-side onError never sees).
+    // The single `fail` handler covers both and returns true so the foundation shows no second toast.
     function _submitRefinery(form, errorMessage, onFailure, submitter) {
         if (!window.krtFetch) { form.submit(); return; }
+        function fail() {
+            if (onFailure) onFailure();
+            showFrontendErrorToast(errorMessage);
+            return true;
+        }
         window.krtFetch.submitForm({
             form: form,
             submitter: submitter,
             toast: false,
             errorMessage: errorMessage,
-            onError: function () {
-                if (onFailure) onFailure();
-                showFrontendErrorToast(errorMessage);
-                return true;
-            },
+            onError: fail,
+            onNetworkError: fail,
             onSuccess: function (body) {
                 if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
                 if (body && body.targetUrl) window.location.assign(body.targetUrl);
                 else window.location.reload();
             },
-        }).then(function (result) {
-            if (result && result.status === 0 && onFailure) { onFailure(); }
         });
     }
 

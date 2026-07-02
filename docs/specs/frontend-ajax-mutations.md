@@ -77,12 +77,17 @@ its boundary itself; the CSRF token rides in the header, never in the form body.
 therefore **not** re-implement the CSRF-header + retry-on-403 + FormData loop by hand — that
 hand-rolled loop (the historical root cause of most krtFetch deviations) is exactly what
 `submitForm` replaces. Page-specific success/error behaviour hangs off the `onSuccess(body)` /
-`onError(status, body, response)` hooks (e.g. navigate-after-AJAX per REQ-FE-006, in-place
-`{field: message}` validation rendering per REQ-FE-007, a section re-swap, a modal close); the
+`onError(status, body, response)` / `onNetworkError(error)` hooks (e.g. navigate-after-AJAX per
+REQ-FE-006, in-place `{field: message}` validation rendering per REQ-FE-007, a section re-swap, a
+modal close, restoring an optimistic control when the transport itself fails); the
 form keeps its `th:action`/`method=post` and each listener guards with `if (!window.krtFetch)
 return;` (or `form.submit()`) so a script-disabled browser still gets the native POST → redirect
-fallback. A form write must not fall back to a full-page reload on success (the only sanctioned
-reloads remain the REQ-FE-003 conflict-confirm and the REQ-FE-008 bfcache restore).
+fallback. An **in-place** form write must not fall back to a full-page reload on success (the only
+sanctioned in-place reloads remain the REQ-FE-003 conflict-confirm and the REQ-FE-008 bfcache
+restore). A **navigate-away** form write (REQ-FE-006 — a create/edit that leaves the page) takes the
+server-supplied `targetUrl` from the 2xx body and `window.location.assign`s it on success; it may
+`window.location.reload()` **only** as the defensive fallback for a `targetUrl` that is unexpectedly
+absent from an otherwise-successful response — never as its normal success path.
 
 **Acceptance**
 
