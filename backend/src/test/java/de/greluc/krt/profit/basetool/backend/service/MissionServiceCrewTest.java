@@ -44,7 +44,7 @@ class MissionServiceCrewTest {
   @Mock private SquadronRepository squadronRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionStructureService missionStructureService;
 
   @Test
   void updateCrewInShip_shouldUpdateJobTypes() {
@@ -72,7 +72,7 @@ class MissionServiceCrewTest {
     when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(jobType));
 
     Mission updatedMission =
-        missionService.updateCrewInShip(missionId, unitId, crewId, Set.of(jobTypeId));
+        missionStructureService.updateCrewInShip(missionId, unitId, crewId, Set.of(jobTypeId));
 
     assertNotNull(updatedMission);
     MissionUnit updatedUnit = updatedMission.getAssignedUnits().iterator().next();
@@ -93,7 +93,7 @@ class MissionServiceCrewTest {
     assertThrows(
         RuntimeException.class,
         () ->
-            missionService.updateCrewInShip(
+            missionStructureService.updateCrewInShip(
                 missionId, UUID.randomUUID(), UUID.randomUUID(), Collections.emptySet()));
   }
 
@@ -108,7 +108,7 @@ class MissionServiceCrewTest {
     assertThrows(
         RuntimeException.class,
         () ->
-            missionService.updateCrewInShip(
+            missionStructureService.updateCrewInShip(
                 missionId, UUID.randomUUID(), UUID.randomUUID(), Collections.emptySet()));
   }
 
@@ -129,7 +129,7 @@ class MissionServiceCrewTest {
     assertThrows(
         RuntimeException.class,
         () ->
-            missionService.updateCrewInShip(
+            missionStructureService.updateCrewInShip(
                 missionId, unitId, UUID.randomUUID(), Collections.emptySet()));
   }
 
@@ -152,7 +152,7 @@ class MissionServiceCrewTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    Mission updatedMission = missionService.removeCrewFromShip(missionId, unitId, crewId);
+    Mission updatedMission = missionStructureService.removeCrewFromShip(missionId, unitId, crewId);
 
     assertNotNull(updatedMission);
     MissionUnit updatedUnit = updatedMission.getAssignedUnits().iterator().next();
@@ -178,6 +178,6 @@ class MissionServiceCrewTest {
 
     assertThrows(
         RuntimeException.class,
-        () -> missionService.removeCrewFromShip(missionId, unitId, UUID.randomUUID()));
+        () -> missionStructureService.removeCrewFromShip(missionId, unitId, UUID.randomUUID()));
   }
 }

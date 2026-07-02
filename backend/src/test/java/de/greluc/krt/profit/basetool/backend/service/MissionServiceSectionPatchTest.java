@@ -57,6 +57,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit-Tests fuer die Section-Patch-Methoden in {@link MissionService}.
@@ -82,6 +83,18 @@ class MissionServiceSectionPatchTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+
+  // The party-lead / manager methods were extracted to MissionParticipantService (L1 step 2, #920);
+  // MissionService now delegates to it. Mockito builds a real instance from the same mocks, which
+  // setUp() wires into missionService via reflection (Mockito does not inject one @InjectMocks
+  // target into another), so this class keeps exercising those delegated paths alongside the
+  // core/schedule/flags section patches.
+  @InjectMocks private MissionParticipantService missionParticipantService;
+
+  // removeMissionUnit was extracted to MissionStructureService (L1 step 2, #920); same wiring
+  // rationale as the participant service above.
+  @InjectMocks private MissionStructureService missionStructureService;
+
   @InjectMocks private MissionService missionService;
 
   private UUID missionId;
@@ -89,6 +102,10 @@ class MissionServiceSectionPatchTest {
 
   @BeforeEach
   void setUp() {
+    ReflectionTestUtils.setField(
+        missionService, "missionParticipantService", missionParticipantService);
+    ReflectionTestUtils.setField(
+        missionService, "missionStructureService", missionStructureService);
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);
