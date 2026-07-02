@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -27,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -1566,6 +1569,49 @@ public class OwnerScopeService {
   }
 
   /**
+   * Shared owner-escape triad (S6, #912) behind {@code Ship}/{@code InventoryItem}/{@code
+   * RefineryOrder} — the three "personal aggregates" of REQ-ORG-003 that each carry a per-user
+   * owner escape (REQ-ORG-011) on top of the strict owning-org-unit scope. Resolution order,
+   * identical across all six callers this replaces:
+   *
+   * <ul>
+   *   <li>the per-user owner (from {@code owner.apply(row)}) may always see/edit the row,
+   *       regardless of its org-unit stamp ({@link #isCurrentUserOwner(User)});
+   *   <li>otherwise, for an ownerless personal row ({@code orgUnit.apply(row) == null}) it defers
+   *       to {@link #canAccessOwnerlessPersonalRow(User)} (admins in all-scopes mode);
+   *   <li>otherwise the strict owning-org-unit scope check — {@link #canSeeSquadron(UUID)} when
+   *       {@code edit} is {@code false}, {@link #canEditSquadron(UUID)} when {@code true}.
+   * </ul>
+   *
+   * <p>{@code row} being empty (a non-existent id) returns {@code false}.
+   *
+   * @param row the row to inspect, already resolved (typically via a {@code findById}); empty
+   *     denies access
+   * @param owner extracts the row's per-user owner field ({@code ship.owner} / {@code
+   *     inventory_item.user} / {@code refinery_order.owner})
+   * @param orgUnit extracts the row's {@code owningOrgUnit} association; {@code null} marks an
+   *     ownerless personal row
+   * @param edit {@code true} to apply the edit-scope check, {@code false} for the read-scope check
+   * @param <T> the row's entity type
+   * @return {@code true} iff the current caller may see/edit the row per the rules above
+   */
+  private <T> boolean permitsRow(
+      Optional<T> row, Function<T, User> owner, Function<T, OrgUnit> orgUnit, boolean edit) {
+    return row.map(
+            r -> {
+              User rowOwner = owner.apply(r);
+              OrgUnit rowOrgUnit = orgUnit.apply(r);
+              return isCurrentUserOwner(rowOwner)
+                  || (rowOrgUnit == null
+                      ? canAccessOwnerlessPersonalRow(rowOwner)
+                      : (edit
+                          ? canEditSquadron(rowOrgUnit.getId())
+                          : canSeeSquadron(rowOrgUnit.getId())));
+            })
+        .orElse(false);
+  }
+
+  /**
    * {@code true} iff the current principal may read inventory item {@code itemId} directly (the
    * Lager-direct path — NOT the Job-Order-Kontext path, which is ungated by design). Resolution
    * order:
@@ -1588,15 +1634,11 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may read the item.
    */
   public boolean canSeeInventoryItem(@NotNull UUID itemId) {
-    return inventoryItemRepository
-        .findById(itemId)
-        .map(
-            i ->
-                isCurrentUserOwner(i.getUser())
-                    || (i.getOwningOrgUnit() == null
-                        ? canAccessOwnerlessPersonalRow(i.getUser())
-                        : canSeeSquadron(i.getOwningOrgUnit().getId())))
-        .orElse(false);
+    return permitsRow(
+        inventoryItemRepository.findById(itemId),
+        InventoryItem::getUser,
+        InventoryItem::getOwningOrgUnit,
+        false);
   }
 
   /**
@@ -1624,15 +1666,11 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may edit the item.
    */
   public boolean canEditInventoryItem(@NotNull UUID itemId) {
-    return inventoryItemRepository
-        .findById(itemId)
-        .map(
-            i ->
-                isCurrentUserOwner(i.getUser())
-                    || (i.getOwningOrgUnit() == null
-                        ? canAccessOwnerlessPersonalRow(i.getUser())
-                        : canEditSquadron(i.getOwningOrgUnit().getId())))
-        .orElse(false);
+    return permitsRow(
+        inventoryItemRepository.findById(itemId),
+        InventoryItem::getUser,
+        InventoryItem::getOwningOrgUnit,
+        true);
   }
 
   /**
@@ -1662,10 +1700,8 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may read the order.
    */
   public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return isCurrentUserOwner(order.getOwner())
-        || (order.getOwningOrgUnit() == null
-            ? canAccessOwnerlessPersonalRow(order.getOwner())
-            : canSeeSquadron(order.getOwningOrgUnit().getId()));
+    return permitsRow(
+        Optional.of(order), RefineryOrder::getOwner, RefineryOrder::getOwningOrgUnit, false);
   }
 
   /**
@@ -1684,15 +1720,11 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may edit the order.
    */
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository
-        .findById(orderId)
-        .map(
-            o ->
-                isCurrentUserOwner(o.getOwner())
-                    || (o.getOwningOrgUnit() == null
-                        ? canAccessOwnerlessPersonalRow(o.getOwner())
-                        : canEditSquadron(o.getOwningOrgUnit().getId())))
-        .orElse(false);
+    return permitsRow(
+        refineryOrderRepository.findById(orderId),
+        RefineryOrder::getOwner,
+        RefineryOrder::getOwningOrgUnit,
+        true);
   }
 
   /**
@@ -1852,15 +1884,8 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may read the ship.
    */
   public boolean canSeeShip(@NotNull UUID shipId) {
-    return shipRepository
-        .findById(shipId)
-        .map(
-            s ->
-                isCurrentUserOwner(s.getOwner())
-                    || (s.getOwningOrgUnit() == null
-                        ? canAccessOwnerlessPersonalRow(s.getOwner())
-                        : canSeeSquadron(s.getOwningOrgUnit().getId())))
-        .orElse(false);
+    return permitsRow(
+        shipRepository.findById(shipId), Ship::getOwner, Ship::getOwningOrgUnit, false);
   }
 
   /**
@@ -1877,15 +1902,8 @@ public class OwnerScopeService {
    * @return {@code true} iff the caller may edit the ship.
    */
   public boolean canEditShip(@NotNull UUID shipId) {
-    return shipRepository
-        .findById(shipId)
-        .map(
-            s ->
-                isCurrentUserOwner(s.getOwner())
-                    || (s.getOwningOrgUnit() == null
-                        ? canAccessOwnerlessPersonalRow(s.getOwner())
-                        : canEditSquadron(s.getOwningOrgUnit().getId())))
-        .orElse(false);
+    return permitsRow(
+        shipRepository.findById(shipId), Ship::getOwner, Ship::getOwningOrgUnit, true);
   }
 
   /**
