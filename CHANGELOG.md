@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **Benachrichtigungen: Admins werden jetzt zuverlässig über neue Konto-Freigabeanträge informiert.** Neue, noch nicht freigeschaltete Registrierungen (insbesondere über Discord) lösen jetzt immer genau eine Admin-Benachrichtigung aus — auch wenn der optionale Discord-Claim in Keycloak fehlt oder das Konto zuerst über die periodische Keycloak-Synchronisation statt über den Login angelegt wird. Bisher blieb die Meldung in diesen Fällen komplett aus (REQ-NOTIF-012).
 - **Deployment: Der Deploy-Zyklus erkennt jetzt einen abgedrifteten oder ungesunden Stack.** `deploy.sh` nimmt die „no change"-Abkürzung nur noch, wenn die laufenden Container tatsächlich den zuletzt ausgerollten Image-Digests entsprechen und gesund sind; andernfalls wird derselbe Stand automatisch neu angewendet — etwa nach einem manuellen `docker compose up` mit veraltetem lokalem `:stable`-Tag (Vorfall vom 02.07.2026). Für geplante Wartung vorher den `iri-deploy.timer` stoppen (REQ-OPS-013).
 
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
