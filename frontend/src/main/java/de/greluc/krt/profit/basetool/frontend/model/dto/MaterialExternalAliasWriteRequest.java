@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code MaterialExternalAliasUpdateRequest}. Identical to {@link
- * MaterialExternalAliasCreateRequest} plus the {@code version} optimistic-lock token that the form
- * re-submits on every edit.
+ * Frontend mirror of the backend {@code MaterialExternalAliasWriteRequest} — the unified create/
+ * update payload (S13, #919). {@code version} is {@code null} on create and carries the
+ * optimistic-lock token the edit form re-submits on update.
  *
  * @param materialId UUID of the local material to link to
  * @param sourceSystem catalogue identifier ({@code "UEX"}, {@code "SCWIKI"} or {@code
@@ -34,9 +34,9 @@ import java.util.UUID;
  * @param externalUuid optional external UUID
  * @param externalCode optional external short code
  * @param note free-form provenance note
- * @param version optimistic-lock token from the GET response
+ * @param version optimistic-lock token; {@code null} on create, from the GET response on update
  */
-public record MaterialExternalAliasUpdateRequest(
+public record MaterialExternalAliasWriteRequest(
     UUID materialId,
     String sourceSystem,
     String externalName,

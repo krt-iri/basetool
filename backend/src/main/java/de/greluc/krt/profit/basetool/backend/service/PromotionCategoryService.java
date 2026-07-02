@@ -23,9 +23,8 @@ import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
@@ -144,7 +143,7 @@ public class PromotionCategoryService {
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public PromotionCategoryResponse create(@NotNull PromotionCategoryCreateRequest request) {
+  public PromotionCategoryResponse create(@NotNull PromotionCategoryWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic topic =
         topicRepository
@@ -182,7 +181,7 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse update(
-      @NotNull UUID id, @NotNull PromotionCategoryUpdateRequest request) {
+      @NotNull UUID id, @NotNull PromotionCategoryWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());

@@ -27,9 +27,8 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -128,8 +127,8 @@ class PromotionCategoryServiceTest {
   void create_shouldThrow_whenTopicNotFound() {
     // Given
     UUID topicId = UUID.randomUUID();
-    PromotionCategoryCreateRequest request =
-        new PromotionCategoryCreateRequest(topicId, "Flug Kenntnisse", null, 0);
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, "Flug Kenntnisse", null, 0, null);
     when(topicRepository.findById(topicId)).thenReturn(Optional.empty());
 
     // When / Then
@@ -141,8 +140,8 @@ class PromotionCategoryServiceTest {
     // Given
     UUID topicId = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
-    PromotionCategoryCreateRequest request =
-        new PromotionCategoryCreateRequest(topicId, "Flug Kenntnisse", null, 0);
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, "Flug Kenntnisse", null, 0, null);
     PromotionCategory entity =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     PromotionCategoryResponse response =
@@ -176,8 +175,8 @@ class PromotionCategoryServiceTest {
     PromotionCategory entity =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     entity.setVersion(1L);
-    PromotionCategoryUpdateRequest request =
-        new PromotionCategoryUpdateRequest(0L, topicId, "Flug Kenntnisse neu", null, 1);
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, "Flug Kenntnisse neu", null, 1, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
     // When / Then

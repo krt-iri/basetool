@@ -27,9 +27,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.PromotionTopicService;
 import java.time.Instant;
 import java.util.List;
@@ -136,7 +135,7 @@ class PromotionTopicControllerTest {
 
   @Test
   void create_forwardsRequestToService_andReturnsCreatedEntity() {
-    PromotionTopicCreateRequest request = new PromotionTopicCreateRequest("Combat", "desc", 1);
+    PromotionTopicWriteRequest request = new PromotionTopicWriteRequest("Combat", "desc", 1, null);
     PromotionTopicResponse created = topic("Combat");
     when(service.create(request)).thenReturn(created);
 
@@ -149,8 +148,8 @@ class PromotionTopicControllerTest {
   @Test
   void update_forwardsBothPathAndBodyToService() {
     UUID id = UUID.randomUUID();
-    PromotionTopicUpdateRequest request =
-        new PromotionTopicUpdateRequest(3L, "Combat updated", "desc", 1);
+    PromotionTopicWriteRequest request =
+        new PromotionTopicWriteRequest("Combat updated", "desc", 1, 3L);
     PromotionTopicResponse updated = topic("Combat updated");
     when(service.update(id, request)).thenReturn(updated);
 

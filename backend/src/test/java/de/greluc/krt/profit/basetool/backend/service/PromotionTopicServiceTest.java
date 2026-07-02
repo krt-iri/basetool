@@ -26,9 +26,8 @@ import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
@@ -115,7 +114,8 @@ class PromotionTopicServiceTest {
   @Test
   void create_shouldSaveAndReturnTopic() {
     // Given
-    PromotionTopicCreateRequest request = new PromotionTopicCreateRequest("Grundlagen", null, 0);
+    PromotionTopicWriteRequest request =
+        new PromotionTopicWriteRequest("Grundlagen", null, 0, null);
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
@@ -148,8 +148,8 @@ class PromotionTopicServiceTest {
     UUID id = UUID.randomUUID();
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     entity.setVersion(1L);
-    PromotionTopicUpdateRequest request =
-        new PromotionTopicUpdateRequest(0L, "Grundlagen neu", null, 1);
+    PromotionTopicWriteRequest request =
+        new PromotionTopicWriteRequest("Grundlagen neu", null, 1, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
     // When / Then
@@ -162,8 +162,8 @@ class PromotionTopicServiceTest {
     UUID id = UUID.randomUUID();
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     entity.setVersion(0L);
-    PromotionTopicUpdateRequest request =
-        new PromotionTopicUpdateRequest(0L, "Grundlagen neu", null, 1);
+    PromotionTopicWriteRequest request =
+        new PromotionTopicWriteRequest("Grundlagen neu", null, 1, 0L);
     PromotionTopicResponse response =
         new PromotionTopicResponse(id, 1L, "Grundlagen neu", null, 1, null, null, null);
     when(repository.findById(id)).thenReturn(Optional.of(entity));

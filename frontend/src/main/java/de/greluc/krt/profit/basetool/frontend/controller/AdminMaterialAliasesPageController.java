@@ -21,9 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -151,15 +150,16 @@ public class AdminMaterialAliasesPageController {
       @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
-      MaterialExternalAliasCreateRequest body =
-          new MaterialExternalAliasCreateRequest(
+      MaterialExternalAliasWriteRequest body =
+          new MaterialExternalAliasWriteRequest(
               materialId,
               sourceSystem,
               externalName,
               blankToNull(externalKey),
               externalUuid,
               blankToNull(externalCode),
-              blankToNull(note));
+              blankToNull(note),
+              null);
       backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -198,8 +198,8 @@ public class AdminMaterialAliasesPageController {
       @RequestParam Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      MaterialExternalAliasUpdateRequest body =
-          new MaterialExternalAliasUpdateRequest(
+      MaterialExternalAliasWriteRequest body =
+          new MaterialExternalAliasWriteRequest(
               materialId,
               sourceSystem,
               externalName,
@@ -248,18 +248,18 @@ public class AdminMaterialAliasesPageController {
    */
   @ResponseBody
   @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> createAjax(
-      @RequestBody MaterialExternalAliasCreateRequest request) {
+  public ResponseEntity<Object> createAjax(@RequestBody MaterialExternalAliasWriteRequest request) {
     try {
-      MaterialExternalAliasCreateRequest body =
-          new MaterialExternalAliasCreateRequest(
+      MaterialExternalAliasWriteRequest body =
+          new MaterialExternalAliasWriteRequest(
               request.materialId(),
               request.sourceSystem(),
               request.externalName(),
               blankToNull(request.externalKey()),
               request.externalUuid(),
               blankToNull(request.externalCode()),
-              blankToNull(request.note()));
+              blankToNull(request.note()),
+              null);
       return ResponseEntity.ok(
           backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
     } catch (BackendServiceException e) {
@@ -285,10 +285,10 @@ public class AdminMaterialAliasesPageController {
   @ResponseBody
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> updateAjax(
-      @PathVariable @NotNull UUID id, @RequestBody MaterialExternalAliasUpdateRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody MaterialExternalAliasWriteRequest request) {
     try {
-      MaterialExternalAliasUpdateRequest body =
-          new MaterialExternalAliasUpdateRequest(
+      MaterialExternalAliasWriteRequest body =
+          new MaterialExternalAliasWriteRequest(
               request.materialId(),
               request.sourceSystem(),
               request.externalName(),

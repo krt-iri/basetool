@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -44,17 +43,19 @@ public interface PromotionTopicMapper {
 
   /**
    * Builds a new {@link PromotionTopic} entity from a creation request. The {@code categories}
-   * collection is left empty and must be populated separately.
+   * collection is left empty and must be populated separately. The request's {@code version} is
+   * ignored so a client-supplied value never seeds the JPA {@code @Version} on the transient
+   * entity.
    *
    * @param request validated payload describing the new topic
    * @return a transient entity ready to be persisted
    */
   @Mapping(target = "categories", ignore = true)
   @Mapping(target = "owningSquadron", ignore = true)
-  PromotionTopic toEntity(PromotionTopicCreateRequest request);
+  PromotionTopic toEntity(PromotionTopicWriteRequest request);
 
   /**
-   * Copies the writable fields from a {@link PromotionTopicUpdateRequest} onto an existing managed
+   * Copies the writable fields from a {@link PromotionTopicWriteRequest} onto an existing managed
    * {@link PromotionTopic}. Identity, audit, and association fields are deliberately ignored to
    * preserve them across the update.
    *
@@ -67,5 +68,5 @@ public interface PromotionTopicMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "categories", ignore = true)
   @Mapping(target = "owningSquadron", ignore = true)
-  void updateEntity(@MappingTarget PromotionTopic entity, PromotionTopicUpdateRequest request);
+  void updateEntity(@MappingTarget PromotionTopic entity, PromotionTopicWriteRequest request);
 }

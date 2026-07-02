@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.PromotionTopicService;
+import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,12 +31,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -136,7 +138,7 @@ public class PromotionTopicController {
     @ApiResponse(responseCode = "400", description = "Validation failed."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
   })
-  public PromotionTopicResponse create(@Valid @RequestBody PromotionTopicCreateRequest request) {
+  public PromotionTopicResponse create(@Valid @RequestBody PromotionTopicWriteRequest request) {
     return service.create(request);
   }
 
@@ -158,7 +160,8 @@ public class PromotionTopicController {
     @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
   })
   public PromotionTopicResponse update(
-      @PathVariable UUID id, @Valid @RequestBody PromotionTopicUpdateRequest request) {
+      @PathVariable UUID id,
+      @Validated({Default.class, OnUpdate.class}) @RequestBody PromotionTopicWriteRequest request) {
     return service.update(id, request);
   }
 

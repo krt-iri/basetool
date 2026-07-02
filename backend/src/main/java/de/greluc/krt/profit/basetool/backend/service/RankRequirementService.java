@@ -26,9 +26,8 @@ import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
@@ -140,7 +139,7 @@ public class RankRequirementService {
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public RankRequirementResponse create(@NotNull RankRequirementCreateRequest request) {
+  public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     // REQ-ORG-017 "pin, else choose": a two-Staffel officer must pin the target Staffel via the
@@ -200,7 +199,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public RankRequirementResponse update(
-      @NotNull UUID id, @NotNull RankRequirementUpdateRequest request) {
+      @NotNull UUID id, @NotNull RankRequirementWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);

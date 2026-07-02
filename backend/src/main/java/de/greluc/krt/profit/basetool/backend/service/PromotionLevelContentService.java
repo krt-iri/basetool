@@ -23,9 +23,8 @@ import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
@@ -123,7 +122,7 @@ public class PromotionLevelContentService {
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public PromotionLevelContentResponse create(@NotNull PromotionLevelContentCreateRequest request) {
+  public PromotionLevelContentResponse create(@NotNull PromotionLevelContentWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
         categoryRepository
@@ -162,7 +161,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse update(
-      @NotNull UUID id, @NotNull PromotionLevelContentUpdateRequest request) {
+      @NotNull UUID id, @NotNull PromotionLevelContentWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());

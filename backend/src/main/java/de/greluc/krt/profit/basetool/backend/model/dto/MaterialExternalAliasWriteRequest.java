@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
+import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -26,11 +28,13 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Create payload for {@code POST /api/v1/material-external-aliases}.
+ * Unified create/update payload for {@code /api/v1/material-external-aliases} (S13, #919 —
+ * collapses the former {@code MaterialExternalAliasCreateRequest}/{@code …UpdateRequest} pair).
  *
- * <p>Server-managed fields ({@code id}, {@code version}, {@code createdBy}, timestamps) are
- * intentionally absent from this record so a client cannot pre-set them via the JSON body
- * (mass-assignment defence). The service stamps {@code createdBy} from the authenticated JWT.
+ * <p>Server-managed fields ({@code id}, {@code createdBy}, timestamps) are intentionally absent so
+ * a client cannot pre-set them via the JSON body (mass-assignment defence); the service stamps
+ * {@code createdBy} from the authenticated JWT. The optimistic-lock {@code version} is nullable on
+ * the type and required only on update, enforced via the {@link OnUpdate} validation group.
  *
  * @param materialId UUID of the local material to link to (required)
  * @param sourceSystem catalogue identifier, must be {@code "UEX"}, {@code "SCWIKI"} or {@code
@@ -40,12 +44,14 @@ import java.util.UUID;
  * @param externalUuid optional external UUID
  * @param externalCode optional external short code (max 64 chars)
  * @param note optional provenance note (free-form text)
+ * @param version optimistic-lock version; required on update, ignored on create
  */
-public record MaterialExternalAliasCreateRequest(
+public record MaterialExternalAliasWriteRequest(
     @NotNull UUID materialId,
-    @NotBlank @Pattern(regexp = "UEX|SCWIKI|REFINERY_SCREEN") String sourceSystem,
-    @NotBlank @Size(max = 255) String externalName,
-    @Size(max = 255) String externalKey,
+    @NotBlank @Pattern(regexp = DtoConstraints.SOURCE_SYSTEM_REGEX) String sourceSystem,
+    @NotBlank @Size(max = DtoConstraints.MAX_NAME) String externalName,
+    @Size(max = DtoConstraints.MAX_NAME) String externalKey,
     UUID externalUuid,
-    @Size(max = 64) String externalCode,
-    String note) {}
+    @Size(max = DtoConstraints.MAX_CODE) String externalCode,
+    String note,
+    @NotNull(groups = OnUpdate.class) Long version) {}

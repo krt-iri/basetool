@@ -24,9 +24,8 @@ import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -134,7 +133,7 @@ public class PromotionTopicService {
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public PromotionTopicResponse create(@NotNull PromotionTopicCreateRequest request) {
+  public PromotionTopicResponse create(@NotNull PromotionTopicWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     // REQ-ORG-017 "pin, else choose": an officer who belongs to two Staffeln must pin the target
     // Staffel via the switcher before creating, rather than have the topic silently stamped to
@@ -186,7 +185,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionTopicResponse update(
-      @NotNull UUID id, @NotNull PromotionTopicUpdateRequest request) {
+      @NotNull UUID id, @NotNull PromotionTopicWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);

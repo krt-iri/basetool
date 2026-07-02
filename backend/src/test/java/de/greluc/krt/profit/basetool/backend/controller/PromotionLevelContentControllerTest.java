@@ -26,9 +26,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.PromotionLevelContentService;
 import java.time.Instant;
 import java.util.List;
@@ -104,8 +103,9 @@ class PromotionLevelContentControllerTest {
   @Test
   void create_preservesPromotionLevelOnWritePath() {
     UUID categoryId = UUID.randomUUID();
-    PromotionLevelContentCreateRequest request =
-        new PromotionLevelContentCreateRequest(categoryId, PromotionLevel.LEVEL_C, "description");
+    PromotionLevelContentWriteRequest request =
+        new PromotionLevelContentWriteRequest(
+            categoryId, PromotionLevel.LEVEL_C, "description", null);
     PromotionLevelContentResponse created = content(categoryId, PromotionLevel.LEVEL_C);
     when(service.create(request)).thenReturn(created);
 
@@ -120,8 +120,8 @@ class PromotionLevelContentControllerTest {
   void update_preservesPromotionLevelOnWritePath() {
     UUID id = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
-    PromotionLevelContentUpdateRequest request =
-        new PromotionLevelContentUpdateRequest(2L, categoryId, PromotionLevel.LEVEL_A, "updated");
+    PromotionLevelContentWriteRequest request =
+        new PromotionLevelContentWriteRequest(categoryId, PromotionLevel.LEVEL_A, "updated", 2L);
     PromotionLevelContentResponse updated = content(categoryId, PromotionLevel.LEVEL_A);
     when(service.update(id, request)).thenReturn(updated);
 

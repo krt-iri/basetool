@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -46,17 +45,18 @@ public interface PromotionCategoryMapper {
   /**
    * Builds a new {@link PromotionCategory} entity from a creation request. The {@code topic}
    * association and {@code levelContents} collection are left unset and must be wired by the
-   * service layer.
+   * service layer. The request's {@code version} is ignored so a client-supplied value never seeds
+   * the JPA {@code @Version} on the transient entity.
    *
    * @param request validated payload describing the new category
    * @return a transient entity ready to be persisted
    */
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "levelContents", ignore = true)
-  PromotionCategory toEntity(PromotionCategoryCreateRequest request);
+  PromotionCategory toEntity(PromotionCategoryWriteRequest request);
 
   /**
-   * Copies the writable fields from a {@link PromotionCategoryUpdateRequest} onto an existing
+   * Copies the writable fields from a {@link PromotionCategoryWriteRequest} onto an existing
    * managed {@link PromotionCategory}. Identity, audit, and association fields are deliberately
    * ignored to preserve them across the update.
    *
@@ -69,6 +69,5 @@ public interface PromotionCategoryMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "levelContents", ignore = true)
-  void updateEntity(
-      @MappingTarget PromotionCategory entity, PromotionCategoryUpdateRequest request);
+  void updateEntity(@MappingTarget PromotionCategory entity, PromotionCategoryWriteRequest request);
 }

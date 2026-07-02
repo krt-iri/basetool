@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementWriteRequest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -47,17 +46,19 @@ public interface RankRequirementMapper {
 
   /**
    * Builds a new {@link RankRequirement} entity from a creation request. The {@code topic} and
-   * {@code category} associations are left unset and must be wired by the service layer.
+   * {@code category} associations are left unset and must be wired by the service layer. The
+   * request's {@code version} is ignored so a client-supplied value never seeds the JPA
+   * {@code @Version} on the transient entity.
    *
    * @param request validated payload describing the new requirement
    * @return a transient entity ready to be persisted
    */
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "category", ignore = true)
-  RankRequirement toEntity(RankRequirementCreateRequest request);
+  RankRequirement toEntity(RankRequirementWriteRequest request);
 
   /**
-   * Copies the writable fields from a {@link RankRequirementUpdateRequest} onto an existing managed
+   * Copies the writable fields from a {@link RankRequirementWriteRequest} onto an existing managed
    * {@link RankRequirement}. Identity, audit, and association fields are deliberately ignored to
    * preserve them across the update.
    *
@@ -70,5 +71,5 @@ public interface RankRequirementMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "category", ignore = true)
-  void updateEntity(@MappingTarget RankRequirement entity, RankRequirementUpdateRequest request);
+  void updateEntity(@MappingTarget RankRequirement entity, RankRequirementWriteRequest request);
 }

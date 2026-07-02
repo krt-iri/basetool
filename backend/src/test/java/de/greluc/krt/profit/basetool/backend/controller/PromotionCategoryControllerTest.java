@@ -26,9 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.PromotionCategoryService;
 import java.time.Instant;
 import java.util.List;
@@ -126,8 +125,8 @@ class PromotionCategoryControllerTest {
   @Test
   void create_forwardsRequestToService() {
     UUID topicId = UUID.randomUUID();
-    PromotionCategoryCreateRequest request =
-        new PromotionCategoryCreateRequest(topicId, "Marksmanship", "desc", 1);
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, "Marksmanship", "desc", 1, null);
     PromotionCategoryResponse created = category(topicId, "Marksmanship");
     when(service.create(request)).thenReturn(created);
 
@@ -141,8 +140,8 @@ class PromotionCategoryControllerTest {
   void update_forwardsBothPathAndBodyToService() {
     UUID id = UUID.randomUUID();
     UUID topicId = UUID.randomUUID();
-    PromotionCategoryUpdateRequest request =
-        new PromotionCategoryUpdateRequest(7L, topicId, "Marksmanship Pro", "desc", 1);
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, "Marksmanship Pro", "desc", 1, 7L);
     PromotionCategoryResponse updated = category(topicId, "Marksmanship Pro");
     when(service.update(id, request)).thenReturn(updated);
 
