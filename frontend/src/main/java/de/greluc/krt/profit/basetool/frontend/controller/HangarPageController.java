@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -723,31 +725,6 @@ public class HangarPageController {
     body.put("status", 422);
     body.put("code", "VALIDATION");
     return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
-  }
-
-  /**
-   * Translates a {@link BackendServiceException} into an RFC 7807 {@code problem+json} response,
-   * preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and
-   * correlation id so the client's {@code krtFetch.handleProblem} can drive the conflict
-   * reload-confirm or an error toast. Mirrors the helper in the inventory / mission / operation
-   * controllers.
-   *
-   * @param e the backend failure to relay
-   * @return a {@code problem+json} response carrying the backend status and code
-   */
-  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return ResponseEntity.status(e.getStatusCode())
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 
   private Long parseLong(Object o) {

@@ -21,14 +21,17 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.service.BankManagementReportService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -50,20 +53,19 @@ public class BankExportController {
    * header overrides UTC for the document timestamps; an invalid IANA zone is silently dropped.
    * Each export is audit-logged.
    *
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Download the management three-month report PDF")
   @GetMapping("/three-month-report")
   @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
-  public ResponseEntity<byte[]> downloadThreeMonthReport(
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf =
-        bankManagementReportService.generateThreeMonthReport(
-            BankAccountController.parse(userTimeZone));
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", "bank-3-monats-report.pdf");
-    return ResponseEntity.ok().headers(headers).body(pdf);
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
+  public ResponseEntity<byte[]> downloadThreeMonthReport(@UserZone ZoneId userZone) {
+    byte[] pdf = bankManagementReportService.generateThreeMonthReport(userZone);
+    return PdfResponses.pdfAttachment(pdf, "bank-3-monats-report.pdf");
   }
 }

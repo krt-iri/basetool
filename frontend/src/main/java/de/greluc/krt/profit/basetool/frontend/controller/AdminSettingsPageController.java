@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
@@ -459,30 +461,6 @@ public class AdminSettingsPageController {
     body.put("code", "VALIDATION_FAILED");
     body.put("detail", messageSource.getMessage(messageKey, null, messageKey, locale));
     return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
-  }
-
-  /**
-   * Relays a backend {@link BackendServiceException} as an {@code application/problem+json} body
-   * preserving the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and {@code detail}, so the
-   * shared {@code krtFetch} client branches on the conflict semantics exactly as the other in-place
-   * writes do.
-   *
-   * @param e the backend failure to relay
-   * @return a problem+json {@link ResponseEntity} carrying the backend status and code
-   */
-  private static ResponseEntity<Object> propagateBackendError(BackendServiceException e) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return ResponseEntity.status(e.getStatusCode())
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 
   /**

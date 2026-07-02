@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.MemberEvaluationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,13 +39,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -80,7 +77,7 @@ public class MemberEvaluationController {
    * Returns every {@link MemberEvaluationResponse} owned by the calling member, filtered by the JWT
    * {@code sub} claim so callers see only their own promotion evaluations.
    *
-   * @param auth the authenticated JWT token used to resolve the caller's {@code sub} claim
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return the calling member's evaluations
    */
   @GetMapping("/my")
@@ -89,8 +86,8 @@ public class MemberEvaluationController {
     @ApiResponse(responseCode = "200", description = "Own evaluations."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<MemberEvaluationResponse> listMy(JwtAuthenticationToken auth) {
-    return service.listForUser(requireSub(auth));
+  public List<MemberEvaluationResponse> listMy(@CurrentUserSub String ownerSub) {
+    return service.listForUser(ownerSub);
   }
 
   /**
@@ -102,7 +99,7 @@ public class MemberEvaluationController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
-   * @param auth the authenticated JWT token used to resolve the caller's {@code sub} claim
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return a {@link PageResponse} of the caller's evaluations
    */
   @GetMapping("/my/paged")
@@ -112,7 +109,7 @@ public class MemberEvaluationController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      JwtAuthenticationToken auth) {
+      @CurrentUserSub String ownerSub) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -120,7 +117,7 @@ public class MemberEvaluationController {
             sort,
             MemberEvaluationService.SORTABLE_FIELDS,
             MemberEvaluationService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.listForUserPaged(requireSub(auth), pageable));
+    return PageResponse.of(service.listForUserPaged(ownerSub, pageable));
   }
 
   /**
@@ -248,18 +245,5 @@ public class MemberEvaluationController {
   })
   public void delete(@PathVariable UUID id) {
     service.delete(id);
-  }
-
-  @NotNull
-  private static String requireSub(JwtAuthenticationToken auth) {
-    if (auth == null || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    Jwt jwt = auth.getToken();
-    String sub = jwt.getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
   }
 }

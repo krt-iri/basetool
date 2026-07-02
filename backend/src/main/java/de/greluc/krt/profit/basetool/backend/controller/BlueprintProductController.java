@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -28,11 +29,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -61,7 +58,7 @@ public class BlueprintProductController {
    *
    * @param q optional case-insensitive product-name substring; blank returns the first products
    * @param limit optional maximum number of results; clamped to {@code [1, MAX_LIMIT]}
-   * @param authentication the caller's JWT authentication
+   * @param ownerSub the caller's JWT {@code sub} claim
    * @return up to {@code limit} matching products, alphabetically by name
    */
   @GetMapping("/search")
@@ -78,29 +75,8 @@ public class BlueprintProductController {
   public List<BlueprintProductDto> search(
       @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer limit,
-      JwtAuthenticationToken authentication) {
-    String ownerSub = requireSub(authentication);
+      @CurrentUserSub String ownerSub) {
     int effectiveLimit = limit == null ? BlueprintProductService.DEFAULT_LIMIT : limit;
     return blueprintProductService.searchProducts(q, effectiveLimit, ownerSub);
-  }
-
-  /**
-   * Extracts the non-blank JWT {@code sub} from the caller's authentication.
-   *
-   * @param auth the caller's JWT authentication
-   * @return the subject claim
-   * @throws AccessDeniedException if the token or its subject claim is missing
-   */
-  @NotNull
-  private static String requireSub(JwtAuthenticationToken auth) {
-    if (auth == null || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    Jwt jwt = auth.getToken();
-    String sub = jwt.getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
   }
 }

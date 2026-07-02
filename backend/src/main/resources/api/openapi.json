@@ -36717,7 +36717,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37450,7 +37449,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -37572,7 +37570,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44074,7 +44071,6 @@
         "parameters" : [ {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44537,7 +44533,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -44910,7 +44905,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -45293,7 +45287,6 @@
         }, {
           "name" : "X-User-Time-Zone",
           "in" : "header",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }
