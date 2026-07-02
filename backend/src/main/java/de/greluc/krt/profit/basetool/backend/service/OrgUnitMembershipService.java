@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
@@ -573,7 +574,7 @@ public class OrgUnitMembershipService {
         bereichId,
         orgUnitLabelById(bereichId),
         userId,
-        "role=" + previousRole);
+        AuditDetails.of("role", previousRole));
   }
 
   /**
@@ -650,7 +651,7 @@ public class OrgUnitMembershipService {
         organisationsleitungId,
         orgUnitLabelById(organisationsleitungId),
         userId,
-        "role=" + previousRole);
+        AuditDetails.of("role", previousRole));
   }
 
   /**
@@ -728,7 +729,8 @@ public class OrgUnitMembershipService {
         squadron.getId(),
         orgUnitLabel(squadron),
         userId,
-        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+        AuditDetails.of("logistician", saved.isLogistician())
+            .with("missionManager", saved.isMissionManager()));
     return saved;
   }
 
@@ -1016,7 +1018,7 @@ public class OrgUnitMembershipService {
         squadronId,
         orgUnitLabelById(squadronId),
         userId,
-        "role=" + previousRole);
+        AuditDetails.of("role", previousRole));
     return saved;
   }
 
@@ -1292,7 +1294,8 @@ public class OrgUnitMembershipService {
         orgUnitId,
         orgUnitLabelById(orgUnitId),
         userId,
-        "logistician=" + saved.isLogistician() + " missionManager=" + saved.isMissionManager());
+        AuditDetails.of("logistician", saved.isLogistician())
+            .with("missionManager", saved.isMissionManager()));
   }
 
   /**

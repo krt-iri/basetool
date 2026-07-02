@@ -276,41 +276,22 @@
     // FormData POST to an SK AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
     // X-Requested-With + CSRF + retry-once-on-403. On success runs onSuccess and re-swaps the list;
     // on failure delegates to krtFetch.handleProblem for the conflict UX.
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate, the success toast and the !ok handleProblem (duplicate-name / in-use toast or
+    // OPTIMISTIC_LOCK reload-confirm). This helper keeps only its page behaviour: run onSuccess and
+    // re-swap the SK list in place. Callers guard with if (!window.krtFetch) form.submit() so the
+    // classic POST->redirect stays the no-JS fallback.
     function scWrite(theForm, successMessage, onSuccess) {
-        var action = theForm.getAttribute('action');
-        function headers() {
-            var h = { 'X-Requested-With': 'XMLHttpRequest' };
-            var t = window.krtCsrf ? window.krtCsrf.token() : null;
-            var hn = window.krtCsrf ? window.krtCsrf.headerName() : null;
-            if (t && hn) { h[hn] = t; }
-            return h;
-        }
-        function post() {
-            return fetch(action, { method: 'POST', headers: headers(), body: new FormData(theForm) });
-        }
-        post().then(function (res) {
-            if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-                return window.krtCsrf.refresh().then(function (r) { return r ? post() : res; });
-            }
-            return res;
-        }).then(function (res) {
-            if (res.ok) {
-                if (window.showFrontendSuccessToast) { window.showFrontendSuccessToast(successMessage); }
+        window.krtFetch.submitForm({
+            form: theForm,
+            successMessage: successMessage,
+            errorMessage: SC_MSG.error,
+            conflict: SC_CONFLICT,
+            onSuccess: function () {
                 if (typeof onSuccess === 'function') { onSuccess(); }
                 reswapScResults();
-                return;
-            }
-            res.text().then(function (text) {
-                var problem = null;
-                try { problem = JSON.parse(text); } catch (e) { /* not problem+json */ }
-                if (window.krtFetch && typeof window.krtFetch.handleProblem === 'function') {
-                    window.krtFetch.handleProblem(res, problem, { errorMessage: SC_MSG.error, conflict: SC_CONFLICT });
-                } else if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(SC_MSG.error);
-                }
-            });
-        }).catch(function () {
-            if (window.showFrontendErrorToast) { window.showFrontendErrorToast(SC_MSG.error); }
+            },
         });
     }
 

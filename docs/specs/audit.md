@@ -89,6 +89,26 @@ details payload — only ids, counts and lengths (the actor handle and non-perso
 such as a material name or order title are snapshotted, exactly as the bank trail snapshots holder
 handles).
 
+**Details payload format & the `AuditDetails` builder (S8, #914).** The common `details` shape is a
+space-separated list of `key=value` pairs (e.g. `section=full status=PLANNED`). Those payloads are
+composed through the shared [`support.AuditDetails`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/AuditDetails.java)
+builder — `AuditDetails.of("section", "full").with("status", status)` — instead of being
+hand-concatenated at each call site. The builder fixes the one-space separator and the `key=value`
+grammar in one place and validates that keys carry no `=` or whitespace, so a copy-paste can no
+longer silently fuse two pairs or drift the format. It stringifies every value through
+`String.valueOf` — byte-identical to the Java `+` it replaced (an enum renders as its name, a
+`UUID`/number/boolean/`null` as its `toString()`), so the emitted trail is unchanged. The builder is
+the **type-level seam**: `AuditService.record(...)` / `BankAuditService.record(...)` take the
+`details` argument as `CharSequence` (which `AuditDetails` implements), so a call site hands the
+composed builder directly — no trailing `.toString()` — and `record` renders it before persistence.
+It deliberately does **not** throw on value *content*: `record(...)` runs inside the business
+transaction and must never roll it back (it truncates rather than throws), so the "no free text / no
+PII in a value" rule above remains a review-time discipline — the uniform `key=value` structure
+simply makes a stray free-text value obvious. A minority of details strings are not `key=value` at
+all (a bare token such as an account number, or a free-form `'old' -> 'new'` label on the bank
+trail); those keep their bespoke composition and, being plain strings (also a `CharSequence`), pass
+through `record` unchanged without the builder.
+
 The log is readable **only by admins**: the `/api/v1/audit/**` URL matcher requires
 `hasRole('ADMIN')`, the controller carries a matching method-level `@PreAuthorize`, and the
 `/admin/audit-log` page is admin-gated. Audit rows are never exposed through any non-admin endpoint.

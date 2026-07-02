@@ -158,7 +158,7 @@ class MemberEvaluationServiceTest {
             isNull(),
             eq("Flug Kenntnisse"),
             isNull(),
-            eq("level=LEVEL_B"));
+            argThat(d -> d != null && d.toString().equals("level=LEVEL_B")));
   }
 
   @Test
@@ -209,7 +209,7 @@ class MemberEvaluationServiceTest {
             isNull(),
             eq("Flug Kenntnisse"),
             eq(UUID.fromString(userId)),
-            eq("level=LEVEL_B"));
+            argThat(d -> d != null && d.toString().equals("level=LEVEL_B")));
   }
 
   @Test

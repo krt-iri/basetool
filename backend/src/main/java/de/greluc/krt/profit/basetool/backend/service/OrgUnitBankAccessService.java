@@ -59,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
@@ -650,7 +651,7 @@ public class OrgUnitBankAccessService {
         accountId,
         null,
         null,
-        "ALL_MEMBERS=" + plain(limit));
+        AuditDetails.of("ALL_MEMBERS", plain(limit)));
     return toSettingsDto(account);
   }
 
@@ -699,7 +700,11 @@ public class OrgUnitBankAccessService {
     }
     upsertLimit(account, BankAccountViewGranteeKind.USER, null, userId, limit);
     bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET, accountId, null, userId, "USER=" + plain(limit));
+        BankAuditEventType.APPROVAL_LIMIT_SET,
+        accountId,
+        null,
+        userId,
+        AuditDetails.of("USER", plain(limit)));
     return toSettingsDto(account);
   }
 

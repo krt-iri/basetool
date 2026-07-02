@@ -694,43 +694,31 @@
     const MSG_ITEM_INVALID = '[(#{error.joborder.item.invalid})]';
     const MSG_CREATE_FAILED = '[(#{error.joborder.create.failed})]';
     const MSG_UPDATE_FAILED = '[(#{error.joborder.update.failed})]';
-    async function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
-        if (!window.krtCsrf) { form.submit(); return; }
-        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
-        // the finally so a failed create can be retried; the success path navigates away).
-        if (submitter) { submitter.disabled = true; }
-        try {
-        const fd = new FormData(form);
-        function buildHeaders() {
-            const h = { 'X-Requested-With': 'XMLHttpRequest' };
-            const t = window.krtCsrf.token();
-            const n = window.krtCsrf.headerName();
-            if (t && n) h[n] = t;
-            return h;
-        }
-        let res;
-        try {
-            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            if (res.status === 403 && window.krtCsrf.refresh) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            }
-        } catch (e) {
-            showFrontendErrorToast(failedMessage);
-            return;
-        }
-        if (res.status === 400) { showFrontendErrorToast(invalidMessage); return; }
-        if (!res.ok) { showFrontendErrorToast(failedMessage); return; }
-        let body = null;
-        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
-        if (body && body.targetUrl) {
-            window.location.assign(body.targetUrl);
-        } else {
-            window.location.reload();
-        }
-        } finally {
-            if (submitter) { submitter.disabled = false; }
-        }
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
+    // behaviour: navigate away to the JSON targetUrl on success (toast:false; a create/edit leaves
+    // the page) and the 400-invalid vs generic inline error toast (onError). The classic form-POST
+    // stays the no-JS fallback (krtFetch absent).
+    function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
+        if (!window.krtFetch) { form.submit(); return; }
+        window.krtFetch.submitForm({
+            form: form,
+            submitter: submitter,
+            toast: false,
+            errorMessage: failedMessage,
+            onError: function (status) {
+                showFrontendErrorToast(status === 400 ? invalidMessage : failedMessage);
+                return true;
+            },
+            onSuccess: function (body) {
+                if (body && body.targetUrl) {
+                    window.location.assign(body.targetUrl);
+                } else {
+                    window.location.reload();
+                }
+            },
+        });
     }
     const _materialCreateForm = document.querySelector('#mode-material form');
     if (_materialCreateForm) {
