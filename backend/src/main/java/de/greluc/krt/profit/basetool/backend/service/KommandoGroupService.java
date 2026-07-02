@@ -130,7 +130,7 @@ public class KommandoGroupService {
         saved.getId(),
         saved.getName(),
         null,
-        AuditDetails.of("squadron", orgUnitLabel(squadron)).toString());
+        AuditDetails.of("squadron", orgUnitLabel(squadron)));
     return kommandoGroupMapper.toDto(saved);
   }
 

@@ -298,7 +298,7 @@ public class OperationService {
         operation.getId(),
         operation.getName(),
         null,
-        AuditDetails.of("status", operation.getStatus()).toString());
+        AuditDetails.of("status", operation.getStatus()));
     return saved;
   }
 
@@ -345,7 +345,7 @@ public class OperationService {
         operation.getId(),
         operation.getName(),
         null,
-        AuditDetails.of("status", operation.getStatus()).toString());
+        AuditDetails.of("status", operation.getStatus()));
     return saved;
   }
 
@@ -597,7 +597,7 @@ public class OperationService {
         operationId,
         status.getOperation() != null ? status.getOperation().getName() : null,
         null,
-        AuditDetails.of("paidOut", paidOut).toString());
+        AuditDetails.of("paidOut", paidOut));
 
     // Re-render the full row so the caller can patch its DOM without a second round-trip. We use
     // the same canonical path as the read endpoint to guarantee the displayed amount stays in

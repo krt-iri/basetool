@@ -126,14 +126,14 @@ class UserServiceDeleteTest {
             isNull(),
             isNull(),
             eq(userId),
-            contains("rows=3"));
+            argThat(d -> d != null && d.toString().contains("rows=3")));
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
             isNull(),
             isNull(),
             eq(userId),
-            contains("rows=2"));
+            argThat(d -> d != null && d.toString().contains("rows=2")));
   }
 
   @Test

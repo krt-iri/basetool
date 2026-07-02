@@ -114,7 +114,7 @@ public class BankAuditReportService {
         null,
         null,
         null,
-        AuditDetails.of("format", "pdf").with("period", from + ".." + to).toString());
+        AuditDetails.of("format", "pdf").with("period", from + ".." + to));
     log.info("Bank audit log exported as PDF ({} events)", events.size());
     return pdf;
   }
@@ -149,7 +149,7 @@ public class BankAuditReportService {
         null,
         null,
         null,
-        AuditDetails.of("format", "json").with("period", from + ".." + to).toString());
+        AuditDetails.of("format", "json").with("period", from + ".." + to));
     log.info("Bank audit log exported as JSON ({} events)", events.size());
     return dtos;
   }

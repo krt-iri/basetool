@@ -400,8 +400,7 @@ public class RefineryOrderService {
         AuditDetails.of("location", locationName(saved))
             .with("method", methodName(saved))
             .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", saved.getStatus())
-            .toString());
+            .with("status", saved.getStatus()));
     return saved;
   }
 
@@ -508,8 +507,7 @@ public class RefineryOrderService {
         AuditDetails.of("location", locationName(saved))
             .with("method", methodName(saved))
             .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", previousStatus + "->" + saved.getStatus())
-            .toString());
+            .with("status", previousStatus + "->" + saved.getStatus()));
     return saved;
   }
 
@@ -601,7 +599,7 @@ public class RefineryOrderService {
         order.getId(),
         refineryLabel(order),
         order.getOwner() != null ? order.getOwner().getId() : null,
-        AuditDetails.of("previousStatus", previousStatus).toString());
+        AuditDetails.of("previousStatus", previousStatus));
   }
 
   /**
@@ -732,8 +730,7 @@ public class RefineryOrderService {
               .with("material", mat.getName())
               .with("amount", item.getAmount())
               .with("q", itemDto.quality())
-              .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-")
-              .toString());
+              .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
 
       // Write the adjusted amount back into the refinery order so that the
       // actually stored output amount is documented there as well.
@@ -750,8 +747,7 @@ public class RefineryOrderService {
         refineryLabel(order),
         order.getOwner() != null ? order.getOwner().getId() : null,
         AuditDetails.of("items", dto.items().size())
-            .with("status", previousStatus + "->COMPLETED")
-            .toString());
+            .with("status", previousStatus + "->COMPLETED"));
   }
 
   private static String normalizeNote(String note) {

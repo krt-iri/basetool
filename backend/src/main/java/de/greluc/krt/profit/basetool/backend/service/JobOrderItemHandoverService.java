@@ -147,8 +147,7 @@ public class JobOrderItemHandoverService {
         null,
         AuditDetails.of("handover", saved.getId())
             .with("entries", dto.entries().size())
-            .with("autoCompleted", allDelivered)
-            .toString());
+            .with("autoCompleted", allDelivered));
 
     return resultDto;
   }

@@ -113,7 +113,7 @@ public class UexRefinerySyncService {
         null,
         null,
         null,
-        AuditDetails.of("source", "UEX").with("added", added).with("updated", updated).toString());
+        AuditDetails.of("source", "UEX").with("added", added).with("updated", updated));
   }
 
   /**
@@ -163,6 +163,6 @@ public class UexRefinerySyncService {
         null,
         null,
         null,
-        AuditDetails.of("source", "UEX").with("processed", processed).toString());
+        AuditDetails.of("source", "UEX").with("processed", processed));
   }
 }

@@ -85,8 +85,7 @@ public class InventoryOrgUnitReconciler {
           userId,
           AuditDetails.of("trigger", "GAINED_FIRST")
               .with("orgUnit", firstOrgUnit.getId())
-              .with("rows", restamped)
-              .toString());
+              .with("rows", restamped));
     }
   }
 
@@ -107,10 +106,7 @@ public class InventoryOrgUnitReconciler {
           null,
           null,
           userId,
-          AuditDetails.of("trigger", "LOST_LAST")
-              .with("orgUnit", "NULL")
-              .with("rows", restamped)
-              .toString());
+          AuditDetails.of("trigger", "LOST_LAST").with("orgUnit", "NULL").with("rows", restamped));
     }
   }
 

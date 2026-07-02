@@ -155,9 +155,7 @@ public class PersonalInventoryItemService {
         saved.getId(),
         personalLabel(saved),
         parseSub(ownerSub),
-        AuditDetails.of("qty", saved.getQuantity())
-            .with("loc", saved.getLocationNameSnapshot())
-            .toString());
+        AuditDetails.of("qty", saved.getQuantity()).with("loc", saved.getLocationNameSnapshot()));
     return mapper.toResponse(saved);
   }
 
@@ -367,9 +365,7 @@ public class PersonalInventoryItemService {
         saved.getId(),
         personalLabel(saved),
         parseSub(saved.getOwnerSub()),
-        AuditDetails.of("qty", saved.getQuantity())
-            .with("loc", saved.getLocationNameSnapshot())
-            .toString());
+        AuditDetails.of("qty", saved.getQuantity()).with("loc", saved.getLocationNameSnapshot()));
     return mapper.toResponse(saved);
   }
 

@@ -162,8 +162,7 @@ public class MissionFinanceEntryService {
         null,
         AuditDetails.of("entry", entry.getId())
             .with("type", dto.type())
-            .with("amount", dto.amount())
-            .toString());
+            .with("amount", dto.amount()));
     return missionMapper.toDto(saved);
   }
 
@@ -201,10 +200,7 @@ public class MissionFinanceEntryService {
         entry.getMission() != null ? entry.getMission().getId() : null,
         entry.getMission() != null ? entry.getMission().getName() : null,
         null,
-        AuditDetails.of("entry", entryId)
-            .with("type", dto.type())
-            .with("amount", dto.amount())
-            .toString());
+        AuditDetails.of("entry", entryId).with("type", dto.type()).with("amount", dto.amount()));
 
     entry = financeEntryRepository.save(entry);
     return missionMapper.toDto(entry);
@@ -232,6 +228,6 @@ public class MissionFinanceEntryService {
         auditMissionId,
         auditMissionName,
         null,
-        AuditDetails.of("entry", entryId).toString());
+        AuditDetails.of("entry", entryId));
   }
 }

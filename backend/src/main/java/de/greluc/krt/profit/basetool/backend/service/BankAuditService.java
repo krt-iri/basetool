@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +74,10 @@ public class BankAuditService {
    * @param accountId the affected account, or {@code null} for account-less events
    * @param transactionId the created ledger transaction, or {@code null} for non-booking events
    * @param targetUserId the affected user (grantee / holder's linked user), or {@code null}
-   * @param details compact human-readable details payload, or {@code null}
+   * @param details compact details payload, or {@code null} — typically an {@link AuditDetails}
+   *     composer for the {@code key=value} shape, stringified via {@link CharSequence#toString()}
+   *     before persistence. Taking {@link CharSequence} (not {@code String}) makes the builder the
+   *     type-level entry point rather than a hand-concatenated string.
    * @return the persisted audit row
    */
   @Transactional(propagation = Propagation.MANDATORY)
@@ -82,7 +86,7 @@ public class BankAuditService {
       @Nullable UUID accountId,
       @Nullable UUID transactionId,
       @Nullable UUID targetUserId,
-      @Nullable String details) {
+      @Nullable CharSequence details) {
     Optional<UUID> actorId = authHelperService.currentUserId();
     String actorHandle =
         actorId.flatMap(userRepository::findById).map(User::getEffectiveName).orElse("system");
@@ -95,7 +99,9 @@ public class BankAuditService {
             .accountId(accountId)
             .transactionId(transactionId)
             .targetUserId(targetUserId)
-            .details(details)
+            // Persist the rendered payload; a null stays null (no details), any other CharSequence
+            // (an AuditDetails composer or a raw String) is stringified byte-identically.
+            .details(details == null ? null : details.toString())
             .build();
     return auditEventRepository.save(event);
   }
@@ -158,7 +164,7 @@ public class BankAuditService {
         null,
         null,
         null,
-        "deleted=" + deleted + " before=" + before);
+        AuditDetails.of("deleted", deleted).with("before", before));
     log.info("Purged {} bank audit events older than {}", deleted, before);
     return deleted;
   }

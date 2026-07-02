@@ -179,8 +179,7 @@ public class JobOrderService {
             .with("materials", jobOrder.getMaterials().size())
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
-            .with("priority", jobOrder.getPriority())
-            .toString());
+            .with("priority", jobOrder.getPriority()));
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -251,8 +250,7 @@ public class JobOrderService {
             .with("lines", jobOrder.getItems().size())
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
-            .with("priority", jobOrder.getPriority())
-            .toString());
+            .with("priority", jobOrder.getPriority()));
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -558,14 +556,14 @@ public class JobOrderService {
           jobOrder.getId(),
           orderLabel(jobOrder),
           null,
-          AuditDetails.of("from", previousStatus).with("autoCompleted", "false").toString());
+          AuditDetails.of("from", previousStatus).with("autoCompleted", "false"));
     } else {
       auditService.record(
           AuditEventType.JOB_ORDER_STATUS_CHANGED,
           jobOrder.getId(),
           orderLabel(jobOrder),
           null,
-          AuditDetails.of("from", previousStatus).with("to", status).toString());
+          AuditDetails.of("from", previousStatus).with("to", status));
     }
 
     return mapToDtoWithStock(jobOrder);
@@ -637,9 +635,7 @@ public class JobOrderService {
         targetOrder.getId(),
         orderLabel(targetOrder),
         null,
-        AuditDetails.of("fromPriority", oldPriority)
-            .with("toPriority", targetOrder.getPriority())
-            .toString());
+        AuditDetails.of("fromPriority", oldPriority).with("toPriority", targetOrder.getPriority()));
     return mapToDtoWithStock(targetOrder);
   }
 
@@ -695,7 +691,7 @@ public class JobOrderService {
         jobOrder.getId(),
         orderLabel(jobOrder),
         null,
-        AuditDetails.of("countWithVariants", countWithVariants).toString());
+        AuditDetails.of("countWithVariants", countWithVariants));
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -783,8 +779,7 @@ public class JobOrderService {
         null,
         AuditDetails.of("materialsRemoved", removedMaterialIds.size())
             .with("materials", jobOrder.getMaterials().size())
-            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
-            .toString());
+            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -877,8 +872,7 @@ public class JobOrderService {
         orderLabel(jobOrder),
         null,
         AuditDetails.of("lines", jobOrder.getItems().size())
-            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
-            .toString());
+            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
     return mapToDtoWithStock(jobOrder);
   }
 
@@ -913,7 +907,7 @@ public class JobOrderService {
         deletedId,
         deletedLabel,
         null,
-        AuditDetails.of("priorityWas", priority).toString());
+        AuditDetails.of("priorityWas", priority));
   }
 
   /**
@@ -948,7 +942,7 @@ public class JobOrderService {
         saved.getId(),
         orderLabel(saved),
         userId,
-        AuditDetails.of("assignee", userId).toString());
+        AuditDetails.of("assignee", userId));
     return mapToDtoWithStock(saved);
   }
 
@@ -986,7 +980,7 @@ public class JobOrderService {
         jobOrderId,
         label,
         null,
-        AuditDetails.of("material", materialId).toString());
+        AuditDetails.of("material", materialId));
   }
 
   /**
@@ -1019,7 +1013,7 @@ public class JobOrderService {
         jobOrderId,
         orderLabel(jobOrder),
         null,
-        AuditDetails.of("inventoryItem", inventoryItemId).toString());
+        AuditDetails.of("inventoryItem", inventoryItemId));
   }
 
   /**
@@ -1046,7 +1040,7 @@ public class JobOrderService {
           saved.getId(),
           orderLabel(saved),
           userId,
-          AuditDetails.of("assignee", userId).toString());
+          AuditDetails.of("assignee", userId));
     }
     return mapToDtoWithStock(saved);
   }
@@ -1126,14 +1120,14 @@ public class JobOrderService {
           saved.getId(),
           orderLabel(saved),
           userId,
-          AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()).toString());
+          AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()));
     } else {
       auditService.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
           saved.getId(),
           orderLabel(saved),
           userId,
-          AuditDetails.of("assignee", userId).toString());
+          AuditDetails.of("assignee", userId));
     }
     return mapToDtoWithStock(saved);
   }
@@ -1645,8 +1639,7 @@ public class JobOrderService {
         null,
         AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
             .with("toOrgUnit", orgUnitRef(target))
-            .with("claimsWithdrawn", claimsWithdrawn)
-            .toString());
+            .with("claimsWithdrawn", claimsWithdrawn));
     return mapToDtoWithStock(jobOrder);
   }
 

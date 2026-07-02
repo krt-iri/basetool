@@ -152,7 +152,7 @@ public class MemberEvaluationService {
         category.getId(),
         categoryLabel(category),
         parseUserUuid(userId),
-        AuditDetails.of("level", request.assignedLevel()).toString());
+        AuditDetails.of("level", request.assignedLevel()));
     log.info(
         "Upserted MemberEvaluation userId={} categoryId={} level={}",
         userId,

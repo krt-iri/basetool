@@ -318,8 +318,7 @@ public class JobOrderHandoverService {
               .with("material", h.material())
               .with("amount", h.amount())
               .with("remaining", h.remaining())
-              .with("depleted", h.depleted())
-              .toString());
+              .with("depleted", h.depleted()));
     }
     auditService.record(
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
@@ -328,8 +327,7 @@ public class JobOrderHandoverService {
         null,
         AuditDetails.of("handover", savedHandover.getId())
             .with("items", handedItems.size())
-            .with("autoCompleted", allFulfilled)
-            .toString());
+            .with("autoCompleted", allFulfilled));
 
     return resultDto;
   }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,8 @@ import org.junit.jupiter.api.Test;
  * Verifies the byte-equivalence contract of {@link AuditDetails}: {@code
  * AuditDetails.of(...).with(...).toString()} must produce a string character-identical to the
  * hand-written {@code "k=" + v + " k2=" + v2} concatenation it replaces (S8, #914), across every
- * value type that appears at the migrated call sites, plus the key-validation guard.
+ * value type that appears at the migrated call sites, plus the key-validation guard and the {@link
+ * CharSequence} contract that lets {@code record(...)} accept the composer directly.
  */
 class AuditDetailsTest {
 
@@ -157,5 +159,24 @@ class AuditDetailsTest {
     assertThrows(IllegalArgumentException.class, () -> AuditDetails.of("a=b", "v"));
     assertThrows(IllegalArgumentException.class, () -> AuditDetails.of("a b", "v"));
     assertThrows(IllegalArgumentException.class, () -> AuditDetails.of("a\tb", "v"));
+  }
+
+  @Test
+  void charSequenceContract_delegatesToRenderedPayload() {
+    // Given — a two-key payload rendering to "section=full status=ACTIVE"
+    AuditDetails details = AuditDetails.of("section", "full").with("status", SampleStatus.ACTIVE);
+    String rendered = "section=full status=ACTIVE";
+    // Then — length/charAt/subSequence mirror the rendered string, so it is a faithful CharSequence
+    assertEquals(rendered.length(), details.length());
+    assertEquals(rendered.charAt(0), details.charAt(0));
+    assertEquals("section", details.subSequence(0, 7).toString());
+  }
+
+  @Test
+  void usableAsCharSequence_matchesRenderedContent() {
+    // The seam: record(...) accepts the composer as a CharSequence and renders it. A String's
+    // contentEquals confirms the composer carries exactly the expected characters.
+    CharSequence details = AuditDetails.of("count", 3);
+    assertTrue("count=3".contentEquals(details), "composer must be a CharSequence of its payload");
   }
 }

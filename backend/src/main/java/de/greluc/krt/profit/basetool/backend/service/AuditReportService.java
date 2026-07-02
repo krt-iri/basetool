@@ -109,7 +109,7 @@ public class AuditReportService {
         null,
         null,
         null,
-        AuditDetails.of("format", "pdf").with("period", from + ".." + to).toString());
+        AuditDetails.of("format", "pdf").with("period", from + ".." + to));
     log.info("Audit log exported as PDF for domain {} ({} events)", domain, events.size());
     return pdf;
   }
@@ -141,7 +141,7 @@ public class AuditReportService {
         null,
         null,
         null,
-        AuditDetails.of("format", "json").with("period", from + ".." + to).toString());
+        AuditDetails.of("format", "json").with("period", from + ".." + to));
     log.info("Audit log exported as JSON for domain {} ({} events)", domain, dtos.size());
     return dtos;
   }

@@ -299,8 +299,7 @@ public class MaterialClaimService {
             .with("quality", dto.qualityRequirement())
             .with("claimingOrgUnit", dto.claimingOrgUnitId())
             .with("amount", amount)
-            .with("mode", isNew ? "created" : "updated")
-            .toString());
+            .with("mode", isNew ? "created" : "updated"));
     return toClaimDto(saved);
   }
 
@@ -339,8 +338,7 @@ public class MaterialClaimService {
         AuditDetails.of("claim", claimId)
             .with("material", claimMaterialId)
             .with("quality", claimQuality)
-            .with("claimingOrgUnit", claimingOrgUnitId)
-            .toString());
+            .with("claimingOrgUnit", claimingOrgUnitId));
     log.info(
         "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
         jobOrderId,

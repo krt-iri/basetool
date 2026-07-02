@@ -651,7 +651,7 @@ public class OrgUnitBankAccessService {
         accountId,
         null,
         null,
-        AuditDetails.of("ALL_MEMBERS", plain(limit)).toString());
+        AuditDetails.of("ALL_MEMBERS", plain(limit)));
     return toSettingsDto(account);
   }
 
@@ -704,7 +704,7 @@ public class OrgUnitBankAccessService {
         accountId,
         null,
         userId,
-        AuditDetails.of("USER", plain(limit)).toString());
+        AuditDetails.of("USER", plain(limit)));
     return toSettingsDto(account);
   }
 

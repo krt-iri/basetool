@@ -36,6 +36,15 @@ import org.jetbrains.annotations.Nullable;
  * {@link #with(String, Object)} appends {@code " key=value"}, so every migrated site emits exactly
  * {@code key=value key=value ...}.
  *
+ * <p><b>The builder is the type-level seam.</b> {@code AuditService.record(...)} / {@code
+ * BankAuditService.record(...)} take the {@code details} argument as {@link CharSequence}, and this
+ * class implements it, so a migrated call site hands the composed {@code AuditDetails}
+ * <em>directly</em> — {@code record(type, id, label, user, AuditDetails.of("k", v).with(...))} —
+ * with no trailing {@code .toString()}. {@code record} renders it via {@link #toString()} before
+ * persistence. A raw {@code String} is still a {@link CharSequence}, so the few non-{@code
+ * key=value} payloads (bare tokens, free-form labels) keep passing a string unchanged; the builder
+ * simply becomes the obvious path for the {@code key=value} shape.
+ *
  * <p><b>Byte-equivalence contract (critical — audit is binding).</b> This composer is a drop-in for
  * the old concatenation: {@code AuditDetails.of("a", x).with("b", y).toString()} produces a string
  * <em>character-identical</em> to {@code "a=" + x + " b=" + y}. It achieves this by stringifying
@@ -56,33 +65,27 @@ import org.jetbrains.annotations.Nullable;
  * enforces is the enabler for a future centralized policy check; the "no free-text/PII in values"
  * rule of REQ-AUDIT-001 remains a review-time discipline.
  */
-public final class AuditDetails {
+public final class AuditDetails implements CharSequence {
 
   /** Accumulates the {@code key=value key=value ...} payload as it is composed. */
   private final StringBuilder buffer = new StringBuilder();
 
-  /**
-   * Starts a detail payload with its first {@code key=value} pair.
-   *
-   * @param key the first key; must be non-empty and free of {@code '='} and whitespace
-   * @param value the first value; stringified via {@link String#valueOf(Object)} (a {@code null}
-   *     renders as {@code "null"}), byte-identical to {@code "key=" + value}
-   */
-  private AuditDetails(@NotNull String key, @Nullable Object value) {
-    append(key, value);
-  }
+  /** Creates an empty composer; a payload is started through {@link #of(String, Object)}. */
+  private AuditDetails() {}
 
   /**
    * Starts a detail payload with its first {@code key=value} pair.
    *
    * @param key the first key; must be non-empty and free of {@code '='} and whitespace
    * @param value the first value; stringified via {@link String#valueOf(Object)} (a {@code null}
-   *     renders as the literal {@code "null"})
+   *     renders as the literal {@code "null"}), byte-identical to {@code "key=" + value}
    * @return a new builder holding {@code "key=value"}
    */
   @Contract("_, _ -> new")
   public static @NotNull AuditDetails of(@NotNull String key, @Nullable Object value) {
-    return new AuditDetails(key, value);
+    AuditDetails details = new AuditDetails();
+    details.append(key, value);
+    return details;
   }
 
   /**
@@ -134,7 +137,48 @@ public final class AuditDetails {
   }
 
   /**
-   * Renders the composed {@code key=value key=value ...} payload.
+   * The number of characters in the composed payload — the {@link CharSequence} contract, delegated
+   * to the backing buffer.
+   *
+   * @return the current payload length
+   */
+  @Override
+  public int length() {
+    return buffer.length();
+  }
+
+  /**
+   * The character at the given index of the composed payload — the {@link CharSequence} contract,
+   * delegated to the backing buffer.
+   *
+   * @param index the zero-based character index
+   * @return the character at {@code index}
+   * @throws IndexOutOfBoundsException if {@code index} is negative or not less than {@link
+   *     #length()}
+   */
+  @Override
+  public char charAt(int index) {
+    return buffer.charAt(index);
+  }
+
+  /**
+   * A subsequence of the composed payload — the {@link CharSequence} contract, delegated to the
+   * backing buffer.
+   *
+   * @param start the start index, inclusive
+   * @param end the end index, exclusive
+   * @return the requested subsequence
+   * @throws IndexOutOfBoundsException if {@code start}/{@code end} are out of range or {@code start
+   *     > end}
+   */
+  @Override
+  public @NotNull CharSequence subSequence(int start, int end) {
+    return buffer.subSequence(start, end);
+  }
+
+  /**
+   * Renders the composed {@code key=value key=value ...} payload — also how {@code record(...)}
+   * turns this {@link CharSequence} into the persisted {@code details} string.
    *
    * @return the detail string, byte-identical to the equivalent {@code "k=" + v + " k2=" + v2}
    *     concatenation

@@ -659,8 +659,7 @@ public class InventoryItemService {
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
             .with("jobOrder", jobOrderRef(item))
-            .with("mission", item.getMission() != null ? item.getMission().getName() : "-")
-            .toString());
+            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
 
@@ -749,8 +748,7 @@ public class InventoryItemService {
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
             .with("jobOrder", jobOrderRef(item))
-            .with("mission", item.getMission() != null ? item.getMission().getName() : "-")
-            .toString());
+            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
 
@@ -967,8 +965,7 @@ public class InventoryItemService {
               .with("amount", dto.amount())
               .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
               .with("newRow", newItem.getId())
-              .with("depleted", depleted)
-              .toString());
+              .with("depleted", depleted));
       return inventoryItemMapper.toDto(savedNew);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
       MissionParticipant participant =
@@ -1062,8 +1059,7 @@ public class InventoryItemService {
               .with("terminal", dto.terminal())
               .with("sellAmount", dto.sellAmount())
               .with("financeEntry", financeEntryId != null ? financeEntryId : "-")
-              .with("depleted", rowDepleted)
-              .toString());
+              .with("depleted", rowDepleted));
     } else {
       auditService.record(
           AuditEventType.INVENTORY_ITEM_CONSUMED,
@@ -1074,8 +1070,7 @@ public class InventoryItemService {
               .with("material", materialName)
               .with("amount", dto.amount())
               .with("remaining", remaining)
-              .with("depleted", rowDepleted)
-              .toString());
+              .with("depleted", rowDepleted));
     }
   }
 
@@ -1193,8 +1188,7 @@ public class InventoryItemService {
             .with("amount", dto.amount())
             .with("newRow", newItem.getId())
             .with("targetOrgUnit", targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
-            .with("depleted", depleted)
-            .toString());
+            .with("depleted", depleted));
 
     return inventoryItemMapper.toDto(savedNew);
   }
@@ -1236,8 +1230,7 @@ public class InventoryItemService {
         null,
         AuditDetails.of(
                 "scope", scope.adminAllScope() ? "adminAll" : "active=" + scope.activeOrgUnitId())
-            .with("removed", removed)
-            .toString());
+            .with("removed", removed));
     return removed;
   }
 
@@ -1290,7 +1283,7 @@ public class InventoryItemService {
         null,
         null,
         currentUserId,
-        AuditDetails.of("count", toDelete.size()).toString());
+        AuditDetails.of("count", toDelete.size()));
   }
 
   /**
@@ -1362,9 +1355,7 @@ public class InventoryItemService {
         item.getId(),
         inventoryLabel(item),
         item.getUser().getId(),
-        AuditDetails.of("delivered", request.delivered())
-            .with("jobOrder", jobOrderRef(saved))
-            .toString());
+        AuditDetails.of("delivered", request.delivered()).with("jobOrder", jobOrderRef(saved)));
     return inventoryItemMapper.toDto(saved);
   }
 

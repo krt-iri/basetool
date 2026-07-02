@@ -987,8 +987,7 @@ public class UserService {
           AuditDetails.of("reason", "user-deletion")
               .with("rows", inventoryReassigned)
               .with("fromUser", userId)
-              .with("toAdmin", admin.getId())
-              .toString());
+              .with("toAdmin", admin.getId()));
     }
     if (refineryReassigned > 0) {
       auditService.record(
@@ -999,8 +998,7 @@ public class UserService {
           AuditDetails.of("reason", "user-deletion")
               .with("rows", refineryReassigned)
               .with("fromUser", userId)
-              .with("toAdmin", admin.getId())
-              .toString());
+              .with("toAdmin", admin.getId()));
     }
     // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
     // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails

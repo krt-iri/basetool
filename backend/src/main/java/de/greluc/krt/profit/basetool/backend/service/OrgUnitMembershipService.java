@@ -574,7 +574,7 @@ public class OrgUnitMembershipService {
         bereichId,
         orgUnitLabelById(bereichId),
         userId,
-        AuditDetails.of("role", previousRole).toString());
+        AuditDetails.of("role", previousRole));
   }
 
   /**
@@ -651,7 +651,7 @@ public class OrgUnitMembershipService {
         organisationsleitungId,
         orgUnitLabelById(organisationsleitungId),
         userId,
-        AuditDetails.of("role", previousRole).toString());
+        AuditDetails.of("role", previousRole));
   }
 
   /**
@@ -730,8 +730,7 @@ public class OrgUnitMembershipService {
         orgUnitLabel(squadron),
         userId,
         AuditDetails.of("logistician", saved.isLogistician())
-            .with("missionManager", saved.isMissionManager())
-            .toString());
+            .with("missionManager", saved.isMissionManager()));
     return saved;
   }
 
@@ -1019,7 +1018,7 @@ public class OrgUnitMembershipService {
         squadronId,
         orgUnitLabelById(squadronId),
         userId,
-        AuditDetails.of("role", previousRole).toString());
+        AuditDetails.of("role", previousRole));
     return saved;
   }
 
@@ -1296,8 +1295,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(orgUnitId),
         userId,
         AuditDetails.of("logistician", saved.isLogistician())
-            .with("missionManager", saved.isMissionManager())
-            .toString());
+            .with("missionManager", saved.isMissionManager()));
   }
 
   /**
