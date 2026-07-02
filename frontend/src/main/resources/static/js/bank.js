@@ -1374,4 +1374,51 @@
             },
         );
     });
+
+    /**
+     * Client-side account-name live filter shared by the bank dashboard cards (D1) and the org-unit
+     * account list (REQ-BANK-046). Purely visual and read-only: as the user types into a
+     * `[data-bank-acc-filter]` search box, every account item inside the container named by the box's
+     * `data-filter-scope` selector whose `data-filter-name` does not contain the entered term
+     * (case-insensitive substring) is hidden via the `hidden` attribute. This is a pure DOM toggle
+     * with no server round-trip — so no krtFetch, no reload and no CSRF — which is why the live-update
+     * standard is met by construction (REQ-FE-001). The optional `[data-filter-empty]` note named by
+     * the box's `data-filter-empty` selector is revealed only when a non-empty account set is filtered
+     * down to nothing (never on a genuinely empty list, which shows its own server-rendered empty
+     * state).
+     *
+     * @param {HTMLInputElement} input the account-filter search box that fired the event
+     */
+    function applyAccountNameFilter(input) {
+        const scope = document.querySelector(input.getAttribute('data-filter-scope'));
+        if (!scope) {
+            return;
+        }
+        const term = input.value.trim().toLowerCase();
+        const items = scope.querySelectorAll('[data-filter-name]');
+        let visible = 0;
+        items.forEach(function (item) {
+            const name = (item.getAttribute('data-filter-name') || '').toLowerCase();
+            const match = term === '' || name.indexOf(term) !== -1;
+            item.hidden = !match;
+            if (match) {
+                visible += 1;
+            }
+        });
+        const emptySelector = input.getAttribute('data-filter-empty');
+        const empty = emptySelector ? document.querySelector(emptySelector) : null;
+        if (empty) {
+            empty.hidden = items.length === 0 || visible > 0;
+        }
+    }
+
+    // Delegated so the single handler serves both the dashboard filter and the org-unit filter, and
+    // survives the org-unit `orgUnitBank` fragment swap (after a swap the input is re-rendered empty,
+    // which naturally resets the filter to "show all").
+    document.addEventListener('input', function (event) {
+        const input = event.target.closest ? event.target.closest('[data-bank-acc-filter]') : null;
+        if (input) {
+            applyAccountNameFilter(input);
+        }
+    });
 })();

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
@@ -58,6 +59,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -94,6 +96,7 @@ class UserServiceSyncTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private UserService userService;
 
@@ -382,6 +385,59 @@ class UserServiceSyncTest {
       userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
 
       verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.ACTIVE));
+    }
+
+    @Test
+    void createsNewNonAdminUser_notifiesAdmins() {
+      // REQ-NOTIF-012: a registration first materialised by the scheduled reconciler (not the
+      // interactive login) must also notify the admins, so a scheduler-first row — or a user who
+      // never interactively logs in while PENDING — is no longer silently missed. Gated on
+      // `created`, so it fires exactly once across the two sync paths.
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(role(99L, "Guest")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userService.syncUser(
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+
+      verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
+    }
+
+    @Test
+    void createsNewAdminUser_doesNotNotify() {
+      // An admin lands ACTIVE (bootstrap carve-out), so no pending-approval notification is raised.
+      Role adminRole = role(1L, "ADMIN");
+      adminRole.setCode("ADMIN");
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(adminRole));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
+
+      verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void existingPendingUser_doesNotReNotify() {
+      // Exactly-once guard: an already-persisted user (created == false) — re-seen on a later
+      // reconciler pass, or after the interactive login already announced them — never
+      // re-publishes.
+      User existing = newUser(USER_ID, "alice");
+      existing.setEmail("alice@example.com");
+      existing.setInKeycloak(true);
+      existing.setApprovalStatus(ApprovalStatus.PENDING);
+      existing.setVersion(2L);
+      Role guest = role(99L, "Guest");
+      existing.setRoles(new HashSet<>(Set.of(guest)));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
+
+      userService.syncUser(
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

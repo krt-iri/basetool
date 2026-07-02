@@ -6,6 +6,7 @@
 
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
+- **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
 
 ### Changed
 
@@ -17,6 +18,7 @@
 
 ### Fixed
 
+- **Benachrichtigungen: Admins werden jetzt zuverlässig über neue Konto-Freigabeanträge informiert.** Neue, noch nicht freigeschaltete Registrierungen (insbesondere über Discord) lösen jetzt immer genau eine Admin-Benachrichtigung aus — auch wenn der optionale Discord-Claim in Keycloak fehlt oder das Konto zuerst über die periodische Keycloak-Synchronisation statt über den Login angelegt wird. Bisher blieb die Meldung in diesen Fällen komplett aus (REQ-NOTIF-012).
 - **Deployment: Der Deploy-Zyklus erkennt jetzt einen abgedrifteten oder ungesunden Stack.** `deploy.sh` nimmt die „no change"-Abkürzung nur noch, wenn die laufenden Container tatsächlich den zuletzt ausgerollten Image-Digests entsprechen und gesund sind; andernfalls wird derselbe Stand automatisch neu angewendet — etwa nach einem manuellen `docker compose up` mit veraltetem lokalem `:stable`-Tag (Vorfall vom 02.07.2026). Für geplante Wartung vorher den `iri-deploy.timer` stoppen (REQ-OPS-013).
 
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
