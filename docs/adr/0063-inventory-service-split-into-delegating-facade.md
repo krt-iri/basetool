@@ -64,7 +64,12 @@ this split, not carried forward.
 sub-services); the sub-services do not inject the facade, so there is no Spring cycle. The facade
 stays in the ArchUnit `staffelScopedServicesMustWireOwnerScopeOrAuthHelper` whitelist and keeps its
 `OwnerScopeService` dependency (used by `createInventoryItem`) so the multi-tenant org-unit stamp
-cannot be dropped; both new services also wire `OwnerScopeService` for the same scoping.
+cannot be dropped. Because the split moves the `OwnerScopeService.currentScopePredicate()` filtering
+wholesale out of the facade into the two extracted services — the facade itself no longer calls it —
+**both `InventoryAggregationService` and `InventoryCheckoutService` are added to that same
+whitelist**, so the defensive guard follows the scoped data and a future maintainer who drops
+`OwnerScopeService` from either service (silently un-scoping the squadron-wide reads or the global
+wipe) fails the build rather than leaking across org units.
 
 ## Consequences
 
