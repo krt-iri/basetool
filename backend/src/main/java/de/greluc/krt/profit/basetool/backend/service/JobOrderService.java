@@ -100,6 +100,7 @@ public class JobOrderService {
   private final de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
+  private final JobOrderPriorityService jobOrderPriorityService;
   private final de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper
       inventoryItemMapper;
 
@@ -151,7 +152,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
-    normalizePriorities();
+    jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditService.record(
         AuditEventType.JOB_ORDER_CREATED,
@@ -224,7 +225,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
-    normalizePriorities();
+    jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditService.record(
         AuditEventType.JOB_ORDER_ITEM_CREATED,
@@ -509,7 +510,7 @@ public class JobOrderService {
     jobOrderRepository.flush();
 
     if (isTerminal != wasTerminal) {
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
     }
 
     if (isTerminal && !wasTerminal) {
@@ -558,59 +559,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
-    JobOrder targetOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
-
-    Integer oldPriority = targetOrder.getPriority();
-    if (oldPriority == null) {
-      throw new BadRequestException("Cannot update priority of a completed or rejected job order");
-    }
-    if (oldPriority.equals(newPriority)) {
-      normalizePriorities();
-      return jobOrderStockProjectionService.mapToDtoWithStock(targetOrder);
-    }
-
-    List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
-
-    List<JobOrder> activeOrders =
-        new java.util.ArrayList<>(
-            allOrders.stream()
-                .filter(o -> o.getPriority() != null)
-                .sorted(
-                    java.util.Comparator.comparing(JobOrder::getPriority)
-                        .thenComparing(JobOrder::getCreatedAt))
-                .toList());
-
-    activeOrders.remove(targetOrder);
-
-    // Clamp `newPriority` BEFORE the subtraction so the arithmetic operates on
-    // already-sanitised input. `newPriority` is sourced from a request DTO; doing
-    // `newPriority - 1` directly and clamping afterwards (the previous shape) trips
-    // CodeQL's `java/tainted-arithmetic` rule — it walks the taint into the `- 1`
-    // expression and doesn't recognise the post-hoc `if (newIndex < 0)` clamp as a
-    // sanitiser. `Math.max(...)` / `Math.min(...)` ARE recognised as sanitisers, so
-    // pre-clamping `newPriority` into `[1, activeOrders.size() + 1]` makes the
-    // subsequent `- 1` safe by construction (result is in `[0, activeOrders.size()]`,
-    // exactly the contract the call site below expects).
-    int clampedPriority = Math.max(1, Math.min(activeOrders.size() + 1, newPriority));
-    int newIndex = clampedPriority - 1;
-
-    activeOrders.add(newIndex, targetOrder);
-
-    int currentPrio = 1;
-    for (JobOrder o : activeOrders) {
-      o.setPriority(currentPrio++);
-    }
-
-    auditService.record(
-        AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
-        targetOrder.getId(),
-        orderLabel(targetOrder),
-        null,
-        AuditDetails.of("fromPriority", oldPriority).with("toPriority", targetOrder.getPriority()));
-    return jobOrderStockProjectionService.mapToDtoWithStock(targetOrder);
+    return jobOrderPriorityService.updateJobOrderPriority(id, newPriority);
   }
 
   /**
@@ -876,7 +825,7 @@ public class JobOrderService {
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
     }
     auditService.record(
         AuditEventType.JOB_ORDER_DELETED,
@@ -1048,7 +997,7 @@ public class JobOrderService {
       // from the DB while Hibernate already holds a newer in-memory version, causing an
       // ObjectOptimisticLockingFailureException on the subsequent flush at transaction end.
       jobOrderRepository.flush();
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
       inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
       // Single funnel for auto-completion (every handover path completes through here): one
       // JOB_ORDER_COMPLETED event, recorded only on the actual OPEN/IN_PROGRESS → COMPLETED edge.
@@ -1058,24 +1007,6 @@ public class JobOrderService {
           orderLabel(jobOrder),
           null,
           "autoCompleted=true");
-    }
-  }
-
-  private void normalizePriorities() {
-    List<JobOrder> activeOrders =
-        jobOrderRepository.lockAllJobOrders().stream()
-            .filter(o -> o.getPriority() != null)
-            .sorted(
-                java.util.Comparator.comparing(JobOrder::getPriority)
-                    .thenComparing(JobOrder::getCreatedAt))
-            .toList();
-
-    int currentPriority = 1;
-    for (JobOrder order : activeOrders) {
-      if (order.getPriority() == null || !order.getPriority().equals(currentPriority)) {
-        order.setPriority(currentPriority);
-      }
-      currentPriority++;
     }
   }
 

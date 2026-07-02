@@ -98,13 +98,15 @@ class JobOrderServiceTest {
 
   @Mock private AuditService auditService;
 
-  // The org-unit resolution and the stock/claim DTO projection were extracted to
-  // JobOrderOrgUnitResolver / JobOrderStockProjectionService (L2, #921); JobOrderService now calls
-  // them. Mockito builds real instances from the same mocks, wired into jobOrderService via
-  // reflection in setUp() (Mockito does not inject one @InjectMocks into another), so the
-  // create/update/read paths keep exercising the real resolution + projection logic.
+  // The org-unit resolution, stock/claim DTO projection and priority queue were extracted to
+  // JobOrderOrgUnitResolver / JobOrderStockProjectionService / JobOrderPriorityService (L2, #921);
+  // JobOrderService now calls them. Mockito builds real instances from the same mocks, wired into
+  // jobOrderService via reflection in setUp() (Mockito does not inject one @InjectMocks into
+  // another; the priority service also gets the real projection chained in), so the
+  // create/update/delete/read paths keep exercising the real logic.
   @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
+  @InjectMocks private JobOrderPriorityService jobOrderPriorityService;
 
   @InjectMocks private JobOrderService jobOrderService;
 
@@ -123,6 +125,10 @@ class JobOrderServiceTest {
         jobOrderService, "jobOrderOrgUnitResolver", jobOrderOrgUnitResolver);
     ReflectionTestUtils.setField(
         jobOrderService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderPriorityService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    ReflectionTestUtils.setField(
+        jobOrderService, "jobOrderPriorityService", jobOrderPriorityService);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
