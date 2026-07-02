@@ -21,17 +21,25 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +63,8 @@ class NotificationRuleEngineIntegrationTest {
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private NotificationCreationService notificationCreationService;
   @Autowired private RecipientResolutionService recipientResolutionService;
+  @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private static JobOrderCreatedEvent eventForRandomUnits() {
@@ -141,6 +151,69 @@ class NotificationRuleEngineIntegrationTest {
     } finally {
       transactionTemplate.executeWithoutResult(
           status -> notificationRuleRepository.deleteById(extraRule.getId()));
+    }
+  }
+
+  @Test
+  void discordRegistrationPendingRuleNotifiesEveryAdmin() {
+    // REQ-NOTIF-012 end-to-end (the previously-unverified "exactly one notification per admin"
+    // acceptance): the V174 seed rule resolves a DISCORD_REGISTRATION_PENDING event to every ADMIN
+    // via its ROLE selector and persists exactly one unread notification per admin. Seeds one admin
+    // holding the DataInitializer-seeded ADMIN role, fires the event, and cleans up afterwards.
+    UUID adminSub = UUID.randomUUID();
+    UUID newUserId = UUID.randomUUID();
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          Role admin = roleRepository.findByNameIgnoreCase("Admin").orElseThrow();
+          User u = new User();
+          u.setId(adminSub);
+          u.setUsername("it-admin-" + adminSub);
+          u.setApprovalStatus(ApprovalStatus.ACTIVE);
+          u.setRoles(new HashSet<>(Set.of(admin)));
+          userRepository.saveAndFlush(u);
+        });
+
+    try {
+      NotificationRule seeded =
+          notificationRuleRepository
+              .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-000000000005"))
+              .orElseThrow();
+      assertThat(seeded.getEventType())
+          .isEqualTo(NotificationEventType.DISCORD_REGISTRATION_PENDING);
+      assertThat(seeded.getNotificationType())
+          .isEqualTo(NotificationType.DISCORD_REGISTRATION_PENDING);
+      assertThat(seeded.isExcludeActor()).isFalse();
+      assertThat(seeded.getSelectors())
+          .singleElement()
+          .satisfies(
+              s -> {
+                assertThat(s.getKind()).isEqualTo(SelectorKind.ROLE);
+                assertThat(s.getRoleCode()).isEqualTo("ADMIN");
+              });
+
+      int created =
+          notificationCreationService.createFromEvent(
+              new DiscordRegistrationPendingEvent(newUserId, "newbie"));
+
+      assertThat(created).isGreaterThanOrEqualTo(1);
+      assertThat(notificationRepository.findAllByRecipientSub(adminSub, Pageable.unpaged()))
+          .singleElement()
+          .satisfies(
+              n -> {
+                assertThat(n.getType()).isEqualTo(NotificationType.DISCORD_REGISTRATION_PENDING);
+                assertThat(n.getEntityType())
+                    .isEqualTo(DiscordRegistrationPendingEvent.ENTITY_TYPE);
+                assertThat(n.getEntityId()).isEqualTo(newUserId);
+                assertThat(n.isRead()).isFalse();
+              });
+    } finally {
+      transactionTemplate.executeWithoutResult(
+          status -> {
+            notificationRepository
+                .findAllByRecipientSub(adminSub, Pageable.unpaged())
+                .forEach(n -> notificationRepository.deleteById(n.getId()));
+            userRepository.deleteById(adminSub);
+          });
     }
   }
 
