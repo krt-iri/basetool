@@ -28,11 +28,13 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * but are in the wrong state, or requests that conflict with an aggregate's current state.
  *
  * <p>Mapped to HTTP {@code 400 Bad Request} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code BAD_REQUEST}. Prefer this over {@code ResponseStatusException} so the
- * code/title/detail flow stays consistent with the other RFC 7807 responses.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code BAD_REQUEST}. Prefer this over
+ * {@code ResponseStatusException} so the code/title/detail flow stays consistent with the other RFC
+ * 7807 responses. Every accessor is inherited unchanged from {@link AppException} — it delegates to
+ * {@link AppExceptionKind#BAD_REQUEST}, the fixed identity passed to the superclass constructor.
  */
-public class BadRequestException extends RuntimeException {
+public final class BadRequestException extends AppException {
 
   /**
    * Creates a {@code BadRequestException} with a developer-facing detail message that is also
@@ -41,7 +43,7 @@ public class BadRequestException extends RuntimeException {
    * @param message human-readable description of the rejected request
    */
   public BadRequestException(String message) {
-    super(message);
+    super(AppExceptionKind.BAD_REQUEST, message);
   }
 
   /**
@@ -53,6 +55,6 @@ public class BadRequestException extends RuntimeException {
    * @param cause underlying failure that triggered this exception
    */
   public BadRequestException(String message, Throwable cause) {
-    super(message, cause);
+    super(AppExceptionKind.BAD_REQUEST, message, cause);
   }
 }

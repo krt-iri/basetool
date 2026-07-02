@@ -24,17 +24,19 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * response or is unreachable.
  *
  * <p>Mapped to HTTP {@code 502 Bad Gateway} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code EXTERNAL_SERVICE_ERROR}. The original cause is kept on the exception for server-side
- * logging; the {@code detail} body returned to the client is a generic localized message so we do
- * not echo back implementation details (status codes, response bodies) of the upstream service to
- * the caller.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code EXTERNAL_SERVICE_ERROR}. {@link
+ * #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED} — inherited from {@link
+ * AppExceptionKind#EXTERNAL_SERVICE_ERROR}, the fixed identity passed to the superclass constructor
+ * — so the original cause is kept on the exception and logged server-side at ERROR; the {@code
+ * detail} body returned to the client is a generic localized message so we do not echo back
+ * implementation details (status codes, response bodies) of the upstream service to the caller.
  *
  * <p>Prefer this over a plain {@link RuntimeException} so an upstream outage surfaces as a clearly
  * distinguishable 5xx category in the client and in the logs, rather than being indistinguishable
  * from an unexpected internal bug ({@code 500 INTERNAL_ERROR}).
  */
-public class ExternalServiceException extends RuntimeException {
+public final class ExternalServiceException extends AppException {
 
   /**
    * Creates an {@code ExternalServiceException} with a description of the upstream problem.
@@ -43,7 +45,7 @@ public class ExternalServiceException extends RuntimeException {
    *     reaching the client
    */
   public ExternalServiceException(String message) {
-    super(message);
+    super(AppExceptionKind.EXTERNAL_SERVICE_ERROR, message);
   }
 
   /**
@@ -55,6 +57,6 @@ public class ExternalServiceException extends RuntimeException {
    * @param cause underlying upstream failure
    */
   public ExternalServiceException(String message, Throwable cause) {
-    super(message, cause);
+    super(AppExceptionKind.EXTERNAL_SERVICE_ERROR, message, cause);
   }
 }
