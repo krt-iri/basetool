@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +113,7 @@ public class UexRefinerySyncService {
         null,
         null,
         null,
-        "source=UEX added=" + added + " updated=" + updated);
+        AuditDetails.of("source", "UEX").with("added", added).with("updated", updated).toString());
   }
 
   /**
@@ -162,6 +163,6 @@ public class UexRefinerySyncService {
         null,
         null,
         null,
-        "source=UEX processed=" + processed);
+        AuditDetails.of("source", "UEX").with("processed", processed).toString());
   }
 }

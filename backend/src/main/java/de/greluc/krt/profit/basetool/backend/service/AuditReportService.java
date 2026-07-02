@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.AuditLogPdfFormat;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -104,7 +105,11 @@ public class AuditReportService {
             label("pdf.audit.title." + domain.name()), from, to, userZone, rows, this::label);
 
     auditService.record(
-        exportEventType(domain), null, null, null, "format=pdf period=" + from + ".." + to);
+        exportEventType(domain),
+        null,
+        null,
+        null,
+        AuditDetails.of("format", "pdf").with("period", from + ".." + to).toString());
     log.info("Audit log exported as PDF for domain {} ({} events)", domain, events.size());
     return pdf;
   }
@@ -132,7 +137,11 @@ public class AuditReportService {
             .map(auditEventMapper::toDto)
             .toList();
     auditService.record(
-        exportEventType(domain), null, null, null, "format=json period=" + from + ".." + to);
+        exportEventType(domain),
+        null,
+        null,
+        null,
+        AuditDetails.of("format", "json").with("period", from + ".." + to).toString());
     log.info("Audit log exported as JSON for domain {} ({} events)", domain, dtos.size());
     return dtos;
   }

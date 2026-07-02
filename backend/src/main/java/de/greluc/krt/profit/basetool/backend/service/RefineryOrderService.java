@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -396,14 +397,11 @@ public class RefineryOrderService {
         saved.getId(),
         refineryLabel(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        "location="
-            + locationName(saved)
-            + " method="
-            + methodName(saved)
-            + " goods="
-            + (saved.getGoods() != null ? saved.getGoods().size() : 0)
-            + " status="
-            + saved.getStatus());
+        AuditDetails.of("location", locationName(saved))
+            .with("method", methodName(saved))
+            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
+            .with("status", saved.getStatus())
+            .toString());
     return saved;
   }
 
@@ -507,16 +505,11 @@ public class RefineryOrderService {
         saved.getId(),
         refineryLabel(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        "location="
-            + locationName(saved)
-            + " method="
-            + methodName(saved)
-            + " goods="
-            + (saved.getGoods() != null ? saved.getGoods().size() : 0)
-            + " status="
-            + previousStatus
-            + "->"
-            + saved.getStatus());
+        AuditDetails.of("location", locationName(saved))
+            .with("method", methodName(saved))
+            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
+            .with("status", previousStatus + "->" + saved.getStatus())
+            .toString());
     return saved;
   }
 
@@ -608,7 +601,7 @@ public class RefineryOrderService {
         order.getId(),
         refineryLabel(order),
         order.getOwner() != null ? order.getOwner().getId() : null,
-        "previousStatus=" + previousStatus);
+        AuditDetails.of("previousStatus", previousStatus).toString());
   }
 
   /**
@@ -734,16 +727,13 @@ public class RefineryOrderService {
           item.getId(),
           mat.getName() + " @ " + loc.getName(),
           assignee.getId(),
-          "source=REFINERY refineryOrder="
-              + orderId
-              + " material="
-              + mat.getName()
-              + " amount="
-              + item.getAmount()
-              + " q="
-              + itemDto.quality()
-              + " jobOrder="
-              + (jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
+          AuditDetails.of("source", "REFINERY")
+              .with("refineryOrder", orderId)
+              .with("material", mat.getName())
+              .with("amount", item.getAmount())
+              .with("q", itemDto.quality())
+              .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-")
+              .toString());
 
       // Write the adjusted amount back into the refinery order so that the
       // actually stored output amount is documented there as well.
@@ -759,7 +749,9 @@ public class RefineryOrderService {
         order.getId(),
         refineryLabel(order),
         order.getOwner() != null ? order.getOwner().getId() : null,
-        "items=" + dto.items().size() + " status=" + previousStatus + "->COMPLETED");
+        AuditDetails.of("items", dto.items().size())
+            .with("status", previousStatus + "->COMPLETED")
+            .toString());
   }
 
   private static String normalizeNote(String note) {

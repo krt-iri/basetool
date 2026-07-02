@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
@@ -151,7 +152,7 @@ public class MemberEvaluationService {
         category.getId(),
         categoryLabel(category),
         parseUserUuid(userId),
-        "level=" + request.assignedLevel());
+        AuditDetails.of("level", request.assignedLevel()).toString());
     log.info(
         "Upserted MemberEvaluation userId={} categoryId={} level={}",
         userId,

@@ -55,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -376,7 +377,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "status=" + mission.getStatus());
+        AuditDetails.of("status", mission.getStatus()).toString());
     return saved;
   }
 
@@ -500,7 +501,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "section=full status=" + mission.getStatus());
+        AuditDetails.of("section", "full").with("status", mission.getStatus()).toString());
     return saved;
   }
 
@@ -572,7 +573,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "section=core status=" + mission.getStatus());
+        AuditDetails.of("section", "core").with("status", mission.getStatus()).toString());
     return saved;
   }
 
@@ -653,7 +654,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "section=flags isInternal=" + isInternal);
+        AuditDetails.of("section", "flags").with("isInternal", isInternal).toString());
     return saved;
   }
 
@@ -1007,7 +1008,9 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         finalUserId,
-        "participant=" + participant.getId() + " type=" + (finalUserId != null ? "user" : "guest"));
+        AuditDetails.of("participant", participant.getId())
+            .with("type", finalUserId != null ? "user" : "guest")
+            .toString());
     // NOTE: no explicit missionRepository.save(mission) here.
     // The collection is @OptimisticLock(excluded = true) so Hibernate's dirty-check
     // on commit persists the new participant (via cascade) without bumping the parent
@@ -1101,7 +1104,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "participant=" + participantId);
+        AuditDetails.of("participant", participantId).toString());
     return mission;
   }
 
@@ -1236,7 +1239,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
-        "participant=" + participantId);
+        AuditDetails.of("participant", participantId).toString());
     return mission;
   }
 
@@ -1262,7 +1265,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
-        "participant=" + participantId);
+        AuditDetails.of("participant", participantId).toString());
     return mission;
   }
 
@@ -1293,7 +1296,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
-        "participant=" + participantId);
+        AuditDetails.of("participant", participantId).toString());
     return mission;
   }
 
@@ -1321,7 +1324,9 @@ public class MissionService {
           mission.getId(),
           mission.getName(),
           participant.getUser() != null ? participant.getUser().getId() : null,
-          "participant=" + participantId + " field=payoutPreference");
+          AuditDetails.of("participant", participantId)
+              .with("field", "payoutPreference")
+              .toString());
     }
     return mission;
   }
@@ -1403,7 +1408,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "unit=" + missionUnit.getId());
+        AuditDetails.of("unit", missionUnit.getId()).toString());
     return mission;
   }
 
@@ -1552,7 +1557,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "unit=" + unitId);
+        AuditDetails.of("unit", unitId).toString());
     return mission;
   }
 
@@ -1641,7 +1646,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "unit=" + unitId);
+        AuditDetails.of("unit", unitId).toString());
     return mission;
   }
 
@@ -1687,7 +1692,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "step=" + step.getId());
+        AuditDetails.of("step", step.getId()).toString());
     return mission;
   }
 
@@ -1722,7 +1727,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "step=" + stepId);
+        AuditDetails.of("step", stepId).toString());
     return mission;
   }
 
@@ -1755,7 +1760,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "step=" + stepId);
+        AuditDetails.of("step", stepId).toString());
     return mission;
   }
 
@@ -1801,7 +1806,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "count=" + existingIds.size());
+        AuditDetails.of("count", existingIds.size()).toString());
     return mission;
   }
 
@@ -1835,7 +1840,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "step=" + stepId + " done=" + done);
+        AuditDetails.of("step", stepId).with("done", done).toString());
     return mission;
   }
 
@@ -1936,7 +1941,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "objective=" + objective.getId() + " kind=" + kind);
+        AuditDetails.of("objective", objective.getId()).with("kind", kind).toString());
     return mission;
   }
 
@@ -1971,7 +1976,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "objective=" + objectiveId + " kind=" + kind);
+        AuditDetails.of("objective", objectiveId).with("kind", kind).toString());
     return mission;
   }
 
@@ -2004,7 +2009,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "objective=" + objectiveId);
+        AuditDetails.of("objective", objectiveId).toString());
     return mission;
   }
 
@@ -2050,7 +2055,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "count=" + existingIds.size());
+        AuditDetails.of("count", existingIds.size()).toString());
     return mission;
   }
 
@@ -2139,7 +2144,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         participant.getUser() != null ? participant.getUser().getId() : null,
-        "unit=" + missionUnitId + " crew=" + crew.getId());
+        AuditDetails.of("unit", missionUnitId).with("crew", crew.getId()).toString());
     return mission;
   }
 
@@ -2176,7 +2181,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "unit=" + missionUnitId + " crew=" + crewId);
+        AuditDetails.of("unit", missionUnitId).with("crew", crewId).toString());
     return mission;
   }
 
@@ -2209,7 +2214,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "unit=" + missionUnitId + " crew=" + crewId);
+        AuditDetails.of("unit", missionUnitId).with("crew", crewId).toString());
     return mission;
   }
 
@@ -2263,7 +2268,7 @@ public class MissionService {
         subMission.getId(),
         subMission.getName(),
         null,
-        "parent=" + parentMissionId);
+        AuditDetails.of("parent", parentMissionId).toString());
     return saved;
   }
 
@@ -2311,7 +2316,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "frequencyType=" + frequencyTypeId);
+        AuditDetails.of("frequencyType", frequencyTypeId).toString());
     return mission;
   }
 
@@ -2353,7 +2358,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "custom=" + saved.getId());
+        AuditDetails.of("custom", saved.getId()).toString());
     return mission;
   }
 
@@ -2412,7 +2417,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "custom=" + frequencyId);
+        AuditDetails.of("custom", frequencyId).toString());
     return mission;
   }
 
@@ -2435,7 +2440,7 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "frequency=" + frequencyId);
+        AuditDetails.of("frequency", frequencyId).toString());
     return mission;
   }
 
@@ -2574,7 +2579,9 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         null,
-        "fromOrgUnit=" + formatOrgUnitRef(previous) + " toOrgUnit=" + formatOrgUnitRef(target));
+        AuditDetails.of("fromOrgUnit", formatOrgUnitRef(previous))
+            .with("toOrgUnit", formatOrgUnitRef(target))
+            .toString());
     return saved;
   }
 
@@ -2654,10 +2661,12 @@ public class MissionService {
         mission.getId(),
         mission.getName(),
         userId,
-        "kind="
-            + (userId != null
-                ? "user"
-                : (guestName != null && !guestName.isBlank() ? "guest" : "cleared")));
+        AuditDetails.of(
+                "kind",
+                userId != null
+                    ? "user"
+                    : (guestName != null && !guestName.isBlank() ? "guest" : "cleared"))
+            .toString());
     return saved;
   }
 

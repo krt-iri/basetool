@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +83,10 @@ public class InventoryOrgUnitReconciler {
           null,
           null,
           userId,
-          "trigger=GAINED_FIRST orgUnit=" + firstOrgUnit.getId() + " rows=" + restamped);
+          AuditDetails.of("trigger", "GAINED_FIRST")
+              .with("orgUnit", firstOrgUnit.getId())
+              .with("rows", restamped)
+              .toString());
     }
   }
 
@@ -103,7 +107,10 @@ public class InventoryOrgUnitReconciler {
           null,
           null,
           userId,
-          "trigger=LOST_LAST orgUnit=NULL rows=" + restamped);
+          AuditDetails.of("trigger", "LOST_LAST")
+              .with("orgUnit", "NULL")
+              .with("rows", restamped)
+              .toString());
     }
   }
 

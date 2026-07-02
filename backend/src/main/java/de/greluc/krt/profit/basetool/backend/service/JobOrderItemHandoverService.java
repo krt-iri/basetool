@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntry
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -144,12 +145,10 @@ public class JobOrderItemHandoverService {
         jobOrderId,
         "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'",
         null,
-        "handover="
-            + saved.getId()
-            + " entries="
-            + dto.entries().size()
-            + " autoCompleted="
-            + allDelivered);
+        AuditDetails.of("handover", saved.getId())
+            .with("entries", dto.entries().size())
+            .with("autoCompleted", allDelivered)
+            .toString());
 
     return resultDto;
   }

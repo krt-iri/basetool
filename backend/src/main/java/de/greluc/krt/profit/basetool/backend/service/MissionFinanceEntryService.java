@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdate
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -159,7 +160,10 @@ public class MissionFinanceEntryService {
         mission.getId(),
         mission.getName(),
         null,
-        "entry=" + entry.getId() + " type=" + dto.type() + " amount=" + dto.amount());
+        AuditDetails.of("entry", entry.getId())
+            .with("type", dto.type())
+            .with("amount", dto.amount())
+            .toString());
     return missionMapper.toDto(saved);
   }
 
@@ -197,7 +201,10 @@ public class MissionFinanceEntryService {
         entry.getMission() != null ? entry.getMission().getId() : null,
         entry.getMission() != null ? entry.getMission().getName() : null,
         null,
-        "entry=" + entryId + " type=" + dto.type() + " amount=" + dto.amount());
+        AuditDetails.of("entry", entryId)
+            .with("type", dto.type())
+            .with("amount", dto.amount())
+            .toString());
 
     entry = financeEntryRepository.save(entry);
     return missionMapper.toDto(entry);
@@ -225,6 +232,6 @@ public class MissionFinanceEntryService {
         auditMissionId,
         auditMissionName,
         null,
-        "entry=" + entryId);
+        AuditDetails.of("entry", entryId).toString());
   }
 }

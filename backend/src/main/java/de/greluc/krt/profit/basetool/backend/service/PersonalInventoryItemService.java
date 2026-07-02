@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.Comparator;
@@ -154,7 +155,9 @@ public class PersonalInventoryItemService {
         saved.getId(),
         personalLabel(saved),
         parseSub(ownerSub),
-        "qty=" + saved.getQuantity() + " loc=" + saved.getLocationNameSnapshot());
+        AuditDetails.of("qty", saved.getQuantity())
+            .with("loc", saved.getLocationNameSnapshot())
+            .toString());
     return mapper.toResponse(saved);
   }
 
@@ -364,7 +367,9 @@ public class PersonalInventoryItemService {
         saved.getId(),
         personalLabel(saved),
         parseSub(saved.getOwnerSub()),
-        "qty=" + saved.getQuantity() + " loc=" + saved.getLocationNameSnapshot());
+        AuditDetails.of("qty", saved.getQuantity())
+            .with("loc", saved.getLocationNameSnapshot())
+            .toString());
     return mapper.toResponse(saved);
   }
 
