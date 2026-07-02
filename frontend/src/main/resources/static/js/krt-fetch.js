@@ -13,6 +13,12 @@
  *    post-re-login session-id rotation, maximumSessions eviction). krtFetch
  *    transparently refetches the token from GET /csrf, updates the meta tags,
  *    and retries the write exactly once before surfacing the error.
+ *  - write (JSON) / submitForm (multipart FormData) — the two write entry
+ *    points share ONE request orchestration (send): CSRF header, bare-403
+ *    refresh-and-retry-once, X-Reauthenticate redirect, guest-token replay,
+ *    error/conflict handling, syncVersion and success toast. submitForm lets a
+ *    page drop its hand-rolled CSRF+retry FormData loop (S10, #916); it omits
+ *    Content-Type so the browser sets the multipart boundary itself.
  *  - JSON / application/problem+json parsing and RFC7807 409 branching
  *    (OPTIMISTIC_LOCK / PESSIMISTIC_LOCK -> reload-confirm; domain conflict
  *    codes -> toast only), carried over verbatim from mission-subresource.js.
@@ -229,6 +235,39 @@
         return m ? readGuestToken(m[1]) : null;
     }
 
+    /**
+     * Assembles the request headers shared by every krtFetch write — the JSON {@link write} and the
+     * multipart {@link submitForm} alike: {@code Accept}, {@code X-Requested-With}, the CSRF header
+     * read fresh from the meta tags, and (for a per-row participant write) the REQ-SEC-018 guest edit
+     * token replayed from local storage. A {@code Content-Type: application/json} is added only when
+     * {@code json} is true; it is deliberately omitted for a {@code FormData} body so the browser sets
+     * the {@code multipart/form-data} boundary itself. Centralising this here keeps the CSRF + guest
+     * token assembly in one place so the two write paths cannot drift.
+     *
+     * @param url  the target URL, used to look up a matching per-row guest edit token
+     * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
+     * @return a plain headers object ready to hand to {@code fetch}
+     */
+    function writeHeaders(url, json) {
+        const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        if (json) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const token = csrfToken();
+        const header = csrfHeaderName();
+        if (token && header) {
+            headers[header] = token;
+        }
+        // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this participant)
+        // so an anonymous guest can edit/withdraw their own sign-up. The frontend relays the header to
+        // the backend, which verifies it against the stored hash.
+        const guestToken = guestTokenForUrl(url);
+        if (guestToken) {
+            headers[GUEST_TOKEN_HEADER] = guestToken;
+        }
+        return headers;
+    }
+
     // Captures any guest edit token returned by a write response (the create response of a guest
     // sign-up) into the store. The body is either a single participant object or the slim
     // participant list; only the freshly created guest row carries a non-null guestEditToken.
@@ -377,12 +416,15 @@
     }
 
     /**
-     * Sends a write (PATCH/POST/PUT/DELETE) as JSON and handles the response.
+     * Shared request orchestration behind both {@link write} (JSON) and {@link submitForm}
+     * (multipart FormData): the double-submit guard, the bare-403 CSRF-refresh-and-retry-once,
+     * network-error toast, RFC7807 parse, X-Reauthenticate redirect, error/conflict handling,
+     * guest-token capture, syncVersion, success toast and onSuccess callback. The only thing that
+     * differs between a JSON write and a form submit is how the request init (headers + body) is
+     * built, so each caller passes its own {@code buildInit} thunk and the target {@code url}; every
+     * response-side behaviour is identical and defined here exactly once.
      *
-     * opts:
-     *  - method               HTTP method (default PATCH)
-     *  - url                  target URL
-     *  - payload              JSON payload (omitted for GET/DELETE)
+     * opts (shared by write / submitForm):
      *  - containerSelector    DOM container/selector for syncVersion on success
      *  - sectionLabel         already-localized success-toast prefix (optional)
      *  - successMessage       already-localized success text (default "Gespeichert.")
@@ -391,43 +433,33 @@
      *  - errorMessage         already-localized generic error text
      *  - conflict             localized conflict strings (see handleProblem)
      *  - onSuccess            callback(body) run after a 2xx
+     *  - onError              optional callback(status, body, response) run on a non-ok, non-reauth
+     *                         response BEFORE the default handleProblem; return a truthy value to
+     *                         signal "handled" (e.g. rendering 422 field-validation errors) and skip
+     *                         the default toast/conflict handling
+     *  - onNetworkError       optional callback(networkError) run when the request fails at the
+     *                         transport layer (no response ever arrived, so onError never fires);
+     *                         return truthy to signal it surfaced its own error UI and suppress the
+     *                         default network-error toast
      *  - submitter            optional submit button disabled for the in-flight request and
      *                         re-enabled when it settles (double-submit guard)
      *
-     * Returns { ok, status, body }. On a bare 403 the CSRF token is refreshed
-     * from GET /csrf and the request retried exactly once before failing.
+     * Returns { ok, status, body }. On a bare 403 the CSRF token is refreshed from GET /csrf and the
+     * request retried exactly once before failing.
      */
-    async function write(opts) {
-        const method = opts.method || 'PATCH';
+    async function send(opts, buildInit, url) {
         // In-flight double-submit guard: the explicit opts.submitter, else the button auto-captured
         // from the triggering form submit. Disabled for the whole round-trip and re-enabled in the
         // finally below on every success/error/network path, so a double-click cannot fire a second
         // (duplicate-create / stale-version) write.
         const submitter = opts.submitter || consumePendingSubmitter();
-
-        function buildInit() {
-            const headers = csrfHeaders();
-            // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this
-            // participant) so an anonymous guest can edit/withdraw their own sign-up. The frontend
-            // relays the header to the backend, which verifies it against the stored hash.
-            const guestToken = guestTokenForUrl(opts.url);
-            if (guestToken) {
-                headers[GUEST_TOKEN_HEADER] = guestToken;
-            }
-            const init = { method: method, headers: headers };
-            if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
-                init.body = JSON.stringify(opts.payload);
-            }
-            return init;
-        }
-
         if (submitter) {
             submitter.disabled = true;
         }
         try {
             let response;
             try {
-                response = await fetch(opts.url, buildInit());
+                response = await fetch(url, buildInit());
                 // A bare 403 is the CSRF filter rejecting a stale token (it answers
                 // before GlobalExceptionHandler, so the body is not problem+json).
                 // Refresh the token once and retry; a genuine authorization failure
@@ -435,16 +467,31 @@
                 if (response.status === 403) {
                     const refreshed = await refreshCsrf();
                     if (refreshed) {
-                        response = await fetch(opts.url, buildInit());
+                        response = await fetch(url, buildInit());
                     }
                 }
             } catch (networkError) {
-                errorToast(
-                    text(opts.errorMessage, 'Speichern fehlgeschlagen.') +
-                        ' (' +
-                        (networkError && networkError.message ? networkError.message : 'network') +
-                        ')',
-                );
+                // Transport-layer failure (offline, DNS/TLS, aborted): the fetch promise rejected
+                // before any response arrived. Keep the raw browser diagnostic in the console for
+                // debugging, but never leak the untranslated message into the user-facing toast
+                // (i18n). The optional onNetworkError hook lets a caller restore optimistic UI (e.g.
+                // re-enable a store button) that the response-side onError never sees on this path;
+                // returning truthy signals it already surfaced its own error UI and suppresses the
+                // default network-error toast.
+                if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                    console.warn('krtFetch network error', networkError);
+                }
+                let handled = false;
+                if (typeof opts.onNetworkError === 'function') {
+                    try {
+                        handled = opts.onNetworkError(networkError);
+                    } catch (_callbackError) {
+                        /* a network-error callback must never break the UX */
+                    }
+                }
+                if (!handled) {
+                    errorToast(text(opts.errorMessage, 'Speichern fehlgeschlagen.'));
+                }
                 return { ok: false, status: 0, body: null };
             }
 
@@ -457,6 +504,19 @@
             }
 
             if (!response.ok) {
+                // Optional caller hook (e.g. 422 field-validation rendering): if it handles the
+                // response it returns truthy and we skip the default toast/conflict handling.
+                if (typeof opts.onError === 'function') {
+                    let handled = false;
+                    try {
+                        handled = opts.onError(response.status, body, response);
+                    } catch (_callbackError) {
+                        /* an error callback must never break the UX */
+                    }
+                    if (handled) {
+                        return { ok: false, status: response.status, body: body };
+                    }
+                }
                 await handleProblem(response, body, opts);
                 return { ok: false, status: response.status, body: body };
             }
@@ -485,6 +545,78 @@
                 submitter.disabled = false;
             }
         }
+    }
+
+    /**
+     * Sends a write (PATCH/POST/PUT/DELETE) as JSON and handles the response via {@link send}.
+     *
+     * opts (in addition to the shared {@link send} opts):
+     *  - method               HTTP method (default PATCH)
+     *  - url                  target URL
+     *  - payload              JSON payload (omitted for GET/DELETE)
+     *
+     * Returns { ok, status, body }.
+     */
+    async function write(opts) {
+        const method = opts.method || 'PATCH';
+
+        function buildInit() {
+            const headers = writeHeaders(opts.url, true);
+            const init = { method: method, headers: headers };
+            if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
+                init.body = JSON.stringify(opts.payload);
+            }
+            return init;
+        }
+
+        return send(opts, buildInit, opts.url);
+    }
+
+    /**
+     * Submits a multipart/form-data (or urlencoded) form write and handles the response via {@link
+     * send} — the FormData twin of {@link write} that lets a page drop its hand-rolled CSRF-header +
+     * retry-on-403 loop (S10, #916). It inherits every response-side behaviour from {@link send},
+     * including the bare-403 CSRF refresh-and-retry, the X-Reauthenticate redirect (REQ-SEC-012) and
+     * the per-row guest edit token replay (REQ-SEC-018), so a migrated site is a net security
+     * improvement over its bespoke loop.
+     *
+     * <p><b>Content-Type is deliberately NOT set.</b> When the body is a {@code FormData} the browser
+     * must set {@code multipart/form-data} together with the boundary parameter itself; a manual
+     * Content-Type would omit the boundary and corrupt the parse. So it asks {@link writeHeaders} for
+     * the shared CSRF + guest-token header set with {@code json=false}, which omits the
+     * {@code Content-Type} that {@link write} forces to {@code application/json}. The CSRF token rides
+     * in the header, never in the form body.
+     *
+     * <p><b>No-JS fallback.</b> submitForm never runs unless {@code window.krtFetch} loaded, so a
+     * script-disabled browser keeps the form's native {@code th:action}/{@code method=post} submit —
+     * the migrated call site must still guard its listener with {@code if (!window.krtFetch) return;}
+     * (before {@code preventDefault}) so the native redirect handler stays the fallback.
+     *
+     * opts (in addition to the shared {@link send} opts):
+     *  - form                 the <form> element or a selector; its action/method/FormData are used
+     *  - url                  target URL (default: form's action attribute)
+     *  - method               HTTP method (default: form's method attribute, else POST)
+     *  - formData             explicit FormData (default: new FormData(form))
+     *
+     * Returns { ok, status, body }.
+     */
+    async function submitForm(opts) {
+        const form = typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form;
+        const url = opts.url || (form ? form.getAttribute('action') : null);
+        const method = (
+            opts.method ||
+            (form ? form.getAttribute('method') : null) ||
+            'POST'
+        ).toUpperCase();
+
+        function buildInit() {
+            const headers = writeHeaders(url, false);
+            const body =
+                opts.formData !== undefined ? opts.formData : form ? new FormData(form) : undefined;
+            return { method: method, headers: headers, body: body };
+        }
+
+        return send(opts, buildInit, url);
     }
 
     // ------------------------------------------------------------ fragment swap
@@ -669,6 +801,7 @@
 
     window.krtFetch = {
         write: write,
+        submitForm: submitForm,
         swap: swap,
         bindSwap: bindSwap,
         syncVersion: syncVersion,

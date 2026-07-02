@@ -248,18 +248,6 @@
             conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
         };
 
-        // FormData needs the browser to set the multipart boundary, so build the CSRF headers
-        // WITHOUT krtCsrf.headers() (which forces Content-Type: application/json).
-        function writeHeaders() {
-            var headers = {'X-Requested-With': 'XMLHttpRequest'};
-            var token = window.krtCsrf.token();
-            var headerName = window.krtCsrf.headerName();
-            if (token && headerName) {
-                headers[headerName] = token;
-            }
-            return headers;
-        }
-
         function clearErrors() {
             form.querySelectorAll('.field-error[data-error-for]').forEach(function (slot) {
                 slot.textContent = '';
@@ -288,72 +276,38 @@
             });
         }
 
-        var inFlight = false;
+        // Migrated to the shared krtFetch.submitForm foundation (S10, REQ-FE-009): it owns the
+        // CSRF header (no Content-Type so the browser sets the multipart boundary), the bare-403
+        // refresh-and-retry, X-Reauthenticate, the double-submit guard (submitter) and the
+        // 409-OPTIMISTIC_LOCK reload-confirm. This handler keeps only its page-specific behaviour:
+        // 422 field-validation rendering (onError) and the in-place clearErrors + version resync on
+        // success (onSuccess). The form keeps its th:action/method=post so a script-disabled browser
+        // still falls back to the redirect handler (the guard above returns before this listener).
         form.addEventListener('submit', function (event) {
             event.preventDefault();
-            if (inFlight) {
-                return;
-            }
-            inFlight = true;
-            var submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-            }
-            function done() {
-                inFlight = false;
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                }
-            }
-            function doPost() {
-                return fetch(form.getAttribute('action'), {
-                    method: 'POST',
-                    headers: writeHeaders(),
-                    body: new FormData(form)
-                });
-            }
-            doPost().then(function (resp) {
-                // A bare 403 is the CSRF filter rejecting a stale token; refresh once and retry.
-                if (resp.status === 403) {
-                    return window.krtCsrf.refresh().then(function (refreshed) {
-                        return refreshed ? doPost() : resp;
-                    });
-                }
-                return resp;
-            }).then(function (resp) {
-                if (resp.status === 422) {
-                    return resp.json().catch(function () { return {}; }).then(function (errors) {
-                        renderErrors(errors);
-                        done();
-                    });
-                }
-                if (!resp.ok) {
-                    return resp.json().catch(function () { return {}; }).then(function (data) {
-                        if (data && data.code === 'OPTIMISTIC_LOCK') {
-                            window.showFrontendErrorToast(data.detail || i18n.conflictDetail);
-                            if (window.showKrtConfirm) {
-                                window.showKrtConfirm(i18n.conflictTitle, i18n.conflictQuestion,
-                                    i18n.conflictReload, i18n.conflictDismiss).then(function (ok) {
-                                    if (ok) {
-                                        window.location.reload();
-                                    }
-                                });
-                            }
-                        } else {
-                            window.showFrontendErrorToast((data && data.detail) || i18n.error);
-                        }
-                        done();
-                    });
-                }
-                return resp.json().catch(function () { return {}; }).then(function (body) {
+            window.krtFetch.submitForm({
+                form: form,
+                submitter: form.querySelector('button[type="submit"]'),
+                successMessage: i18n.saved,
+                errorMessage: i18n.error,
+                conflict: {
+                    title: i18n.conflictTitle,
+                    reloadLabel: i18n.conflictReload,
+                    dismissLabel: i18n.conflictDismiss,
+                    reloadQuestion: i18n.conflictQuestion,
+                    reloadDetailFallback: i18n.conflictDetail,
+                },
+                onError: function (status, body) {
+                    if (status === 422) {
+                        renderErrors(body || {});
+                        return true;
+                    }
+                    return false;
+                },
+                onSuccess: function (body) {
                     clearErrors();
                     syncVersion(body ? body.version : null);
-                    window.showFrontendSuccessToast(i18n.saved);
-                    done();
-                });
-            }).catch(function () {
-                window.showFrontendErrorToast(i18n.error);
-                done();
+                },
             });
         });
     })();

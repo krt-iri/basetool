@@ -488,45 +488,35 @@
     // the order itself is ownerless) and the placeholder label for the rebuilt option list.
     const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
     const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
-    async function _submitRefinery(form, errorMessage, onFailure, submitter) {
-        if (!window.krtCsrf) { form.submit(); return; }
-        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
-        // the finally so a failed write can be retried; the success path navigates away).
-        if (submitter) { submitter.disabled = true; }
-        try {
-        const fd = new FormData(form);
-        function buildHeaders() {
-            const h = { 'X-Requested-With': 'XMLHttpRequest' };
-            const t = window.krtCsrf.token();
-            const n = window.krtCsrf.headerName();
-            if (t && n) h[n] = t;
-            return h;
-        }
-        let res;
-        try {
-            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            if (res.status === 403 && window.krtCsrf.refresh) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            }
-        } catch (e) {
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
+    // behaviour: navigate away to the JSON targetUrl on success (toast:false — an edit/store/cancel
+    // leaves the page) with resetUnsavedChanges, and the onFailure store-button restore + inline
+    // error toast. The classic form-POST handlers stay the no-JS fallback (krtFetch absent). The
+    // store-button restore must fire on BOTH failure paths: an !ok response (onError) AND a
+    // transport-layer network failure (onNetworkError, which the response-side onError never sees).
+    // The single `fail` handler covers both and returns true so the foundation shows no second toast.
+    function _submitRefinery(form, errorMessage, onFailure, submitter) {
+        if (!window.krtFetch) { form.submit(); return; }
+        function fail() {
             if (onFailure) onFailure();
             showFrontendErrorToast(errorMessage);
-            return;
+            return true;
         }
-        if (!res.ok) {
-            if (onFailure) onFailure();
-            showFrontendErrorToast(errorMessage);
-            return;
-        }
-        let body = null;
-        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
-        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
-        if (body && body.targetUrl) window.location.assign(body.targetUrl);
-        else window.location.reload();
-        } finally {
-            if (submitter) { submitter.disabled = false; }
-        }
+        window.krtFetch.submitForm({
+            form: form,
+            submitter: submitter,
+            toast: false,
+            errorMessage: errorMessage,
+            onError: fail,
+            onNetworkError: fail,
+            onSuccess: function (body) {
+                if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+                if (body && body.targetUrl) window.location.assign(body.targetUrl);
+                else window.location.reload();
+            },
+        });
     }
 
     function calcScu(index) {

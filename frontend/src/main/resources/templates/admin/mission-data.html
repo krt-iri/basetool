@@ -405,50 +405,25 @@
     // forms use) with X-Requested-With + CSRF + retry-once-on-403. On success runs onSuccess and
     // re-swaps the section; on failure delegates to krtFetch.handleProblem for the conflict UX
     // (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm).
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate, the double-submit guard (submitter), the success toast and the !ok
+    // handleProblem (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm). This helper
+    // keeps only its page behaviour: run onSuccess and re-swap the affected section in place.
+    // Callers guard with if (!window.krtFetch) form.submit() so the classic POST->redirect stays the
+    // no-JS fallback.
     function missionWrite(form, successMessage, onSuccess) {
         var action = form.getAttribute('action');
-        // In-flight double-submit guard: disable the form's submit button for the whole round-trip
-        // and re-enable it in the finally below, so a double-click cannot fire a duplicate write.
-        var submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) { submitBtn.disabled = true; }
-        function headers() {
-            var h = { 'X-Requested-With': 'XMLHttpRequest' };
-            var t = window.krtCsrf ? window.krtCsrf.token() : null;
-            var hn = window.krtCsrf ? window.krtCsrf.headerName() : null;
-            if (t && hn) { h[hn] = t; }
-            return h;
-        }
-        function post() {
-            return fetch(action, { method: 'POST', headers: headers(), body: new FormData(form) });
-        }
-        post().then(function (res) {
-            if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-                return window.krtCsrf.refresh().then(function (r) { return r ? post() : res; });
-            }
-            return res;
-        }).then(function (res) {
-            if (res.ok) {
-                if (window.showFrontendSuccessToast) { window.showFrontendSuccessToast(successMessage); }
+        window.krtFetch.submitForm({
+            form: form,
+            submitter: form.querySelector('button[type="submit"]'),
+            successMessage: successMessage,
+            errorMessage: MISSION_MSG.error,
+            conflict: MISSION_CONFLICT,
+            onSuccess: function () {
                 if (typeof onSuccess === 'function') { onSuccess(); }
                 reswapMissionSection(action);
-                return;
-            }
-            res.text().then(function (text) {
-                var problem = null;
-                try { problem = JSON.parse(text); } catch (e) { /* not problem+json */ }
-                if (window.krtFetch && typeof window.krtFetch.handleProblem === 'function') {
-                    window.krtFetch.handleProblem(res, problem, {
-                        errorMessage: MISSION_MSG.error,
-                        conflict: MISSION_CONFLICT
-                    });
-                } else if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MISSION_MSG.error);
-                }
-            });
-        }).catch(function () {
-            if (window.showFrontendErrorToast) { window.showFrontendErrorToast(MISSION_MSG.error); }
-        }).finally(function () {
-            if (submitBtn) { submitBtn.disabled = false; }
+            },
         });
     }
 

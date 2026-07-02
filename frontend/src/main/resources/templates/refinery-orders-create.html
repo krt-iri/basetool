@@ -781,47 +781,31 @@
     // the entered data. The classic form-POST is the no-JS fallback (krtCsrf absent).
     const MSG_RFC_MATERIAL_INVALID = /*[[#{error.refineryorder.material.invalid}]]*/ 'Add a material.';
     const MSG_RFC_CREATE_FAILED = /*[[#{error.refineryorder.create.failed}]]*/ 'Create failed.';
-    async function _submitRefineryCreate(form, submitter) {
-        if (!window.krtCsrf) { form.submit(); return; }
-        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
-        // the finally so a failed create can be retried; the success path navigates away).
-        if (submitter) { submitter.disabled = true; }
-        try {
-        const fd = new FormData(form);
-        function buildHeaders() {
-            const h = { 'X-Requested-With': 'XMLHttpRequest' };
-            const t = window.krtCsrf.token();
-            const n = window.krtCsrf.headerName();
-            if (t && n) h[n] = t;
-            return h;
-        }
-        let res;
-        try {
-            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            if (res.status === 403 && window.krtCsrf.refresh) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            }
-        } catch (e) {
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_CREATE_FAILED);
-            return;
-        }
-        if (res.status === 400) {
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_MATERIAL_INVALID);
-            return;
-        }
-        if (!res.ok) {
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_CREATE_FAILED);
-            return;
-        }
-        let body = null;
-        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
-        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
-        if (body && body.targetUrl) window.location.assign(body.targetUrl);
-        else window.location.reload();
-        } finally {
-            if (submitter) { submitter.disabled = false; }
-        }
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
+    // behaviour: navigate away to the JSON targetUrl on success (toast:false; a create leaves the
+    // page) with resetUnsavedChanges, and the 400-invalid vs generic inline error toast. The classic
+    // form-POST is the no-JS fallback (krtFetch absent).
+    function _submitRefineryCreate(form, submitter) {
+        if (!window.krtFetch) { form.submit(); return; }
+        window.krtFetch.submitForm({
+            form: form,
+            submitter: submitter,
+            toast: false,
+            errorMessage: MSG_RFC_CREATE_FAILED,
+            onError: function (status) {
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(status === 400 ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED);
+                }
+                return true;
+            },
+            onSuccess: function (body) {
+                if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+                if (body && body.targetUrl) window.location.assign(body.targetUrl);
+                else window.location.reload();
+            },
+        });
     }
     // #591: single idempotent re-init for everything that is NOT document-delegated, run on first
     // load AND after the screenshot-import swaps #refineryImportFormContainer in place. The delegated

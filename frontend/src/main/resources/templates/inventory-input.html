@@ -230,56 +230,35 @@
             validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.'
         };
         /*]]>*/
-        function headers() {
-            const h = { 'X-Requested-With': 'XMLHttpRequest' };
-            if (window.krtCsrf) {
-                const t = window.krtCsrf.token();
-                const n = window.krtCsrf.headerName();
-                if (t && n) h[n] = t;
-            }
-            return h;
-        }
-        let inFlight = false;
-        form.addEventListener('submit', async function (event) {
+        // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF
+        // header (no Content-Type so the browser sets the multipart boundary), the bare-403
+        // refresh-and-retry, X-Reauthenticate and the double-submit guard. This handler keeps only
+        // its page behaviour: navigate-after-AJAX on success (toast:false — the destination renders
+        // its own toast) and the code-specific inline error toast (onError). The classic
+        // POST->redirect stays the no-JS fallback (the guard above returns before this listener).
+        form.addEventListener('submit', function (event) {
             event.preventDefault();
-            if (inFlight) return;
-            inFlight = true;
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.disabled = true;
-            try {
-                const action = form.getAttribute('action');
-                let res;
-                try {
-                    res = await fetch(action, { method: 'POST', body: new FormData(form), headers: headers() });
-                    if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-                        const refreshed = await window.krtCsrf.refresh();
-                        if (refreshed) res = await fetch(action, { method: 'POST', body: new FormData(form), headers: headers() });
-                    }
-                } catch (e) {
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(INV_ADD_MSG.failed);
-                    return;
-                }
-                if (res.ok) {
-                    let body = {};
-                    try { body = await res.json(); } catch (e) { /* tolerate empty body */ }
-                    // Navigate to the source listing carrying a success signal the destination's toast
-                    // fragment renders — a pre-navigation toast would be torn down by the page load.
+            window.krtFetch.submitForm({
+                form: form,
+                submitter: form.querySelector('button[type="submit"]'),
+                toast: false,
+                errorMessage: INV_ADD_MSG.failed,
+                onError: function (status, problem) {
+                    let msg = INV_ADD_MSG.failed;
+                    if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT') msg = INV_ADD_MSG.personalAssignment;
+                    else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
+                    else if (problem && problem.detail) msg = problem.detail;
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+                    return true;
+                },
+                onSuccess: function (body) {
+                    // Navigate to the source listing carrying a success signal the destination's
+                    // toast fragment renders — a pre-navigation toast would be torn down by the load.
                     const target = body && body.targetUrl ? body.targetUrl : '/inventory';
                     window.location.assign(
                         target + (target.indexOf('?') >= 0 ? '&' : '?') + 'success=success.inventory.add');
-                    return;
-                }
-                let problem = {};
-                try { problem = await res.json(); } catch (e) { /* non-JSON body */ }
-                let msg = INV_ADD_MSG.failed;
-                if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT') msg = INV_ADD_MSG.personalAssignment;
-                else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
-                else if (problem && problem.detail) msg = problem.detail;
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
-            } finally {
-                inFlight = false;
-                if (submitBtn) submitBtn.disabled = false;
-            }
+                },
+            });
         });
     })();
 </script>
