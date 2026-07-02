@@ -14,8 +14,8 @@ ADR-0012. Phase 0 (#572) builds the foundation + exemplars; per-area conversions
 child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
-loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `swap`,
-`syncVersion`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
+loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
+`swap`, `syncVersion`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
 
@@ -66,12 +66,34 @@ Mutations use `krtFetch.write(...)`; no page may hand-roll a `fetch` write or a 
 `meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `members.html`
 `X-CSRF-TOKEN`) are forbidden.
 
+**Multipart / `FormData` writes use `krtFetch.submitForm(...)` (S10, #916).** A form-POST write — a
+`FormData` body rather than a JSON payload — goes through `krtFetch.submitForm({form, ...})`, the
+multipart twin of `write`. Both entry points share **one** request orchestration (`send`): the
+CSRF header, the bare-403 refresh-and-retry-once (REQ-FE-004), the `X-Reauthenticate` redirect
+(REQ-SEC-012), the guest-edit-token replay (REQ-SEC-018), `syncVersion` (REQ-FE-003), the
+success toast, and the RFC 7807 `handleProblem` conflict UX. `submitForm` **must not** set a
+`Content-Type` header on a `FormData` body — the browser sets `multipart/form-data` together with
+its boundary itself; the CSRF token rides in the header, never in the form body. A page may
+therefore **not** re-implement the CSRF-header + retry-on-403 + FormData loop by hand — that
+hand-rolled loop (the historical root cause of most krtFetch deviations) is exactly what
+`submitForm` replaces. Page-specific success/error behaviour hangs off the `onSuccess(body)` /
+`onError(status, body, response)` hooks (e.g. navigate-after-AJAX per REQ-FE-006, in-place
+`{field: message}` validation rendering per REQ-FE-007, a section re-swap, a modal close); the
+form keeps its `th:action`/`method=post` and each listener guards with `if (!window.krtFetch)
+return;` (or `form.submit()`) so a script-disabled browser still gets the native POST → redirect
+fallback. A form write must not fall back to a full-page reload on success (the only sanctioned
+reloads remain the REQ-FE-003 conflict-confirm and the REQ-FE-008 bfcache restore).
+
 **Acceptance**
 
-- [ ] A new write call site uses `krtFetch.write` / `krtCsrf.headers()` — no bespoke CSRF block.
+- [ ] A new write call site uses `krtFetch.write` (JSON) or `krtFetch.submitForm` (FormData) /
+  `krtCsrf.headers()` — no bespoke CSRF block, no hand-rolled retry-on-403 FormData loop.
 - [ ] No template or JS hard-codes the CSRF header name.
+- [ ] A `submitForm` write never sets `Content-Type` on the `FormData` body, keeps its no-JS
+  native-submit fallback, and does not full-page reload on success.
 
-**Enforced by:** code review + grep guard in review · **Code:** `krt-fetch.js` · **Issues:** #572
+**Enforced by:** code review + grep guard in review · **Code:** `krt-fetch.js` (`write`,
+`submitForm`, `send`) · **Issues:** #572, #916
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 

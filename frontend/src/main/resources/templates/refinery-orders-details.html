@@ -488,45 +488,34 @@
     // the order itself is ownerless) and the placeholder label for the rebuilt option list.
     const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
     const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
-    async function _submitRefinery(form, errorMessage, onFailure, submitter) {
-        if (!window.krtCsrf) { form.submit(); return; }
-        // Double-submit guard: disable the triggering button for the whole round-trip (re-enabled in
-        // the finally so a failed write can be retried; the success path navigates away).
-        if (submitter) { submitter.disabled = true; }
-        try {
-        const fd = new FormData(form);
-        function buildHeaders() {
-            const h = { 'X-Requested-With': 'XMLHttpRequest' };
-            const t = window.krtCsrf.token();
-            const n = window.krtCsrf.headerName();
-            if (t && n) h[n] = t;
-            return h;
-        }
-        let res;
-        try {
-            res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            if (res.status === 403 && window.krtCsrf.refresh) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
-            }
-        } catch (e) {
-            if (onFailure) onFailure();
-            showFrontendErrorToast(errorMessage);
-            return;
-        }
-        if (!res.ok) {
-            if (onFailure) onFailure();
-            showFrontendErrorToast(errorMessage);
-            return;
-        }
-        let body = null;
-        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
-        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
-        if (body && body.targetUrl) window.location.assign(body.targetUrl);
-        else window.location.reload();
-        } finally {
-            if (submitter) { submitter.disabled = false; }
-        }
+    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
+    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
+    // X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
+    // behaviour: navigate away to the JSON targetUrl on success (toast:false — an edit/store/cancel
+    // leaves the page) with resetUnsavedChanges, and the onFailure UI-restore + inline error toast.
+    // The classic form-POST handlers stay the no-JS fallback (krtFetch absent). onFailure must fire
+    // on BOTH the !ok response (via onError) AND a network failure (status 0, which never reaches
+    // onError) so the store button's disabled/label is always restored.
+    function _submitRefinery(form, errorMessage, onFailure, submitter) {
+        if (!window.krtFetch) { form.submit(); return; }
+        window.krtFetch.submitForm({
+            form: form,
+            submitter: submitter,
+            toast: false,
+            errorMessage: errorMessage,
+            onError: function () {
+                if (onFailure) onFailure();
+                showFrontendErrorToast(errorMessage);
+                return true;
+            },
+            onSuccess: function (body) {
+                if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+                if (body && body.targetUrl) window.location.assign(body.targetUrl);
+                else window.location.reload();
+            },
+        }).then(function (result) {
+            if (result && result.status === 0 && onFailure) { onFailure(); }
+        });
     }
 
     function calcScu(index) {
