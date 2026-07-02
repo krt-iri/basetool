@@ -194,6 +194,11 @@ Summary of the release loop:
    if its digest moved, runs `docker compose pull && docker compose up -d
    --wait` with a 180 s health-check, and auto-rolls-back both the digest
    pin and the config tree if the new stack fails to become healthy.
+   When nothing new was promoted, the tick still verifies that the
+   running containers match the pinned digests and are healthy, and
+   re-applies on drift — a stack started off a stale local `:stable`
+   tag, crash-looping or left half-down self-heals within one tick
+   (REQ-OPS-013).
 
 During the brief window in step 3 between "old container gone" and "new
 container healthy", `nginx-proxy-manager` intercepts the upstream `502` and

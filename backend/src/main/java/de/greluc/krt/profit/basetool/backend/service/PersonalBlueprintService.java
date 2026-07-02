@@ -208,6 +208,24 @@ public class PersonalBlueprintService {
   }
 
   /**
+   * Clears the caller's <em>removable</em> owned blueprints in one bulk statement — the "delete all
+   * my blueprints" action (REQ-INV-023). The auto-granted, non-removable default blueprints
+   * (REQ-INV-016) are preserved, exactly as the per-row {@link #delete} guard would, so a full
+   * clear leaves the user's defaults intact rather than churning them against the provisioning
+   * sweep. Idempotent: clearing an already-empty (or default-only) set removes nothing and returns
+   * {@code 0}.
+   *
+   * @param ownerSub Keycloak {@code sub} of the caller
+   * @return the number of blueprints removed (never counts a preserved default)
+   */
+  @Transactional
+  public int deleteAllOwn(@NotNull String ownerSub) {
+    int removed = repository.deleteRemovableByOwnerSub(ownerSub);
+    log.info("Cleared {} personal blueprint(s) for ownerSub={}", removed, ownerSub);
+    return removed;
+  }
+
+  /**
    * Owner-scoped recipe view for one of the caller's owned blueprints (#327): loads the entry (404
    * if missing or foreign), then resolves its product key to a representative SC Wiki recipe graph
    * (ingredients + per-quality stat modifiers) via {@link BlueprintProductService#resolveRecipe}.
@@ -319,6 +337,21 @@ public class PersonalBlueprintService {
     requireRemovable(entity);
     repository.delete(entity);
     log.info("Admin deleted blueprint id={} ownerSub={}", id, entity.getOwnerSub());
+  }
+
+  /**
+   * Admin global purge: clears the <em>removable</em> owned blueprints of <strong>every</strong>
+   * user in one bulk statement (REQ-INV-024). Preserves the auto-granted defaults (REQ-INV-016) so
+   * the purge does not fight the default-provisioning sweep. The ADMIN gate lives on the
+   * controller; logged at WARN because it removes data across all users at once.
+   *
+   * @return the number of blueprints removed across all users (never counts a preserved default)
+   */
+  @Transactional
+  public int deleteAllForAllUsers() {
+    int removed = repository.deleteAllRemovable();
+    log.warn("Admin cleared ALL {} removable personal blueprint(s) across every user", removed);
+    return removed;
   }
 
   /**

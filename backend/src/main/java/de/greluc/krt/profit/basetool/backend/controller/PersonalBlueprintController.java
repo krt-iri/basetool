@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
+import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBulkDeleteResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
@@ -200,6 +201,28 @@ public class PersonalBlueprintController {
   })
   public void delete(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
     service.delete(ownerSub, id);
+  }
+
+  /**
+   * Clears the caller's entire <em>removable</em> owned-blueprint set in one call — the "delete all
+   * my blueprints" action (REQ-INV-023). The auto-granted, non-removable default blueprints
+   * (REQ-INV-016) are preserved. Returns the number of blueprints removed so the UI can confirm the
+   * outcome; a set that held only defaults (or was already empty) yields {@code 0}.
+   *
+   * @param ownerSub the caller's JWT {@code sub} claim
+   * @return the count of removed blueprints
+   */
+  @DeleteMapping
+  @Operation(
+      summary = "Clear the caller's removable owned blueprints (keeps auto-granted defaults).")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Removable blueprints cleared; the removed count is returned."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public PersonalBlueprintBulkDeleteResult deleteAll(@CurrentUserSub String ownerSub) {
+    return new PersonalBlueprintBulkDeleteResult(service.deleteAllOwn(ownerSub));
   }
 
   /**

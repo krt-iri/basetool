@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)
 
 # Deployment delivery & promotion
@@ -162,6 +162,50 @@ tick (the manual-staging fallback in the runbook still applies).
 - [ ] A failed keycloak recreate restores the previous JAR and records the failure for backoff.
 
 **Enforced by:** `.github/workflows/release-images.yml` (`build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak custom providers* · **Decision:** ADR-0055
+
+### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
+
+(The ids REQ-OPS-008..012 are allocated to [`backup-recovery.md`](backup-recovery.md); this
+requirement continues the series at the next free number.)
+
+The idempotence marker (`last-deployed.digests`) records what the last **successful** deploy
+applied — it says nothing about what is running *now*. A manual `docker compose up` without the
+digest-pin overlay resolves `:stable` from the **local** image cache (which `deploy.sh` never
+refreshes — it always pulls by digest) and can silently start an outdated build; a crash loop or
+a half-down stack likewise leaves the marker untouched. `deploy.sh` must therefore take the
+"no change" fast-exit **only after verifying the running stack against the target digest set**:
+every app service (backend, frontend, ingest) has a container that is running, healthy (a
+container without a healthcheck counts as healthy, mirroring `up --wait`), and created from an
+image whose RepoDigest equals the target digest. On any divergence the run logs one
+`drift: <service>: <reason>` line per finding and falls through to the normal apply path
+(digest-pinned pull + `up -d --wait`), still honouring the bad-digest backoff so a
+persistently-failing target does not flap every tick. `--check-only` reports the pending drift
+re-apply without applying. Two deliberate exclusions keep the check free of false positives:
+a container still inside its healthcheck **start period** (`running/starting`) counts as
+converged for that tick (`up --wait` would merely wait on it, and a re-apply racing a slow
+cold boot could record a false backoff failure for a good target — a genuinely broken container
+surfaces as unhealthy/restarting on a later tick; a wrong image digest drifts regardless of the
+start period), and one-off `docker compose run` containers are ignored (they are not part of
+the deployed stack). Incident precedent: 2026-07-02, a pre-V199 backend started manually
+off the stale local `:stable` tag against a V201-migrated database crash-looped while
+`deploy.sh` reported "no change" and exited 0.
+
+**Acceptance**
+
+- [ ] A matching marker over a converged, healthy stack exits 0 without pulling or restarting
+  anything ("no change", running stack verified).
+- [ ] A matching marker over a container running a non-target image digest, an
+  unhealthy/restarting container, or a missing container triggers a logged drift re-apply of
+  the same digest set.
+- [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
+  other re-apply of that target; a failed drift re-apply records the failure for the backoff.
+- [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
+  nothing.
+- [ ] A container inside its healthcheck start period does not trigger a drift re-apply (but a
+  non-target image digest does, even during the start period); a one-off `compose run`
+  container never does.
+
+**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
 
 ## Out of scope
 

@@ -48,6 +48,16 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
                     <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
                 </button>
+                <!-- One-click clear of the caller's own (removable) blueprints (REQ-INV-023). Hidden
+                     while the caller owns nothing removable (defaults stay non-removable); JS re-toggles
+                     it on every list swap. Opens the danger confirm modal below. -->
+                <button type="button" id="krt-bp-delete-all-open" class="btn btn-quiet-danger"
+                        data-trigger="bp-open-delete-all"
+                        th:hidden="${blueprints.?[removable].size() == 0}"
+                        th:title="#{personalInventory.blueprints.action.removeAll}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                    <span th:text="#{personalInventory.blueprints.action.removeAll}">Alle l&ouml;schen</span>
+                </button>
             </div>
             <!-- Multi-select staging: chips appear compactly under the bar; the CTA stays
                  disabled until at least one blueprint is staged. -->
@@ -224,6 +234,28 @@
     </div>
 </div>
 
+<!-- Delete-all confirmation modal (KRT danger frame): clears every removable blueprint the caller
+     owns (REQ-INV-023). Lives outside the swapped #krt-bp-list fragment so its form survives every
+     list re-render; the classic POST is the no-JS fallback. -->
+<div id="krt-bp-delete-all-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.removeAll.title}">
+    <div class="krt-modal krt-modal--danger">
+        <div class="krt-modal-head">
+            <h2 th:text="#{personalInventory.blueprints.modal.removeAll.title}">Alle Blueprints entfernen</h2>
+            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-delete-all" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+        </div>
+        <div class="krt-modal-body">
+            <p style="margin: 0;" th:text="#{personalInventory.blueprints.modal.removeAll.body}">Wirklich ALLE deine Blueprints entfernen? Standard-Blueprints bleiben erhalten. Dies kann nicht r&uuml;ckg&auml;ngig gemacht werden.</p>
+        </div>
+        <form id="krt-bp-delete-all-form" method="post" th:action="@{/personal-inventory/blueprints/delete-all}">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="bp-close-delete-all" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.blueprints.action.removeAll}">Alle entfernen</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Blueprint import preview modal (KRT modal frame, wide). Body filled by JS. -->
 <div id="krt-bp-import-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.import.title}">
     <div class="krt-modal krt-bp-import-frame">
@@ -269,6 +301,8 @@
         removed:      /*[[#{personalInventory.blueprints.toast.removed}]]*/ 'Blueprint entfernt.',
         editError:    /*[[#{personalInventory.blueprints.error.update}]]*/ 'Speichern fehlgeschlagen.',
         removeError:  /*[[#{personalInventory.blueprints.error.remove}]]*/ 'Entfernen fehlgeschlagen.',
+        removeAllError:  /*[[#{personalInventory.blueprints.error.removeAll}]]*/ 'Loeschen fehlgeschlagen.',
+        removedAllCount: /*[[#{personalInventory.blueprints.toast.removedAllCount}]]*/ '{0} Blueprints entfernt.',
         conflictTitle:    /*[[#{frontend.ajax.conflict.title}]]*/  'Konflikt',
         conflictDetail:   /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
         conflictReload:   /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
@@ -333,6 +367,7 @@
         addSelected: /*[[@{/personal-inventory/blueprints/add-selected}]]*/ '/personal-inventory/blueprints/add-selected',
         updateNote:  /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/update-note}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/update-note',
         remove:      /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/delete}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/delete',
+        removeAll:   /*[[@{/personal-inventory/blueprints/delete-all}]]*/ '/personal-inventory/blueprints/delete-all',
         recipe:      /*[[@{/personal-inventory/blueprints/ID_PLACEHOLDER/recipe}]]*/ '/personal-inventory/blueprints/ID_PLACEHOLDER/recipe',
         craftability: /*[[@{/personal-inventory/blueprints/craftability}]]*/ '/personal-inventory/blueprints/craftability',
         importPreview: /*[[@{/personal-inventory/blueprints/import/preview}]]*/ '/personal-inventory/blueprints/import/preview',

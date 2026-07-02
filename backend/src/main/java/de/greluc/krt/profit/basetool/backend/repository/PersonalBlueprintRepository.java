@@ -215,6 +215,48 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   Set<String> findAllDistinctOwnerSubs();
 
   /**
+   * Bulk-removes every <em>removable</em> owned blueprint of one user — the "delete all my
+   * blueprints" clear (REQ-INV-023). Auto-granted default blueprints (REQ-INV-016) are preserved by
+   * excluding any row whose {@code product_key} is in the {@code default_blueprint} set, exactly
+   * mirroring the per-row {@code requireRemovable} guard so no path can strip a user's defaults
+   * (they would only be re-provisioned). The {@code NOT IN (subquery)} form deletes the whole owned
+   * set when the default set is empty. A single set-based statement, so no {@code @Version} bumps
+   * and no per-row {@code load}; {@code clearAutomatically} detaches any owned rows loaded earlier
+   * in the transaction so a later read reflects the removal.
+   *
+   * @param ownerSub Keycloak {@code sub} of the owner whose removable blueprints are cleared
+   * @return the number of rows removed (never counts a preserved default)
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      DELETE FROM PersonalBlueprint b
+      WHERE b.ownerSub = :ownerSub
+        AND b.productKey NOT IN (SELECT d.productKey FROM DefaultBlueprint d)
+      """)
+  int deleteRemovableByOwnerSub(@Param("ownerSub") String ownerSub);
+
+  /**
+   * Bulk-removes every <em>removable</em> owned blueprint of <strong>all</strong> users — the admin
+   * "delete all users' blueprints" global purge (REQ-INV-024). Like {@link
+   * #deleteRemovableByOwnerSub(String)} it preserves the auto-granted default blueprints
+   * (REQ-INV-016) by excluding rows whose {@code product_key} is in the {@code default_blueprint}
+   * set, so the purge cannot fight the default-provisioning sweep. ADMIN-ONLY — it spans every
+   * owner and is reachable only from the ADMIN-gated controller. One set-based statement (no
+   * {@code @Version} bumps); {@code clearAutomatically} detaches any owned rows loaded earlier in
+   * the transaction.
+   *
+   * @return the number of rows removed across all users (never counts a preserved default)
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      DELETE FROM PersonalBlueprint b
+      WHERE b.productKey NOT IN (SELECT d.productKey FROM DefaultBlueprint d)
+      """)
+  int deleteAllRemovable();
+
+  /**
    * Materialises the admin-curated default blueprints (REQ-INV-016) for a single user: inserts one
    * {@code personal_blueprint} row per {@code default_blueprint} the user does not yet own. The
    * {@code ON CONFLICT (owner_sub, product_key) DO NOTHING} makes it idempotent (a re-run, or a

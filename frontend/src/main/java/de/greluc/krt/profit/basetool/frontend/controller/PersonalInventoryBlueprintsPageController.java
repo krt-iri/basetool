@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
@@ -289,6 +290,30 @@ public class PersonalInventoryBlueprintsPageController {
     return "redirect:/personal-inventory/blueprints";
   }
 
+  /**
+   * Clears the caller's entire removable owned-blueprint set — the "delete all my blueprints"
+   * action (REQ-INV-023). Auto-granted defaults (REQ-INV-016) are preserved by the backend. No-JS
+   * fallback: flashes a countless success toast and redirects (the AJAX twin below shows the
+   * removed count).
+   *
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to the Blueprints page
+   */
+  @PostMapping("/delete-all")
+  public String deleteAll(RedirectAttributes redirectAttributes) {
+    try {
+      backendApiClient.delete(
+          "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      redirectAttributes.addFlashAttribute(
+          "successToast", "personalInventory.blueprints.toast.removedAll");
+    } catch (Exception e) {
+      log.error("Failed to clear all owned blueprints", e);
+      redirectAttributes.addFlashAttribute(
+          "errorToast", classifyError(e, "personalInventory.blueprints.error.removeAll"));
+    }
+    return "redirect:/personal-inventory/blueprints";
+  }
+
   // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
 
   /**
@@ -347,6 +372,34 @@ public class PersonalInventoryBlueprintsPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to remove blueprint {} (ajax)", id, e);
+      return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * Header-gated AJAX twin of {@link #deleteAll}: clears the caller's removable owned blueprints
+   * (REQ-INV-023) and returns the removed count as JSON so {@code
+   * personal-inventory-blueprints.html} re-renders the collection card in place (via {@code GET
+   * /personal-inventory/blueprints?fragment=list}) and toasts "{n} Blueprints entfernt" — no
+   * full-page reload (REQ-FE-001/005). A backend failure is relayed as {@code problem+json}.
+   *
+   * @return {@code 200} with the removed count on success, or the relayed backend {@code
+   *     problem+json}
+   */
+  @PostMapping(value = "/delete-all", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteAllAjax() {
+    try {
+      PersonalBlueprintBulkDeleteResultDto result =
+          backendApiClient.delete(
+              "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      return ResponseEntity.ok(
+          result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
+    } catch (BackendServiceException e) {
+      log.error("Failed to clear all owned blueprints (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to clear all owned blueprints (ajax)", e);
       return ResponseEntity.internalServerError().build();
     }
   }

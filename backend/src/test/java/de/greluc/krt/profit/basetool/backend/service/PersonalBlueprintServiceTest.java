@@ -268,6 +268,16 @@ class PersonalBlueprintServiceTest {
   }
 
   @Test
+  void deleteAllOwn_delegatesToOwnerScopedBulkDeleteAndReturnsCount() {
+    when(repository.deleteRemovableByOwnerSub(SUB)).thenReturn(4);
+
+    int removed = service.deleteAllOwn(SUB);
+
+    assertEquals(4, removed);
+    verify(repository).deleteRemovableByOwnerSub(SUB);
+  }
+
+  @Test
   void recipeForOwn_loadsOwnedThenDelegatesToProductService() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
@@ -380,5 +390,15 @@ class PersonalBlueprintServiceTest {
 
     assertThrows(BusinessConflictException.class, () -> service.deleteForUser(id));
     verify(repository, never()).delete(any());
+  }
+
+  @Test
+  void deleteAllForAllUsers_delegatesToGlobalBulkDeleteAndReturnsCount() {
+    when(repository.deleteAllRemovable()).thenReturn(7);
+
+    int removed = service.deleteAllForAllUsers();
+
+    assertEquals(7, removed);
+    verify(repository).deleteAllRemovable();
   }
 }
