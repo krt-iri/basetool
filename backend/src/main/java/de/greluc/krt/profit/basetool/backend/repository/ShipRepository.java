@@ -252,18 +252,22 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Query(
       value =
-          "SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END)"
-              + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
-              + " WHERE "
+          """
+          SELECT s.shipType, COUNT(s), SUM(CASE WHEN s.fitted = true THEN 1 ELSE 0 END)
+          FROM Ship s LEFT JOIN s.shipType.manufacturer m
+          WHERE
+          """
               + ScopeSpecifications.SHIP_SCOPE_TRIPLE
               + " AND (cast(:query as string) IS NULL"
               + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + " ) GROUP BY s.shipType ORDER BY s.shipType.name ASC",
       countQuery =
-          "SELECT COUNT(DISTINCT s.shipType)"
-              + " FROM Ship s LEFT JOIN s.shipType.manufacturer m"
-              + " WHERE "
+          """
+          SELECT COUNT(DISTINCT s.shipType)
+          FROM Ship s LEFT JOIN s.shipType.manufacturer m
+          WHERE
+          """
               + ScopeSpecifications.SHIP_SCOPE_TRIPLE
               + " AND (cast(:query as string) IS NULL"
               + "  OR LOWER(s.shipType.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"

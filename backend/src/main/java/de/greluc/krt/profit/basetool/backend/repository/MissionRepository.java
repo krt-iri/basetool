@@ -72,11 +72,13 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
    * @return slim reference DTOs visible to the caller, ordered newest planned-start first.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,"
-          + " m.status, m.plannedStartTime) FROM Mission m WHERE ("
-          + "  m.status IN ('PLANNED', 'ACTIVE')"
-          + "  OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)"
-          + " ) AND "
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,
+      m.status, m.plannedStartTime) FROM Mission m WHERE (
+        m.status IN ('PLANNED', 'ACTIVE')
+        OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)
+      ) AND
+      """
           + ScopeSpecifications.MISSION_SCOPE_PREDICATE
           + " ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(

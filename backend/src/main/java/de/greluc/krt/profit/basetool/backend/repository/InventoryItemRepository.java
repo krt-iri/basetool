@@ -182,12 +182,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * scope-triple + optional-filter contract as {@link #findGlobalByFilters}.
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate("
-          + "i.material, i.user, i.location, i.quality, jo, m, i.personal,"
-          + " oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *"
-          + " COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i"
-          + " LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou"
-          + " WHERE i.personal = false AND "
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
+      COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
+      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      WHERE i.personal = false AND
+      """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
@@ -251,12 +252,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(
       attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
   @Query(
-      "SELECT i FROM InventoryItem i WHERE i.personal = false AND i.material.id = :materialId AND"
-          + " i.user.id = :userId AND i.location.id = :locationId AND ((:quality IS NULL AND"
-          + " i.quality IS NULL) OR i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder"
-          + " IS NULL) OR i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS"
-          + " NULL) OR i.mission.id = :missionId) AND ((:owningOrgUnitId IS NULL AND"
-          + " i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND "
+      """
+      SELECT i FROM InventoryItem i WHERE i.personal = false AND i.material.id = :materialId AND
+      i.user.id = :userId AND i.location.id = :locationId AND ((:quality IS NULL AND
+      i.quality IS NULL) OR i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder
+      IS NULL) OR i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS
+      NULL) OR i.mission.id = :missionId) AND ((:owningOrgUnitId IS NULL AND
+      i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND
+      """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " ORDER BY i.createdAt ASC")
   Page<InventoryItem> findGlobalStackEntries(
@@ -313,9 +316,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * null} means admin "all squadrons" mode (aggregated across the whole org).
    */
   @Query(
-      "SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS"
-          + " double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount"
-          + " FROM InventoryItem i WHERE i.personal = false AND "
+      """
+      SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS
+      double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount
+      FROM InventoryItem i WHERE i.personal = false AND
+      """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " GROUP BY i.material")
   Page<Object[]> getAggregatedInventory(
