@@ -85,8 +85,11 @@ public class MonitoringScrapeSecurityConfig {
   @Order(1)
   public SecurityFilterChain monitoringScrapeFilterChain(HttpSecurity http) throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
-        // A credentialed machine-to-machine GET: no browser session exists that CSRF could
-        // protect, and a 30 s scrape interval must not accumulate sessions or saved requests.
+        // CSRF protection is deliberately off on this chain: it is a stateless, basic-auth-only
+        // machine endpoint with no session cookie, so there is no browser credential a forged
+        // cross-site request could ride on - the rule does not apply to this call site. A 30 s
+        // scrape interval must also not accumulate sessions or saved requests.
+        // lgtm[java/spring-disabled-csrf-protection]
         .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
