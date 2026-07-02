@@ -115,6 +115,10 @@ dependencies {
   implementation(libs.commonmark.core)
   // Actuator for /actuator/health -- consumed by the Docker HEALTHCHECK
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  // Prometheus text-format rendering for /actuator/prometheus (REQ-OBS-005). Version from the
+  // Spring Boot BOM. The endpoint itself is guarded by the fail-closed basic-auth chain in
+  // MonitoringScrapeSecurityConfig.
+  implementation("io.micrometer:micrometer-registry-prometheus")
   // Spring Session with Redis for persistent sessions across restarts
   implementation("org.springframework.session:spring-session-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")

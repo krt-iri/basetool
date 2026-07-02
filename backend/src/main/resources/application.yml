@@ -119,6 +119,14 @@ app:
     user-id-mdc-key: userId
     slow-request-threshold-ms: 2000
     structured-enabled: false
+  monitoring:
+    scrape:
+      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0061). Fail-closed:
+      # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
+      # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
+      # real values.
+      username: ${MONITORING_SCRAPE_USER:}
+      password: ${MONITORING_SCRAPE_PASSWORD:}
   keycloak:
     sync:
       enabled: true
@@ -209,9 +217,12 @@ app:
         refillTokens: 30
         refillPeriod: 1m
 
-# Actuator: expose only `health` for the Docker HEALTHCHECK / docker-compose
-# `service_healthy` gating. The response is restricted to the bare status so that
-# unauthenticated callers cannot enumerate internal components.
+# Actuator: expose `health` for the Docker HEALTHCHECK / docker-compose
+# `service_healthy` gating (bare status only, so unauthenticated callers cannot
+# enumerate internal components) plus `prometheus` for the monitoring scrape
+# (REQ-OBS-005). `/actuator/prometheus` is NOT public: MonitoringScrapeSecurityConfig
+# guards it with fail-closed basic auth (denyAll until MONITORING_SCRAPE_USER/PASSWORD
+# are set), so exposing it here adds no unauthenticated surface.
 #
 # The `readiness` group is widened from Spring's default (just `readinessState`) to
 # also include the indicators whose `DOWN` actually means "stop sending traffic":
@@ -232,7 +243,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
   endpoint:
     health:
       show-details: never
@@ -242,3 +253,8 @@ management:
       group:
         readiness:
           include: readinessState, db, keycloak, diskSpace, ssl
+  metrics:
+    tags:
+      # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
+      # module through this `application` label (epic #936 dashboard set).
+      application: basetool-backend

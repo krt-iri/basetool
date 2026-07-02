@@ -69,6 +69,14 @@ app:
       # Opt-in audience check. Empty by default; set to `basetool-backend` ONLY after both the
       # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md).
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
+  monitoring:
+    scrape:
+      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0061). Fail-closed:
+      # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
+      # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
+      # real values.
+      username: ${MONITORING_SCRAPE_USER:}
+      password: ${MONITORING_SCRAPE_PASSWORD:}
 
 # Resilience4j around the backend relay. HTTP response errors are ignored (a 400 envelope reject is
 # a client problem, not a backend-health signal); only transport failures open the breaker.
@@ -88,15 +96,23 @@ logging:
     root: INFO
     io.github.resilience4j: INFO
 
-# Actuator: expose only `health` (Docker HEALTHCHECK / compose service_healthy gating); bare status.
+# Actuator: expose `health` (Docker HEALTHCHECK / compose service_healthy gating; bare status)
+# plus `prometheus` for the monitoring scrape (REQ-OBS-005). `/actuator/prometheus` is NOT
+# public: MonitoringScrapeSecurityConfig guards it with fail-closed basic auth (denyAll until
+# MONITORING_SCRAPE_USER/PASSWORD are set).
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
   endpoint:
     health:
       show-details: never
       show-components: never
       probes:
         enabled: true
+  metrics:
+    tags:
+      # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
+      # module through this `application` label (epic #936 dashboard set).
+      application: basetool-ingest

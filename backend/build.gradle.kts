@@ -47,6 +47,10 @@ dependencies {
   // never reachable from outside a deployed environment.
   implementation(libs.springdoc.openapi.starter.webmvc.api)
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  // Prometheus text-format rendering for /actuator/prometheus (REQ-OBS-005). Version from the
+  // Spring Boot BOM. The endpoint itself is guarded by the fail-closed basic-auth chain in
+  // MonitoringScrapeSecurityConfig.
+  implementation("io.micrometer:micrometer-registry-prometheus")
   implementation(libs.bucket4j.core)
   implementation(libs.semver4j.core)
   // Structured JSON logging (LogstashEncoder) for production profile in logback-spring.xml.
