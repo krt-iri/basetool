@@ -29,10 +29,12 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * several aggregates and cannot be expressed by a simple uniqueness constraint.
  *
  * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} with the stable error
- * code {@code BUSINESS_CONFLICT}.
+ * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
+ * AppException} dispatch handler with the stable error code {@code BUSINESS_CONFLICT}. Every
+ * accessor is inherited unchanged from {@link AppException} — it delegates to {@link
+ * AppExceptionKind#BUSINESS_CONFLICT}, the fixed identity passed to the superclass constructor.
  */
-public class BusinessConflictException extends RuntimeException {
+public final class BusinessConflictException extends AppException {
 
   /**
    * Creates a {@code BusinessConflictException} with a human-readable description of the conflict.
@@ -41,7 +43,7 @@ public class BusinessConflictException extends RuntimeException {
    * @param message description of the conflicting state, suitable for the client response
    */
   public BusinessConflictException(String message) {
-    super(message);
+    super(AppExceptionKind.BUSINESS_CONFLICT, message);
   }
 
   /**
@@ -52,6 +54,6 @@ public class BusinessConflictException extends RuntimeException {
    * @param cause underlying failure that surfaced the conflict
    */
   public BusinessConflictException(String message, Throwable cause) {
-    super(message, cause);
+    super(AppExceptionKind.BUSINESS_CONFLICT, message, cause);
   }
 }
