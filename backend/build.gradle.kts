@@ -51,6 +51,16 @@ dependencies {
   // Spring Boot BOM. The endpoint itself is guarded by the fail-closed basic-auth chain in
   // MonitoringScrapeSecurityConfig.
   implementation("io.micrometer:micrometer-registry-prometheus")
+  // Distributed tracing (REQ-OBS-009, epic #936 Phase 1b): Boot 4's OpenTelemetry starter
+  // (Micrometer Tracing on the OTel SDK + OTLP export auto-configuration). Version from the
+  // Spring Boot BOM. Inert unless MONITORING_TRACING_ENABLED=true (see application.yml
+  // `management.tracing`). micrometer-registry-otlp is excluded: it would activate Boot's OTLP
+  // metrics PUSH with a localhost default endpoint in every environment (periodic
+  // connection-refused noise) - metrics are exclusively Prometheus PULL via
+  // /actuator/prometheus (REQ-OBS-005).
+  implementation("org.springframework.boot:spring-boot-starter-opentelemetry") {
+    exclude(group = "io.micrometer", module = "micrometer-registry-otlp")
+  }
   implementation(libs.bucket4j.core)
   implementation(libs.semver4j.core)
   // Structured JSON logging (LogstashEncoder) for production profile in logback-spring.xml.
@@ -85,6 +95,9 @@ dependencies {
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
+  // In-memory OTel span exporter for the tracing tests (REQ-OBS-009): asserts recorded spans
+  // without any network export. Version from the Spring Boot BOM (opentelemetry-bom).
+  testImplementation("io.opentelemetry:opentelemetry-sdk-testing")
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.testcontainers.postgresql)
   // ArchUnit core (no archunit-junit5: the latter brings its own JUnit Platform

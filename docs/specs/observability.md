@@ -122,10 +122,53 @@ rule — no blanket "everything is masked" claim:
 - **Transport:** all app/Keycloak/NPM edges stay HTTPS — Prometheus scrapes the three
   modules over HTTPS validating the pinned public certificate (no `insecure_skip_verify`).
   **Inside** the isolated monitoring networks (Prometheus→exporters, Grafana→datasources,
-  Alloy→Loki/Tempo, →`keycloak:9000`) traffic is deliberately plain HTTP. This carve-out is
+  Alloy→Loki/Tempo, apps→Alloy OTLP span push, →`keycloak:9000`) traffic is deliberately
+  plain HTTP. This carve-out is
   owner-approved (2026-07-02, epic #936) and amends the HTTPS-only posture; the REQ-SEC-014
   wording in [`security-and-access.md`](security-and-access.md) is amended in the Phase-2 PR
   that actually creates those networks. Rationale and residual risk live in ADR-0061.
 - The private key of the shared `keystore.p12` never leaves the four existing services;
   Grafana gets its own self-signed certificate.
+
+### REQ-OBS-009 — Distributed tracing (OTLP via the monitoring plane only)
+
+All three modules ship OpenTelemetry tracing (Boot's OpenTelemetry starter, Micrometer
+Tracing on the OTel SDK) behind a hard master gate:
+
+- **Inert by default:** `MONITORING_TRACING_ENABLED` (default `false`) drives BOTH Boot 4
+  gates — `management.opentelemetry.enabled` (no SDK tracer provider, no span processor) and
+  `management.tracing.export.otlp.enabled` (the OTLP exporter bean is not even instantiated).
+  Disabled therefore means: no span is ever recorded to or exported anywhere, no OTLP
+  connection attempts, no exporter errors — dev/test/e2e and a prod host without the
+  monitoring stack are unaffected. (Boot's ungated bridge fallback may still mint in-process
+  span contexts; they are attached to no processor/exporter and vanish on end. The per-request
+  ids this puts into the MDC are dangling but harmless — the `correlationId` remains the
+  primary correlation key.) Boot 4 note, verified against the 4.1.0 module bytecode: these two
+  flags are the ones the auto-configuration actually honours; the legacy
+  `management.tracing.enabled` is consumed by nothing, and an endpoint-only gate is likewise
+  not possible — with the starter on the classpath, tracing would otherwise be active by
+  default.
+- **Export path:** spans go via OTLP/HTTP (`MONITORING_OTLP_ENDPOINT`, Phase 2:
+  `http://alloy:4318/v1/traces` on the scrape network) to Alloy, which forwards to Tempo on
+  the core network — apps never reach the trace store directly. Sampling probability comes
+  from `MONITORING_TRACING_SAMPLING_PROBABILITY` (default 1.0; revisited in Phase-3 tuning).
+- **No user-identifying span data:** span names and the low-cardinality `uri` attribute use
+  templated routes (`/api/v1/locations/{id}`). Each module's `ObservationPrivacyFilter`
+  scrubs every URL-carrying observation key-value before it becomes a metric tag or span
+  attribute: query strings (user search text!) are always cut, and on the metric-facing
+  `uri` tag UUID/numeric path segments are collapsed to `{id}` (cardinality guard for
+  hand-assembled client URIs). The `http.url` attribute thus carries the query-stripped raw
+  path — entity ids at most; attributes must never carry usernames, e-mails, `sub` UUIDs,
+  IPs or tokens (mirror of REQ-OBS-006).
+- **Logs↔traces:** while a span is active, `traceId`/`spanId` join the MDC and are emitted
+  by the prod JSON appenders as first-class fields for Grafana's derived-field links. The
+  correlation-id system (REQ-OBS-001/-002) is untouched — `traceId` is an additional field,
+  not a replacement.
+- The trace service identity is pinned to the module's `application` metric tag
+  (`basetool-{backend,frontend,ingest}`); hand-built `WebClient`s are explicitly wired to
+  the observation registry (Boot's customizer only covers the auto-configured builder).
+  The frontend's SSE relay client is deliberately not observed (a ~30-minute stream would
+  hold one span open for its whole lifetime).
+- Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
+  (REQ-OBS-008).
 

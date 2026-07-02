@@ -7,6 +7,7 @@
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
 - **Monitoring: Prometheus-Metrik-Endpunkt in allen drei Modulen.** Backend, Frontend und Ingest exponieren jetzt Micrometer-Metriken (JVM, HTTP, Caches, Verbindungspools) unter `/actuator/prometheus` — abgesichert über einen fail-closed Basic-Auth-Zugang (`MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD`; ohne Konfiguration wird jeder Zugriff abgelehnt). Grundstein für den Monitoring-Stack aus Epic #936 (REQ-OBS-005, ADR-0061).
+- **Monitoring: Verteiltes Tracing (OpenTelemetry) in allen drei Modulen vorbereitet.** Frontend-, Backend- und Ingest-Aufrufe können durchgängig als Traces verfolgt werden (W3C `traceparent`, Trace-IDs in den JSON-Logs). Query-Strings und rohe IDs werden aus Metrik-Tags und Span-Attributen entfernt. Standardmäßig vollständig inaktiv; erst `MONITORING_TRACING_ENABLED=true` plus OTLP-Endpunkt aktivieren den Export zum Monitoring-Stack (REQ-OBS-009, Epic #936 Phase 1b).
 
 ### Fixed
 
