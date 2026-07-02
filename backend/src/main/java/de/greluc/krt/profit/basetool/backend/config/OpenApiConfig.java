@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -37,6 +41,17 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class OpenApiConfig {
+
+  static {
+    // These parameters are resolved from the request out-of-band (the JWT principal for
+    // @CurrentUserSub/@CurrentUserId, the X-User-Time-Zone header for @UserZone), not from a
+    // request line SpringDoc can introspect — so tell SpringDoc to skip them entirely (S11, #917).
+    // Otherwise SpringDoc would try to expand the ZoneId parameter into bogus query parameters. The
+    // @UserZone endpoints re-declare the X-User-Time-Zone header via a method-level @Parameter, so
+    // the generated document still advertises the header exactly as before.
+    SpringDocUtils.getConfig()
+        .addAnnotationsToIgnore(CurrentUserSub.class, CurrentUserId.class, UserZone.class);
+  }
 
   /**
    * Returns the {@link OpenAPI} root document used by SpringDoc to generate {@code openapi.json}.

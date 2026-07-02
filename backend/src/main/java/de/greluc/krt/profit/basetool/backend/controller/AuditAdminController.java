@@ -28,7 +28,12 @@ import de.greluc.krt.profit.basetool.backend.service.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.web.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -46,7 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -117,22 +121,24 @@ public class AuditAdminController {
    * @param domain the area to export
    * @param from period start (inclusive, ISO instant)
    * @param to period end (inclusive, ISO instant); must not be before {@code from}
-   * @param userTimeZone IANA zone (e.g. {@code Europe/Berlin}); optional
+   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Export an activity audit log as a PDF for a period (admin)")
   @GetMapping("/{domain}/export")
+  @Parameter(
+      name = "X-User-Time-Zone",
+      in = ParameterIn.HEADER,
+      required = false,
+      schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> exportAuditLog(
       @PathVariable AuditDomain domain,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf = auditReportService.generateAuditLogPdf(domain, from, to, parseZone(userTimeZone));
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData(
-        "attachment", "audit-" + domain.name().toLowerCase(java.util.Locale.ROOT) + ".pdf");
-    return ResponseEntity.ok().headers(headers).body(pdf);
+      @UserZone ZoneId userZone) {
+    byte[] pdf = auditReportService.generateAuditLogPdf(domain, from, to, userZone);
+    return PdfResponses.pdfAttachment(
+        pdf, "audit-" + domain.name().toLowerCase(java.util.Locale.ROOT) + ".pdf");
   }
 
   /**
@@ -174,23 +180,5 @@ public class AuditAdminController {
       @PathVariable AuditDomain domain,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
     return new AuditPurgeResultDto(auditService.purgeBefore(domain, before));
-  }
-
-  /**
-   * Parses an IANA time-zone id, tolerating a blank or invalid value by falling back to {@code
-   * null} (the report service then renders in UTC).
-   *
-   * @param zoneId the raw header value, or {@code null}
-   * @return the parsed zone, or {@code null}
-   */
-  private static ZoneId parseZone(String zoneId) {
-    if (zoneId == null || zoneId.isBlank()) {
-      return null;
-    }
-    try {
-      return ZoneId.of(zoneId.trim());
-    } catch (RuntimeException e) {
-      return null;
-    }
   }
 }

@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -29,17 +28,18 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-/** Unit tests for {@link BlueprintProductController}. */
+/**
+ * Unit tests for {@link BlueprintProductController}. The caller's JWT subject arrives via
+ * {@code @CurrentUserSub} (guarded by {@code CurrentUserArgumentResolver}, tested in {@code
+ * CurrentUserArgumentResolverTest}); these tests pin the search pass-through and default-limit
+ * logic.
+ */
 @ExtendWith(MockitoExtension.class)
 class BlueprintProductControllerTest {
 
@@ -48,21 +48,13 @@ class BlueprintProductControllerTest {
   @Mock private BlueprintProductService service;
   @InjectMocks private BlueprintProductController controller;
 
-  private JwtAuthenticationToken auth;
-
-  @BeforeEach
-  void setUp() {
-    Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").claim("sub", SUB).build();
-    auth = new JwtAuthenticationToken(jwt);
-  }
-
   @Test
   void search_derivesSubAndAppliesDefaultLimit() {
     BlueprintProductDto dto = new BlueprintProductDto("k", "Name", 1, null, "BP", false);
     when(service.searchProducts(eq("pi"), eq(BlueprintProductService.DEFAULT_LIMIT), eq(SUB)))
         .thenReturn(List.of(dto));
 
-    List<BlueprintProductDto> result = controller.search("pi", null, auth);
+    List<BlueprintProductDto> result = controller.search("pi", null, SUB);
 
     assertEquals(1, result.size());
     verify(service).searchProducts("pi", BlueprintProductService.DEFAULT_LIMIT, SUB);
@@ -72,13 +64,8 @@ class BlueprintProductControllerTest {
   void search_relaysExplicitLimit() {
     when(service.searchProducts(any(), eq(5), eq(SUB))).thenReturn(List.of());
 
-    controller.search("x", 5, auth);
+    controller.search("x", 5, SUB);
 
     verify(service).searchProducts("x", 5, SUB);
-  }
-
-  @Test
-  void search_rejectsMissingJwtWithAccessDenied() {
-    assertThrows(AccessDeniedException.class, () -> controller.search("x", null, null));
   }
 }
