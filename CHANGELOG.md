@@ -9,6 +9,7 @@
 
 ### Changed
 
+- **Benachrichtigungen: Löschen ohne Rückfrage.** Eine einzelne Benachrichtigung im Glocken-Menü oder auf der Benachrichtigungsseite wird jetzt sofort gelöscht — die zusätzliche Bestätigungsabfrage entfällt, da Benachrichtigungen unkritisch sind. Das Sammel-Löschen „Gelesene löschen" fragt weiterhin nach (REQ-NOTIF-005).
 - **Bank: Kontoname in der Antragsansicht besser sichtbar.** In der Antragsübersicht (`/bank/requests`) zeigt die Konto-Spalte jetzt den Kontonamen an erster Stelle; die Kontonummer steht klein darunter, das Einheitskürzel entfällt (REQ-BANK-023).
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
 - **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).
