@@ -438,6 +438,40 @@ tr.is-inert td {
     align-items: center;
 }
 
+/* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
+/*
+ * The filter hides non-matching items via the `hidden` attribute. The card / row author rules set
+ * `display: flex` / `display: grid`, which would otherwise beat the UA stylesheet's
+ * `[hidden] { display: none }`, so both are re-hidden explicitly here (same landmine the
+ * `.bank-form-row[hidden]` rule guards against).
+ */
+.kpi-card[hidden],
+.ou-row[hidden] {
+    display: none;
+}
+
+/* Search box: the magnifier icon overlays the input's left padding (square-first HUD, no rounding). */
+.bank-acc-search {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.bank-acc-search-icon {
+    position: absolute;
+    left: 8px;
+    width: 15px;
+    height: 15px;
+    color: var(--color-gray-2);
+    pointer-events: none;
+}
+
+.bank-acc-search-input {
+    width: 220px;
+    max-width: 100%;
+    padding-left: 30px;
+}
+
 .bank-facts {
     display: flex;
     gap: 16px;
