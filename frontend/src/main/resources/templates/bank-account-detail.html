@@ -121,7 +121,7 @@
                             <th th:text="#{bank.booking.note}">Notiz</th>
                             <th th:text="#{bank.booking.justification}">Begr&uuml;ndung</th>
                             <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
-                            <th sec:authorize="hasRole('BANK_MANAGEMENT')"></th>
+                            <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -162,7 +162,7 @@
                                       th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
                                       th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
                             </td>
-                            <td sec:authorize="hasRole('BANK_MANAGEMENT')" class="text-right">
+                            <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" class="text-right">
                                 <button type="button" class="btn btn-ghost btn-sm bank-reverse-btn"
                                         th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
                                         data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
@@ -499,7 +499,7 @@
          bank administration's holder menu (REQ-BANK-031). -->
 
     <!-- Reversal confirm (management only). -->
-    <div class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole('BANK_MANAGEMENT')">
+    <div class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reverse.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.reverse.title}">Buchung stornieren</h3>

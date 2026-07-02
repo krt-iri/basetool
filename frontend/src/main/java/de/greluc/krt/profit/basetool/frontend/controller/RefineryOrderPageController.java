@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1474,9 +1475,9 @@ public class RefineryOrderPageController {
         reachableAuthorities.stream()
             .anyMatch(
                 a ->
-                    a.getAuthority().equals("ROLE_LOGISTICIAN")
-                        || a.getAuthority().equals("ROLE_ADMIN")
-                        || a.getAuthority().equals("ROLE_OFFICER"));
+                    a.getAuthority().equals(Roles.authority(Roles.LOGISTICIAN))
+                        || a.getAuthority().equals(Roles.authority(Roles.ADMIN))
+                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       try {
         // Fallback: check the DB flag from the backend

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -67,21 +67,26 @@ depend on the backend's Java classes — separate Gradle module, bearer-token re
 values are intentionally duplicated and must stay byte-identical). `FrontendAuthHelperService` and
 every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
-**Deliberately out of scope**, tracked as follow-up:
+**Follow-up completed (originally deliberately out of scope in PR #931):**
 
-- **Programmatic authority-string comparisons** outside `@PreAuthorize` — e.g. backend
-  `AuthHelperService.hasReachableRole("ROLE_ADMIN")` call sites (`BankSecurityService`,
-  `MissionSecurityService`, `OwnerScopeService`, `OrgUnitBankAccessService`, a few controllers) and
-  frontend raw `"ROLE_ADMIN".equals(...)`/`getAuthority().equals("ROLE_X")` checks (`BackendRoleSyncFilter`,
+- **Programmatic authority-string comparisons** outside `@PreAuthorize` — backend
+  `AuthHelperService.hasReachableRole(...)` call sites (`BankSecurityService`,
+  `MissionSecurityService`, `OwnerScopeService`, `OrgUnitBankAccessService`) and frontend raw
+  `getAuthority().equals("ROLE_X")` / `"ROLE_X".equals(...)` checks (`BackendRoleSyncFilter`,
   `InventoryPageController`, `JobOrderPageController`, `OperationPageController`,
-  `RefineryOrderPageController`). Same stringly-typed pattern, different code shape (a method
-  parameter / raw comparison, not a `@PreAuthorize` SpEL literal) — left for a dedicated follow-up
-  rather than risking a rushed, differently-shaped mechanical sweep on top of an already large change.
-- **Thymeleaf `sec:authorize="hasRole('X')"` template attributes** (136 occurrences across 27
-  templates) — these are HTML strings evaluated by the Spring Security Thymeleaf dialect at render
-  time; javac never sees them, so no `Roles` constant reference is possible without introducing a new
-  Thymeleaf expression-utility object bound into every request's model — a materially larger,
-  differently-risked change than a string substitution, and out of scope here.
+  `RefineryOrderPageController`) now reference `Roles`/`Permissions` constants and the
+  `Roles.authority(String)` helper (including the two dynamic `"ROLE_" + grant.getRoleCode()` sites
+  in `OrgUnitBankAccessService`, which became `Roles.authority(grant.getRoleCode())`). Same shape
+  as the `@PreAuthorize` sweep, without the annotation compile-time-constant constraint.
+- **Thymeleaf `sec:authorize="hasRole('X')"` template attributes** (134 occurrences across 27
+  templates at time of migration) are migrated to reference `frontend.support.Roles` via the SpEL
+  `T()` type-reference operator, e.g. `hasRole('ADMIN')` →
+  `hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)`. `sec:authorize`
+  evaluates through the same unrestricted `StandardEvaluationContext` as `@PreAuthorize` (verified
+  against the resolved `thymeleaf-extras-springsecurity6` / `spring-security-web` sources), so no
+  new Thymeleaf expression-utility object or model binding was needed — see
+  [ADR-0059](../adr/0059-thymeleaf-sec-authorize-role-constants-via-spel-type-operator.md) for the
+  full rationale and the rejected bound-expression-object alternative.
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 

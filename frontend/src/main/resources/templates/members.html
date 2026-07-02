@@ -101,7 +101,7 @@
                     <td>
                         <div class="flex-gap-xs">
                             <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost btn-icon" th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></a>
-                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole('ADMIN')"
+                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                                     class="btn btn-quiet-danger btn-icon"
                                     th:data-user-id="${user.id}"
                                     data-trigger="members-delete-user"
