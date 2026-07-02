@@ -51,9 +51,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit tests for the goal (Ziel) mutators on {@link MissionTimelineService}: add / update / delete
- * / reorder. Pins the {@code objectivesVersion} optimistic-lock guard (409 on stale), the contiguous
- * {@code orderIndex} re-pack on delete, the single reorder audit event, and the no-free-text rule
- * (a goal title never enters the audit details payload, though the non-personal kind enum may).
+ * / reorder. Pins the {@code objectivesVersion} optimistic-lock guard (409 on stale), the
+ * contiguous {@code orderIndex} re-pack on delete, the single reorder audit event, and the
+ * no-free-text rule (a goal title never enters the audit details payload, though the non-personal
+ * kind enum may).
  */
 @ExtendWith(MockitoExtension.class)
 class MissionObjectiveServiceTest {

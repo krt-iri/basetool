@@ -43,7 +43,7 @@ class MissionServicePayoutTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionParticipantService missionParticipantService;
 
   @Test
   void shouldCheckInParticipant() {
@@ -63,7 +63,7 @@ class MissionServicePayoutTest {
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When
-    Mission updatedMission = missionService.checkIn(missionId, participantId);
+    Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
 
     // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
@@ -91,7 +91,7 @@ class MissionServicePayoutTest {
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When
-    Mission updatedMission = missionService.checkOut(missionId, participantId);
+    Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
 
     // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
@@ -119,7 +119,8 @@ class MissionServicePayoutTest {
 
     // When
     Mission updatedMission =
-        missionService.updatePayoutPreference(missionId, participantId, PayoutPreference.DONATE);
+        missionParticipantService.updatePayoutPreference(
+            missionId, participantId, PayoutPreference.DONATE);
 
     // Then
     MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();

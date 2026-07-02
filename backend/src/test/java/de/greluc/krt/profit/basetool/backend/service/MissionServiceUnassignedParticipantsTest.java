@@ -43,7 +43,7 @@ class MissionServiceUnassignedParticipantsTest {
   @Mock private SquadronRepository squadronRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private MissionService missionService;
+  @InjectMocks private MissionParticipantService missionParticipantService;
 
   @Test
   void getUnassignedParticipants_shouldReturnAllWhenNoneAssigned() {
@@ -62,7 +62,8 @@ class MissionServiceUnassignedParticipantsTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     // When
-    List<MissionParticipant> result = missionService.getUnassignedParticipants(missionId);
+    List<MissionParticipant> result =
+        missionParticipantService.getUnassignedParticipants(missionId);
 
     // Then
     assertEquals(2, result.size());
@@ -95,7 +96,8 @@ class MissionServiceUnassignedParticipantsTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     // When
-    List<MissionParticipant> result = missionService.getUnassignedParticipants(missionId);
+    List<MissionParticipant> result =
+        missionParticipantService.getUnassignedParticipants(missionId);
 
     // Then
     assertEquals(1, result.size());
@@ -125,7 +127,8 @@ class MissionServiceUnassignedParticipantsTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     // When
-    List<MissionParticipant> result = missionService.getUnassignedParticipants(missionId);
+    List<MissionParticipant> result =
+        missionParticipantService.getUnassignedParticipants(missionId);
 
     // Then
     assertTrue(result.isEmpty());
@@ -138,6 +141,8 @@ class MissionServiceUnassignedParticipantsTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(RuntimeException.class, () -> missionService.getUnassignedParticipants(missionId));
+    assertThrows(
+        RuntimeException.class,
+        () -> missionParticipantService.getUnassignedParticipants(missionId));
   }
 }

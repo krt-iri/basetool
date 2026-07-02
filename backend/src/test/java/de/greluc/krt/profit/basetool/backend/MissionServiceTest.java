@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
@@ -52,6 +53,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -60,6 +62,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class MissionServiceTest {
@@ -83,7 +86,18 @@ class MissionServiceTest {
       orgUnitMembershipService;
 
   @Mock private AuditService auditService;
+
+  @InjectMocks private MissionParticipantService missionParticipantService;
   @InjectMocks private MissionService missionService;
+
+  @BeforeEach
+  void wireExtractedParticipantService() {
+    // MissionService delegates the participant methods to the extracted MissionParticipantService
+    // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
+    // reflection, since Mockito does not inject one @InjectMocks target into another.
+    ReflectionTestUtils.setField(
+        missionService, "missionParticipantService", missionParticipantService);
+  }
 
   // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
   // covers REQ-MISSION-008 — admin all-scope falls back to the organisation-wide next mission
