@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -35,31 +34,24 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -93,22 +85,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderService {
 
-  /** System-setting key holding the UUID of the intake SK that guest order creations route to. */
-  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
-
-  /**
-   * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (650+ =
-   * refining-grade); a {@code NONE} bucket imposes no floor. Mirrors the MATERIAL requirement's
-   * stored {@code minQuality} so item-order collection progress is computed the same way.
-   */
-  private static final int GOOD_QUALITY_FLOOR = 650;
-
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final UserRepository userRepository;
+  private final JobOrderAssigneeService jobOrderAssigneeService;
   private final OrgUnitRepository orgUnitRepository;
-  private final SystemSettingService systemSettingService;
+  private final JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final ApplicationEventPublisher eventPublisher;
@@ -117,8 +99,8 @@ public class JobOrderService {
   private final JobOrderMapper jobOrderMapper;
   private final de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
-  private final de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper
-      jobOrderItemHandoverMapper;
+  private final JobOrderStockProjectionService jobOrderStockProjectionService;
+  private final JobOrderPriorityService jobOrderPriorityService;
   private final de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper
       inventoryItemMapper;
 
@@ -137,8 +119,10 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
-    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
+    OrgUnit responsible =
+        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting =
+        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -168,7 +152,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
-    normalizePriorities();
+    jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditService.record(
         AuditEventType.JOB_ORDER_CREATED,
@@ -180,7 +164,7 @@ public class JobOrderService {
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
             .with("priority", jobOrder.getPriority()));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -202,8 +186,10 @@ public class JobOrderService {
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    OrgUnit responsible = resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
-    OrgUnit requesting = resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
+    OrgUnit responsible =
+        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+    OrgUnit requesting =
+        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
     JobOrder jobOrder =
         JobOrder.builder()
@@ -239,7 +225,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
-    normalizePriorities();
+    jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditService.record(
         AuditEventType.JOB_ORDER_ITEM_CREATED,
@@ -251,7 +237,7 @@ public class JobOrderService {
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
             .with("priority", jobOrder.getPriority()));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -342,20 +328,9 @@ public class JobOrderService {
             scope.memberOrgUnitIds(),
             pageable);
 
-    // Batch the per-row enrichment once for the whole page (REQ-DATA-003): instead of one stock SUM
-    // per material per order (O(orders × materials)) plus one claim query per SK order, load every
-    // order's linked stock in a single query and sum the buckets in memory, and load every SK
-    // order's claims in a single query. The single-order write paths keep the per-order resolvers.
-    List<JobOrder> orders = page.getContent();
-    Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex =
-        loadStockIndex(orders.stream().map(JobOrder::getId).toList());
-    Map<UUID, List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto>> claimsByOrder =
-        materialClaimService.getClaimBucketsForOrders(
-            orders.stream().filter(JobOrderService::isSpecialCommandResponsible).toList());
-    StockResolver stockResolver =
-        (orderId, materialId, floor) -> sumStockAtFloor(stockIndex, orderId, materialId, floor);
-    ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
-    return page.map(o -> mapToDtoWithStock(o, stockResolver, claimResolver));
+    // The whole-page per-row enrichment (batched stock + SK claims, REQ-DATA-003) lives in the
+    // extracted projection service alongside the single-order path, so both behave identically.
+    return jobOrderStockProjectionService.mapPageWithStock(page);
   }
 
   /**
@@ -407,7 +382,7 @@ public class JobOrderService {
         jobOrderRepository
             .findById(id)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -535,7 +510,7 @@ public class JobOrderService {
     jobOrderRepository.flush();
 
     if (isTerminal != wasTerminal) {
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
     }
 
     if (isTerminal && !wasTerminal) {
@@ -566,7 +541,7 @@ public class JobOrderService {
           AuditDetails.of("from", previousStatus).with("to", status));
     }
 
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -584,59 +559,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
-    JobOrder targetOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
-
-    Integer oldPriority = targetOrder.getPriority();
-    if (oldPriority == null) {
-      throw new BadRequestException("Cannot update priority of a completed or rejected job order");
-    }
-    if (oldPriority.equals(newPriority)) {
-      normalizePriorities();
-      return mapToDtoWithStock(targetOrder);
-    }
-
-    List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
-
-    List<JobOrder> activeOrders =
-        new java.util.ArrayList<>(
-            allOrders.stream()
-                .filter(o -> o.getPriority() != null)
-                .sorted(
-                    java.util.Comparator.comparing(JobOrder::getPriority)
-                        .thenComparing(JobOrder::getCreatedAt))
-                .toList());
-
-    activeOrders.remove(targetOrder);
-
-    // Clamp `newPriority` BEFORE the subtraction so the arithmetic operates on
-    // already-sanitised input. `newPriority` is sourced from a request DTO; doing
-    // `newPriority - 1` directly and clamping afterwards (the previous shape) trips
-    // CodeQL's `java/tainted-arithmetic` rule — it walks the taint into the `- 1`
-    // expression and doesn't recognise the post-hoc `if (newIndex < 0)` clamp as a
-    // sanitiser. `Math.max(...)` / `Math.min(...)` ARE recognised as sanitisers, so
-    // pre-clamping `newPriority` into `[1, activeOrders.size() + 1]` makes the
-    // subsequent `- 1` safe by construction (result is in `[0, activeOrders.size()]`,
-    // exactly the contract the call site below expects).
-    int clampedPriority = Math.max(1, Math.min(activeOrders.size() + 1, newPriority));
-    int newIndex = clampedPriority - 1;
-
-    activeOrders.add(newIndex, targetOrder);
-
-    int currentPrio = 1;
-    for (JobOrder o : activeOrders) {
-      o.setPriority(currentPrio++);
-    }
-
-    auditService.record(
-        AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
-        targetOrder.getId(),
-        orderLabel(targetOrder),
-        null,
-        AuditDetails.of("fromPriority", oldPriority).with("toPriority", targetOrder.getPriority()));
-    return mapToDtoWithStock(targetOrder);
+    return jobOrderPriorityService.updateJobOrderPriority(id, newPriority);
   }
 
   /**
@@ -676,7 +599,7 @@ public class JobOrderService {
     if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
       // No change: skip the @Version bump (which would needlessly 409 a concurrent edit) and the
       // audit entry. The caller still gets the current state back.
-      return mapToDtoWithStock(jobOrder);
+      return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
     }
 
     jobOrder.setCountBlueprintsWithVariants(countWithVariants);
@@ -692,7 +615,7 @@ public class JobOrderService {
         orderLabel(jobOrder),
         null,
         AuditDetails.of("countWithVariants", countWithVariants));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -723,7 +646,8 @@ public class JobOrderService {
     // therefore ignored here. The requesting (customer) org unit is freely editable by any
     // Logistician+; a null id on update means "leave it unchanged" (minimal-payload contract).
     if (updateDto.requestingOrgUnitId() != null) {
-      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+      jobOrder.setRequestingOrgUnit(
+          jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
@@ -780,7 +704,7 @@ public class JobOrderService {
         AuditDetails.of("materialsRemoved", removedMaterialIds.size())
             .with("materials", jobOrder.getMaterials().size())
             .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -829,7 +753,8 @@ public class JobOrderService {
     // The requesting (customer) org unit is freely editable; a null id leaves it unchanged. The
     // responsible org unit stays put (reassignment endpoint owns it).
     if (updateDto.requestingOrgUnitId() != null) {
-      jobOrder.setRequestingOrgUnit(resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
+      jobOrder.setRequestingOrgUnit(
+          jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
@@ -873,7 +798,7 @@ public class JobOrderService {
         null,
         AuditDetails.of("lines", jobOrder.getItems().size())
             .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
-    return mapToDtoWithStock(jobOrder);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
@@ -900,7 +825,7 @@ public class JobOrderService {
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
     }
     auditService.record(
         AuditEventType.JOB_ORDER_DELETED,
@@ -921,29 +846,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto addAssignee(UUID jobOrderId, UUID userId) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    boolean alreadyAssigned =
-        jobOrder.getAssignees().stream()
-            .anyMatch(a -> a.getUser() != null && a.getUser().getId().equals(userId));
-    if (alreadyAssigned) {
-      return mapToDtoWithStock(jobOrder);
-    }
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-    jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    auditService.record(
-        AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
-        saved.getId(),
-        orderLabel(saved),
-        userId,
-        AuditDetails.of("assignee", userId));
-    return mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.addAssignee(jobOrderId, userId);
   }
 
   /**
@@ -1025,24 +928,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto removeAssignee(UUID jobOrderId, UUID userId) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    boolean removed =
-        jobOrder
-            .getAssignees()
-            .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    if (removed) {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId));
-    }
-    return mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.removeAssignee(jobOrderId, userId);
   }
 
   /**
@@ -1062,7 +948,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
-    return setAssigneeNote(jobOrderId, userId, note, version);
+    return jobOrderAssigneeService.updateAssigneeNote(jobOrderId, userId, note, version);
   }
 
   /**
@@ -1079,57 +965,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto deleteAssigneeNote(UUID jobOrderId, UUID userId, Long version) {
-    return setAssigneeNote(jobOrderId, userId, null, version);
-  }
-
-  /**
-   * Shared implementation for the note set/clear endpoints: locates the assignee edge, enforces the
-   * supplied version against the edge's own {@code @Version}, mutates the note via dirty-checking
-   * and flushes so the returned DTO carries the freshly incremented edge version.
-   *
-   * @param jobOrderId job order primary key
-   * @param userId the assignee whose note is changed
-   * @param note the new note value, or {@code null} to clear it
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
-   * @return the persisted order with the refreshed assignee list
-   */
-  private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    JobOrderAssignee assignee =
-        jobOrder.getAssignees().stream()
-            .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Assignee not found on job order " + jobOrderId + ": " + userId));
-
-    OptimisticLock.checkOptionalClient(
-        assignee.getVersion(), version, JobOrderAssignee.class, assignee.getId());
-
-    String trimmed = (note == null || note.isBlank()) ? null : note.strip();
-    assignee.setNote(trimmed);
-    JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    // PII: the note body is user free text — record only its presence/length, never the content.
-    if (trimmed != null) {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()));
-    } else {
-      auditService.record(
-          AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
-          saved.getId(),
-          orderLabel(saved),
-          userId,
-          AuditDetails.of("assignee", userId));
-    }
-    return mapToDtoWithStock(saved);
+    return jobOrderAssigneeService.deleteAssigneeNote(jobOrderId, userId, version);
   }
 
   /**
@@ -1161,7 +997,7 @@ public class JobOrderService {
       // from the DB while Hibernate already holds a newer in-memory version, causing an
       // ObjectOptimisticLockingFailureException on the subsequent flush at transaction end.
       jobOrderRepository.flush();
-      normalizePriorities();
+      jobOrderPriorityService.normalizePriorities();
       inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
       // Single funnel for auto-completion (every handover path completes through here): one
       // JOB_ORDER_COMPLETED event, recorded only on the actual OPEN/IN_PROGRESS → COMPLETED edge.
@@ -1172,387 +1008,6 @@ public class JobOrderService {
           null,
           "autoCompleted=true");
     }
-  }
-
-  private void normalizePriorities() {
-    List<JobOrder> activeOrders =
-        jobOrderRepository.lockAllJobOrders().stream()
-            .filter(o -> o.getPriority() != null)
-            .sorted(
-                java.util.Comparator.comparing(JobOrder::getPriority)
-                    .thenComparing(JobOrder::getCreatedAt))
-            .toList();
-
-    int currentPriority = 1;
-    for (JobOrder order : activeOrders) {
-      if (order.getPriority() == null || !order.getPriority().equals(currentPriority)) {
-        order.setPriority(currentPriority);
-      }
-      currentPriority++;
-    }
-  }
-
-  private JobOrderDto mapToDtoWithStock(JobOrder jobOrder) {
-    StockResolver stockResolver =
-        (orderId, materialId, floor) -> {
-          Double stock =
-              inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-                  materialId, orderId, floor);
-          return stock != null ? stock : 0.0;
-        };
-    // Lambda (not a bound method reference) so the claim service is dereferenced lazily, only when
-    // the resolver actually runs — i.e. for SK orders — mirroring the original conditional call.
-    return mapToDtoWithStock(
-        jobOrder, stockResolver, order -> materialClaimService.getClaimBucketsForOrder(order));
-  }
-
-  /**
-   * Core order projection shared by the single-order write paths and the paged list. The {@code
-   * stockResolver} and {@code claimResolver} abstract where the per-bucket stock and the SK claim
-   * view come from — the single-order path backs them with per-order queries, the list path with
-   * page-batched lookups (REQ-DATA-003) — so the DTO assembly itself lives in exactly one place and
-   * behaves identically on both paths.
-   *
-   * @param jobOrder the managed order to project.
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor.
-   * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK).
-   * @return the assembled order DTO with per-bucket stock and (for SK orders) claims.
-   */
-  private JobOrderDto mapToDtoWithStock(
-      JobOrder jobOrder, StockResolver stockResolver, ClaimResolver claimResolver) {
-    JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
-
-    // Phase 5 (#345): on a public SK order, every material/aggregated bucket carries the
-    // per-squadron
-    // claims + open-remaining; private (squadron) orders carry none (claims empty, openAmount
-    // null),
-    // so the detail UI renders no claim columns for them.
-    Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket =
-        isSpecialCommandResponsible(jobOrder)
-            ? claimResolver.claimsFor(jobOrder).stream()
-                .collect(
-                    Collectors.toMap(
-                        b -> bucketKey(b.material().id(), b.qualityRequirement().name()), b -> b))
-            : Map.of();
-
-    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto> updatedMaterials =
-        baseDto.materials().stream()
-            .map(
-                matDto -> {
-                  double stock =
-                      stockResolver.stockFor(
-                          jobOrder.getId(), matDto.material().id(), matDto.minQuality());
-                  log.debug(
-                      "Stock for job order #{} (ID: {}), material {}: {} / required: {} (min"
-                          + " quality: {})",
-                      jobOrder.getDisplayId(),
-                      jobOrder.getId(),
-                      matDto.material().name(),
-                      stock,
-                      matDto.amount(),
-                      matDto.minQuality());
-                  // MATERIAL bucket quality mirrors aggregateMaterials(): a 650-floor is GOOD,
-                  // "Keine" (null minQuality) is NONE.
-                  String qualityName =
-                      matDto.minQuality() != null
-                          ? de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
-                              .name()
-                          : de.greluc.krt.profit.basetool.backend.model.QualityRequirement.NONE
-                              .name();
-                  de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
-                      claimByBucket.get(bucketKey(matDto.material().id(), qualityName));
-                  return new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
-                      matDto.id(),
-                      matDto.material(),
-                      matDto.minQuality(),
-                      matDto.amount(),
-                      stock,
-                      bucket != null ? bucket.claims() : List.of(),
-                      bucket != null ? bucket.openRemaining() : null,
-                      matDto.version());
-                })
-            .toList();
-
-    boolean isItem = jobOrder.getType() == JobOrderType.ITEM;
-    List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
-    List<AggregatedMaterialDto> aggregatedMaterials =
-        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket, stockResolver) : List.of();
-    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
-        isItem
-            ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
-            : List.of();
-
-    return new JobOrderDto(
-        baseDto.id(),
-        baseDto.displayId(),
-        baseDto.responsibleOrgUnit(),
-        baseDto.requestingOrgUnit(),
-        baseDto.handle(),
-        baseDto.comment(),
-        baseDto.priority(),
-        baseDto.status(),
-        baseDto.type(),
-        baseDto.countBlueprintsWithVariants(),
-        updatedMaterials,
-        items,
-        aggregatedMaterials,
-        baseDto.assignees(),
-        baseDto.handovers(),
-        itemHandovers,
-        baseDto.createdAt(),
-        baseDto.version());
-  }
-
-  /**
-   * Rebuilds the item order's aggregated-material rows with their collection stock and (for SK
-   * orders) their per-bucket claims + open-remaining. The base rows come from {@link
-   * JobOrderItemService#aggregateMaterials} with neutral stock/claim fields; this enriches each
-   * with {@code currentStock} — the order-linked inventory summed at the bucket's quality floor
-   * ({@code GOOD} → {@link #GOOD_QUALITY_FLOOR}, {@code NONE} → no floor), the same per-bucket sum
-   * the MATERIAL rows use — so the overview can show material-collection progress (#595). For a
-   * non-SK order {@code claimByBucket} is empty, so every row keeps its empty claims / {@code null}
-   * open-amount but still gains its stock.
-   *
-   * @param jobOrder the item order.
-   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders.
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor (per-
-   *     order query on the single-order path, page-batched lookup on the list path).
-   * @return the aggregated rows, stock- and claim-enriched.
-   */
-  private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
-      JobOrder jobOrder,
-      Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket,
-      StockResolver stockResolver) {
-    return jobOrderItemService.aggregateMaterials(jobOrder).stream()
-        .map(
-            agg -> {
-              Integer minQuality =
-                  agg.qualityRequirement()
-                          == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
-                      ? GOOD_QUALITY_FLOOR
-                      : null;
-              double stock =
-                  stockResolver.stockFor(jobOrder.getId(), agg.material().id(), minQuality);
-              de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
-                  claimByBucket.get(
-                      bucketKey(agg.material().id(), agg.qualityRequirement().name()));
-              return new AggregatedMaterialDto(
-                  agg.material(),
-                  agg.qualityRequirement(),
-                  agg.totalQuantity(),
-                  stock,
-                  bucket != null ? bucket.claims() : agg.claims(),
-                  bucket != null ? bucket.openRemaining() : agg.openAmount());
-            })
-        .toList();
-  }
-
-  /**
-   * Resolves the order-linked stock of one material at a quality floor for {@link
-   * #mapToDtoWithStock(JobOrder, StockResolver, ClaimResolver)}. The single-order path backs it
-   * with the per-order {@code SUM} query; the paged list backs it with an in-memory sum over the
-   * page-batched stock index (REQ-DATA-003).
-   */
-  @FunctionalInterface
-  private interface StockResolver {
-    /**
-     * Returns the total stock of {@code materialId} linked to {@code jobOrderId} whose quality
-     * meets or exceeds {@code qualityFloor} ({@code null} floor = no quality restriction); {@code
-     * 0.0} when nothing matches — the exact semantics of {@code
-     * sumAmountByMaterialAndJobOrderAndMinQuality}.
-     *
-     * @param jobOrderId the order the stock is linked to.
-     * @param materialId the material to sum.
-     * @param qualityFloor the minimum quality, or {@code null} for no floor.
-     * @return the summed amount, never negative, {@code 0.0} when empty.
-     */
-    double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor);
-  }
-
-  /**
-   * Resolves the SK claim view of one order for {@link #mapToDtoWithStock(JobOrder, StockResolver,
-   * ClaimResolver)}. The single-order path backs it with the per-order claim query; the paged list
-   * backs it with the page-batched claim lookup (REQ-DATA-003). Only invoked for SK-responsible
-   * orders.
-   */
-  @FunctionalInterface
-  private interface ClaimResolver {
-    /**
-     * Returns the per-bucket claim view of {@code order}.
-     *
-     * @param order the SK order whose claim buckets to return.
-     * @return the claim buckets, never {@code null}.
-     */
-    List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimsFor(JobOrder order);
-  }
-
-  /**
-   * Loads every job-order-linked inventory row for the given orders in one query and indexes it by
-   * order id then material id, so the paged list can sum each material bucket at its own quality
-   * floor in memory (REQ-DATA-003) instead of firing a {@code SUM} aggregate per bucket per order.
-   *
-   * @param orderIds the orders whose linked stock to index; empty yields an empty index.
-   * @return order id → material id → the linked inventory rows, never {@code null}.
-   */
-  private Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> loadStockIndex(
-      Collection<UUID> orderIds) {
-    if (orderIds.isEmpty()) {
-      return Map.of();
-    }
-    return inventoryItemRepository.findMaterialStockRowsByJobOrderIds(orderIds).stream()
-        .collect(
-            Collectors.groupingBy(
-                JobOrderMaterialStockRow::jobOrderId,
-                Collectors.groupingBy(JobOrderMaterialStockRow::materialId)));
-  }
-
-  /**
-   * Sums the pre-loaded stock rows of one (order, material) bucket at a quality floor, reproducing
-   * the {@code COALESCE(SUM(amount), 0.0) WHERE (:floor IS NULL OR quality >= :floor)} semantics of
-   * {@code sumAmountByMaterialAndJobOrderAndMinQuality} entirely in memory.
-   *
-   * @param stockIndex the page-batched index from {@link #loadStockIndex(Collection)}.
-   * @param jobOrderId the order to sum within.
-   * @param materialId the material to sum.
-   * @param qualityFloor the minimum quality, or {@code null} for no floor.
-   * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
-   */
-  private static double sumStockAtFloor(
-      Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
-      UUID jobOrderId,
-      UUID materialId,
-      Integer qualityFloor) {
-    Map<UUID, List<JobOrderMaterialStockRow>> byMaterial = stockIndex.get(jobOrderId);
-    if (byMaterial == null) {
-      return 0.0;
-    }
-    List<JobOrderMaterialStockRow> rows = byMaterial.get(materialId);
-    if (rows == null) {
-      return 0.0;
-    }
-    double sum = 0.0;
-    for (JobOrderMaterialStockRow row : rows) {
-      if (row.amount() == null) {
-        continue;
-      }
-      if (qualityFloor == null || (row.quality() != null && row.quality() >= qualityFloor)) {
-        sum += row.amount();
-      }
-    }
-    return sum;
-  }
-
-  /**
-   * {@code true} iff the order is responsible to a Spezialkommando — the only orders that carry
-   * material claims (Phase 5, #345).
-   *
-   * @param jobOrder the order.
-   * @return whether the order is a public SK order.
-   */
-  private static boolean isSpecialCommandResponsible(JobOrder jobOrder) {
-    return jobOrder.getResponsibleOrgUnit() != null
-        && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
-  }
-
-  /**
-   * Builds the composite key identifying a material bucket ({@code materialId|QUALITY}) used to
-   * join claim buckets onto the material / aggregated rows.
-   *
-   * @param materialId the material id.
-   * @param qualityName the {@code GOOD}/{@code NONE} quality name.
-   * @return the composite bucket key.
-   */
-  private static String bucketKey(UUID materialId, String qualityName) {
-    return materialId + "|" + qualityName;
-  }
-
-  /**
-   * Resolves the responsible (processing) org unit for a freshly-created job order.
-   *
-   * <ul>
-   *   <li>Anonymous / guest callers (the public request form is {@code permitAll}) may pick any
-   *       <em>profit-eligible</em> squadron or Spezialkommando from the create form's responsible
-   *       picker, and that pick is honoured. When the picker output is absent, unresolvable, or
-   *       points at a non-profit unit, the order routes to the configured intake Spezialkommando
-   *       ({@link #INTAKE_SK_SETTING_KEY}) as a forgiving fallback — so a guest can still never
-   *       direct work to a unit that has not opted in to processing orders.
-   *   <li>Authenticated callers must supply a {@code responsibleOrgUnitId} that resolves to a
-   *       profit-eligible squadron or Spezialkommando — only Profit-side units process orders.
-   * </ul>
-   *
-   * @param responsibleOrgUnitId picker output from the create DTO; required for authenticated
-   *     callers, honoured-when-profit-eligible (else intake-SK fallback) for guests.
-   * @return the resolved, profit-eligible responsible org unit; never {@code null}.
-   * @throws BadRequestException when an authenticated caller's id is missing/unresolvable or not
-   *     profit-eligible, or no intake SK is configured for a guest creation that falls back.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveResponsibleOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID responsibleOrgUnitId) {
-    if (!authHelperService.isAuthenticated()) {
-      // Guest (public request form): honour a profit-eligible pick from the responsible picker,
-      // otherwise route to the configured intake Spezialkommando. A non-profit or unresolvable id
-      // is
-      // not a 400 here — the public form stays forgiving and silently falls back rather than
-      // surfacing a validation gate to an anonymous probe. The profit-eligibility guard is
-      // preserved, so a guest still cannot direct work to a unit that has not opted in.
-      if (responsibleOrgUnitId != null) {
-        OrgUnit picked = orgUnitRepository.findById(responsibleOrgUnitId).orElse(null);
-        if (picked != null && picked.isProfitEligible()) {
-          return picked;
-        }
-      }
-      return resolveIntakeSpecialCommand();
-    }
-    if (responsibleOrgUnitId == null) {
-      throw new BadRequestException("responsibleOrgUnitId is required.");
-    }
-    OrgUnit orgUnit =
-        orgUnitRepository
-            .findById(responsibleOrgUnitId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "responsibleOrgUnitId does not resolve to a known org unit: "
-                            + responsibleOrgUnitId));
-    if (!orgUnit.isProfitEligible()) {
-      throw new BadRequestException(
-          "The selected responsible org unit is not profit-eligible and cannot process orders: "
-              + responsibleOrgUnitId);
-    }
-    return orgUnit;
-  }
-
-  /**
-   * Resolves the configured intake Spezialkommando that anonymous/guest order creations are routed
-   * to (system setting {@link #INTAKE_SK_SETTING_KEY}). The setting is seeded empty by V128; until
-   * an admin selects an SK, guest creation is refused with a 400.
-   *
-   * @return the configured intake org unit; never {@code null}.
-   * @throws BadRequestException when the setting is unset/blank/malformed or no longer resolves.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveIntakeSpecialCommand() {
-    String raw =
-        systemSettingService
-            .getSettingValue(INTAKE_SK_SETTING_KEY)
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "No intake Spezialkommando is configured; an admin must set it in system"
-                            + " settings before guests can create orders."));
-    UUID intakeId;
-    try {
-      intakeId = UUID.fromString(raw);
-    } catch (IllegalArgumentException ex) {
-      throw new BadRequestException("Configured intake Spezialkommando id is malformed.");
-    }
-    return orgUnitRepository
-        .findById(intakeId)
-        .orElseThrow(
-            () -> new BadRequestException("Configured intake Spezialkommando no longer exists."));
   }
 
   /**
@@ -1640,33 +1095,7 @@ public class JobOrderService {
         AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
             .with("toOrgUnit", orgUnitRef(target))
             .with("claimsWithdrawn", claimsWithdrawn));
-    return mapToDtoWithStock(jobOrder);
-  }
-
-  /**
-   * Resolves the requesting (customer / Auftraggeber) org unit from the picker output. Any org unit
-   * is accepted — Staffel, Spezialkommando, Bereich or Organisationsleitung (epic #692): there is
-   * no profit-eligibility or kind restriction on who may be named the customer (unlike the
-   * responsible unit, which must be a profit-eligible Staffel/SK). Mandatory: the create/update
-   * DTOs always carry it.
-   *
-   * @param requestingOrgUnitId picker output from the DTO.
-   * @return the resolved requesting org unit; never {@code null}.
-   * @throws BadRequestException when the id is missing or does not resolve to a known org unit.
-   */
-  @org.jetbrains.annotations.NotNull
-  private OrgUnit resolveRequestingOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID requestingOrgUnitId) {
-    if (requestingOrgUnitId == null) {
-      throw new BadRequestException("requestingOrgUnitId is required.");
-    }
-    return orgUnitRepository
-        .findById(requestingOrgUnitId)
-        .orElseThrow(
-            () ->
-                new BadRequestException(
-                    "requestingOrgUnitId does not resolve to a known org unit: "
-                        + requestingOrgUnitId));
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**
