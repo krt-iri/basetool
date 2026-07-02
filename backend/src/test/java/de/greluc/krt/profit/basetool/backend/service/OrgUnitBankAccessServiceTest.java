@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -600,6 +602,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(false),
             eq(null)))
         .thenReturn(expected);
@@ -636,6 +639,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(true),
             eq(new BigDecimal("30"))))
         .thenReturn(expected);
@@ -665,6 +669,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(false),
             eq(null)))
         .thenReturn(expected);
@@ -695,6 +700,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(false),
             eq(null)))
         .thenReturn(expected);
@@ -727,6 +733,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
@@ -743,6 +750,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            isNull(),
             eq(false),
             eq(null));
     verify(approvalLimitRepository, never()).findByAccountId(any());
@@ -811,6 +819,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
@@ -827,6 +836,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null));
   }
@@ -856,6 +866,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
@@ -872,6 +883,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null));
   }
@@ -900,6 +912,7 @@ class OrgUnitBankAccessServiceTest {
             eq(destId),
             eq(true),
             eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
@@ -916,16 +929,18 @@ class OrgUnitBankAccessServiceTest {
             eq(destId),
             eq(true),
             eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null));
   }
 
   @Test
-  void createBookingRequest_aboveAllMembersLimit_appliesToNonMemberViewGrantHolder() {
-    // REQ-BANK-041 (review F2): the all-members ceiling is the catch-all for every eligible
-    // requester, not only org-unit members. An outsider holding only a USER *view* grant (canView
-    // via the grant, but not a member and matching no USER/role limit) must still be capped by the
-    // all-members limit — otherwise the exact audience the cap targets escapes it (was: unlimited).
+  void createBookingRequest_nonMemberViewGrantHolder_notCappedByAllMembers_needsApproval() {
+    // REQ-BANK-046 (amends REQ-BANK-041): the all-members ceiling is now MEMBERS-ONLY. An outsider
+    // holding only a USER *view* grant (canView via the grant, but NOT a member of the owning unit
+    // and matching no USER/role limit) is NOT covered by the all-members limit — they fall through
+    // to approval-required (applicableLimit = null, requiresOwnerApproval = true,
+    // RESPONSIBLE_HOLDER).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID outsider = UUID.randomUUID();
@@ -945,6 +960,63 @@ class OrgUnitBankAccessServiceTest {
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of(viewGrant));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(outsider));
+    // The outsider is NOT a member of the owning unit (currentUserIsMemberOfOrgUnit defaults
+    // false),
+    // so the ALL_MEMBERS ceiling does not apply.
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(null),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
+            eq(false),
+            eq(null));
+    verify(ownerScopeService).currentUserIsMemberOfOrgUnit(orgUnitId);
+  }
+
+  @Test
+  void createBookingRequest_allMembersLimit_appliesToActualOwningUnitMember() {
+    // REQ-BANK-046: the ALL_MEMBERS ceiling now applies ONLY to an actual member of the owning
+    // unit.
+    // A member requesting above the ceiling is flagged for the responsible holder's approval.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    BankAccountApprovalLimit allMembers = new BankAccountApprovalLimit();
+    allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    allMembers.setLimitAmount(new BigDecimal("100"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
+    when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(member));
+    when(ownerScopeService.currentUserIsMemberOfOrgUnit(orgUnitId)).thenReturn(true);
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -954,6 +1026,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
@@ -970,6 +1043,148 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
+            eq(false),
+            eq(null));
+  }
+
+  /**
+   * Builds an active KRT (CARTEL) account with the two approval-ladder thresholds set, viewable via
+   * {@code isMemberOrAbove}, and stubs the common request-create preconditions.
+   *
+   * @param accountId the KRT account id
+   * @param t1 the bank-employee ceiling
+   * @param t2 the area-lead ceiling
+   * @return the stubbed KRT account
+   */
+  private BankAccount krtAccountWithTiers(UUID accountId, String t1, String t2) {
+    BankAccount cartel =
+        typedAccount(
+            accountId, "KB-0003", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    cartel.setEmployeeApprovalCeiling(new BigDecimal(t1));
+    cartel.setAreaLeadApprovalCeiling(new BigDecimal(t2));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    return cartel;
+  }
+
+  @Test
+  void createBookingRequest_krtWithinEmployeeCeiling_needsNoApproval() {
+    // REQ-BANK-046: a KRT withdrawal at or below T1 needs no external approval; the bank employee
+    // self-approves. applicable_limit is T1 (display), required_approver null.
+    UUID accountId = UUID.randomUUID();
+    krtAccountWithTiers(accountId, "1000", "5000");
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), "reason");
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(new BigDecimal("1000")),
+            isNull(),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(new BigDecimal("1000")),
+            isNull(),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_krtMiddleBand_routesToBereichsleiterProfit() {
+    // REQ-BANK-046: a KRT withdrawal above T1 and at/below T2 needs the Bereichsleiter Profit.
+    UUID accountId = UUID.randomUUID();
+    krtAccountWithTiers(accountId, "1000", "5000");
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("3000"), "reason");
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("3000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("3000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_krtTopBand_routesToOrganisationsleitung() {
+    // REQ-BANK-046: a KRT withdrawal above T2 needs the Organisationsleitung.
+    UUID accountId = UUID.randomUUID();
+    krtAccountWithTiers(accountId, "1000", "5000");
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
             eq(null));
   }
@@ -1131,6 +1346,7 @@ class OrgUnitBankAccessServiceTest {
         null,
         null,
         false,
+        null,
         null,
         false,
         null,

@@ -205,8 +205,10 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
 
@@ -271,8 +273,10 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
@@ -342,8 +346,10 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
@@ -441,6 +447,8 @@ class BankPageControllerTest {
         null,
         null,
         new BigDecimal(balance),
+        null,
+        null,
         null,
         0L,
         Instant.parse("2026-01-15T10:00:00Z"));
