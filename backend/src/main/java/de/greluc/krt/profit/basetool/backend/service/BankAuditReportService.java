@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.AuditLogPdfFormat;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -113,7 +114,7 @@ public class BankAuditReportService {
         null,
         null,
         null,
-        "format=pdf period=" + from + ".." + to);
+        AuditDetails.of("format", "pdf").with("period", from + ".." + to));
     log.info("Bank audit log exported as PDF ({} events)", events.size());
     return pdf;
   }
@@ -148,7 +149,7 @@ public class BankAuditReportService {
         null,
         null,
         null,
-        "format=json period=" + from + ".." + to);
+        AuditDetails.of("format", "json").with("period", from + ".." + to));
     log.info("Bank audit log exported as JSON ({} events)", events.size());
     return dtos;
   }

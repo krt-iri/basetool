@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
@@ -983,12 +984,10 @@ public class UserService {
           null,
           null,
           userId,
-          "reason=user-deletion rows="
-              + inventoryReassigned
-              + " fromUser="
-              + userId
-              + " toAdmin="
-              + admin.getId());
+          AuditDetails.of("reason", "user-deletion")
+              .with("rows", inventoryReassigned)
+              .with("fromUser", userId)
+              .with("toAdmin", admin.getId()));
     }
     if (refineryReassigned > 0) {
       auditService.record(
@@ -996,12 +995,10 @@ public class UserService {
           null,
           null,
           userId,
-          "reason=user-deletion rows="
-              + refineryReassigned
-              + " fromUser="
-              + userId
-              + " toAdmin="
-              + admin.getId());
+          AuditDetails.of("reason", "user-deletion")
+              .with("rows", refineryReassigned)
+              .with("fromUser", userId)
+              .with("toAdmin", admin.getId()));
     }
     // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
     // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails

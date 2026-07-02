@@ -182,7 +182,7 @@ class MissionObjectiveServiceTest {
     assertEquals(goal1Id, ordered.get(1).getId());
     assertEquals(4L, result.getObjectivesVersion());
     // Exactly one reorder event, carrying only a count (never a title).
-    ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
             eq(AuditEventType.MISSION_OBJECTIVE_REORDERED),
@@ -190,7 +190,7 @@ class MissionObjectiveServiceTest {
             any(),
             isNull(),
             details.capture());
-    assertEquals("count=2", details.getValue());
+    assertEquals("count=2", details.getValue().toString());
   }
 
   @Test
@@ -208,7 +208,7 @@ class MissionObjectiveServiceTest {
         missionId, "TOP-SECRET RALLY POINT", MissionObjectiveKind.PRIMARY, 3L);
 
     ArgumentCaptor<String> label = ArgumentCaptor.forClass(String.class);
-    ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
             eq(AuditEventType.MISSION_OBJECTIVE_ADDED),
@@ -217,8 +217,8 @@ class MissionObjectiveServiceTest {
             isNull(),
             details.capture());
     assertEquals(mission.getName(), label.getValue()); // subject label is the mission name snapshot
-    assertTrue(details.getValue().contains("PRIMARY")); // kind is allowed
-    assertTrue(!details.getValue().contains("TOP-SECRET")); // title must not leak
-    assertTrue(!details.getValue().contains("RALLY"));
+    assertTrue(details.getValue().toString().contains("PRIMARY")); // kind is allowed
+    assertTrue(!details.getValue().toString().contains("TOP-SECRET")); // title must not leak
+    assertTrue(!details.getValue().toString().contains("RALLY"));
   }
 }

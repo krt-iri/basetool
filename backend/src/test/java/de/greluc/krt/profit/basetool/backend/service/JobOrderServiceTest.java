@@ -1543,7 +1543,7 @@ class JobOrderServiceTest {
               eq(orderId),
               any(),
               any(),
-              eq("countWithVariants=false"));
+              argThat(d -> d != null && d.toString().equals("countWithVariants=false")));
     }
 
     @Test

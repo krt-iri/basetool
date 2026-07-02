@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupReques
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
@@ -129,7 +130,7 @@ public class KommandoGroupService {
         saved.getId(),
         saved.getName(),
         null,
-        "squadron=" + orgUnitLabel(squadron));
+        AuditDetails.of("squadron", orgUnitLabel(squadron)));
     return kommandoGroupMapper.toDto(saved);
   }
 

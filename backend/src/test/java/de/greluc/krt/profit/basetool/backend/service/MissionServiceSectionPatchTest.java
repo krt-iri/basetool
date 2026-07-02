@@ -415,7 +415,7 @@ class MissionServiceSectionPatchTest {
     assertEquals(4L, result.getCoreVersion(), "other section counters must stay untouched");
     ArgumentCaptor<AuditEventType> typeCaptor = ArgumentCaptor.forClass(AuditEventType.class);
     verify(auditService)
-        .record(typeCaptor.capture(), eq(missionId), any(), isNull(), any(String.class));
+        .record(typeCaptor.capture(), eq(missionId), any(), isNull(), any(CharSequence.class));
     assertEquals(AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED, typeCaptor.getValue());
   }
 
@@ -440,7 +440,7 @@ class MissionServiceSectionPatchTest {
             eq(missionId),
             any(),
             isNull(),
-            any(String.class));
+            any(CharSequence.class));
   }
 
   @Test

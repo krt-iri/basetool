@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -293,18 +294,12 @@ public class MaterialClaimService {
         order.getId(),
         orderLabel(order),
         null,
-        "claim="
-            + saved.getId()
-            + " material="
-            + dto.materialId()
-            + " quality="
-            + dto.qualityRequirement()
-            + " claimingOrgUnit="
-            + dto.claimingOrgUnitId()
-            + " amount="
-            + amount
-            + " mode="
-            + (isNew ? "created" : "updated"));
+        AuditDetails.of("claim", saved.getId())
+            .with("material", dto.materialId())
+            .with("quality", dto.qualityRequirement())
+            .with("claimingOrgUnit", dto.claimingOrgUnitId())
+            .with("amount", amount)
+            .with("mode", isNew ? "created" : "updated"));
     return toClaimDto(saved);
   }
 
@@ -340,14 +335,10 @@ public class MaterialClaimService {
         order.getId(),
         orderLabel(order),
         null,
-        "claim="
-            + claimId
-            + " material="
-            + claimMaterialId
-            + " quality="
-            + claimQuality
-            + " claimingOrgUnit="
-            + claimingOrgUnitId);
+        AuditDetails.of("claim", claimId)
+            .with("material", claimMaterialId)
+            .with("quality", claimQuality)
+            .with("claimingOrgUnit", claimingOrgUnitId));
     log.info(
         "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
         jobOrderId,
